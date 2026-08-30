@@ -88,7 +88,8 @@ export default function Sidebar() {
           </div>
         ))}
       </nav>
-      <div className="rule-t p-[18px]">
+      {/* pb 预留底部固定播放器(68px)的遮挡带，保证积分区与退出按钮可点击 */}
+      <div className="rule-t px-[18px] pt-[18px] pb-[84px]">
         <button className="btn btn-ghost w-full !py-1.5 text-[11px] mb-3" onClick={startOnboarding}>
           新手引导
         </button>

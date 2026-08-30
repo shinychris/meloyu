@@ -86,6 +86,16 @@ export default function WorkDetailView() {
       await adoptCandidate(c.id)
       setCandidates((prev) => prev.map((x) => ({ ...x, adopted: x.id === c.id })))
       toast(`已采用候选 ${c.label} 为当前版本定稿`)
+      // 采用会改变后端 current_version_id，刷新版本树「当前」标记
+      try {
+        if (workId) {
+          const tree = await getVersionTree(workId)
+          setCurrentVersionId(tree.current_version_id)
+          setSelectedVersionId(tree.current_version_id)
+        }
+      } catch {
+        /* 标记刷新失败不阻塞主流程 */
+      }
     } catch {
       /* 40901 重复采用已 toast */
     }

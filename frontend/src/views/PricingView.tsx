@@ -134,7 +134,7 @@ export default function PricingView() {
                   {p.features.map((f) => (
                     <li key={f}>· {f}</li>
                   ))}
-                  {p.monthly_credits != null && (
+                  {p.monthly_credits != null && !p.features.some((f) => f.includes('积分')) && (
                     <li>
                       · 每月 <span className="num">{formatNum(p.monthly_credits)}</span> 积分
                     </li>
