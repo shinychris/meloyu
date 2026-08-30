@@ -14,7 +14,7 @@ type Filter = 'all' | 'draft' | 'fav' | 'trash'
 
 const PAGE_SIZE = 20
 
-/** 作品库：表格 + 筛选 chips + 收藏星标 + 回收站闭环 + 行内试听 */
+/** 作品库：表格 + 筛选 chips + 搜索/排序 + 标签 + 收藏星标 + 回收站闭环 + 行内试听 */
 export default function LibraryView() {
   const navigate = useNavigate()
   const [filter, setFilter] = useState<Filter>('all')
@@ -23,6 +23,11 @@ export default function LibraryView() {
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  /** 搜索（q，≤50 字，400ms 防抖）与排序（sort/order，契约 §1.3/§7.1） */
+  const [qInput, setQInput] = useState('')
+  const [q, setQ] = useState('')
+  const [sort, setSort] = useState<'updated_at' | 'created_at' | 'title'>('updated_at')
+  const [order, setOrder] = useState<'desc' | 'asc'>('desc')
   /** workId → 已成功导出的格式列表（导出徽标由导出任务推导，契约 §14 R1） */
   const [exportMap, setExportMap] = useState<Record<string, string[]>>({})
   const playTrack = usePlayerStore((s) => s.playTrack)
@@ -31,12 +36,20 @@ export default function LibraryView() {
 
   const commercial = user && user.plan !== 'free'
 
+  useEffect(() => {
+    const t = setTimeout(() => setQ(qInput.trim().slice(0, 50)), 400)
+    return () => clearTimeout(t)
+  }, [qInput])
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const res = await listWorks({
         status: filter === 'trash' ? 'trash' : 'active',
         favorite: filter === 'fav' ? true : undefined,
+        q: q || undefined,
+        sort,
+        order,
         page,
         page_size: PAGE_SIZE,
       })
@@ -63,7 +76,7 @@ export default function LibraryView() {
     } finally {
       setLoading(false)
     }
-  }, [filter, page])
+  }, [filter, page, q, sort, order])
 
   useEffect(() => {
     void load()
@@ -71,7 +84,7 @@ export default function LibraryView() {
 
   useEffect(() => {
     setPage(1)
-  }, [filter])
+  }, [filter, q, sort, order])
 
   const shown = filter === 'draft' ? items.filter((w) => (exportMap[w.id] ?? []).length === 0) : items
 
@@ -114,6 +127,24 @@ export default function LibraryView() {
     }
   }
 
+  const onTrash = async (e: React.MouseEvent, w: Work) => {
+    e.stopPropagation()
+    const ok = await confirm({
+      title: `移入回收站「${w.title}」？`,
+      description: '作品将进入回收站并保留 30 天，期间可随时恢复；已生成的版本与音频不受影响。',
+      confirmText: '移入回收站',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await deleteWork(w.id, false)
+      toast(`已将「${w.title}」移入回收站`)
+      void load()
+    } catch {
+      /* 拦截器已 toast */
+    }
+  }
+
   const onPlay = (e: React.MouseEvent, w: Work) => {
     e.stopPropagation()
     if (!w.preview_file_id) {
@@ -144,7 +175,35 @@ export default function LibraryView() {
             {filter === 'trash' ? '回收站' : '全部作品'}
           </h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <input
+            type="text"
+            value={qInput}
+            maxLength={50}
+            placeholder="搜索标题 / 歌词…"
+            onChange={(e) => setQInput(e.target.value)}
+            className="!w-[220px] !text-[12px]"
+            style={{ padding: '6px 10px' }}
+          />
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as 'updated_at' | 'created_at' | 'title')}
+            className="!text-[12px]"
+            title="排序字段"
+          >
+            <option value="updated_at">最近更新</option>
+            <option value="created_at">创建时间</option>
+            <option value="title">标题</option>
+          </select>
+          <select
+            value={order}
+            onChange={(e) => setOrder(e.target.value as 'desc' | 'asc')}
+            className="!text-[12px]"
+            title="排序方向"
+          >
+            <option value="desc">降序</option>
+            <option value="asc">升序</option>
+          </select>
           {(['all', 'draft', 'fav', 'trash'] as Filter[]).map((f) => (
             <span key={f} className={`chip ${filter === f ? 'on' : ''}`} onClick={() => setFilter(f)}>
               {chipLabel[f]}
@@ -217,7 +276,21 @@ export default function LibraryView() {
               <div className="row" key={w.id} onClick={() => navigate(`/works/${w.id}`)}>
                 <span className="text-[11px] num" style={{ color: 'var(--dim)' }}>{w.display_code}</span>
                 <div className="cover" style={{ background: w.cover_color ?? '#232323', border: '1px solid var(--line)' }}></div>
-                <span className="text-[13px] font-semibold truncate">{w.title}</span>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-semibold truncate">{w.title}</div>
+                  {w.tags.length > 0 && (
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      {w.tags.slice(0, 4).map((t) => (
+                        <span key={t} className="text-[10px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>
+                          {t}
+                        </span>
+                      ))}
+                      {w.tags.length > 4 && (
+                        <span className="text-[10px]" style={{ color: 'var(--dim)' }}>+{w.tags.length - 4}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <span className="text-[12px]" style={{ color: 'var(--muted)' }}>{keyLabel(w.key)}</span>
                 <span className="text-[12px] num" style={{ color: 'var(--muted)' }}>{w.bpm}</span>
                 <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{badge}</span>
@@ -237,6 +310,15 @@ export default function LibraryView() {
                   <button className="iconbtn" title="试听" onClick={(e) => onPlay(e, w)}>
                     <svg viewBox="0 0 16 16" fill="currentColor">
                       <path d="M5 3l8 5-8 5z" />
+                    </svg>
+                  </button>
+                  <button
+                    className="iconbtn"
+                    title="移入回收站"
+                    onClick={(e) => void onTrash(e, w)}
+                  >
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
+                      <path d="M2.5 4.5h11M6 4.5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M4 4.5l.6 8a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9l.6-8M6.5 7v4M9.5 7v4" />
                     </svg>
                   </button>
                 </div>

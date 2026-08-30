@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Certificate, Work } from '../types/api'
 import { listWorks, fetchCertificate, downloadCertificate } from '../api/works'
 import { useSessionStore } from '../stores/session'
@@ -18,6 +18,8 @@ export default function RightsView() {
   const [certError, setCertError] = useState<string | null>(null)
   const user = useSessionStore((s) => s.user)
   const [toggles, setToggles] = useState({ disclosure: true, watermark: true, voiceVerify: true })
+  /** version_id → 已签发证书（会话内缓存）：证书端点有落库副作用，仅显式点击时调用一次 */
+  const certCache = useRef<Map<string, Certificate>>(new Map())
 
   useEffect(() => {
     void (async () => {
@@ -33,32 +35,34 @@ export default function RightsView() {
 
   const work = works.find((w) => w.id === workId) ?? null
 
+  // 切换作品仅重置展示，不自动拉取证书（浏览即签发会污染 FR-14 审计数据）
   useEffect(() => {
-    if (!work) {
-      setCert(null)
+    setCert(null)
+    setCertError(null)
+  }, [workId])
+
+  const onViewCert = async () => {
+    if (!work) return
+    const versionId = work.active_version_id
+    const cached = certCache.current.get(versionId)
+    if (cached) {
+      setCert(cached)
       return
     }
-    let alive = true
     setLoading(true)
     setCertError(null)
-    setCert(null)
-    void (async () => {
-      try {
-        const c = await fetchCertificate(work.active_version_id)
-        if (alive) setCert(c)
-      } catch (err) {
-        if (!alive) return
-        setCertError(
-          err instanceof Error && err.message ? err.message : '该版本尚未采用候选，暂无法签发证书',
-        )
-      } finally {
-        if (alive) setLoading(false)
-      }
-    })()
-    return () => {
-      alive = false
+    try {
+      const c = await fetchCertificate(versionId)
+      certCache.current.set(versionId, c)
+      setCert(c)
+    } catch (err) {
+      setCertError(
+        err instanceof Error && err.message ? err.message : '该版本尚未采用候选，暂无法签发证书',
+      )
+    } finally {
+      setLoading(false)
     }
-  }, [work])
+  }
 
   const onDownload = async () => {
     if (!work || !cert) return
@@ -130,6 +134,9 @@ export default function RightsView() {
               <div className="text-[11px] mt-2 leading-relaxed" style={{ color: 'var(--dim)' }}>
                 在作品详情页对候选点「采用定稿」后，即可签发授权证书。
               </div>
+              <button className="btn btn-ghost text-[11px] mt-4" onClick={() => void onViewCert()}>
+                重试
+              </button>
             </div>
           ) : cert ? (
             <div className="card mt-3 p-6">
@@ -176,9 +183,22 @@ export default function RightsView() {
                 </button>
               </div>
             </div>
+          ) : work ? (
+            <div className="card mt-3 p-6">
+              <div className="text-[12px]" style={{ color: 'var(--muted)' }}>
+                点击查看并签发授权证书
+              </div>
+              <div className="text-[11px] mt-2 leading-relaxed" style={{ color: 'var(--dim)' }}>
+                证书按契约 §8.4 实时签发：每次查看都会生成一条新的签发记录与留痕事件，
+                并固化当前版本的 SHA-256 指纹；本次会话内同一版本不会重复签发。
+              </div>
+              <button className="btn btn-acc text-[11px] mt-4" onClick={() => void onViewCert()}>
+                查看证书
+              </button>
+            </div>
           ) : (
             <div className="card mt-3 p-6 text-[12px]" style={{ color: 'var(--dim)' }}>
-              选择作品后展示授权证书
+              暂无在库作品，去创作工作台生成第一首歌后再来签发证书。
             </div>
           )}
 

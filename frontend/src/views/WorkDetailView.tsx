@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { Candidate, VersionTreeNode, Work } from '../types/api'
-import { getWork, getVersionTree } from '../api/works'
+import { getWork, getVersionTree, patchWork } from '../api/works'
 import { adoptCandidate, listCandidates as fetchCandidates } from '../api/generation'
 import { usePlayerStore } from '../stores/player'
 import { toast } from '../stores/toast'
@@ -30,6 +30,11 @@ export default function WorkDetailView() {
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null)
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [loading, setLoading] = useState(true)
+  /** 标题/标签内联编辑（PATCH /works/{id}，契约 §7.3） */
+  const [editing, setEditing] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
+  const [tagsDraft, setTagsDraft] = useState('')
+  const [saving, setSaving] = useState(false)
   const playTrack = usePlayerStore((s) => s.playTrack)
 
   const loadCandidates = useCallback(async (versionId: string) => {
@@ -100,6 +105,45 @@ export default function WorkDetailView() {
     })
   }
 
+  const startEdit = () => {
+    if (!work) return
+    setTitleDraft(work.title)
+    setTagsDraft(work.tags.join(', '))
+    setEditing(true)
+  }
+
+  const saveEdit = async () => {
+    if (!work || !workId) return
+    const title = titleDraft.trim()
+    if (title.length < 1 || title.length > 50) {
+      toast('标题须为 1~50 字', 'warn')
+      return
+    }
+    const tags = tagsDraft
+      .split(/[,，\n]+/)
+      .map((t) => t.trim())
+      .filter(Boolean)
+    if (tags.length > 8) {
+      toast('标签最多 8 个', 'warn')
+      return
+    }
+    if (tags.some((t) => t.length < 1 || t.length > 12)) {
+      toast('每个标签须为 1~12 字', 'warn')
+      return
+    }
+    setSaving(true)
+    try {
+      const updated = await patchWork(workId, { title, tags })
+      setWork((prev) => (prev ? { ...prev, title: updated.title, tags: updated.tags } : prev))
+      setEditing(false)
+      toast('作品信息已更新')
+    } catch {
+      /* 拦截器已 toast（40001 校验失败等） */
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="py-20 text-center text-[12px]" style={{ color: 'var(--dim)' }}>
@@ -119,16 +163,63 @@ export default function WorkDetailView() {
   return (
     <section className="view flex flex-col h-full">
       <header className="px-8 pt-6 pb-4 flex items-end justify-between flex-wrap gap-3">
-        <div>
+        <div className="min-w-0">
           <div className="label">Work / 作品详情 · {work.display_code}</div>
-          <h1 className="text-[28px] font-extrabold tracking-tight mt-1">{work.title}</h1>
-          <div className="flex items-center gap-3 text-[11px] mt-2" style={{ color: 'var(--muted)' }}>
-            <span className="num">{keyLabel(work.key)}</span>
-            <span className="num">{work.bpm} BPM</span>
-            <span className="num">{formatDuration(work.duration_sec)}</span>
-            <span>{work.model}</span>
-            <span>版本 ×{work.version_count}</span>
-          </div>
+          {editing ? (
+            <div className="mt-2 flex flex-col gap-2 max-w-[560px]">
+              <input
+                type="text"
+                value={titleDraft}
+                maxLength={50}
+                placeholder="标题（1~50 字）"
+                onChange={(e) => setTitleDraft(e.target.value)}
+                className="!text-[14px]"
+                autoFocus
+              />
+              <input
+                type="text"
+                value={tagsDraft}
+                placeholder="标签，逗号分隔（最多 8 个，每个 1~12 字）"
+                onChange={(e) => setTagsDraft(e.target.value)}
+                className="!text-[12px]"
+              />
+              <div className="flex gap-2">
+                <button className="btn btn-acc !py-1.5 !px-3 text-[11px]" disabled={saving} onClick={() => void saveEdit()}>
+                  {saving ? '保存中…' : '保存'}
+                </button>
+                <button className="btn btn-ghost !py-1.5 !px-3 text-[11px]" disabled={saving} onClick={() => setEditing(false)}>
+                  取消
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 mt-1">
+                <h1 className="text-[28px] font-extrabold tracking-tight truncate">{work.title}</h1>
+                <button className="iconbtn shrink-0" title="编辑标题与标签" onClick={startEdit}>
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
+                    <path d="M11.3 1.7l3 3L5.5 13.5l-3.7.7.7-3.7zM10 3l3 3" />
+                  </svg>
+                </button>
+              </div>
+              {work.tags.length > 0 && (
+                <div className="flex gap-1 mt-1.5 flex-wrap">
+                  {work.tags.map((t) => (
+                    <span key={t} className="text-[10px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center gap-3 text-[11px] mt-2" style={{ color: 'var(--muted)' }}>
+                <span className="num">{keyLabel(work.key)}</span>
+                <span className="num">{work.bpm} BPM</span>
+                <span className="num">{formatDuration(work.duration_sec)}</span>
+                <span>{work.model}</span>
+                <span>版本 ×{work.version_count}</span>
+              </div>
+            </>
+          )}
         </div>
         <button className="btn btn-ghost !py-1.5 !px-3 text-[11px]" onClick={() => navigate('/library')}>
           ← 返回作品库
