@@ -107,16 +107,26 @@ def _register(db: Session, work: Work, version: Version, *, kind: str, relpath: 
               mime: str, path: Path, duration_sec: float | None, name: str,
               stem_name: str | None = None) -> File:
     import hashlib
+    from sqlalchemy import select
     h = hashlib.sha256()
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
+    digest = h.hexdigest()
+    # 同路径已有登记且内容一致（导出对 version+candidate+format 确定）→ 复用，避免 UNIQUE(path) 冲突
+    existing = db.execute(select(File).where(File.path == relpath)).scalars().first()
+    if existing is not None:
+        if existing.sha256 == digest:
+            return existing
+        # 内容不一致（理论上仅换候选后发生，路径已含候选标签则不会走到这里）：换唯一路径兜底
+        suffix = utc_now_iso().replace("-", "").replace(":", "").replace("T", "").replace("Z", "")
+        relpath = f"{relpath.rsplit('/', 1)[0]}/{path.stem}_{suffix}{path.suffix}"
     now = utc_now_iso()
     f = File(work_id=work.id, version_id=version.id, candidate_id=None, kind=kind,
              stem_name=stem_name, name=name, path=relpath, mime=mime,
              bytes=path.stat().st_size, duration_sec=duration_sec,
              sample_rate=48000 if path.suffix == ".wav" else None,
-             sha256=h.hexdigest(), created_at=now, updated_at=now)
+             sha256=digest, created_at=now, updated_at=now)
     db.add(f)
     db.flush()
     return f
@@ -124,9 +134,10 @@ def _register(db: Session, work: Work, version: Version, *, kind: str, relpath: 
 
 def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate,
                       fmt: str) -> list[dict]:
-    exports_dir = _abs(f"{work.id}/{version.id}/exports")
+    # 路径含候选标签：换候选重导出不会撞路径；同候选重导出由 _register 复用记录
+    base = f"{work.id}/{version.id}/exports/{cand.label}"
+    exports_dir = _abs(base)
     exports_dir.mkdir(parents=True, exist_ok=True)
-    base = f"{work.id}/{version.id}/exports"
     out: list[dict] = []
 
     if fmt == "mp3":
