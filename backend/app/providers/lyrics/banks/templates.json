@@ -1,0 +1,65 @@
+{
+  "zh": {
+    "verse": [
+      "{a}还留在{p}",
+      "{v}了{a}的{b}",
+      "{a}把{b}数了又数",
+      "谁在{p}轻轻{v}",
+      "{a}穿过{b}和{p}",
+      "把{a}写进{b}里",
+      "{a}落满{p}",
+      "{v}的时候{a}很轻"
+    ],
+    "pre_chorus": [
+      "{a}越来越{b2}",
+      "就快要看不清{a}",
+      "{v}之前说好的",
+      "风把{a}吹得{b2}"
+    ],
+    "chorus": [
+      "{A}{v}成{e}",
+      "让{a}都{v}吧 {e}",
+      "我们在{p}等待{e}",
+      "{A}换一次{e}",
+      "别怕{a}来得{b2}",
+      "把{a}唱成{e}"
+    ],
+    "bridge": [
+      "如果{a}能{v}",
+      "就让{b2}的都{b2}",
+      "{a}之外还有{a}",
+      "再一次{v}那{a}"
+    ],
+    "outro": [
+      "{a}停了",
+      "{v}吧 {e}",
+      "剩下的交给{e}"
+    ]
+  },
+  "en": {
+    "verse": [
+      "{a} still {v} in the {b}",
+      "{v} through the {a} and {b}",
+      "counting {a} like {b}",
+      "someone {v} at the {b}"
+    ],
+    "pre_chorus": [
+      "holding on to {a}",
+      "almost out of {b}"
+    ],
+    "chorus": [
+      "we run into the {E}",
+      "let it {v} into {E}",
+      "waiting for the {E}",
+      "turn the {a} into {E}"
+    ],
+    "bridge": [
+      "if the {a} could {v}",
+      "beyond the {a} and {b}"
+    ],
+    "outro": [
+      "the {a} fades",
+      "leave it to the {E}"
+    ]
+  }
+}

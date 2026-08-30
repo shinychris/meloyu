@@ -64,7 +64,7 @@ export default function LoginView() {
   const fillDemo = () => {
     setTab('login')
     setEmail('demo@meloyu.local')
-    setPassword('Demo123456!')
+    setPassword('Meloyu2026')
     setError(null)
   }
 
@@ -147,7 +147,7 @@ export default function LoginView() {
           </form>
 
           <div className="mt-5 pt-4 rule-t text-[11px] leading-relaxed" style={{ color: 'var(--dim)' }}>
-            演示账号：<span className="num" style={{ color: 'var(--muted)' }}>demo@meloyu.local / Demo123456!</span>
+            演示账号：<span className="num" style={{ color: 'var(--muted)' }}>demo@meloyu.local / Meloyu2026</span>
             <button className="text-[11px] font-bold ml-2" style={{ color: 'var(--acc)' }} type="button" onClick={fillDemo}>
               一键填入
             </button>

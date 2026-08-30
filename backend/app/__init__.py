@@ -1,0 +1,1 @@
+"""Meloyu backend application package."""
