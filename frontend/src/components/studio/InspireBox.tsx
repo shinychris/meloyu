@@ -1,0 +1,73 @@
+import { useMetaStore } from '../../stores/meta'
+import { useStudioStore } from '../../stores/studio'
+import { toast } from '../../stores/toast'
+
+const GROUPS: Array<{ key: 'scene' | 'mood' | 'genre' | 'inst'; label: string; source: 'scenes' | 'moods' | 'genres' | 'instruments' }> = [
+  { key: 'scene', label: '场景', source: 'scenes' },
+  { key: 'mood', label: '情绪', source: 'moods' },
+  { key: 'genre', label: '风格', source: 'genres' },
+  { key: 'inst', label: '主奏乐器', source: 'instruments' },
+]
+
+/** 灵感指引卡：点选组合自动组装风格描述（数据来自 /system/meta inspiration） */
+export default function InspireBox() {
+  const inspiration = useMetaStore((s) => s.meta.inspiration)
+  const inspire = useStudioStore((s) => s.inspire)
+  const { setInspire, applyInspireToPrompt, markStep, logOp } = useStudioStore()
+
+  const pick = (group: (typeof GROUPS)[number], value: string) => {
+    const next = { ...inspire, [group.key]: inspire[group.key] === value ? '' : value }
+    setInspire({ [group.key]: next[group.key] })
+    if (next[group.key]) {
+      applyInspireToPrompt(next)
+      markStep(1)
+    }
+  }
+
+  const random = () => {
+    const next = { scene: '', mood: '', genre: '', inst: '' }
+    for (const g of GROUPS) {
+      const list = inspiration[g.source]
+      if (list.length > 0) next[g.key] = list[Math.floor(Math.random() * list.length)]
+    }
+    useStudioStore.setState({ inspire: next })
+    applyInspireToPrompt(next)
+    markStep(1)
+    logOp(`灵感指引：${[next.genre, next.mood, next.inst, next.scene].filter(Boolean).join(' / ')}`)
+    toast('已随机生成一组灵感组合')
+  }
+
+  return (
+    <div className="card mt-4 p-3.5" id="inspireBox">
+      <div className="flex items-center justify-between">
+        <div className="label" style={{ color: 'var(--acc)' }}>
+          灵感指引
+        </div>
+        <button className="text-[10px] font-bold" style={{ color: 'var(--acc)' }} onClick={random}>
+          随机一组 ↻
+        </button>
+      </div>
+      <div className="text-[10px] mt-1.5 mb-2" style={{ color: 'var(--dim)' }}>
+        点选组合，自动填入风格描述
+      </div>
+      {GROUPS.map((g) => (
+        <div key={g.key}>
+          <div className={`text-[10px] ${g.key === 'scene' ? '' : 'mt-2.5'} mb-1`} style={{ color: 'var(--dim)' }}>
+            {g.label}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {inspiration[g.source].map((item) => (
+              <span
+                key={item}
+                className={`chip ${inspire[g.key] === item ? 'on' : ''}`}
+                onClick={() => pick(g, item)}
+              >
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}

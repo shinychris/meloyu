@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+/* ============ Meloyu · 设计令牌（与原型 styles.css 逐项一致） ============ */
+:root {
+  --bg: #0e0e0e; --bg2: #191919; --bg3: #222222; --bg4: #2a2a2a;
+  --line: #2c2c2c; --line2: #383838;
+  --txt: #ffffff; --muted: #9a9a9a; --dim: #5c5c5c;
+  --acc: #00ff2c; --acc-dim: rgba(0, 255, 44, .14); --acc-glow: rgba(0, 255, 44, .35);
+  --warn: #ffb02c; --bad: #ff4d4d;
+  --trk-vox: #ff5c8a; --trk-drm: #ffb02c; --trk-bas: #b07cff; --trk-key: #4da6ff; --trk-str: #4dd0a6; --trk-fx: #8a8a8a;
+}
+* { box-sizing: border-box }
+html, body, #root { height: 100% }
+body {
+  background: var(--bg); color: var(--txt);
+  font-family: 'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased; margin: 0; font-size: 13px;
+}
+.num { font-variant-numeric: tabular-nums }
+.label { font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--dim); font-weight: 700 }
+.rule-t { border-top: 1px solid var(--line) }
+
+/* ---------- chips / buttons ---------- */
+.chip { border: 1px solid var(--line); padding: 4px 10px; font-size: 11px; color: var(--muted); cursor: pointer; transition: all .15s ease; user-select: none; white-space: nowrap; background: transparent }
+.chip:hover { border-color: var(--txt); color: var(--txt) }
+.chip.on { background: var(--acc); border-color: var(--acc); color: #000; font-weight: 700 }
+.chip.acc-on { border-color: var(--acc); color: var(--acc) }
+.chip[disabled], .chip.disabled { opacity: .35; pointer-events: none }
+.btn { border: 1px solid var(--line); background: transparent; color: var(--txt); font-size: 12px; font-weight: 600; padding: 9px 16px; cursor: pointer; transition: all .15s ease; position: relative; overflow: hidden }
+.btn:hover { border-color: var(--txt) }
+.btn-acc { background: var(--acc); border-color: var(--acc); color: #000 }
+.btn-acc:hover { background: #4dff6e; border-color: #4dff6e }
+.btn-ghost:hover { background: var(--txt); color: #000 }
+.btn[disabled] { opacity: .4; pointer-events: none }
+.iconbtn { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); background: transparent; color: var(--txt); cursor: pointer; transition: all .15s ease; flex: none }
+.iconbtn:hover { background: var(--txt); color: #000 }
+.iconbtn.on { background: var(--acc); border-color: var(--acc); color: #000 }
+.iconbtn svg { width: 14px; height: 14px }
+
+/* ---------- nav ---------- */
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 18px; font-size: 13px; color: var(--muted); cursor: pointer; border-left: 2px solid transparent; transition: all .15s ease }
+.nav-item:hover { color: var(--txt); background: var(--bg2) }
+.nav-item.on { color: var(--txt); border-left-color: var(--acc); background: var(--bg2) }
+.nav-item.on .dot { background: var(--acc) }
+.nav-item .kbd { margin-left: auto; font-size: 9px; color: var(--dim); border: 1px solid var(--line); padding: 1px 4px }
+.dot { width: 5px; height: 5px; background: var(--dim); flex: none }
+.view { animation: fadein .25s ease }
+@keyframes fadein { from { opacity: 0; transform: translateY(5px) } to { opacity: 1; transform: none } }
+@keyframes pop { from { opacity: 0; transform: scale(.985) translateY(8px) } to { opacity: 1; transform: none } }
+.pop { animation: pop .3s ease both }
+@keyframes pulse-dot { 0%, 100% { opacity: 1 } 50% { opacity: .25 } }
+.gen-dot { animation: pulse-dot 1s infinite }
+@keyframes slidein { from { opacity: 0; transform: translateX(16px) } to { opacity: 1; transform: none } }
+.slidein { animation: slidein .25s ease both }
+
+/* ---------- forms ---------- */
+textarea, input[type=text], input[type=email], input[type=password], select {
+  background: var(--bg); border: 1px solid var(--line); color: var(--txt);
+  font-size: 13px; padding: 10px 12px; width: 100%; outline: none;
+  transition: border-color .15s; font-family: inherit;
+}
+textarea:focus, input:focus, select:focus { border-color: var(--muted) }
+textarea { resize: vertical; line-height: 1.8 }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 2px; background: var(--line); outline: none; cursor: pointer }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: var(--acc); cursor: pointer }
+input[type=range]::-moz-range-thumb { width: 12px; height: 12px; background: var(--acc); border: none; border-radius: 0; cursor: pointer }
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6'%3E%3Cpath d='M0 0l4 6 4-6z' fill='%239a9a9a'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; padding-right: 26px;
+}
+.card { background: var(--bg2); border: 1px solid var(--line) }
+
+/* ---------- studio steps guide ---------- */
+.stepbar { display: flex; align-items: center; gap: 0 }
+.step { display: flex; align-items: center; gap: 8px; padding: 7px 14px; border: 1px solid var(--line); font-size: 11px; color: var(--dim); cursor: pointer; transition: all .15s; background: var(--bg) }
+.step b { font-weight: 800; font-size: 12px }
+.step:hover { border-color: var(--muted); color: var(--muted) }
+.step.on { border-color: var(--acc); color: var(--txt) }
+.step.on b { color: var(--acc) }
+.step.done { border-color: var(--line2); color: var(--muted) }
+.step-arrow { width: 18px; height: 1px; background: var(--line2); flex: none }
+
+/* ---------- candidates ---------- */
+.segmini { height: 26px; border: 1px solid var(--line2); font-size: 9px; display: flex; align-items: center; justify-content: center; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; flex: none }
+
+/* ---------- toast / overlay ---------- */
+.toast-stack { position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none }
+.toast-item { background: var(--txt); color: #000; font-size: 12px; font-weight: 600; padding: 10px 18px; animation: toastup .25s ease both; max-width: 70vw; text-align: center }
+.toast-item.warn { background: var(--warn) }
+.toast-item.bad { background: var(--bad); color: #fff }
+@keyframes toastup { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
+.ob-mask { position: fixed; inset: 0; background: rgba(0, 0, 0, .72); z-index: 90 }
+.ob-spot { position: fixed; z-index: 91; box-shadow: 0 0 0 2px var(--acc), 0 0 0 4000px rgba(0, 0, 0, .72); transition: all .35s ease; pointer-events: none; display: none }
+.ob-tip { position: fixed; z-index: 92; width: 300px; background: var(--bg2); border: 1px solid var(--acc); padding: 16px; display: none }
+.ob-tip.on { display: block; animation: pop .25s ease }
+
+/* ---------- scrollbars ---------- */
+::-webkit-scrollbar { width: 8px; height: 8px }
+::-webkit-scrollbar-thumb { background: var(--bg3) }
+::-webkit-scrollbar-track { background: transparent }
+
+/* ---------- misc ---------- */
+.toggle { width: 38px; height: 20px; background: var(--bg3); position: relative; cursor: pointer; flex: none; transition: background .2s; border: none; padding: 0 }
+.toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; background: var(--muted); transition: all .2s }
+.toggle.on { background: var(--acc) }
+.toggle.on::after { left: 21px; background: #000 }
+.price-num { font-size: 44px; font-weight: 800; letter-spacing: -.03em; line-height: 1 }
+.row { display: grid; grid-template-columns: 72px 52px 1fr 84px 56px 118px 104px 76px; gap: 12px; align-items: center; padding: 12px 18px; border-top: 1px solid var(--line); transition: background .12s; cursor: pointer }
+.row:hover { background: var(--bg2) }
+.cover { width: 40px; height: 40px; flex: none }
+.vnode { display: flex; align-items: center; gap: 8px; padding: 7px 0; font-size: 12px; color: var(--muted); cursor: pointer }
+.vnode:hover { color: var(--txt) }
+.vnode.cur { color: var(--txt) }
+.vnode.cur .dot { background: var(--acc); box-shadow: 0 0 0 4px var(--acc-dim) }
+.vtree { border-left: 1px solid var(--line); margin-left: 2px; padding-left: 14px }
+.marquee { overflow: hidden; white-space: nowrap }
+.marquee span { display: inline-block }
+.playing .marquee span { animation: mq 8s linear infinite }
+@keyframes mq { from { transform: translateX(0) } to { transform: translateX(-50%) } }
+.kbd-hint { font-size: 9px; color: var(--dim); border: 1px solid var(--line); padding: 1px 5px }
+
+/* ---------- 登录页（原型未含，同风格扩展） ---------- */
+.login-bg { background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0, 255, 44, .06), transparent 60%), var(--bg) }
+.auth-input { background: var(--bg2) }
+.star-btn { background: transparent; border: none; cursor: pointer; padding: 2px; display: inline-flex; color: var(--dim); transition: color .15s }
+.star-btn:hover { color: var(--txt) }
+.star-btn.on { color: var(--acc) }
+.star-btn svg { width: 16px; height: 16px }
+.pager { display: flex; align-items: center; gap: 6px; justify-content: flex-end; padding: 14px 18px }
+.pager .pnum-btn { min-width: 26px; height: 26px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0 6px }
+.pager .pnum-btn:hover:not([disabled]) { border-color: var(--txt); color: var(--txt) }
+.pager .pnum-btn.on { background: var(--acc); border-color: var(--acc); color: #000; font-weight: 700 }
+.pager .pnum-btn[disabled] { opacity: .35; cursor: default }
