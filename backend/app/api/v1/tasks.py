@@ -21,7 +21,7 @@ def list_tasks(type: str | None = Query(default=None),
                status: str | None = Query(default=None),
                work_id: str | None = Query(default=None),
                page: int = Query(default=1, ge=1),
-               page_size: int = Query(default=20, ge=1, le=100),
+               page_size: int = Query(default=20, ge=1),
                user: User = Depends(get_current_user),
                db: Session = Depends(get_db)):
     if type is not None and type not in TASK_TYPES:

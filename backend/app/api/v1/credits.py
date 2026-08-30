@@ -23,7 +23,7 @@ def balance(user: User = Depends(get_current_user), db: Session = Depends(get_db
 
 @router.get("/transactions")
 def transactions(page: int = Query(default=1, ge=1),
-                 page_size: int = Query(default=20, ge=1, le=100),
+                 page_size: int = Query(default=20, ge=1),
                  user: User = Depends(get_current_user),
                  db: Session = Depends(get_db)):
     return ok(credits_svc.list_transactions(db, user.id, page, min(page_size, 100)))

@@ -243,15 +243,18 @@ def execute_generation(task_id: str) -> None:
         with SessionLocal() as db:
             _finish_task(db, task_id, "canceled", None, None)
             _refund(db, task_id)
+            db.commit()
     except TimeoutError as e:
         with SessionLocal() as db:
             _finish_task(db, task_id, "failed", 50002, f"生成失败：渲染超时 {e}")
             _refund(db, task_id)
+            db.commit()
     except Exception as e:  # noqa: BLE001 —— 任务级兜底，退款 + 50002
         logger.exception(f"generation {task_id} failed: {e}")
         with SessionLocal() as db:
             _finish_task(db, task_id, "failed", 50002, f"生成失败：{type(e).__name__} {e}")
             _refund(db, task_id)
+            db.commit()
 
 
 def _write_progress(task_id: str, stage_key: str, pct: int, label: str) -> None:
@@ -356,7 +359,7 @@ def _finish_task(db: Session, task_id: str, status: str, error_code: int | None,
     t.error_message = error_message
     t.finished_at = utc_now_iso()
     t.updated_at = utc_now_iso()
-    db.commit()
+    db.flush()  # 不单独 commit：终态与退款由调用方在同一事务内一次提交
 
 
 def _refund(db: Session, task_id: str) -> None:
@@ -368,7 +371,6 @@ def _refund(db: Session, task_id: str) -> None:
         return
     from app.services.credits import refund
     refund(db, user.id, t.cost_credits, t.id)
-    db.commit()
 
 
 # ---------- 查询 / 取消 ----------
@@ -409,8 +411,8 @@ def cancel_task(db: Session, user: User, task_id: str) -> dict:
         task.status = "canceled"
         task.finished_at = utc_now_iso()
         task.updated_at = utc_now_iso()
-        db.commit()
         _refund(db, task.id)
+        db.commit()  # 终态与退款同事务提交
         db.refresh(task)
         return task_to_dict(task)
     # running：置取消标志，渲染循环在阶段边界到达

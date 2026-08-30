@@ -38,12 +38,14 @@ def _safe_run(fn, task_id: str) -> None:
 
 
 def recover_zombie_tasks() -> int:
-    """启动自愈：进程重启后，把 running/queued 僵尸任务置 failed(50003) 并退款。"""
+    """启动自愈：① running/queued 僵尸任务置 failed(50003) 并退款（终态与退款同事务）；
+    ② 兜底扫描历史「已终态、已扣积分、无退款流水」的任务补退款（幂等，覆盖旧版本崩溃窗口遗留）。"""
+    from app.models import CreditTransaction
+    from app.services.credits import refund
+
     recovered = 0
     with SessionLocal() as db:
         rows = db.execute(select(Task).where(Task.status.in_(("queued", "running")))).scalars().all()
-        if not rows:
-            return 0
         now = utc_now_iso()
         for t in rows:
             t.status = "failed"
@@ -52,12 +54,24 @@ def recover_zombie_tasks() -> int:
             t.finished_at = now
             t.updated_at = now
             recovered += 1
-        db.commit()
-        for t in rows:
             if t.cost_credits > 0:
-                from app.services.credits import refund
+                refund(db, t.user_id, t.cost_credits, t.id)
+        db.commit()
+
+        compensated = 0
+        terminal = db.execute(select(Task).where(Task.status.in_(("failed", "canceled")),
+                                                 Task.cost_credits > 0)).scalars().all()
+        for t in terminal:
+            exists = db.execute(
+                select(CreditTransaction.id).where(CreditTransaction.ref_task_id == t.id,
+                                                   CreditTransaction.reason == "refund")
+            ).fetchone()
+            if not exists:
                 refund(db, t.user_id, t.cost_credits, t.id)
                 db.commit()
+                compensated += 1
+        if compensated:
+            logger.warning(f"compensated {compensated} terminal tasks missing refund")
     if recovered:
         logger.info(f"recovered {recovered} zombie tasks (refunded)")
     return recovered

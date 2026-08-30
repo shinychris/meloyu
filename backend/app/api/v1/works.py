@@ -23,7 +23,7 @@ def list_works(q: str | None = Query(default=None, max_length=50),
                sort: str = Query(default="updated_at"),
                order: str = Query(default="desc"),
                page: int = Query(default=1, ge=1),
-               page_size: int = Query(default=20, ge=1, le=100),
+               page_size: int = Query(default=20, ge=1),
                user: User = Depends(get_current_user),
                db: Session = Depends(get_db)):
     if status not in ("active", "trash", "all"):
@@ -64,6 +64,6 @@ def restore_work(work_id: str, user: User = Depends(get_current_user),
 
 @router.get("/{work_id}/events")
 def list_events(work_id: str, page: int = Query(default=1, ge=1),
-                page_size: int = Query(default=20, ge=1, le=100),
+                page_size: int = Query(default=20, ge=1),
                 user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return ok(works_svc.list_events(db, work_id, user, page, min(page_size, 100)))
