@@ -189,8 +189,9 @@ class VariantRequest(BaseModel):
 
 
 class RegenSectionRequest(BaseModel):
-    """契约 §5.7：仅重生成指定段落（section 枚举，须存在于候选 structure）。"""
+    """契约 v1.2 §5.7：仅重生成指定段落的第 occurrence 次出现（1 起始，默认 1）。"""
     section: str
+    occurrence: int = Field(default=1, ge=1)
 
     @field_validator("section")
     @classmethod

@@ -7,8 +7,8 @@
   与原音频等功率交叉淡化拼接（≥50ms，无爆音）。
 - variant：段落划分/时长逐段复用原候选（重建结构并校验一致），和声/旋律/编曲
   以新 style_prompt（换和弦库/鼓型/配器）整曲重渲染。
-- regen-section：整曲重渲染后，非选区时间范围逐样本复制回原候选采样（字节级不变）；
-  边界融合窗只落在选区内部，保证非选区 sha256 与原候选一致（FR-6）。
+- regen-section：整曲重渲染后，非目标段时间范围逐样本复制回原候选采样（字节级不变，
+  同名其他出现同属非目标段）；边界融合窗只落在目标段内部，保证非目标段 sha256 不变（FR-6）。
 """
 from __future__ import annotations
 
@@ -144,15 +144,26 @@ def build_variant_ir(req_variant: SongRequest, base_ir: SongIR,
     return ir
 
 
-def regenerate_sections(base_ir: SongIR, section: str,
-                        rng: np.random.Generator) -> SongIR:
-    """复制 base_ir，仅重生成指定 section 类型段落的和声/旋律/节奏。
+def section_occurrence_index(structure: list[dict], section: str,
+                             occurrence: int) -> int | None:
+    """section 第 occurrence 次出现（1 起始）在 structure 中的下标；越界返回 None。"""
+    idxs = [i for i, seg in enumerate(structure or [])
+            if str(seg.get("section")) == section]
+    if 1 <= occurrence <= len(idxs):
+        return idxs[occurrence - 1]
+    return None
 
-    其余段落的音符事件对象原样保留（MIDI 导出时逐事件一致）。
+
+def regenerate_sections(base_ir: SongIR, section: str, occurrence: int,
+                        rng: np.random.Generator) -> SongIR:
+    """复制 base_ir，仅重生成 section 第 occurrence 次出现的那个段落。
+
+    其余段落（含同名其他出现）的音符事件对象原样保留（MIDI 导出时逐事件一致）。
     """
-    selected = [sp for sp in base_ir.sections if sp.section == section]
-    if not selected:
-        raise ValueError(f"结构中不存在段落：{section}")
+    matches = [sp for sp in base_ir.sections if sp.section == section]
+    if not 1 <= occurrence <= len(matches):
+        raise ValueError(f"occurrence 越界：段落 {section} 共出现 {len(matches)} 次")
+    selected = [matches[occurrence - 1]]
     ir = SongIR(req=base_ir.req, seed=base_ir.seed)
     ir.style_family = base_ir.style_family
     ir.inferred_structure = base_ir.inferred_structure
@@ -242,18 +253,19 @@ def structure_sample_ranges(structure: list[dict], n_samples: int) -> list[tuple
 
 
 def splice_regen(rendered: np.ndarray, orig: np.ndarray, structure: list[dict],
-                 section: str) -> np.ndarray:
-    """regen-section 波形装配：非选区逐样本复制原候选，选区保留重渲染内容。
+                 target_index: int) -> np.ndarray:
+    """regen-section 波形装配：非目标段逐样本复制原候选，目标段保留重渲染内容。
 
-    边界融合窗（BLEND_SEC）只落在选区内部：窗内由原内容淡入/淡出到重渲染内容，
-    至边界点精确等于原样本 → 非选区字节级不变且拼接处连续无爆音。
+    边界融合窗（BLEND_SEC）只落在目标段内部：窗内由原内容淡入/淡出到重渲染内容，
+    至边界点精确等于原样本 → 非目标段字节级不变且拼接处连续无爆音。
+    target_index 为 structure 下标（由 section + occurrence 解析，同名其他出现不选中）。
     """
     if len(rendered) != len(orig):
         raise ValueError(f"长度不一致：渲染 {len(rendered)} vs 原始 {len(orig)}")
     n = len(orig)
     out = np.array(rendered, dtype=np.float64, copy=True)
     ranges = structure_sample_ranges(structure, n)
-    selected = [str(seg.get("section")) == section for seg in (structure or [])]
+    selected = [i == target_index for i in range(len(ranges))]
     blend = int(BLEND_SEC * SAMPLE_RATE)
 
     for i, (a, b) in enumerate(ranges):

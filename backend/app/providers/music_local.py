@@ -312,16 +312,21 @@ class LocalSynthProvider:
     def _derive_regen(self, request: SongRequest, spec: dict, base_req: SongRequest,
                       base_dir: str, dest: Path, progress: ProgressCallback,
                       should_cancel: CancelCheck) -> tuple[CandidateArtifact, bool]:
-        """段落重生成：整曲重渲染（选区内容换新）→ 非选区逐样本复制回原候选。"""
+        """段落重生成：整曲重渲染（仅目标出现的段落换新）→ 其余段逐样本复制回原候选。"""
         _stage(progress, should_cancel, "structure", 10)
         base_ir = editing_mod.rebuild_ir(base_req, base_req.seed)
         structure = spec.get("base_structure") or []
         if not editing_mod.structure_matches(base_ir, structure):
             raise ValueError("源候选结构重建与存库不一致，无法重生成段落")
+        occurrence = int(spec.get("occurrence", 1))
+        target_index = editing_mod.section_occurrence_index(structure, spec["section"],
+                                                            occurrence)
+        if target_index is None:
+            raise ValueError(f"occurrence 越界：段落 {spec['section']}")
 
         _stage(progress, should_cancel, "harmony", 25)
         rng = editing_mod.make_rng(request.seed)
-        ir = editing_mod.regenerate_sections(base_ir, spec["section"], rng)
+        ir = editing_mod.regenerate_sections(base_ir, spec["section"], occurrence, rng)
 
         _stage(progress, should_cancel, "melody", 40)
         _stage(progress, should_cancel, "arrange", 55)
@@ -337,11 +342,11 @@ class LocalSynthProvider:
         if len(result.master_l) != n:
             raise ValueError(f"重渲染长度不一致：{len(result.master_l)} vs {n}")
         new_l = editing_mod.splice_regen(result.master_l, orig_master[0], structure,
-                                         spec["section"])
+                                         target_index)
         new_r = editing_mod.splice_regen(result.master_r, orig_master[1], structure,
-                                         spec["section"])
+                                         target_index)
         new_stems = {s: editing_mod.splice_regen(result.stems[s], orig_stems[s],
-                                                 structure, spec["section"])
+                                                 structure, target_index)
                      for s in STEM_NAMES}
         total_sec = n / SAMPLE_RATE
         files = _write_candidate_files(dest, "A", new_l, new_r, new_stems, total_sec, ir)

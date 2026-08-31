@@ -67,6 +67,7 @@ def variant(candidate_id: str, body: VariantRequest,
 @router.post("/{candidate_id}/regen-section", status_code=201)
 def regen_section(candidate_id: str, body: RegenSectionRequest,
                   user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """仅重生成指定段落：非选区段音频逐字节不变（sha256 校验），建子版本。"""
-    return ok(edit_svc.submit_regen_section(db, user, candidate_id, body.section),
-              status_code=201)
+    """仅重生成指定段落的第 occurrence 次出现（1 起始，默认 1）：
+    其余段（含同名其他出现）音频逐字节不变（sha256 校验），建子版本。"""
+    return ok(edit_svc.submit_regen_section(db, user, candidate_id, body.section,
+                                            body.occurrence), status_code=201)

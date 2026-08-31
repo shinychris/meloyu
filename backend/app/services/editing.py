@@ -64,7 +64,7 @@ def _base_params(version: Version, cand: Candidate) -> dict:
 
 def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
                    seconds: int | None = None, style_prompt: str | None = None,
-                   section: str | None = None) -> dict:
+                   section: str | None = None, occurrence: int = 1) -> dict:
     """提交派生生成：建子版本 + 任务 + 扣积分，返回 POST /generations 同构响应。"""
     if op not in DERIVED_OPS:
         raise err_validation(f"未知派生操作：{op}")
@@ -93,7 +93,13 @@ def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
         if section not in seg_sections:
             raise err_validation(
                 f"候选结构中不存在该段落：{section}（可用：{sorted(seg_sections)}）")
-        extra = section or ""
+        n_occ = sum(1 for seg in (cand.structure or [])
+                    if str(seg.get("section")) == section)
+        if not 1 <= occurrence <= n_occ:
+            raise err_validation(
+                f"occurrence 越界：段落 {section} 共出现 {n_occ} 次，合法范围 1~{n_occ}",
+                details=[{"field": "occurrence", "message": f"1~{n_occ}"}])
+        extra = f"{section}:{occurrence}"
 
     gen_svc.check_free_daily_limit(db, user)  # 派生同样计入免费档每日生成限额
 
@@ -124,6 +130,7 @@ def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
         derived_spec["style_prompt"] = style_prompt or ""
     elif op == "regen_section":
         derived_spec["section"] = section or ""
+        derived_spec["occurrence"] = int(occurrence)
 
     cost = EDIT_OPERATION_CREDIT_COST.get(op, 6)
     task = Task(user_id=user.id, type="generation", status="queued", progress=0,
@@ -165,5 +172,7 @@ def submit_variant(db: Session, user: User, candidate_id: str, style_prompt: str
     return submit_derived(db, user, candidate_id, "variant", style_prompt=style_prompt)
 
 
-def submit_regen_section(db: Session, user: User, candidate_id: str, section: str) -> dict:
-    return submit_derived(db, user, candidate_id, "regen_section", section=section)
+def submit_regen_section(db: Session, user: User, candidate_id: str, section: str,
+                         occurrence: int = 1) -> dict:
+    return submit_derived(db, user, candidate_id, "regen_section", section=section,
+                          occurrence=occurrence)

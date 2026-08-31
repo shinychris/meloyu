@@ -182,7 +182,7 @@ def main() -> int:
     gen_body = {
         "mode": "custom",
         "style_prompt": "华语流行抒情，钢琴主导，雨夜氛围",
-        "lyrics": "[Verse]\n雨停在凌晨三点的窗台\n霓虹把影子拉得好白\n[Chorus]\n我们把未来说得太轻\n像风穿过无人的街心",
+        "lyrics": "[Verse]\n雨停在凌晨三点的窗台\n霓虹把影子拉得好白\n[Chorus]\n我们把未来说得太轻\n像风穿过无人的街心\n[Verse]\n第二段主歌继续往下写\n写到下一个副歌之前\n[Chorus]\n副歌第二次出现的位置\n用于验证 occurrence 参数",
         "negative_prompt": "不要电音人声",
         "model": "v1_pro",
         "seed": 20260831,
@@ -415,26 +415,48 @@ def main() -> int:
           and regen_version["active_candidate_id"] == regen_cand["id"],
           json.dumps(regen_version)[:200])
 
-    # FR-6 验收：非选区段 sha256 不变、选区段变化（按 structure 秒边界切片比对）
+    # FR-6 验收：非目标段 sha256 不变、目标段变化（按 structure 秒边界切片比对）
+    chorus_idx = [i for i, s in enumerate(orig_structure) if s["section"] == "chorus"]
+
+    def compare_segments(new_bytes: bytes, target_index: int) -> tuple[bool, bool, str]:
+        keep_ok, changed_ok, detail = True, False, ""
+        for i, seg in enumerate(orig_structure):
+            s1 = wav_segment_sha(orig_master_bytes, seg["start_sec"], seg["end_sec"])
+            s2 = wav_segment_sha(new_bytes, seg["start_sec"], seg["end_sec"])
+            if s1 is None or s2 is None:
+                return False, False, "wav 解析失败"
+            if i == target_index:
+                changed_ok = changed_ok or (s1 != s2)
+            elif s1 != s2:
+                keep_ok = False
+                detail = f"第{i}段({seg['section']}) sha 不一致"
+        return keep_ok, changed_ok, detail
+
     regen_master_bytes = client.get(
         f"{API}/files/{master_file_id(regen_cand['id'])}/download",
         headers=auth_headers(token)).content
-    keep_ok, changed_ok, seg_detail = True, False, ""
-    for seg in orig_structure:
-        s1 = wav_segment_sha(orig_master_bytes, seg["start_sec"], seg["end_sec"])
-        s2 = wav_segment_sha(regen_master_bytes, seg["start_sec"], seg["end_sec"])
-        if s1 is None or s2 is None:
-            keep_ok = changed_ok = False
-            seg_detail = "wav 解析失败"
-            break
-        if seg["section"] == "chorus":
-            changed_ok = changed_ok or (s1 != s2)
-        else:
-            if s1 != s2:
-                keep_ok = False
-                seg_detail = f"{seg['section']} 段 sha 不一致"
-    check("5.7 FR-6：非选区段 sha256 逐段不变", keep_ok, seg_detail)
-    check("5.7 FR-6：选区段（chorus）音频已变化", changed_ok)
+    keep_ok, changed_ok, seg_detail = compare_segments(regen_master_bytes, chorus_idx[0])
+    check("5.7 FR-6：非目标段 sha256 逐段不变（含第 2 次 chorus）", keep_ok, seg_detail)
+    check("5.7 FR-6：目标段（chorus#1）音频已变化", changed_ok)
+
+    # ---- 5.7 occurrence=2：仅第 2 次出现的 chorus 重生成 ----
+    r = client.post(f"{API}/candidates/{cand_a['id']}/regen-section",
+                    headers=auth_headers(token),
+                    json={"section": "chorus", "occurrence": 2})
+    b = unwrap(r)
+    check("5.7 occurrence=2 提交", r.status_code == 201 and b["code"] == 0,
+          json.dumps(b)[:200])
+    occ2_task = wait_task(client, b["data"]["task"]["id"], token)
+    occ2_master_bytes = client.get(
+        f"{API}/files/{master_file_id(occ2_task['result']['candidates'][0]['id'])}/download",
+        headers=auth_headers(token)).content
+    keep2, changed2, detail2 = compare_segments(occ2_master_bytes, chorus_idx[1])
+    check("5.7 occurrence=2：第 1 次出现的 chorus sha256 不变（其余段亦不变）",
+          occ2_task["status"] == "succeeded" and keep2, detail2)
+    check("5.7 occurrence=2：目标段（chorus#2）音频已变化", changed2)
+    check("5.7 occurrence=2：与 occurrence=1 产物不同（种子含 occurrence）",
+          hashlib.sha256(occ2_master_bytes).hexdigest()
+          != hashlib.sha256(regen_master_bytes).hexdigest())
 
     # 确定性：同候选同 section 再次 regen → master 逐字节一致
     r = client.post(f"{API}/candidates/{cand_a['id']}/regen-section",
@@ -449,7 +471,7 @@ def main() -> int:
           and hashlib.sha256(regen2_master_bytes).hexdigest()
           == hashlib.sha256(regen_master_bytes).hexdigest())
 
-    # 校验类错误：seconds 越界 / 候选结构不存在的段落
+    # 校验类错误：seconds 越界 / 候选结构不存在的段落 / occurrence 越界
     r = client.post(f"{API}/candidates/{cand_a['id']}/extend", headers=auth_headers(token),
                     json={"seconds": 10})
     b = unwrap(r)
@@ -458,6 +480,15 @@ def main() -> int:
                     headers=auth_headers(token), json={"section": "bridge"})
     b = unwrap(r)
     check("5.7 regen-section 不存在段落 → 40001", r.status_code == 422 and b["code"] == 40001)
+    r = client.post(f"{API}/candidates/{cand_a['id']}/regen-section",
+                    headers=auth_headers(token),
+                    json={"section": "chorus", "occurrence": 3})
+    b = unwrap(r)
+    detail_field = (b.get("data") or {}).get("details") if isinstance(b.get("data"), dict) else None
+    check("5.7 occurrence 越界 → 40001（detail 指明合法范围）",
+          r.status_code == 422 and b["code"] == 40001 and "1~2" in b.get("message", "")
+          and detail_field == [{"field": "occurrence", "message": "1~2"}],
+          json.dumps(b)[:200])
 
     # ============ 作品库（6） ============
     r = client.get(f"{API}/works", headers=auth_headers(token))
@@ -521,10 +552,10 @@ def main() -> int:
         derived_nodes = [n for n in nodes
                          if n["source"] in ("extend", "variant", "regen_section")]
         cur_node = [n for n in nodes if n["id"] == b["data"]["current_version_id"]]
-        tree_ok = (tree_ok and len(derived_nodes) == 4
+        tree_ok = (tree_ok and len(derived_nodes) == 5
                    and all(n["parent_version_id"] == version_id for n in derived_nodes)
                    and bool(cur_node) and cur_node[0]["candidate_count"] == 1)
-    check("8.1 GET /works/{id}/versions（版本树 v1→v2 + 4 个派生子版本）", tree_ok,
+    check("8.1 GET /works/{id}/versions（版本树 v1→v2 + 5 个派生子版本）", tree_ok,
           json.dumps(b["data"])[:250])
 
     r = client.get(f"{API}/versions/{version_id}", headers=auth_headers(token))
@@ -650,12 +681,12 @@ def main() -> int:
     for t in sorted(txs, key=lambda x: x["created_at"]):
         chain_ok = chain_ok and (prev + t["delta"] == t["balance_after"] or True)
     check("10.2 GET /credits/transactions", r.status_code == 200
-          and len(gen_txs) == 7 and len(refund_txs) >= 1
+          and len(gen_txs) == 8 and len(refund_txs) >= 1
           and all(t["balance_after"] >= 0 for t in txs))
 
-    # 注册 200 + studio 切换 10000 − 整曲 12×3 − 派生 6×4 + 取消退款 12 = 10152
-    check("10.2 账本自洽（200 + 10000 − 36 − 24 + 12 = 10152）",
-          balance_now == 200 + 10000 - 36 - 24 + 12, f"balance={balance_now}")
+    # 注册 200 + studio 切换 10000 − 整曲 12×3 − 派生 6×5 + 取消退款 12 = 10146
+    check("10.2 账本自洽（200 + 10000 − 36 − 30 + 12 = 10146）",
+          balance_now == 200 + 10000 - 36 - 30 + 12, f"balance={balance_now}")
 
     # ============ 订阅（2） ============
     r = client.get(f"{API}/subscriptions/plans", headers=auth_headers(token))
