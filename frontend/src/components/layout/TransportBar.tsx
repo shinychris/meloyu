@@ -132,9 +132,14 @@ export default function TransportBar() {
           {formatDuration(dur)}
         </span>
       </div>
-      <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--dim)' }}>
+      <div
+        className="flex items-center gap-2 text-[10px]"
+        style={{ color: 'var(--dim)' }}
+        title="导出目标规格（流媒体预设），非实时测量值"
+      >
+        <span>目标</span>
         <span className="num" style={{ color: 'var(--acc)' }}>
-          −14.2 LUFS
+          −14 LUFS
         </span>
         <span>·</span>
         <span className="num">−1.0 dBTP</span>

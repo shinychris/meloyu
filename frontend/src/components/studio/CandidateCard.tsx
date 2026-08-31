@@ -1,13 +1,19 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { Candidate } from '../../types/api'
+import type { Candidate, GenerationSubmitResult, RegenSectionRequest } from '../../types/api'
 import { drawWave } from '../../lib/wave'
 import { formatDuration, keyLabel, VOCAL_LABEL } from '../../lib/format'
 import { usePlayerStore } from '../../stores/player'
 import { useStudioStore } from '../../stores/studio'
 import { toast } from '../../stores/toast'
-import { adoptCandidate } from '../../api/generation'
+import {
+  adoptCandidate,
+  extendCandidate,
+  regenSectionCandidate,
+  variantCandidate,
+} from '../../api/generation'
 import { SECTION_LABEL } from '../../lib/format'
+import DerivePanel, { type DeriveKind } from './DerivePanel'
 
 /** 候选卡：封面波形 + AI 质量分 + 标签 + 时长 + 结构段条 + 操作按钮 */
 export default function CandidateCard({
@@ -25,6 +31,13 @@ export default function CandidateCard({
   const navigate = useNavigate()
   const playTrack = usePlayerStore((s) => s.playTrack)
   const workId = useStudioStore((s) => s.workId)
+  /** 生成中（含延长/变体/段落重生成等派生任务）：禁用派生操作，避免并发扣积分 */
+  const generating =
+    useStudioStore((s) => s.submitting) ||
+    useStudioStore((s) => s.task != null && (s.task.status === 'queued' || s.task.status === 'running'))
+  /** V1.1 派生操作面板：extend 选秒数 / variant 输入风格 / regen 选段落 */
+  const [panel, setPanel] = useState<DeriveKind | null>(null)
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     if (canvasRef.current) drawWave(canvasRef.current, candidate.seed, '#00ff2c')
@@ -63,7 +76,36 @@ export default function CandidateCard({
     }
   }
 
-  const soon = (name: string) => toast(`${name}：功能将在 V1.1 上线`)
+  /** 派生操作统一入口：提交成功交给 store 接管轮询；失败（含后端未升级的 501）由拦截器 toast */
+  const runDerived = async (op: () => Promise<GenerationSubmitResult>, label: string) => {
+    setBusy(true)
+    try {
+      const result = await op()
+      useStudioStore.getState().startDerivedGeneration(result, `${label} · 候选 ${candidate.label}`)
+      setPanel(null)
+    } catch {
+      /* 拦截器已 toast（50101 功能未上线 / 40201 积分不足等） */
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const submitExtend = (seconds: number) =>
+    void runDerived(() => extendCandidate(candidate.id, { seconds }), `延长 ${seconds} 秒`)
+
+  const submitVariant = (stylePrompt: string) =>
+    void runDerived(
+      () => variantCandidate(candidate.id, stylePrompt ? { style_prompt: stylePrompt } : {}),
+      '生成变体',
+    )
+
+  const submitRegen = (req: RegenSectionRequest) =>
+    void runDerived(
+      () => regenSectionCandidate(candidate.id, req),
+      `段落重生成 ${SECTION_LABEL[req.section]}${req.occurrence != null && req.occurrence > 1 ? `#${req.occurrence}` : ''}`,
+    )
+
+  const togglePanel = (kind: DeriveKind) => setPanel((p) => (p === kind ? null : kind))
 
   return (
     <div className="card pop" style={{ animationDelay: `${index * 0.12}s` }}>
@@ -131,14 +173,29 @@ export default function CandidateCard({
             采用定稿
           </button>
         )}
-        <button className="btn btn-ghost !py-1 !px-2.5 text-[11px]" onClick={() => soon('延长')}>
-          延长 <span className="text-[9px] ml-0.5" style={{ color: 'var(--dim)' }}>V1.1</span>
+        <button
+          className="btn btn-ghost !py-1 !px-2.5 text-[11px]"
+          disabled={generating}
+          title={generating ? '生成中，请稍候' : '从结尾续写 15~60 秒，生成新子版本'}
+          onClick={() => togglePanel('extend')}
+        >
+          延长
         </button>
-        <button className="btn btn-ghost !py-1 !px-2.5 text-[11px]" onClick={() => soon('变体')}>
-          变体 <span className="text-[9px] ml-0.5" style={{ color: 'var(--dim)' }}>V1.1</span>
+        <button
+          className="btn btn-ghost !py-1 !px-2.5 text-[11px]"
+          disabled={generating}
+          title={generating ? '生成中，请稍候' : '同结构换风格，生成新子版本'}
+          onClick={() => togglePanel('variant')}
+        >
+          变体
         </button>
-        <button className="btn btn-ghost !py-1 !px-2.5 text-[11px]" onClick={() => soon('段落重生成')}>
-          段落重生成 <span className="text-[9px] ml-0.5" style={{ color: 'var(--dim)' }}>V1.1</span>
+        <button
+          className="btn btn-ghost !py-1 !px-2.5 text-[11px]"
+          disabled={generating}
+          title={generating ? '生成中，请稍候' : '选择段落重生成，其余段保持不变'}
+          onClick={() => togglePanel('regen')}
+        >
+          段落重生成
         </button>
         <span style={{ flex: 1 }}></span>
         <button
@@ -160,6 +217,18 @@ export default function CandidateCard({
           导出
         </button>
       </div>
+      {panel != null && (
+        <DerivePanel
+          key={panel}
+          kind={panel}
+          candidate={candidate}
+          busy={busy}
+          onSubmitExtend={submitExtend}
+          onSubmitVariant={submitVariant}
+          onSubmitRegen={submitRegen}
+          onClose={() => setPanel(null)}
+        />
+      )}
     </div>
   )
 }

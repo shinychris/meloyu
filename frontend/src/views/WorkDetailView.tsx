@@ -5,7 +5,7 @@ import { getWork, getVersionTree, patchWork } from '../api/works'
 import { adoptCandidate, listCandidates as fetchCandidates } from '../api/generation'
 import { usePlayerStore } from '../stores/player'
 import { toast } from '../stores/toast'
-import { formatDuration, keyLabel, SECTION_LABEL } from '../lib/format'
+import { formatDuration, keyLabel, SECTION_LABEL, versionSourceLabel } from '../lib/format'
 import ExportPanel from '../components/work/ExportPanel'
 
 function depthOf(nodes: VersionTreeNode[], node: VersionTreeNode): number {
@@ -241,16 +241,16 @@ export default function WorkDetailView() {
         <div className="border-r px-5 py-5 overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
           <div className="label">版本树</div>
           <div className="vtree mt-3">
-            {nodes.map((n, i) => (
+            {nodes.map((n) => (
               <div
                 key={n.id}
                 className={`vnode ${n.id === selectedVersionId ? 'cur' : ''}`}
                 style={{ marginLeft: depthOf(nodes, n) * 14 }}
                 onClick={() => selectVersion(n.id)}
-                title={`候选 ×${n.candidate_count}`}
+                title={`${versionSourceLabel(n.source)} · 候选 ×${n.candidate_count}`}
               >
                 <span className="dot"></span>
-                {n.version_no} · {i === 0 ? '初始生成' : '重新生成'}
+                {n.version_no} · {versionSourceLabel(n.source)}
                 {n.id === currentVersionId && (
                   <span className="text-[9px] ml-1 px-1 font-bold" style={{ background: 'var(--acc-dim)', color: 'var(--acc)' }}>
                     当前

@@ -9,6 +9,9 @@ import PricingView from './PricingView'
 import ComingSoonView from './ComingSoonView'
 import WorkDetailView from './WorkDetailView'
 import LoginView from './LoginView'
+import CandidateCard from '../components/studio/CandidateCard'
+import DerivePanel from '../components/studio/DerivePanel'
+import type { Candidate } from '../types/api'
 
 function render(ui: React.ReactElement): string {
   return renderToString(<MemoryRouter>{ui}</MemoryRouter>)
@@ -41,6 +44,12 @@ describe('views render smoke', () => {
     expect(html).toContain('回收站')
   })
 
+  it('LibraryView 搜索框为独立组件渲染（发现 #1：防抖不回写输入框）', () => {
+    const html = render(<LibraryView />)
+    expect(html).toContain('搜索标题 / 歌词…')
+    expect(html).not.toContain('清空搜索') // 初始为空：清空按钮不渲染（有内容时才出现）
+  })
+
   it('WorkDetailView 渲染加载态（无参数时不崩溃）', () => {
     const html = render(<WorkDetailView />)
     expect(html).toContain('加载中')
@@ -50,6 +59,13 @@ describe('views render smoke', () => {
     const html = render(<RightsView />)
     expect(html).toContain('每一首，都有清白凭证')
     expect(html).toContain('导出嵌入 AI 披露')
+  })
+
+  it('RightsView 合规检查文案不做失实断言（审查 P2-13）', () => {
+    const html = render(<RightsView />)
+    expect(html).toContain('导出目标规格（流媒体预设），非逐条实测')
+    expect(html).toContain('SHA-256 指纹登记实现')
+    expect(html).not.toContain('不可听水印已嵌入导出文件')
   })
 
   it('PricingView 渲染档位加载态与流水表', () => {
@@ -62,5 +78,87 @@ describe('views render smoke', () => {
     expect(render(<ComingSoonView kind="arrange" />)).toContain('多轨时间线编曲')
     expect(render(<ComingSoonView kind="edit" />)).toContain('非破坏性音频剪辑')
     expect(render(<ComingSoonView kind="pitch" />)).toContain('旋律修调工坊')
+  })
+})
+
+/* ============ V1.1 候选派生操作（延长/变体/段落重生成） ============ */
+
+const candidateFixture: Candidate = {
+  id: 'c2f6b4e8d0a2468c9e1a3b5d7f9a1c3e',
+  version_id: 'b8d4f2a6c1e34d5f908172635a4b7c9d',
+  label: 'A',
+  adopted: false,
+  seed: 1832744110,
+  quality_score: 92,
+  duration_sec: 212,
+  bpm: 90,
+  key: { tonic: 'A', mode: 'minor' },
+  time_signature: '4/4',
+  vocal: 'female_air',
+  language: 'zh',
+  style_tags: ['华语流行'],
+  structure: [
+    { section: 'verse', bars: 11, start_bar: 0, start_sec: 0, end_sec: 29.3 },
+    { section: 'chorus', bars: 11, start_bar: 11, start_sec: 29.3, end_sec: 58.7 },
+    { section: 'chorus', bars: 11, start_bar: 22, start_sec: 58.7, end_sec: 88.1 },
+  ],
+  applied_negative: [],
+  files: [],
+  created_at: '2026-08-31T08:00:45Z',
+}
+
+describe('CandidateCard V1.1 派生操作', () => {
+  it('延长/变体/段落重生成按钮可用，不再置灰 V1.1', () => {
+    const html = render(
+      <CandidateCard candidate={candidateFixture} index={0} workTitle="测试作品" modelLabel="V1 Pro" />,
+    )
+    expect(html).toContain('延长')
+    expect(html).toContain('变体')
+    expect(html).toContain('段落重生成')
+    expect(html).not.toContain('V1.1')
+  })
+})
+
+describe('DerivePanel 派生面板', () => {
+  const noop = () => {}
+  const base = {
+    candidate: candidateFixture,
+    busy: false,
+    onSubmitExtend: noop,
+    onSubmitVariant: noop,
+    onSubmitRegen: noop,
+    onClose: noop,
+  }
+
+  it('extend 面板渲染 15/30/60 秒预设', () => {
+    const html = renderToString(<DerivePanel {...base} kind="extend" />)
+    expect(html).toContain('+15s')
+    expect(html).toContain('+30s')
+    expect(html).toContain('+60s')
+    expect(html).toContain('延长 30 秒') // 默认选中 30
+  })
+
+  it('variant 面板渲染风格输入（可留空）', () => {
+    const html = renderToString(<DerivePanel {...base} kind="variant" />)
+    expect(html).toContain('可留空 = 自动换风格')
+    expect(html).toContain('生成变体')
+  })
+
+  it('regen 面板按 structure 列出段落，同名段落标注次序与起止秒', () => {
+    const html = renderToString(<DerivePanel {...base} kind="regen" />)
+    expect(html).toContain('Verse')
+    expect(html).toContain('Chorus#1')
+    expect(html).toContain('Chorus#2')
+    expect(html).toContain('0:00–0:29')
+    expect(html).toContain('0:59–1:28')
+    // 未选段落时提交按钮禁用
+    expect(html).toContain('disabled')
+  })
+
+  it('空 structure 时给出无法定位提示', () => {
+    const html = renderToString(
+      <DerivePanel {...base} kind="regen" candidate={{ ...candidateFixture, structure: [] }} />,
+    )
+    expect(html).toContain('该候选无结构信息，无法定位段落')
   })
 })

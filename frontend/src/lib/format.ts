@@ -94,6 +94,18 @@ export const EVENT_ACTOR_LABEL: Record<string, string> = {
   system: '系统',
 }
 
+/** 版本来源中文标签（契约 §1.6 source 枚举：generate/extend/variant/regen_section）；未知值原样显示 */
+export const VERSION_SOURCE_LABEL: Record<string, string> = {
+  generate: '初始生成',
+  extend: '延长',
+  variant: '变体',
+  regen_section: '段落重生成',
+}
+
+export function versionSourceLabel(source: string): string {
+  return VERSION_SOURCE_LABEL[source] ?? source
+}
+
 /** 调性显示：{tonic:'A',mode:'minor'} → "A 小调" */
 export function keyLabel(key: { tonic: string; mode: string }): string {
   return `${key.tonic} ${key.mode === 'major' ? '大调' : '小调'}`

@@ -1,5 +1,6 @@
 import { useStudioStore } from '../../stores/studio'
 import type { VersionTreeNode } from '../../types/api'
+import { versionSourceLabel } from '../../lib/format'
 
 /** 计算每个节点深度（parent_version_id 自引用链） */
 function depthOf(nodes: VersionTreeNode[], node: VersionTreeNode): number {
@@ -51,10 +52,10 @@ export default function VersionTree() {
               key={n.id}
               className={`vnode pop ${versionTree?.current_version_id === n.id ? 'cur' : ''}`}
               style={{ marginLeft: depthOf(nodes, n) * 14, animationDelay: `${i * 0.05}s` }}
-              title={`${n.version_no} · 候选 ×${n.candidate_count}`}
+              title={`${n.version_no} · ${versionSourceLabel(n.source)} · 候选 ×${n.candidate_count}`}
             >
               <span className="dot"></span>
-              {n.version_no} · {i === 0 ? '初始生成' : '重新生成'}
+              {n.version_no} · {versionSourceLabel(n.source)}
             </div>
           ))
         )}

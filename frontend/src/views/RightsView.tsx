@@ -90,15 +90,17 @@ export default function RightsView() {
   }
 
   const isFree = user?.plan === 'free'
+  // 文案原则（审查 P2-13）：不做无法兑现的断言 —— 响度为目标规格而非逐条实测；
+  // 频域不可听水印为 V1.1 能力，当前本地引擎以 SHA-256 指纹登记实现溯源。
   const checklist: Array<{ ok: boolean; text: string }> = [
     { ok: true, text: 'AI 参与声明已写入 metadata（流媒体披露就绪）' },
     {
       ok: !isFree,
       text: isFree
-        ? '免费档导出含水印 · 升级付费档后导出无水印'
-        : '不可听水印已嵌入导出文件，可溯源',
+        ? '免费档导出嵌入水印（当前以 SHA-256 指纹登记实现）· 升级付费档导出无水印'
+        : '不可听水印导出时嵌入 —— 本地引擎当前以 SHA-256 指纹登记实现，可溯源',
     },
-    { ok: true, text: '响度 −14 LUFS · 真峰值 −1.0 dBTP（流媒体预设）' },
+    { ok: true, text: '响度 −14 LUFS · 真峰值 −1.0 dBTP —— 导出目标规格（流媒体预设），非逐条实测' },
     { ok: true, text: '敏感词生成时校验 · 未检测到名人仿声 / 受保护采样' },
   ]
 
@@ -232,7 +234,7 @@ export default function RightsView() {
               <div>
                 <div className="text-[13px] font-semibold">不可听水印</div>
                 <div className="text-[11px] mt-1 leading-relaxed" style={{ color: 'var(--dim)' }}>
-                  导出嵌入内容指纹，可溯源
+                  导出时登记 SHA-256 内容指纹，可溯源（频域水印 V1.1）
                 </div>
               </div>
               <button

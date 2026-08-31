@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type {
   Candidate,
   GenerationSubmitRequest,
+  GenerationSubmitResult,
   KeyMode,
   Language,
   Mode,
@@ -80,6 +81,8 @@ interface StudioState {
   markStep: (n: 1 | 2 | 3) => void
   logOp: (text: string) => void
   submitGeneration: (opts?: { simplified?: boolean }) => Promise<void>
+  /** 延长/变体/段落重生成（V1.1）提交成功后接管任务轮询（响应复用 generations 形态） */
+  startDerivedGeneration: (result: GenerationSubmitResult, opLabel: string) => void
   cancelGeneration: () => Promise<void>
   startPolling: (taskId: string) => void
   stopPolling: () => void
@@ -141,6 +144,10 @@ async function onGenerationSucceeded(task: Task) {
         inferredStructure: result.inferred_structure,
       })
       if (result.inferred_structure) toast('歌词无结构标签，已自动补全结构')
+      // 候选数以接口为准（生成固定 2 个；延长/变体/段落重生成等派生操作可能不同）
+      const n = result.items.length
+      s.logOp(n > 0 ? `生成 ${n} 个候选（任务已完成）` : '生成完成（任务已完成）')
+      toast(n > 0 ? `已生成 ${n} 个候选` : '生成完成')
     } catch {
       /* 拦截器已 toast */
     }
@@ -148,8 +155,6 @@ async function onGenerationSucceeded(task: Task) {
   useStudioStore.setState({ submitting: false, failureMessage: null })
   void s.refreshVersionTree()
   void useSessionStore.getState().refreshUser()
-  s.logOp('生成 2 个候选（任务已完成）')
-  toast('已生成 2 个候选')
 }
 
 export const useStudioStore = create<StudioState>((set, get) => ({
@@ -248,6 +253,24 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     } catch {
       /* 拦截器已 toast */
     }
+  },
+
+  /**
+   * V1.1 派生操作（延长/变体/段落重生成）提交成功后的接管入口：
+   * 置为「生成中」态、清空旧候选、指向新作品上下文并启动既有 1.5s 轮询；
+   * 成功后 onGenerationSucceeded 会拉取新子版本候选并刷新版本树。
+   */
+  startDerivedGeneration(result, opLabel) {
+    set({
+      task: result.task,
+      workId: result.work.id,
+      workTitle: result.work.title,
+      submitting: true,
+      failureMessage: null,
+      candidates: [],
+    })
+    get().logOp(`${opLabel}（${result.cost_credits} 积分）→ ${result.work.display_code} 新子版本生成中`)
+    get().startPolling(result.task.id)
   },
 
   startPolling(taskId) {

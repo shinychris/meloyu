@@ -44,6 +44,8 @@ export type FileKind =
 export type StemName = 'vocals' | 'drums' | 'bass' | 'other'
 export type ExportFormat = 'mp3' | 'wav' | 'midi' | 'stems'
 export type WorkStatus = 'active' | 'trash'
+/** 版本来源（契约 §1.6：MVP 仅 generate，extend/variant/regen_section 为 V1.1 值） */
+export type VersionSource = 'generate' | 'extend' | 'variant' | 'regen_section'
 
 /* ============ 公共资源结构（契约 §1.6） ============ */
 export interface CreditsInfo {
@@ -161,6 +163,11 @@ export interface Work {
   version_count: number
   active_version_id: string
   preview_file_id: string | null
+  /**
+   * 已成功导出的格式（去重，如 ['wav','mp3']）。V1.1 后端新增派生字段；
+   * 后端未重启/旧数据时可能缺失，前端需回退推导（契约 §14 R1 / 审查 P2-5）。
+   */
+  exported_formats?: string[]
   created_at: string
   updated_at: string
   trashed_at: string | null
@@ -182,7 +189,7 @@ export interface Version {
   work_id: string
   parent_version_id: string | null
   version_no: string
-  source: string
+  source: VersionSource
   active_candidate_id: string | null
   candidate_count: number
   params: GenerationParams
@@ -194,7 +201,7 @@ export interface VersionTreeNode {
   id: string
   version_no: string
   parent_version_id: string | null
-  source: string
+  source: VersionSource
   active_candidate_id: string | null
   candidate_count: number
   created_at: string
@@ -269,6 +276,28 @@ export interface GenerationSubmitResult {
 export interface CandidatesResult {
   items: Candidate[]
   inferred_structure: boolean
+}
+
+/* ============ V1.1 候选派生操作（契约 §5.5~5.7，响应复用 POST /generations 的 task+work 形态） ============ */
+
+/** POST /candidates/{id}/extend —— 从结尾续写 seconds 秒（15~60），生成子版本 */
+export interface ExtendCandidateRequest {
+  seconds: number
+}
+
+/** POST /candidates/{id}/variant —— 同结构换风格生成子版本；style_prompt 缺省 = 自动换风格 */
+export interface VariantCandidateRequest {
+  style_prompt?: string
+}
+
+/**
+ * POST /candidates/{id}/regen-section —— 仅重生成该段（其余段音频不变）。
+ * 契约 v1.2 §5.7：请求体 { section, occurrence? }；occurrence 为该 section
+ * 在候选 structure 中第几次出现，1 起始，缺省 = 1。
+ */
+export interface RegenSectionRequest {
+  section: Section
+  occurrence?: number
 }
 
 /* ============ lyrics ============ */

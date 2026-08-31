@@ -2,10 +2,13 @@ import { apiGet, apiPost } from './client'
 import type {
   Candidate,
   CandidatesResult,
+  ExtendCandidateRequest,
   GenerationSubmitRequest,
   GenerationSubmitResult,
   Paginated,
+  RegenSectionRequest,
   Task,
+  VariantCandidateRequest,
   Version,
 } from '../types/api'
 
@@ -50,7 +53,30 @@ export function adoptCandidate(candidateId: string): Promise<Version> {
   return apiPost<Version>(`/candidates/${candidateId}/adopt`)
 }
 
-/** V1.1 占位接口（MVP 返回 501/50101，前端按钮给「即将上线」提示） */
-export function extendCandidate(candidateId: string): Promise<never> {
-  return apiPost<never>(`/candidates/${candidateId}/extend`)
+/* ============ V1.1 候选派生操作（契约 §5.5~5.7） ============ */
+// 三接口响应复用 POST /generations 的 { task, work, cost_credits } 形态，
+// 提交后由 stores/studio.ts 复用生成轮询；后端未升级时返回 501/50101（拦截器 toast）。
+
+/** POST /candidates/{id}/extend —— 延长：从结尾续写 {seconds:15~60}，生成子版本 */
+export function extendCandidate(
+  candidateId: string,
+  req: ExtendCandidateRequest,
+): Promise<GenerationSubmitResult> {
+  return apiPost<GenerationSubmitResult>(`/candidates/${candidateId}/extend`, req)
+}
+
+/** POST /candidates/{id}/variant —— 变体：同结构换风格生成子版本；style_prompt 缺省=自动换风格 */
+export function variantCandidate(
+  candidateId: string,
+  req: VariantCandidateRequest,
+): Promise<GenerationSubmitResult> {
+  return apiPost<GenerationSubmitResult>(`/candidates/${candidateId}/variant`, req)
+}
+
+/** POST /candidates/{id}/regen-section —— 段落重生成：仅重生成该段，其余段不变 */
+export function regenSectionCandidate(
+  candidateId: string,
+  req: RegenSectionRequest,
+): Promise<GenerationSubmitResult> {
+  return apiPost<GenerationSubmitResult>(`/candidates/${candidateId}/regen-section`, req)
 }

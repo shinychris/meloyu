@@ -9,6 +9,7 @@ import { useConfirmStore } from '../stores/confirm'
 import { toast } from '../stores/toast'
 import { formatDuration, keyLabel } from '../lib/format'
 import Pagination from '../components/common/Pagination'
+import SearchInput from '../components/common/SearchInput'
 
 type Filter = 'all' | 'draft' | 'fav' | 'trash'
 
@@ -23,23 +24,23 @@ export default function LibraryView() {
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
-  /** 搜索（q，≤50 字，400ms 防抖）与排序（sort/order，契约 §1.3/§7.1） */
-  const [qInput, setQInput] = useState('')
+  /** 搜索词（q，≤50 字）：SearchInput 内部 400ms 防抖后回调写入，仅作 API 查询参数 */
   const [q, setQ] = useState('')
   const [sort, setSort] = useState<'updated_at' | 'created_at' | 'title'>('updated_at')
   const [order, setOrder] = useState<'desc' | 'asc'>('desc')
-  /** workId → 已成功导出的格式列表（导出徽标由导出任务推导，契约 §14 R1） */
-  const [exportMap, setExportMap] = useState<Record<string, string[]>>({})
+  /**
+   * 导出徽标回退表（workId → 已成功导出格式）：仅当 works 响应缺失 exported_formats
+   * 字段（后端未重启/旧数据）时，由一次批量导出任务请求分组填充，替代旧的逐作品 N+1。
+   */
+  const [exportFallback, setExportFallback] = useState<Record<string, string[]>>({})
   const playTrack = usePlayerStore((s) => s.playTrack)
   const user = useSessionStore((s) => s.user)
   const confirm = useConfirmStore((s) => s.confirm)
 
   const commercial = user && user.plan !== 'free'
 
-  useEffect(() => {
-    const t = setTimeout(() => setQ(qInput.trim().slice(0, 50)), 400)
-    return () => clearTimeout(t)
-  }, [qInput])
+  /** 稳定引用：SearchInput 依赖它做 memo 隔离，防抖期间视图重渲染不再触碰输入框 */
+  const onQueryChange = useCallback((v: string) => setQ(v), [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -56,21 +57,24 @@ export default function LibraryView() {
       setItems(res.items)
       setTotalPages(res.total_pages || 1)
       setTotal(res.total)
-      // 导出徽标：按 work 拉取成功导出任务（种子数据量小，逐个查询可接受）
-      const next: Record<string, string[]> = {}
-      await Promise.all(
-        res.items.map(async (w) => {
-          try {
-            const tasks = await listTasks({ type: 'export', work_id: w.id, page_size: 100 })
-            next[w.id] = tasks.items
-              .filter((t) => t.status === 'succeeded' && t.format)
-              .map((t) => t.format as string)
-          } catch {
-            next[w.id] = []
+      // 导出徽标（P2-5 修复）：优先读 works.exported_formats；字段缺失时一次批量拉取
+      // 导出任务按 work_id 分组（1 次请求），不再逐作品 listTasks 造成 1+N。
+      if (res.items.some((w) => !Array.isArray(w.exported_formats))) {
+        try {
+          const tasks = await listTasks({ type: 'export', page_size: 100 })
+          const next: Record<string, string[]> = {}
+          for (const t of tasks.items) {
+            if (t.status === 'succeeded' && t.format && t.work_id) {
+              ;(next[t.work_id] ??= []).push(t.format)
+            }
           }
-        }),
-      )
-      setExportMap((prev) => ({ ...prev, ...next }))
+          setExportFallback(next)
+        } catch {
+          setExportFallback({}) // 徽标降级为「未导出」，不阻塞列表
+        }
+      } else {
+        setExportFallback({})
+      }
     } catch {
       /* 拦截器已 toast */
     } finally {
@@ -86,7 +90,13 @@ export default function LibraryView() {
     setPage(1)
   }, [filter, q, sort, order])
 
-  const shown = filter === 'draft' ? items.filter((w) => (exportMap[w.id] ?? []).length === 0) : items
+  /** 某作品的已导出格式：新字段优先，缺失时回退批量推导 */
+  const exportsOf = useCallback(
+    (w: Work): string[] => w.exported_formats ?? exportFallback[w.id] ?? [],
+    [exportFallback],
+  )
+
+  const shown = filter === 'draft' ? items.filter((w) => exportsOf(w).length === 0) : items
 
   const toggleFav = async (e: React.MouseEvent, w: Work) => {
     e.stopPropagation()
@@ -176,15 +186,7 @@ export default function LibraryView() {
           </h1>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <input
-            type="text"
-            value={qInput}
-            maxLength={50}
-            placeholder="搜索标题 / 歌词…"
-            onChange={(e) => setQInput(e.target.value)}
-            className="!w-[220px] !text-[12px]"
-            style={{ padding: '6px 10px' }}
-          />
+          <SearchInput onQueryChange={onQueryChange} placeholder="搜索标题 / 歌词…" />
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as 'updated_at' | 'created_at' | 'title')}
@@ -270,7 +272,7 @@ export default function LibraryView() {
           ))
         ) : (
           shown.map((w) => {
-            const exports = exportMap[w.id] ?? []
+            const exports = exportsOf(w)
             const badge = exports.length > 0 ? [...new Set(exports)].map((f) => f.toUpperCase()).join(' · ') : '未导出'
             return (
               <div className="row" key={w.id} onClick={() => navigate(`/works/${w.id}`)}>
