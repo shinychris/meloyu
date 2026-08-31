@@ -9,6 +9,7 @@ from app.api.v1 import (
     files,
     generations,
     lyrics,
+    models,
     subscriptions,
     system,
     tasks,
@@ -23,6 +24,7 @@ api_router.include_router(generations.router)
 api_router.include_router(tasks.router)
 api_router.include_router(candidates.router)
 api_router.include_router(lyrics.router)
+api_router.include_router(models.router)
 api_router.include_router(works.router)
 api_router.include_router(versions.router)
 api_router.include_router(exports.router)

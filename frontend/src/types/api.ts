@@ -313,6 +313,10 @@ export interface LyricsGenerateResult {
   lyrics: string
   structure: { section: Section; line_count: number }[]
   alternatives: { lyrics: string }[]
+  /** V1.2：实际执行引擎（如 ollama:qwen3.5:4b / openai-compat:gpt-4o-mini） */
+  engine?: string
+  fallback?: boolean
+  fallback_reason?: string
 }
 
 export interface LyricsPolishRequest {
@@ -326,6 +330,9 @@ export interface LyricsPolishResult {
   lyrics: string
   changes: { line_no: number; before: string; after: string }[]
   polished_sections: string[]
+  engine?: string
+  fallback?: boolean
+  fallback_reason?: string
 }
 
 export interface RhymeLine {
@@ -467,4 +474,96 @@ export interface WorkPatchRequest {
 export interface WorkDeleteResult {
   deleted: boolean
   permanent: boolean
+}
+
+/* ============ models（V1.2 模型中心，契约 §5.8） ============ */
+export type LyricsBackend = 'localsynth' | 'ollama' | 'openai_compat'
+
+export interface OllamaRuntime {
+  host: string
+  running: boolean
+  version: string
+  models_count: number
+  error: string
+  install_hint: string
+}
+
+export interface ModelsRuntime {
+  ollama: OllamaRuntime
+  active_backend: LyricsBackend
+  engine: string
+}
+
+export interface LocalModelInfo {
+  name: string
+  size_bytes: number
+  modified_at: string
+  family: string
+  parameter_size: string
+  quantization: string
+  capabilities: string[]
+}
+
+export interface RecommendedModel {
+  tag: string
+  name: string
+  size_mb: number
+  note: string
+}
+
+export interface ModelOpInfo {
+  id: string
+  op_type: 'pull' | 'delete'
+  target: string
+  status: 'queued' | 'running' | 'succeeded' | 'failed'
+  progress: number
+  message: string
+  error_message: string
+  created_at: string
+  updated_at: string
+}
+
+export interface LocalModelsResult {
+  host: string
+  models: LocalModelInfo[]
+  selected: string
+  pulling: ModelOpInfo[]
+  error: string
+  recommended: RecommendedModel[]
+}
+
+export interface LLMSettings {
+  lyrics_backend: LyricsBackend
+  ollama_host: string
+  ollama_model: string
+  external_base_url: string
+  external_model: string
+  external_api_key: { has_key: boolean; key_tail: string }
+}
+
+export interface LLMSettingsUpdate {
+  lyrics_backend?: LyricsBackend
+  ollama_host?: string
+  ollama_model?: string
+  external_base_url?: string
+  external_model?: string
+  /** 空串/省略 = 保持不变（脱敏读回无法回显） */
+  external_api_key?: string
+}
+
+export interface ExternalTestResult {
+  ok: boolean
+  sample: string
+  message: string
+}
+
+export interface ExternalPreset {
+  vendor: string
+  base_url: string
+  model_hint: string
+}
+
+export interface ModelsPresets {
+  external_presets: ExternalPreset[]
+  recommended_models: RecommendedModel[]
 }

@@ -28,7 +28,10 @@ const NAV_GROUPS: Array<{ label: string; items: Array<{ to: string; label: strin
   },
   {
     label: '账户',
-    items: [{ to: '/pricing', label: '定价与积分', kbd: '8' }],
+    items: [
+      { to: '/pricing', label: '定价与积分', kbd: '8' },
+      { to: '/models', label: '模型中心', kbd: '9' },
+    ],
   },
 ]
 

@@ -1,4 +1,4 @@
-"""歌词路由（4 接口同步 + V1.1 草稿持久化 2 接口）。"""
+"""歌词路由（4 接口同步 + V1.1 草稿持久化 2 接口；V1.2 起引擎通道可配置）。"""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
@@ -20,25 +20,29 @@ router = APIRouter(prefix="/lyrics", tags=["lyrics"])
 
 
 @router.post("/generate")
-def generate(body: LyricGenerateRequest, user: User = Depends(get_current_user)):
-    return ok(lyrics_svc.generate(body.theme, body.style_hint, body.mood,
+def generate(body: LyricGenerateRequest, db: Session = Depends(get_db),
+             user: User = Depends(get_current_user)):
+    return ok(lyrics_svc.generate(db, body.theme, body.style_hint, body.mood,
                                   body.language, body.sections))
 
 
 @router.post("/polish")
-def polish(body: LyricPolishRequest, user: User = Depends(get_current_user)):
-    return ok(lyrics_svc.polish(body.lyrics, body.target_section, body.style_hint,
+def polish(body: LyricPolishRequest, db: Session = Depends(get_db),
+           user: User = Depends(get_current_user)):
+    return ok(lyrics_svc.polish(db, body.lyrics, body.target_section, body.style_hint,
                                 body.locked_lines or []))
 
 
 @router.post("/rhyme-check")
-def rhyme_check(body: LyricTextRequest, user: User = Depends(get_current_user)):
-    return ok(lyrics_svc.rhyme_check(body.lyrics))
+def rhyme_check(body: LyricTextRequest, db: Session = Depends(get_db),
+                user: User = Depends(get_current_user)):
+    return ok(lyrics_svc.rhyme_check(db, body.lyrics))
 
 
 @router.post("/complete-tags")
-def complete_tags(body: LyricTextRequest, user: User = Depends(get_current_user)):
-    return ok(lyrics_svc.complete_tags(body.lyrics))
+def complete_tags(body: LyricTextRequest, db: Session = Depends(get_db),
+                  user: User = Depends(get_current_user)):
+    return ok(lyrics_svc.complete_tags(db, body.lyrics))
 
 
 @router.get("/draft")

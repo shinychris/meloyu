@@ -78,6 +78,10 @@ def _startup() -> None:
 
     Base.metadata.create_all(engine)
     recovered = recover_zombie_tasks()
+    from app.services.model_center import recover_stale_ops
+    stale_ops = recover_stale_ops()
+    if stale_ops:
+        logger.info(f"startup: recovered {stale_ops} stale model ops")
     from app.database import SessionLocal
     with SessionLocal() as db:
         purge_expired(db)

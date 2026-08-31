@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { completeTags, generateLyrics, polishLyrics, rhymeCheck } from '../api/lyrics'
+import { getModelsRuntime } from '../api/models'
 import type { CompleteTagsResult, LyricsGenerateResult, RhymeCheckResult } from '../types/api'
 import { useStudioStore } from '../stores/studio'
 import { toast } from '../stores/toast'
@@ -50,6 +51,7 @@ export default function LyricsView() {
   const [rhyme, setRhyme] = useState<RhymeCheckResult | null>(null)
   const [tagInfo, setTagInfo] = useState<CompleteTagsResult | null>(null)
   const [changes, setChanges] = useState<ChangeEntry[]>([])
+  const [engine, setEngine] = useState('')
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
   const navigate = useNavigate()
   const setLyricsFromAssistant = useStudioStore((s) => s.setLyricsFromAssistant)
@@ -61,6 +63,13 @@ export default function LyricsView() {
       /* ignore */
     }
   }, [text])
+
+  // V1.2：显示当前歌词引擎（模型中心可切换）
+  useEffect(() => {
+    getModelsRuntime()
+      .then((rt) => setEngine(rt.engine))
+      .catch(() => {})
+  }, [])
 
   const run = async (key: string, fn: () => Promise<void>) => {
     if (busy) return
@@ -85,7 +94,11 @@ export default function LyricsView() {
       setRhyme(null)
       setChanges([])
       setText(res.lyrics)
-      toast('AI 已生成歌词草稿，可继续润色')
+      if (res.fallback && res.fallback_reason) {
+        toast(`引擎不可用已回退本地规则：${res.fallback_reason}`, 'warn')
+      } else {
+        toast(`AI 已生成歌词草稿（${res.engine || engine}），可继续润色`)
+      }
       useStudioStore.getState().logOp('歌词助手：AI 生成草稿')
     })
 
@@ -100,11 +113,15 @@ export default function LyricsView() {
       const res = await polishLyrics({ lyrics: text, ...(section ? { target_section: section } : {}) })
       setChanges(res.changes)
       setText(res.lyrics)
-      toast(
-        section
-          ? `已润色${SECTION_ZH[section]}（${res.changes.length} 处修改）`
-          : `已润色全文（${res.changes.length} 处修改）`,
-      )
+      if (res.fallback && res.fallback_reason) {
+        toast(`引擎不可用已回退本地规则：${res.fallback_reason}`, 'warn')
+      } else {
+        toast(
+          section
+            ? `已润色${SECTION_ZH[section]}（${res.changes.length} 处修改）`
+            : `已润色全文（${res.changes.length} 处修改）`,
+        )
+      }
     })
 
   const onRhyme = () =>
@@ -138,7 +155,19 @@ export default function LyricsView() {
     <section className="view flex flex-col h-full">
       <header className="px-8 pt-6 pb-4">
         <div className="label">Lyrics / 歌词助手</div>
-        <h1 className="text-[28px] font-extrabold tracking-tight mt-1">写词，并与旋律对齐</h1>
+        <div className="flex items-end justify-between">
+          <h1 className="text-[28px] font-extrabold tracking-tight mt-1">写词，并与旋律对齐</h1>
+          {engine && (
+            <span
+              className="text-[10px] font-bold px-2 py-1 cursor-pointer"
+              style={{ background: 'var(--bg2)', border: '1px solid var(--line)', color: 'var(--dim)' }}
+              title="在模型中心切换 AI 引擎（本地规则 / 本地开源模型 / 外部 API）"
+              onClick={() => navigate('/models')}
+            >
+              引擎：{engine} ⇄
+            </span>
+          )}
+        </div>
       </header>
       <div className="grid grid-cols-[1fr_300px] rule-t flex-1 min-h-0">
         <div className="px-8 py-5 border-r overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
@@ -165,8 +194,11 @@ export default function LyricsView() {
             </div>
           </div>
           <div className="flex gap-2 mb-3 flex-wrap">
-            <button className="btn btn-ghost text-[11px]" disabled={busy !== null} onClick={onGenerate}>
-              {busy === 'gen' ? '生成中…' : 'AI 生成歌词'}
+            <button className="btn btn-ghost text-[11px]" disabled={busy !== null} onClick={onGenerate}
+              title={engine && !engine.includes('本地规则') ? 'LLM 引擎生成中，视模型 10s~3min' : undefined}>
+              {busy === 'gen'
+                ? engine && !engine.includes('本地规则') ? 'AI 生成中（最长约 3 分钟）…' : '生成中…'
+                : 'AI 生成歌词'}
             </button>
             <button className="btn btn-ghost text-[11px]" disabled={busy !== null} onClick={onPolish}>
               {busy === 'polish' ? '润色中…' : '润色选中段'}

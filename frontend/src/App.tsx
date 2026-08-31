@@ -12,6 +12,7 @@ import LibraryView from './views/LibraryView'
 import WorkDetailView from './views/WorkDetailView'
 import RightsView from './views/RightsView'
 import PricingView from './views/PricingView'
+import ModelCenterView from './views/ModelCenterView'
 import ComingSoonView from './views/ComingSoonView'
 import { useSessionStore } from './stores/session'
 import { useMetaStore } from './stores/meta'
@@ -29,6 +30,7 @@ const SHORTCUT_ROUTES: Record<string, string> = {
   '6': '/library',
   '7': '/rights',
   '8': '/pricing',
+  '9': '/models',
 }
 
 function AppLayout() {
@@ -138,6 +140,7 @@ function RootRoutes() {
           <Route path="/works/:workId" element={<WorkDetailView />} />
           <Route path="/rights" element={<RightsView />} />
           <Route path="/pricing" element={<PricingView />} />
+          <Route path="/models" element={<ModelCenterView />} />
           <Route path="*" element={<Navigate to="/studio" replace />} />
         </Route>
       ) : (

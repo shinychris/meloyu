@@ -65,6 +65,7 @@ def _rng_for(*parts) -> random.Random:
 class LocalLyricsProvider:
     name = "localsynth-lyrics"
     display_name = "Meloyu 本地歌词引擎"
+    engine_name = "localsynth-lyrics"
 
     # ---- 生成 ----
     def generate(self, theme: str, style_hint: str = "", mood: str | None = None,

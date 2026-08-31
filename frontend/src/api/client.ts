@@ -94,26 +94,37 @@ instance.interceptors.response.use(
 )
 
 /** JSON GET：返回已解包的 data */
-export async function apiGet<T>(url: string, params?: Record<string, unknown>): Promise<T> {
-  const data = await instance.get(url, { params })
+export async function apiGet<T>(url: string, params?: Record<string, unknown>,
+  config?: AxiosRequestConfig): Promise<T> {
+  const data = await instance.get(url, { params, ...config })
   return data as T
 }
 
 /** JSON POST */
-export async function apiPost<T>(url: string, body?: unknown): Promise<T> {
-  const data = await instance.post(url, body ?? {})
+export async function apiPost<T>(url: string, body?: unknown,
+  config?: AxiosRequestConfig): Promise<T> {
+  const data = await instance.post(url, body ?? {}, config)
+  return data as T
+}
+
+/** JSON PUT */
+export async function apiPut<T>(url: string, body?: unknown,
+  config?: AxiosRequestConfig): Promise<T> {
+  const data = await instance.put(url, body ?? {}, config)
   return data as T
 }
 
 /** JSON PATCH */
-export async function apiPatch<T>(url: string, body?: unknown): Promise<T> {
-  const data = await instance.patch(url, body ?? {})
+export async function apiPatch<T>(url: string, body?: unknown,
+  config?: AxiosRequestConfig): Promise<T> {
+  const data = await instance.patch(url, body ?? {}, config)
   return data as T
 }
 
 /** JSON DELETE */
-export async function apiDelete<T>(url: string, params?: Record<string, unknown>): Promise<T> {
-  const data = await instance.delete(url, { params })
+export async function apiDelete<T>(url: string, params?: Record<string, unknown>,
+  config?: AxiosRequestConfig): Promise<T> {
+  const data = await instance.delete(url, { params, ...config })
   return data as T
 }
 

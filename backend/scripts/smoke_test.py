@@ -178,6 +178,93 @@ def main() -> int:
     check("6.5 草稿读回一致（upsert 单草稿）", b["data"]["text"] == generated_lyrics
           and b["data"]["updated_at"] is not None)
 
+    # ============ 模型中心（V1.2：本地开源模型 + 外部 API） ============
+    r = client.get(f"{API}/models/runtime", headers=auth_headers(token))
+    b = unwrap(r)
+    rt_ok = (r.status_code == 200 and b["code"] == 0 and "ollama" in b["data"]
+             and "engine" in b["data"] and "active_backend" in b["data"])
+    check("13.1 GET /models/runtime", rt_ok, json.dumps(b)[:150])
+    ollama_running = rt_ok and b["data"]["ollama"]["running"] is True
+
+    r = client.get(f"{API}/models/settings", headers=auth_headers(token))
+    b = unwrap(r)
+    check("13.2 GET /models/settings（默认 localsynth，key 脱敏）",
+          r.status_code == 200 and b["code"] == 0
+          and b["data"]["lyrics_backend"] == "localsynth"
+          and isinstance(b["data"]["external_api_key"], dict), json.dumps(b)[:150])
+
+    r = client.get(f"{API}/models/local", headers=auth_headers(token))
+    b = unwrap(r)
+    check("13.3 GET /models/local（列表 + 推荐）",
+          r.status_code == 200 and b["code"] == 0
+          and isinstance(b["data"]["models"], list)
+          and len(b["data"]["recommended"]) >= 3, json.dumps(b)[:150])
+    local_models = [m["name"] for m in b["data"]["models"]] if ollama_running else []
+
+    r = client.put(f"{API}/models/settings", headers=auth_headers(token),
+                   json={"lyrics_backend": "bogus"})
+    b = unwrap(r)
+    check("13.4 PUT /models/settings 非法通道 → 40001",
+          r.status_code == 422 and b["code"] == 40001)
+
+    if ollama_running and local_models:
+        pick = next((m for m in ("qwen3.5:4b", "qwen2.5:1.5b", "qwen3:4b")
+                     if m in local_models), local_models[0])
+        r = client.put(f"{API}/models/settings", headers=auth_headers(token),
+                       json={"lyrics_backend": "ollama", "ollama_model": pick})
+        b = unwrap(r)
+        check(f"13.5 PUT /models/settings 切 ollama（{pick}）",
+              r.status_code == 200 and b["data"]["lyrics_backend"] == "ollama")
+
+        r = client.post(f"{API}/lyrics/generate", headers=auth_headers(token),
+                        json={"theme": "晨雾里的灯塔", "mood": "宁静", "language": "zh"})
+        b = unwrap(r)
+        gen_ok = (r.status_code == 200 and b["code"] == 0
+                  and "engine" in b["data"] and "fallback" in b["data"]
+                  and (b["data"]["fallback"] or "\n" in b["data"]["lyrics"]))
+        check("13.6 POST /lyrics/generate（LLM 通道，engine 留痕）", gen_ok,
+              f"engine={b['data'].get('engine')} fallback={b['data'].get('fallback')}")
+
+        # 重拉已存在模型：幂等，应快速 succeeded（同时验证 pull→ops 轮询链路）
+        r = client.post(f"{API}/models/pull", headers=auth_headers(token),
+                        json={"model": pick})
+        b = unwrap(r)
+        pull_ok = r.status_code == 202 and b["code"] == 0 and b["data"]["id"]
+        check("13.7 POST /models/pull（202 异步受理）", pull_ok)
+        if pull_ok:
+            op_id = b["data"]["id"]
+            op = {"status": "timeout"}
+            for _ in range(120):
+                time.sleep(2)
+                r2 = client.get(f"{API}/models/ops/{op_id}", headers=auth_headers(token))
+                op = unwrap(r2)["data"]
+                if op["status"] not in ("queued", "running"):
+                    break
+            check("13.7 模型下载任务终态 succeeded（已存在则秒完成）",
+                  op["status"] == "succeeded", json.dumps(op)[:150])
+
+        r = client.get(f"{API}/models/ops?limit=5", headers=auth_headers(token))
+        b = unwrap(r)
+        check("13.8 GET /models/ops（操作留痕）", r.status_code == 200 and b["code"] == 0
+              and len(b["data"]) >= 1)
+
+        if "qwen2.5:1.5b" in local_models:
+            r = client.post(f"{API}/models/test-external", headers=auth_headers(token),
+                            json={"base_url": "http://localhost:11434/v1",
+                                  "api_key": "ollama", "model": "qwen2.5:1.5b"})
+            b = unwrap(r)
+            check("13.9 POST /models/test-external（OpenAI 兼容端点连通）",
+                  r.status_code == 200 and b["code"] == 0 and b["data"]["ok"] is True,
+                  json.dumps(b)[:150])
+
+        r = client.put(f"{API}/models/settings", headers=auth_headers(token),
+                       json={"lyrics_backend": "localsynth"})
+        b = unwrap(r)
+        check("13.10 还原 localsynth（环境收尾）",
+              r.status_code == 200 and b["data"]["lyrics_backend"] == "localsynth")
+    else:
+        print("SKIP 13.5~13.10：本机 Ollama 未运行或无本地模型（LLM 通道用例跳过）")
+
     # ============ 生成（4） ============
     gen_body = {
         "mode": "custom",
