@@ -1,0 +1,63 @@
+"""一键部署 ACE-Step v1.5 到 backend/data/acestep（代码 + 独立 venv + uv sync）。
+
+在 backend/ 下运行：./.venv/Scripts/python scripts/setup_acestep.py
+
+为什么独立 venv：ACE-Step 钉死 torch==2.7.1+cu128，与后端 venv 的
+torch 2.13+cu130（MusicGen 使用）互斥（ADR-016）。部署产物全部位于
+backend/data/acestep/（gitignored）：源码、.venv、checkpoints（约 11GB 权重，
+首次在模型中心下载）。
+
+前置：已安装 uv（https://docs.astral.sh/uv/）；Python 3.11/3.12 由 uv 自动解析。
+"""
+from __future__ import annotations
+
+import shutil
+import subprocess
+import sys
+import urllib.request
+import zipfile
+from io import BytesIO
+from pathlib import Path
+
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+DEST = BACKEND_DIR / "data" / "acestep"
+REPO_ZIP = "https://codeload.github.com/ACE-Step/ACE-Step-1.5/zip/refs/heads/main"
+
+
+def main() -> int:
+    print(f"目标目录：{DEST}")
+    if not (DEST / "acestep").is_dir():
+        print("下载源码…")
+        with urllib.request.urlopen(REPO_ZIP, timeout=300) as r:
+            data = r.read()
+        tmp = DEST.parent / "_acestep_tmp"
+        if tmp.exists():
+            shutil.rmtree(tmp)
+        zipfile.ZipFile(BytesIO(data)).extractall(tmp)
+        inner = tmp / next(iter(sorted(p.name for p in tmp.iterdir())))
+        DEST.mkdir(parents=True, exist_ok=True)
+        for item in inner.iterdir():
+            shutil.move(str(item), DEST / item.name)
+        shutil.rmtree(tmp)
+        print("源码就绪")
+    else:
+        print("源码已存在，跳过下载")
+
+    uv = shutil.which("uv")
+    if not uv:
+        print("未找到 uv：请先安装 https://docs.astral.sh/uv/ 后重试")
+        return 2
+    print("uv sync（下载 torch cu128 等依赖，约 4GB，可能 5~20 分钟）…")
+    rc = subprocess.call([uv, "sync"], cwd=str(DEST))
+    if rc != 0:
+        print("uv sync 失败，请检查网络（代理）后重试")
+        return rc
+    venv_py = DEST / ".venv" / "Scripts" / "python.exe"
+    ok = subprocess.call([str(venv_py), "-c", "import acestep"]) == 0
+    print("部署完成" if ok else "部署异常：acestep 包不可导入")
+    print("下一步：模型中心下载权重（约 11GB），或 API POST /models/music-pull")
+    return 0 if ok else 3
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -26,6 +26,8 @@ GENERATION_TASK_TIMEOUT_SEC = 180
 MUSIC_API_TASK_TIMEOUT_SEC = 900
 # 本机 MusicGen 通道的任务超时（秒）：CPU 上 30s 器乐约 2~6 分钟（small），留足余量
 MUSICGEN_TASK_TIMEOUT_SEC = 1800
+# 本机 ACE-Step 通道的任务超时（秒）：GPU turbo 档 1~3 分钟/首，首次含 venv 冷启动留余量
+ACESTEP_TASK_TIMEOUT_SEC = 1800
 # Replicate 官方 API（V1.4 开源模型托管通道；测试连接支持 base 覆盖以便自建代理）
 REPLICATE_API_BASE = "https://api.replicate.com"
 # 免费档回收站清扫天数
@@ -45,6 +47,9 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     # HuggingFace 端点覆盖（.env 配 HF_ENDPOINT=https://hf-mirror.com 走国内镜像）
     hf_endpoint: str = ""
+    # ACE-Step 独立部署目录（默认 backend/data/acestep：代码+独立 venv+checkpoints，
+    # gitignored；其依赖钉死 torch 2.7.1+cu128 与后端 venv 互斥，故隔离部署）
+    acestep_home: str = ""
 
     @property
     def data_path(self) -> Path:
@@ -59,6 +64,12 @@ class Settings(BaseSettings):
     @property
     def audio_path(self) -> Path:
         return self.data_path / "audio"
+
+    @property
+    def acestep_path(self) -> Path:
+        if self.acestep_home:
+            return Path(self.acestep_home).resolve()
+        return self.data_path / "acestep"
 
 
 settings = Settings()

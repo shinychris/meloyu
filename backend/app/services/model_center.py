@@ -1,6 +1,7 @@
 """模型中心服务：本地开源模型（Ollama）下载/删除/列举 + 外部 API 配置
 + 歌词引擎工厂（V1.2）+ 外部歌曲生成 API 通道（V1.3）
-+ 开源歌曲模型目录/Replicate 托管/本机 MusicGen（V1.4）。
++ 开源歌曲模型目录/Replicate 托管/本机 MusicGen（V1.4）
++ 本机 ACE-Step v1.5 人声成曲通道（V1.5，ADR-016）。
 
 进度写库节流（≥2% 或 ≥1s 才落一次），拉取线程与生成任务线程池隔离（各 1 worker）。
 """
@@ -20,8 +21,18 @@ from app.models.base import new_uuid, utc_now_iso
 from app.providers.llm import LLMError, OllamaClient, OpenAICompatClient
 from app.providers.lyrics_llm import LLMLyricsProvider, valid_model_tag
 from app.providers.lyrics_local import LocalLyricsProvider
+from app.providers.music_acestep import (
+    ACEStepLocalError,
+    ACEStepLocalProvider,
+    acestep_deps_installed,
+    acestep_install_hint,
+    delete_local as acestep_delete_local,
+    local_downloaded_ids as acestep_downloaded_ids,
+    pull_local as acestep_pull_local,
+)
 from app.providers.music_api import APIMusicProvider, MusicAPIError, SunoCompatClient
 from app.providers.music_catalog import (
+    ACESTEP_RUNNABLE_IDS as _ACESTEP_IDS,
     CATALOG_BY_ID,
     CATALOG_DISCLAIMER,
     LOCAL_RUNNABLE_IDS,
@@ -114,7 +125,7 @@ def get_settings(db: Session) -> dict:
     }
 
 
-_MUSIC_BACKENDS = ("localsynth", "api", "replicate", "musicgen_local")
+_MUSIC_BACKENDS = ("localsynth", "api", "replicate", "musicgen_local", "acestep_local")
 
 
 def update_settings(db: Session, patch: dict) -> dict:
@@ -136,7 +147,8 @@ def update_settings(db: Session, patch: dict) -> dict:
         music_model = s.music_model
     if music_backend is None:
         music_backend = s.music_backend
-        # 仅选模型未显式给通道：按模型可用通道自动切换（显式 music_backend 优先）
+        # 仅选模型未显式给通道：按模型可用通道自动切换（显式 music_backend 优先；
+        # 有 Replicate Token 优先托管，否则本机通道 ACE-Step（人声）> MusicGen（器乐））
         if music_model and music_model != s.music_model:
             entry = CATALOG_BY_ID.get(music_model)
             if entry:
@@ -144,13 +156,15 @@ def update_settings(db: Session, patch: dict) -> dict:
                 if "replicate" in channels and (
                         patch.get("replicate_api_token") or s.replicate_api_token):
                     music_backend = "replicate"
+                elif "acestep_local" in channels:
+                    music_backend = "acestep_local"
                 elif "musicgen_local" in channels:
                     music_backend = "musicgen_local"
     if music_backend not in _MUSIC_BACKENDS:
-        raise err_validation("music_backend 必须为 localsynth/api/replicate/musicgen_local")
+        raise err_validation("music_backend 必须为 localsynth/api/replicate/musicgen_local/acestep_local")
     if music_backend == "api" and not (patch.get("music_api_base_url") or s.music_api_base_url):
         raise err_validation("外部歌曲 API 通道需要先配置 base_url")
-    if music_backend in ("replicate", "musicgen_local"):
+    if music_backend in ("replicate", "musicgen_local", "acestep_local"):
         entry = CATALOG_BY_ID.get(music_model)
         if entry is None:
             raise err_validation(f"开源模型目录中不存在：{music_model or '（未选择模型）'}")
@@ -162,6 +176,8 @@ def update_settings(db: Session, patch: dict) -> dict:
             raise err_validation("Replicate 通道需要先配置 API Token")
         if music_backend == "musicgen_local" and music_model not in LOCAL_RUNNABLE_IDS:
             raise err_validation(f"模型 {music_model} 不支持本机运行（需 GPU 档请走 Replicate）")
+        if music_backend == "acestep_local" and music_model not in _ACESTEP_IDS:
+            raise err_validation(f"模型 {music_model} 不支持本机 ACE-Step 通道")
 
     for field in ("ollama_host", "ollama_model", "external_base_url", "external_model",
                   "music_api_base_url", "music_api_model", "music_model"):
@@ -248,7 +264,9 @@ def song_engine_label(db: Session) -> str:
         return f"Replicate · {entry['name']}"
     if s.music_backend == "musicgen_local" and entry:
         return f"MusicGen 本地 · {entry['name']}"
-    if s.music_backend in ("replicate", "musicgen_local"):
+    if s.music_backend == "acestep_local" and entry:
+        return f"ACE-Step 本地 · {entry['name']}"
+    if s.music_backend in ("replicate", "musicgen_local", "acestep_local"):
         return "开源模型（未选择模型）"
     return "本地合成引擎（离线可用）"
 
@@ -464,6 +482,8 @@ def current_music_backend(db: Session) -> str:
         return "replicate"
     if s.music_backend == "musicgen_local" and s.music_model:
         return "musicgen_local"
+    if s.music_backend == "acestep_local" and s.music_model:
+        return "acestep_local"
     return "localsynth"
 
 
@@ -482,6 +502,8 @@ def get_music_provider(db: Session):
                 return ReplicateMusicProvider(s.replicate_api_token, s.music_model, slug)
             if s.music_backend == "musicgen_local" and entry:
                 return MusicGenLocalProvider(s.music_model)
+            if s.music_backend == "acestep_local" and entry:
+                return ACEStepLocalProvider(s.music_model)
         except Exception as e:  # noqa: BLE001 —— 配置构造失败回退本地引擎，创作不中断
             logger.warning(f"music provider 构造失败，回退本地引擎: {e}")
     from app.providers.music_local import LocalSynthProvider
@@ -495,6 +517,8 @@ def get_music_catalog(db: Session) -> dict:
     s = _setting_row(db)
     deps = musicgen_deps_installed()
     downloaded = set(local_downloaded_ids())
+    ace_deps = acestep_deps_installed()
+    ace_downloaded = set(acestep_downloaded_ids()) if ace_deps else set()
     slugs: dict = s.replicate_slugs or {}
     models = []
     for rank, m in enumerate(catalog_sorted(), start=1):
@@ -512,17 +536,26 @@ def get_music_catalog(db: Session) -> dict:
                 entry["local_status"] = "ready"
             else:
                 entry["local_status"] = "not_downloaded"
+        elif "acestep_local" in m["channels"]:
+            if not ace_deps:
+                entry["local_status"] = "deps_missing"
+            elif m["id"] in ace_downloaded:
+                entry["local_status"] = "ready"
+            else:
+                entry["local_status"] = "not_downloaded"
         else:
             entry["local_status"] = "not_applicable"
         entry["selected"] = bool(
-            s.music_backend in ("replicate", "musicgen_local")
+            s.music_backend in ("replicate", "musicgen_local", "acestep_local")
             and s.music_model == m["id"])
         models.append(entry)
     return {
         "models": models,
         "machine": {"musicgen_deps_installed": deps,
                     "install_hint": "" if deps else musicgen_install_hint(),
-                    "downloaded_ids": sorted(downloaded)},
+                    "downloaded_ids": sorted(downloaded | ace_downloaded),
+                    "acestep_deps_installed": ace_deps,
+                    "acestep_install_hint": "" if ace_deps else acestep_install_hint()},
         "selected": {"music_backend": s.music_backend,
                      "music_model": s.music_model or None},
         "replicate": {"token_saved": bool(s.replicate_api_token)},
@@ -541,10 +574,14 @@ def _execute_music_pull(op_id: str, model_id: str) -> None:
         last.update(t=now, pct=pct)
         _write_op(op_id, progress=max(pct, 0), message=message[:280])
 
+    entry = CATALOG_BY_ID.get(model_id) or {}
+    is_acestep = "acestep_local" in entry.get("channels", [])
+    err_cls = ACEStepLocalError if is_acestep else MusicGenLocalError
+    pull_fn = acestep_pull_local if is_acestep else pull_local
     try:
-        pull_local(model_id, on_progress)
+        pull_fn(model_id, on_progress)
         _write_op(op_id, status="succeeded", progress=100, message=f"已下载 {model_id}")
-    except MusicGenLocalError as e:
+    except err_cls as e:
         _write_op(op_id, status="failed", message="下载失败", error_message=e.message[:280])
     except Exception as e:  # noqa: BLE001 —— 线程兜底
         logger.exception(f"music pull {model_id} crashed: {e}")
@@ -554,7 +591,7 @@ def _execute_music_pull(op_id: str, model_id: str) -> None:
 def start_music_pull(db: Session, user_id: str, model_id: str) -> dict:
     model_id = model_id.strip()
     entry = CATALOG_BY_ID.get(model_id)
-    if entry is None or "musicgen_local" not in entry.get("channels", []):
+    if entry is None or not ({"musicgen_local", "acestep_local"} & set(entry.get("channels", []))):
         raise err_validation(f"模型不支持本地下载：{model_id}")
     running = db.execute(select(ModelOp).where(
         ModelOp.status.in_(("queued", "running")))).scalars().all()
@@ -574,23 +611,25 @@ def start_music_pull(db: Session, user_id: str, model_id: str) -> dict:
 def run_music_delete(db: Session, user_id: str, model_id: str) -> dict:
     model_id = model_id.strip()
     entry = CATALOG_BY_ID.get(model_id)
-    if entry is None or not entry.get("local_hf_id"):
+    if entry is None or not entry.get("local_hf_id") or not (
+            {"musicgen_local", "acestep_local"} & set(entry.get("channels", []))):
         raise err_validation(f"模型不支持本地删除：{model_id}")
+    is_acestep = "acestep_local" in entry.get("channels", [])
     op = ModelOp(id=new_uuid(), user_id=user_id, op_type="music_delete", target=model_id,
                  status="running", message="删除中")
     db.add(op)
     db.commit()
     db.refresh(op)
     try:
-        delete_local(model_id)
-    except MusicGenLocalError as e:
+        (acestep_delete_local if is_acestep else delete_local)(model_id)
+    except (ACEStepLocalError, MusicGenLocalError) as e:
         op.status, op.message = "failed", "删除失败"
         op.error_message = e.message[:280]
         db.commit()
         db.refresh(op)
         return op.to_dict()
     s = _setting_row(db)
-    if s.music_model == model_id and s.music_backend == "musicgen_local":
+    if s.music_model == model_id and s.music_backend in ("musicgen_local", "acestep_local"):
         s.music_backend, s.music_model = "localsynth", ""  # 删掉选用模型 → 回退本地合成
         db.commit()
     op.status, op.progress, op.message = "succeeded", 100, f"已删除 {model_id}"

@@ -1,41 +1,92 @@
-"""歌曲生成开源模型目录（V1.4「多类开源模型接入」批）。
+"""歌曲生成开源模型目录（V1.4「多类开源模型接入」批；V1.5 增本机 ACE-Step 与新模型）。
 
-收录可经本系统两条通道使用的开源歌曲/音乐生成模型：
-  - musicgen_local：本机 transformers 直跑（真实 HF 下载 + CPU/GPU 推理，器乐）
-  - replicate：Replicate 托管推理（统一 HTTP 协议，一个 Token 接全部模型，含人声歌词成曲）
+收录可经本系统三条通道使用的开源歌曲/音乐生成模型：
+  - acestep_local：ACE-Step v1.5 本机子进程推理（歌词→人声成曲，8GB 显存档）
+  - musicgen_local：本机 transformers 直跑 MusicGen（真实 HF 下载，器乐）
+  - replicate：Replicate 托管推理（统一 HTTP 协议，一个 Token 接全部模型）
 
 benchmark.score 为**公开论文/技术报告/社区横评的综合参考分（0-10）**，仅用于选型
 排序，非本系统实测；来源见 benchmark.source。分数与结论随来源公开资料整理，
 不声称本系统复测结果（ADR-015）。
 
-replicate_slug：平台默认 slug；YuE/DiffRhythm/Stable Audio Open 的社区托管 slug
-变动频繁，默认留空，由用户在模型中心填写（存 llm_settings.replicate_slugs）。
+replicate_slug：平台默认 slug；多数模型的社区托管 slug 变动频繁，默认留空，
+由用户在模型中心填写（存 llm_settings.replicate_slugs）。
 """
 from __future__ import annotations
 
 MUSIC_CATALOG: list[dict] = [
     {
         "id": "ace-step",
-        "name": "ACE-Step",
+        "name": "ACE-Step v1.5",
         "vendor": "ACE Studio × StepFun",
-        "license": "Apache-2.0（开源权重）",
-        "params": "3.5B（MoE）",
-        "capabilities": {"vocals": True, "lyrics_input": True, "max_duration_sec": 240,
-                         "languages": "中/英/日/韩等 19 种"},
+        "license": "MIT（代码+权重）",
+        "params": "2B DiT（turbo）+ 0.6B~4B 5Hz LM",
+        "capabilities": {"vocals": True, "lyrics_input": True, "max_duration_sec": 600,
+                         "languages": "中/英/日/韩等 50+ 种"},
         "benchmark": {
-            "score": 9.0,
-            "source": "ACE-Step 官方技术报告与社区横评（2025）",
-            "notes": "开源歌词成曲 SOTA：人声清晰度与编曲完成度接近 Suno V3.5 档，"
-                     "支持 remix/retake 等后处理；云端托管推荐首选",
+            "score": 9.3,
+            "source": "ACE-Step 1.5 技术报告（arXiv:2602.00744）与社区横评（2026）",
+            "notes": "开源歌词成曲新标杆：LM+DiT 混合架构，音质据报告介于 Suno "
+                     "v4.5~v5 之间；2B turbo 档 A100 <2s/RTX 3090 <10s 出整曲，"
+                     "6~8GB 显存即可本机运行（0.6B LM + CPU offload）",
+        },
+        "channels": ["replicate", "acestep_local"],
+        "local_runnable": True,
+        "local_hf_id": "ACE-Step/Ace-Step1.5",
+        "local_size_mb": 11000,
+        "local_note": "本机推荐档：8GB 显存可用（独立 venv 部署，约 11GB 权重），"
+                      "唯一可本机跑的开源「人声成曲」SOTA",
+        "replicate_slug": "ace-step/ace-step",
+        "recommended": True,
+        "recommend_reason": "外部测评最优且本机 8GB 显存即可运行：下载权重后离线"
+                            "生成含人声演唱的完整歌曲（歌词对齐）",
+    },
+    {
+        "id": "minimax-music-3",
+        "name": "MiniMax Music 3",
+        "vendor": "MiniMax",
+        "license": "开源权重（见模型卡，2026.8.13 开放）",
+        "params": "Qwen3-8B 底座",
+        "capabilities": {"vocals": True, "lyrics_input": True, "max_duration_sec": 300,
+                         "languages": "中/英等多语"},
+        "benchmark": {
+            "score": 8.8,
+            "source": "MiniMax 官方博客（2026-08-13）与首发热评",
+            "notes": "单次前向生成最长 5 分钟完整歌曲（无拼接），长程结构与情绪递进"
+                     "强、乐器音色真实；新发布实测样本尚少，32kHz 输出",
         },
         "channels": ["replicate"],
         "local_runnable": False,
         "local_hf_id": None,
         "local_size_mb": 0,
-        "local_note": "本地部署需 8GB+ 显存 GPU；本机 CPU 请走 Replicate 托管",
-        "replicate_slug": "ace-step/ace-step",
-        "recommended": True,
-        "recommend_reason": "外部测评最优且能力完整（人声+歌词+多语言），云端一键使用",
+        "local_note": "8B 底座需 16GB+ 显存，本机不可跑；走 Replicate 托管（slug 需自查填写）",
+        "replicate_slug": "",
+        "recommended": False,
+        "recommend_reason": "",
+    },
+    {
+        "id": "songgeneration-2",
+        "name": "SongGeneration 2（LeVo 2）",
+        "vendor": "腾讯 AI Lab × 清华大学",
+        "license": "开源（见模型卡）",
+        "params": "4B（LLM+Diffusion 混合，分层表征）",
+        "capabilities": {"vocals": True, "lyrics_input": True, "max_duration_sec": 270,
+                         "languages": "中/英等多语"},
+        "benchmark": {
+            "score": 8.7,
+            "source": "LeVo 2 论文与社区横评（2026）",
+            "notes": "开源音质天花板档：歌词音素错误率低至 8.55%，人声/伴奏多轨表征"
+                     "精准控制，社区称效果对标 Suno 高版本",
+        },
+        "channels": ["replicate"],
+        "local_runnable": False,
+        "local_hf_id": None,
+        "local_size_mb": 0,
+        "local_note": "官方部署需 24GB+ 显存（社区量化版约 12GB），本机不可跑；"
+                      "走 Replicate 托管（slug 需自查填写）",
+        "replicate_slug": "",
+        "recommended": False,
+        "recommend_reason": "",
     },
     {
         "id": "yue",
@@ -48,8 +99,8 @@ MUSIC_CATALOG: list[dict] = [
         "benchmark": {
             "score": 8.3,
             "source": "YuE 技术报告（2025）主观评测",
-            "notes": "音乐性与演唱自然度强、风格控制细；推理慢、显存需求高（24GB+），"
-                     "长结构一致性弱于 ACE-Step",
+            "notes": "首个开源长篇歌曲基础模型，音乐性与演唱自然度强、风格控制细；"
+                     "推理慢、显存需求高，长结构一致性弱于 ACE-Step",
         },
         "channels": ["replicate"],
         "local_runnable": False,
@@ -57,6 +108,29 @@ MUSIC_CATALOG: list[dict] = [
         "local_size_mb": 0,
         "local_note": "本地部署需 24GB+ 显存；请走 Replicate 托管（slug 需自查填写）",
         "replicate_slug": "",   # 社区托管 slug 变动频繁，默认留空由用户填写
+        "recommended": False,
+        "recommend_reason": "",
+    },
+    {
+        "id": "khala",
+        "name": "Khala",
+        "vendor": "中央音乐学院 × 清华大学",
+        "license": "开源（见模型卡）",
+        "params": "64 层残差声学 Token（RVQ）",
+        "capabilities": {"vocals": True, "lyrics_input": True, "max_duration_sec": 240,
+                         "languages": "中/英"},
+        "benchmark": {
+            "score": 8.2,
+            "source": "Khala 技术报告与社区横评（2026）",
+            "notes": "高保真学术标杆：统一 64 层声学空间同时建模结构与细节，"
+                     "人声清晰度/乐器分离度/歌词节奏对齐开源第一梯队，适合研究底座",
+        },
+        "channels": ["replicate"],
+        "local_runnable": False,
+        "local_hf_id": None,
+        "local_size_mb": 0,
+        "local_note": "本地部署需 24GB+ 显存；请走 Replicate 托管（slug 需自查填写）",
+        "replicate_slug": "",
         "recommended": False,
         "recommend_reason": "",
     },
@@ -179,8 +253,9 @@ CATALOG_DISCLAIMER = (
     "每项 benchmark.source），仅作选型参考，非本系统实测结果。"
 )
 
-# 本机可下载运行的模型（musicgen_local 通道）
+# 本机可下载运行的模型（按通道分组：V1.4 musicgen_local / V1.5 acestep_local）
 LOCAL_RUNNABLE_IDS = [m["id"] for m in MUSIC_CATALOG if "musicgen_local" in m["channels"]]
+ACESTEP_RUNNABLE_IDS = [m["id"] for m in MUSIC_CATALOG if "acestep_local" in m["channels"]]
 
 CATALOG_BY_ID = {m["id"]: m for m in MUSIC_CATALOG}
 

@@ -381,7 +381,8 @@ def main() -> int:
               f"lyrics_head={(vb['data'].get('lyrics') or '')[:60]!r}")
 
     # ============ 模型中心 V1.4：开源歌曲模型目录（Replicate / 本机 MusicGen） ============
-    smoke_state = {"mg6_refunded": False}  # 15.6 终态自适应（未就绪=退款；真机成功=扣费）
+    smoke_state = {"mg6_refunded": False, "ace_ran": False, "ace_refunded": False}
+    # 15.6/15.10 终态自适应（未就绪=退款；真机成功=扣费不退）
     r = client.get(f"{API}/models/music-catalog", headers=auth_headers(token))
     b = unwrap(r)
     cat = b["data"]["models"] if r.status_code == 200 and b["code"] == 0 else []
@@ -471,7 +472,7 @@ def main() -> int:
                   mg_failed_clean, json.dumps(t.get("error"))[:200])
 
     r = client.post(f"{API}/models/music-pull", headers=auth_headers(token),
-                    json={"model": "ace-step"})
+                    json={"model": "yue"})
     b = unwrap(r)
     check("15.7 music-pull 非本机模型 → 40001", r.status_code == 422 and b["code"] == 40001)
 
@@ -493,6 +494,64 @@ def main() -> int:
               mop["status"] == "succeeded"
               or (mop["status"] == "failed" and "requirements-musicgen" in mop["error_message"]),
               json.dumps(mop)[:200])
+
+    # ACE-Step v1.5 本机通道（V1.5 批）：权重已就绪 → 秒级 succeeded（已存在即跳过）；
+    # 未部署 venv → failed 且 error_message 含 setup_acestep 部署指引
+    ace_ready = any(m["id"] == "ace-step" and m["local_status"] == "ready"
+                    for m in cat) if cat else False
+    r = client.post(f"{API}/models/music-pull", headers=auth_headers(token),
+                    json={"model": "ace-step"})
+    b = unwrap(r)
+    ap_ok = r.status_code == 202 and b["code"] == 0 and b["data"]["id"]
+    check("15.8b music-pull ace-step（202 异步受理；未部署→可读失败）",
+          ap_ok or (r.status_code == 422 and b["code"] == 40001), json.dumps(b)[:200])
+    if ap_ok:
+        mop_id = b["data"]["id"]
+        mop = {"status": "timeout"}
+        for _ in range(90):
+            time.sleep(2)
+            r2 = client.get(f"{API}/models/ops/{mop_id}", headers=auth_headers(token))
+            mop = unwrap(r2)["data"]
+            if mop["status"] not in ("queued", "running"):
+                break
+        check("15.8b music-pull ace-step 终态（就绪→succeeded/未部署→指引）",
+              mop["status"] == "succeeded"
+              or (mop["status"] == "failed" and "setup_acestep" in mop["error_message"]),
+              json.dumps(mop)[:200])
+
+    r = client.put(f"{API}/models/settings", headers=auth_headers(token),
+                   json={"music_backend": "acestep_local", "music_model": "ace-step"})
+    b = unwrap(r)
+    ac_ok = r.status_code == 200 and b["code"] == 0 \
+        and b["data"]["music_backend"] == "acestep_local"
+    check("15.10 切 acestep_local（ace-step）", ac_ok, json.dumps(b)[:200])
+    if ac_ok:
+        r = client.get(f"{API}/models/runtime", headers=auth_headers(token))
+        b = unwrap(r)
+        check("15.10 runtime 歌曲引擎显示 ACE-Step 本地",
+              b["data"]["song_engine"].startswith("ACE-Step 本地 · ACE-Step"),
+              b["data"].get("song_engine", ""))
+        r = client.post(f"{API}/generations", headers=auth_headers(token), json={
+            "mode": "simple", "simple_prompt": "夜风里的城市情歌", "seed": 900116,
+            "params": {"duration_sec": 30, "vocal": "female_air"},
+        })
+        b = unwrap(r)
+        ac_submit = (r.status_code == 201 and b["code"] == 0
+                     and b["data"]["task"]["provider"] == "acestep_local")
+        smoke_state["ace_ran"] = ac_submit
+        check("15.10 acestep 通道提交（task.provider 留痕）", ac_submit, json.dumps(b)[:200])
+        if ac_submit:
+            # 真机已部署+权重就绪 → 真实人声成曲（GPU turbo 实测 1~3 分钟）；未就绪 fail-fast
+            t = wait_task(client, b["data"]["task"]["id"], token, timeout=900)
+            ac_end = (
+                (t["status"] == "succeeded" and t["result"]
+                 and len(t["result"]["candidates"]) == 2)
+                or (t["status"] == "failed" and t["error"] is not None
+                    and ("未部署" in t["error"]["message"]
+                         or "未下载" in t["error"]["message"])))
+            smoke_state["ace_refunded"] = t["status"] == "failed"
+            check("15.10 acestep 执行终态（未就绪→fail-fast 指引；就绪→人声成曲成功）",
+                  ac_end, json.dumps(t.get("error") or t.get("result"))[:200])
 
     r = client.put(f"{API}/models/settings", headers=auth_headers(token),
                    json={"music_backend": "localsynth", "music_model": "",
@@ -1002,13 +1061,19 @@ def main() -> int:
     for t in sorted(txs, key=lambda x: x["created_at"]):
         chain_ok = chain_ok and (prev + t["delta"] == t["balance_after"] or True)
     check("10.2 GET /credits/transactions", r.status_code == 200
-          and len(gen_txs) == 11 and len(refund_txs) >= 2
+          and len(gen_txs) == 11 + (1 if smoke_state["ace_ran"] else 0)
+          and len(refund_txs) >= 2
           and all(t["balance_after"] >= 0 for t in txs))
 
-    # 注册 200 + studio 切换 10000 − 整曲 12×6（14.7/14.9/15.6/4.1/确定性/长任务）
-    # − 派生 6×5 + 取消退款（14.7/长任务 恒 2 笔；15.6 未就绪时 +1）= 10134 / 10122
-    expected_balance = 200 + 10000 - 72 - 30 + (36 if smoke_state["mg6_refunded"] else 24)
-    check(f"10.2 账本自洽（200 + 10000 − 72 − 30 + {36 if smoke_state['mg6_refunded'] else 24}"
+    # 注册 200 + studio 切换 10000 − 整曲 12×（14.7/14.9/15.6/4.1/确定性/长任务
+    # [+15.10 acestep 真机]）− 派生 6×5 + 取消退款（14.7/长任务 恒 2 笔；
+    # 15.6/15.10 未就绪时各 +1）
+    ace_cost = 12 if smoke_state["ace_ran"] else 0
+    ace_refund = 12 if smoke_state["ace_refunded"] else 0
+    expected_balance = (200 + 10000 - 72 - ace_cost - 30
+                        + (36 if smoke_state["mg6_refunded"] else 24) + ace_refund)
+    check(f"10.2 账本自洽（200 + 10000 − {72 + ace_cost} − 30 + "
+          f"{(36 if smoke_state['mg6_refunded'] else 24) + ace_refund}"
           f" = {expected_balance}）",
           balance_now == expected_balance, f"balance={balance_now}")
 

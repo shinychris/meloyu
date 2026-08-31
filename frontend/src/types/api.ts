@@ -489,8 +489,9 @@ export interface WorkDeleteResult {
 /* ============ models（V1.2 模型中心，契约 §5.8） ============ */
 export type LyricsBackend = 'localsynth' | 'ollama' | 'openai_compat'
 
-/** 歌曲生成引擎通道：本地合成 / Suno 兼容网关 / Replicate 开源模型托管 / 本机 MusicGen */
-export type MusicBackend = 'localsynth' | 'api' | 'replicate' | 'musicgen_local'
+/** 歌曲生成引擎通道：本地合成 / Suno 兼容网关 / Replicate 开源模型托管 /
+ *  本机 MusicGen（器乐）/ 本机 ACE-Step v1.5（人声成曲） */
+export type MusicBackend = 'localsynth' | 'api' | 'replicate' | 'musicgen_local' | 'acestep_local'
 
 export interface OllamaRuntime {
   host: string
@@ -545,6 +546,8 @@ export interface MusicCatalog {
     musicgen_deps_installed: boolean
     install_hint: string
     downloaded_ids: string[]
+    acestep_deps_installed: boolean
+    acestep_install_hint: string
   }
   selected: { music_backend: MusicBackend; music_model: string | null }
   replicate: { token_saved: boolean }

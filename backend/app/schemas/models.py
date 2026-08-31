@@ -29,6 +29,7 @@ class LLMSettingsRequest(BaseModel):
     V1.3 新增歌曲生成通道：music_backend ∈ localsynth|api；
     V1.4 扩展：music_backend 增 replicate|musicgen_local（开源模型目录通道，
     music_model 为目录模型 id；replicate_slugs 覆盖目录默认 slug）。
+    V1.5 扩展：music_backend 增 acestep_local（本机 ACE-Step v1.5 人声成曲）。
     """
     lyrics_backend: str | None = None
     ollama_host: str | None = Field(default=None, max_length=200)
@@ -54,8 +55,10 @@ class LLMSettingsRequest(BaseModel):
     @field_validator("music_backend")
     @classmethod
     def _music_backend(cls, v: str | None) -> str | None:
-        if v is not None and v not in ("localsynth", "api", "replicate", "musicgen_local"):
-            raise ValueError("music_backend 必须为 localsynth/api/replicate/musicgen_local")
+        if v is not None and v not in (
+                "localsynth", "api", "replicate", "musicgen_local", "acestep_local"):
+            raise ValueError("music_backend 必须为 localsynth/api/replicate/"
+                             "musicgen_local/acestep_local")
         return v
 
 

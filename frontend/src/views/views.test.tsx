@@ -97,6 +97,12 @@ describe('views render smoke', () => {
     expect(html).toContain('Replicate 开源模型托管')
     expect(html).toContain('本机 MusicGen（开源）')
   })
+
+  it('ModelCenterView 渲染本机 ACE-Step 通道卡（V1.5 人声成曲）', () => {
+    const html = render(<ModelCenterView />)
+    expect(html).toContain('本机 ACE-Step v1.5（开源·人声成曲）')
+    expect(html).toContain('歌词→真人声演唱完整歌曲')
+  })
 })
 
 /* ============ V1.1 候选派生操作（延长/变体/段落重生成） ============ */

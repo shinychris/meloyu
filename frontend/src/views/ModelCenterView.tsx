@@ -46,10 +46,16 @@ const BACKENDS: { value: LyricsBackend; title: string; desc: string }[] = [
 
 const MUSIC_BACKENDS: { value: MusicBackend; title: string; desc: string }[] = [
   { value: 'localsynth', title: '本地合成引擎', desc: '离线可用 · 算法作曲实时渲染 · 含分轨/MIDI（默认）' },
-  { value: 'api', title: '外部歌曲 API（Suno 兼容）', desc: '商业整曲模型（人声演唱）· 需网关与 Key · 约 1~5 分钟/首' },
+  { value: 'acestep_local', title: '本机 ACE-Step v1.5（开源·人声成曲）', desc: '歌词→真人声演唱完整歌曲 · 独立 venv 部署 · 8GB 显存档 · GPU 约 1~3 分钟/首' },
   { value: 'replicate', title: 'Replicate 开源模型托管', desc: '多类开源歌曲模型（ACE-Step/YuE/MusicGen…）· 一个 Token 全可用' },
+  { value: 'api', title: '外部歌曲 API（Suno 兼容）', desc: '商业整曲模型（人声演唱）· 需网关与 Key · 约 1~5 分钟/首' },
   { value: 'musicgen_local', title: '本机 MusicGen（开源）', desc: '本地真实下载与推理（器乐）· 免 API Key · CPU 可跑' },
 ]
+
+/** 支持本机下载运行的通道（目录按钮/状态按此泛化渲染） */
+const LOCAL_CHANNELS: MusicBackend[] = ['acestep_local', 'musicgen_local']
+const localChannelOf = (m: MusicCatalogModel): MusicBackend | undefined =>
+  m.channels.find((c) => LOCAL_CHANNELS.includes(c))
 
 const OP_TYPE_LABEL: Record<ModelOpInfo['op_type'], string> = {
   pull: '下载', delete: '删除', music_pull: '下载', music_delete: '删除',
@@ -289,12 +295,9 @@ export default function ModelCenterView() {
       toast('Replicate 通道需先保存 API Token（见下方开源模型目录）')
       return
     }
-    if (target === 'replicate' && !settings?.music_model) {
+    if ((target === 'replicate' || target === 'musicgen_local' || target === 'acestep_local')
+        && !settings?.music_model) {
       toast('请先在下方目录中选择一个开源模型')
-      return
-    }
-    if (target === 'musicgen_local' && !settings?.music_model) {
-      toast('请先在下方目录中选择支持本机运行的模型（MusicGen）')
       return
     }
     setMusicSaving(true)
@@ -363,8 +366,8 @@ export default function ModelCenterView() {
 
   /** 使用目录模型：后端按模型通道自动推断 music_backend（显式传入时优先） */
   const useCatalogModel = async (m: MusicCatalogModel, channel?: MusicBackend) => {
-    if (channel === 'replicate' || (!channel && m.channels.includes('replicate')
-        && !m.channels.includes('musicgen_local'))) {
+    const hasLocal = m.channels.some((c) => LOCAL_CHANNELS.includes(c))
+    if (channel === 'replicate' || (!channel && !hasLocal)) {
       if (!settings?.replicate_api_token.has_key && !replicateKey.trim()) {
         toast('该模型走 Replicate 托管，请先在下方保存 API Token')
         return
@@ -447,8 +450,8 @@ export default function ModelCenterView() {
         <h1 className="text-[22px] font-extrabold tracking-tight mt-2">AI 引擎与模型管理</h1>
         <p className="text-[12px] mt-2" style={{ color: 'var(--dim)' }}>
           歌词引擎：本地规则（离线兜底）/ 本地开源模型（Ollama）/ 外部 API（OpenAI 兼容）；
-          歌曲引擎：本地合成（离线兜底）/ 外部歌曲 API（Suno 兼容）/ Replicate 开源模型托管 /
-          本机 MusicGen——开源模型按外部测评参考分排序并给出推荐（见下方目录）。引擎失败时自动回退本地引擎，创作不中断。
+          歌曲引擎：本机 ACE-Step v1.5（开源人声成曲）/ 本地合成（离线兜底）/ Replicate
+          开源模型托管 / 外部歌曲 API / 本机 MusicGen——开源模型按外部测评参考分排序并给出推荐（见下方目录）。引擎失败时自动回退本地引擎，创作不中断。
         </p>
 
         {/* 运行时状态 */}
@@ -513,7 +516,8 @@ export default function ModelCenterView() {
                       toast('请先在下方目录区保存 Replicate API Token')
                       return
                     }
-                    if (b.value === 'musicgen_local' && !settings?.music_model) {
+                    if ((b.value === 'musicgen_local' || b.value === 'acestep_local')
+                        && !settings?.music_model) {
                       toast('请先在下方目录选择支持本机运行的模型')
                       return
                     }
@@ -682,7 +686,12 @@ export default function ModelCenterView() {
             </div>
             {catalog && !catalog.machine.musicgen_deps_installed && (
               <div className="text-[11px] mt-3 leading-relaxed" style={{ color: 'var(--dim)' }}>
-                {catalog.machine.install_hint}
+                MusicGen：{catalog.machine.install_hint}
+              </div>
+            )}
+            {catalog && !catalog.machine.acestep_deps_installed && (
+              <div className="text-[11px] mt-2 leading-relaxed" style={{ color: 'var(--dim)' }}>
+                ACE-Step：{catalog.machine.acestep_install_hint}
               </div>
             )}
           </div>
@@ -691,6 +700,7 @@ export default function ModelCenterView() {
           <div className="mt-3 space-y-3">
             {(catalog?.models || []).map((m) => {
               const st = localStatusText(m)
+              const localChannel = localChannelOf(m)
               return (
                 <div key={m.id} className="card p-4" style={m.selected ? { borderColor: 'var(--acc)' } : undefined}>
                   <div className="flex items-start gap-3 flex-wrap">
@@ -741,7 +751,7 @@ export default function ModelCenterView() {
                           {m.capabilities.languages}
                         </span>
                         <span className="text-[10px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>
-                          {m.channels.includes('musicgen_local') ? '本机/托管' : 'Replicate 托管'}
+                          {localChannel ? '本机/托管' : 'Replicate 托管'}
                         </span>
                       </div>
                       <div className="text-[10px] mt-1.5 leading-relaxed" style={{ color: 'var(--dim)' }}>
@@ -758,12 +768,12 @@ export default function ModelCenterView() {
                           云端使用
                         </button>
                       )}
-                      {m.channels.includes('musicgen_local') && (
+                      {localChannel && (
                         <>
                           <button
                             className="btn !py-1 !px-2.5 text-[11px]"
                             disabled={catalogBusy || m.selected}
-                            onClick={() => void useCatalogModel(m, 'musicgen_local')}
+                            onClick={() => void useCatalogModel(m, localChannel)}
                           >
                             本机使用
                           </button>

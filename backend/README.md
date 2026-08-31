@@ -1,6 +1,6 @@
 # Meloyu Backend · FastAPI 单体服务
 
-AI 音乐创作系统的后端：53 个契约接口 + 四通道歌曲生成（本地合成 / Suno 网关 / Replicate 开源模型托管 / 本机 MusicGen）+ 歌词 LLM 双通道（Ollama / OpenAI 兼容）+ SQLite 任务/积分/作品库。
+AI 音乐创作系统的后端：53 个契约接口 + 五通道歌曲生成（本地合成 / Suno 网关 / Replicate 开源模型托管 / 本机 MusicGen / 本机 ACE-Step v1.5 人声成曲）+ 歌词 LLM 双通道（Ollama / OpenAI 兼容）+ SQLite 任务/积分/作品库。
 
 ## 环境要求
 
@@ -70,12 +70,16 @@ master.wav SHA-256 一致」确定性验证与「simple 模式执行线程自动
 | 歌曲/整曲生成 | 外部歌曲生成 API（Suno 兼容） | `music_backend=api` + `music_api_base_url`（网关根，自动补 /api/v1）+ Key |
 | 同上 | **Replicate 开源模型托管（V1.4）** | `music_backend=replicate` + `replicate_api_token` + 目录选模型（ACE-Step/YuE/DiffRhythm/MusicGen…） |
 | 同上 | **本机 MusicGen（V1.4，离线免 Key）** | `music_backend=musicgen_local` + 目录选 musicgen-small|medium + 下载权重 |
+| 同上 | **本机 ACE-Step v1.5（V1.5，人声成曲）** | 先 `python scripts/setup_acestep.py`（独立 venv，约 4GB 依赖），再 `music_backend=acestep_local` + 目录选 ace-step + 下载权重（约 11GB） |
 | 同上 | 本地合成引擎（离线兜底） | `music_backend=localsynth`（默认） |
 
-- **开源模型目录**（GET /models/music-catalog）：7 个开源歌曲模型按**外部测评参考分**降序
-  （ACE-Step 9.0 / YuE 8.3 / DiffRhythm 8.0 / MusicGen 大中小 / Stable Audio Open），
+- **开源模型目录**（GET /models/music-catalog）：10 个开源歌曲模型按**外部测评参考分**降序
+  （ACE-Step v1.5 9.3 / MiniMax Music 3 8.8 / SongGeneration 2 8.7 / YuE 8.3 / Khala 8.2 / DiffRhythm 8.0 / MusicGen 大中小 / Stable Audio Open），
   含能力矩阵、来源与免责声明（分数综合自公开论文/技术报告，非本系统实测）；推荐
-  ACE-Step（云端首选）与 MusicGen Small（离线免 Key 首选）。
+  ACE-Step v1.5（本机 8GB 显存即可人声成曲，推荐）与 MusicGen Small（离线免 Key 器乐档）。
+- **本机 ACE-Step v1.5 通道**：独立 venv 子进程桥（ADR-016）——其依赖钉死 torch 2.7.1+cu128
+  与后端 venv（MusicGen 用 torch 2.13+cu130）互斥，故部署于 `data/acestep/`（gitignored）；
+  推理经 `scripts/acestep_runner.py` 子进程，stdout JSON Lines 回传进度，取消=terminate。
 - Replicate 通道：一个 Token 接全部目录模型；每模型白名单 input 适配；一次并行 2 个
   prediction 对应 A/B 候选；社区 slug 变动可在 `replicate_slugs` 覆盖。
 - 本机 MusicGen：HF 真实下载（POST /models/music-pull，进度轮询）+ transformers 推理
