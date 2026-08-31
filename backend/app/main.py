@@ -43,12 +43,41 @@ async def biz_error_handler(request: Request, exc: BizError):
     return fail(exc)
 
 
+_FIELD_LABELS = {
+    "simple_prompt": "一句话描述", "style_prompt": "风格描述", "lyrics": "歌词",
+    "negative_prompt": "排除元素", "mode": "创作模式", "model": "模型",
+    "email": "邮箱", "password": "密码", "format": "格式", "version_id": "版本",
+    "work_id": "作品", "parent_version_id": "父版本",
+    "params.duration_sec": "时长", "params.bpm": "BPM", "params.vocal": "人声",
+    "params.language": "语言", "params.time_signature": "拍号",
+    "params.key.tonic": "调性（主音）", "params.key.mode": "调性（大小调）",
+    "params.instrument_density": "器乐密度",
+}
+
+
+def _localize_validation(field: str, msg: str) -> str:
+    """pydantic 英文校验消息 → 面向用户的中文提示（真实业务测试发现 #10）。"""
+    import re as _re
+
+    label = _FIELD_LABELS.get(field)
+    m = _re.match(r"String should have at most (\d+) characters", msg)
+    if m:
+        return f"{label or '该字段'}不能超过 {m.group(1)} 字"
+    m = _re.match(r"String should have at least (\d+) characters", msg)
+    if m:
+        return f"{label or '该字段'}不能少于 {m.group(1)} 字"
+    if msg == "Field required":
+        return f"缺少必填字段：{label or field}"
+    return f"{label or '该字段'}{msg}" if label else msg
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(request: Request, exc: RequestValidationError):
     details = []
     for err in exc.errors():
         loc = ".".join(str(x) for x in err.get("loc", []) if x not in ("body", "query"))
-        details.append({"field": loc or ".", "message": str(err.get("msg", "校验失败"))})
+        raw = str(err.get("msg", "校验失败"))
+        details.append({"field": loc or ".", "message": _localize_validation(loc, raw)})
     first = details[0]["message"] if details else "参数错误"
     return JSONResponse(
         status_code=422,

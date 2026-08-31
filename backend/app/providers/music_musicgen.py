@@ -217,13 +217,24 @@ class MusicGenLocalProvider:
         # guidance_scale=1.0：关闭 classifier-free guidance 分支——该分支在 CUDA 上存在
         # flaky 设备端索引断言（srcIndex < srcSelectDimSize，真机中文风格+人声请求实测
         # 两次命中并拖死进程），关掉后损失少量文本贴合度换取稳定；采样路径不受影响。
+        from transformers import StoppingCriteria, StoppingCriteriaList
+
+        class _CancelStopping(StoppingCriteria):
+            """逐解码步检查取消标志：采样阶段（占绝大部分耗时）也能秒级响应取消，
+            而不必等到下一阶段边界。提前停止的部分音频不会落盘（下一 _stage 即抛取消）。"""
+
+            def __call__(self, input_ids, scores, **kwargs) -> bool:  # noqa: ARG002
+                return bool(should_cancel())
+
         def _sample(dev_inputs, dev_model, dev: str):
             torch.manual_seed(request.seed)
             if dev == "cuda":
                 torch.cuda.manual_seed_all(request.seed)
             with torch.no_grad():
-                return dev_model.generate(**dev_inputs, do_sample=True, guidance_scale=1.0,
-                                          max_new_tokens=int(duration * 50)).cpu()
+                return dev_model.generate(
+                    **dev_inputs, do_sample=True, guidance_scale=1.0,
+                    max_new_tokens=int(duration * 50),
+                    stopping_criteria=StoppingCriteriaList([_CancelStopping()])).cpu()
 
         try:
             audio = _sample(inputs, model, device)

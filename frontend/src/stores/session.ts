@@ -15,6 +15,8 @@ interface SessionState {
   logout: () => void
   /** 重新拉取 /auth/me（生成成功/切档后刷新积分） */
   refreshUser: () => Promise<void>
+  /** 只刷新积分余额（提交生成即时扣分后同步侧栏，不等任务终态） */
+  refreshCredits: () => Promise<void>
   /** 契约 §13.5：登录后首屏并行 /auth/me + /credits/balance */
   bootstrap: () => Promise<void>
 }
@@ -42,6 +44,18 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       set({ user })
     } catch {
       /* 拦截器已 toast / 跳登录 */
+    }
+  },
+
+  async refreshCredits() {
+    try {
+      const balance = await getCreditsBalance()
+      const user = get().user
+      if (user) {
+        set({ user: { ...user, credits: { ...user.credits, balance: balance.balance } } })
+      }
+    } catch {
+      /* 静默：余额刷新失败不打断创作流 */
     }
   },
 

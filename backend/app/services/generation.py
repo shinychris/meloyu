@@ -142,6 +142,10 @@ def submit_generation(db: Session, user: User, payload: dict) -> dict:
     now = utc_now_iso()
     if work_id:
         work = works_svc.get_work_row(db, work_id, user)
+        # 指向「全空壳被自动清理」的作品重新提交（如重试）：先恢复，避免成果落入回收站
+        if work.trashed_at is not None:
+            work.trashed_at = None
+            work.updated_at = now
     else:
         title = _derive_title(payload, params)
         work = Work(user_id=user.id, display_code=works_svc.new_display_code(db),
@@ -504,6 +508,10 @@ def rollback_empty_current_version(db: Session, task_id: str) -> None:
     任务在提交时已建版本；失败/取消后该版本 candidate_count=0，
     若 work.current 正指向它，则回滚到最近的非空版本（通常为 parent）。
     不删除版本行（任务/事件外键仍引用），版本树 current 解析另跳过空版本。
+
+    若作品所有版本均为空（首次生成即失败，无任何候选/文件产出），
+    则将作品移入回收站（trashed_at），避免「全部作品」列表残留同名空壳
+    与后续成功作品混淆（真实业务测试发现 #7）；带显式 work_id 重提交会自动恢复。
     """
     t = db.get(Task, task_id)
     if t is None or t.version_id is None:
@@ -516,6 +524,9 @@ def rollback_empty_current_version(db: Session, task_id: str) -> None:
         return
     if work.active_version_id == version.id:
         work.active_version_id = _fallback_current_version(db, work.id, version.id)
+        work.updated_at = utc_now_iso()
+    if _fallback_current_version(db, work.id, version.id) is None and work.trashed_at is None:
+        work.trashed_at = utc_now_iso()
         work.updated_at = utc_now_iso()
 
 

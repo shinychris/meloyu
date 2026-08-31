@@ -234,6 +234,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     try {
       const result = await submitGeneration(req)
       set({ task: result.task, workId: result.work.id, workTitle: result.work.title })
+      // 积分在提交时即被扣减：立刻同步侧栏余额，不等任务终态（真实业务测试发现 #5）
+      void useSessionStore.getState().refreshCredits()
       get().logOp(
         `提交生成（${result.cost_credits} 积分）${opts?.simplified ? ' · 精简重试' : ''}`,
       )

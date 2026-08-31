@@ -12,7 +12,7 @@ npm run dev        # http://localhost:5173（/api 代理到 127.0.0.1:8000）
 
 后端（`backend/`，FastAPI :8000）需同时运行；无后端时页面会停在登录页，`/system/meta` 拉取失败会静默回退到与契约一致的本地枚举兜底。
 
-演示账号：`demo@meloyu.local / Demo123456!`
+演示账号：`demo@meloyu.local / Meloyu2026`
 
 ## 常用命令
 

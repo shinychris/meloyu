@@ -106,7 +106,7 @@ def _abs(path: str) -> Path:
 
 def _register(db: Session, work: Work, version: Version, *, kind: str, relpath: str,
               mime: str, path: Path, duration_sec: float | None, name: str,
-              stem_name: str | None = None) -> File:
+              stem_name: str | None = None, sample_rate: int | None = None) -> File:
     import hashlib
 
     from sqlalchemy import select
@@ -127,11 +127,20 @@ def _register(db: Session, work: Work, version: Version, *, kind: str, relpath: 
     f = File(work_id=work.id, version_id=version.id, candidate_id=None, kind=kind,
              stem_name=stem_name, name=name, path=relpath, mime=mime,
              bytes=path.stat().st_size, duration_sec=duration_sec,
-             sample_rate=48000 if path.suffix == ".wav" else None,
+             sample_rate=sample_rate,
              sha256=digest, created_at=now, updated_at=now)
     db.add(f)
     db.flush()
     return f
+
+
+def _wav_sample_rate(path: Path) -> int | None:
+    """读 wav 头取真实采样率（外部模型母带可能是 32kHz 等，非本地引擎 48kHz）。"""
+    try:
+        with wav_mod.open(str(path), "rb") as wf:
+            return wf.getframerate()
+    except Exception:  # noqa: BLE001 —— 头解析失败不阻断导出，登记留空
+        return None
 
 
 def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate,
@@ -155,6 +164,7 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
         raise err_conflict("该候选母带为 mp3（外部歌曲 API 通道），仅支持 MP3 导出")
 
     if fmt == "mp3":
+        src_rate: int | None = None
         if mp3_master:
             # 母带即 mp3：直接复制（无 WAV 可解码，不做有损→有损二压）
             p = exports_dir / "export.mp3"
@@ -164,6 +174,7 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
                 n = wf.getnframes()
                 ch = wf.getnchannels()
                 sw = wf.getsampwidth()
+                src_rate = wf.getframerate()
                 raw = wf.readframes(n)
             data = _wav_bytes_to_float(raw, sw)
             if ch == 1:
@@ -171,10 +182,13 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
             else:
                 left, right = data[0::2], data[1::2]
             p = exports_dir / "export.mp3"
-            encode_mp3(p, left, right, bitrate=320)
+            # 按母带真实采样率编码：外部模型母带可能非 48kHz（如 MusicGen 32kHz），
+            # 若按默认 48k 编码会把全部样本时间轴压缩（时长缩水、变速变调）
+            encode_mp3(p, left, right, bitrate=320, sample_rate=src_rate)
         row = _register(db, work, version, kind="export_mp3", relpath=f"{base}/export.mp3",
                         mime="audio/mpeg", path=p, duration_sec=master.duration_sec,
-                        name=f"{work.display_code}_{version.version_no}_export_mp3.mp3")
+                        name=f"{work.display_code}_{version.version_no}_export_mp3.mp3",
+                        sample_rate=src_rate)
         out.append(file_ref(row))
 
     elif fmt == "wav":
@@ -182,7 +196,8 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
         p.write_bytes(_abs(master.path).read_bytes())
         row = _register(db, work, version, kind="export_wav", relpath=f"{base}/master.wav",
                         mime="audio/wav", path=p, duration_sec=master.duration_sec,
-                        name=f"{work.display_code}_{version.version_no}_export_wav.wav")
+                        name=f"{work.display_code}_{version.version_no}_export_wav.wav",
+                        sample_rate=_wav_sample_rate(p))
         out.append(file_ref(row))
 
     elif fmt == "midi":
