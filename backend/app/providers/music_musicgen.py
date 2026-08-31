@@ -56,6 +56,11 @@ def _apply_hf_endpoint() -> None:
         os.environ.setdefault("HF_ENDPOINT", settings.hf_endpoint)
 
 
+# 进程级标记：CUDA 设备断言毒化上下文后置 True，本进程后续生成一律走 CPU
+# （重启服务后自动恢复尝试 GPU）
+_CUDA_POISONED = {"flag": False}
+
+
 class MusicGenLocalError(Exception):
     """MusicGen 本地通道错误。kind ∈ deps|download|runtime。"""
 
@@ -185,8 +190,9 @@ class MusicGenLocalProvider:
 
         _apply_hf_endpoint()
 
-        # GPU 优先（RTX 等独显较 CPU 快一个量级）；无 CUDA 环境回退 CPU
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        # GPU 优先；进程内曾触发 CUDA 设备断言后禁用（断言会毒化上下文并拖死进程）
+        device = "cpu" if _CUDA_POISONED["flag"] else (
+            "cuda" if torch.cuda.is_available() else "cpu")
         duration = min(request.duration_sec, self.max_duration)
         _stage(progress, should_cancel, "model_load", 4,
                f"加载本地模型 {self.hf_id}（{device.upper()}，首次加载较慢）")
@@ -207,13 +213,38 @@ class MusicGenLocalProvider:
             est = f"CPU 约 {est_min}~{est_min * 3} 分钟"
         _stage(progress, should_cancel, "model_sample", 25,
                f"模型采样中（{duration}s 器乐 ×2 候选，{est}）")
-        torch.manual_seed(request.seed)
-        if device == "cuda":
-            torch.cuda.manual_seed_all(request.seed)
-        with torch.no_grad():
-            audio = model.generate(**inputs, do_sample=True, guidance_scale=3.0,
-                                   max_new_tokens=int(duration * 50))
-        audio = audio.cpu()
+
+        # guidance_scale=1.0：关闭 classifier-free guidance 分支——该分支在 CUDA 上存在
+        # flaky 设备端索引断言（srcIndex < srcSelectDimSize，真机中文风格+人声请求实测
+        # 两次命中并拖死进程），关掉后损失少量文本贴合度换取稳定；采样路径不受影响。
+        def _sample(dev_inputs, dev_model, dev: str):
+            torch.manual_seed(request.seed)
+            if dev == "cuda":
+                torch.cuda.manual_seed_all(request.seed)
+            with torch.no_grad():
+                return dev_model.generate(**dev_inputs, do_sample=True, guidance_scale=1.0,
+                                          max_new_tokens=int(duration * 50)).cpu()
+
+        try:
+            audio = _sample(inputs, model, device)
+        except RuntimeError as e:
+            if device != "cuda":
+                raise
+            # CUDA 设备断言：上下文已毒化——本进程后续禁用 CUDA，换 CPU 重载重试
+            _CUDA_POISONED["flag"] = True
+            logger.warning(f"musicgen CUDA 采样失败（设备断言类），本进程降级 CPU 重试: {e}")
+            del model
+            try:
+                torch.cuda.empty_cache()
+            except RuntimeError:  # noqa: BLE001 —— 清理失败不影响 CPU 重试
+                pass
+            _stage(progress, should_cancel, "model_sample", 30,
+                   "GPU 采样异常，已切换 CPU 重试（本进程内不再使用 GPU）")
+            device = "cpu"
+            model = MusicgenForConditionalGeneration.from_pretrained(
+                self.hf_id, cache_dir=str(hf_cache_dir()))
+            inputs = processor(text=[desc, desc], padding=True, return_tensors="pt")
+            audio = _sample(inputs, model, device)
         _stage(progress, should_cancel, "model_export", 88, "导出音频…")
 
         dest = Path(dest_dir)
