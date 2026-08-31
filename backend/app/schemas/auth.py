@@ -178,6 +178,33 @@ class ExportRequest(BaseModel):
         return _check_uuid(v)
 
 
+class ExtendRequest(BaseModel):
+    """契约 §5.5：从候选结尾续写 15~60 秒。"""
+    seconds: int = Field(ge=15, le=60)
+
+
+class VariantRequest(BaseModel):
+    """契约 §5.6：同结构换编曲风格（style_prompt ≤500 字）。"""
+    style_prompt: str = Field(min_length=1, max_length=500)
+
+
+class RegenSectionRequest(BaseModel):
+    """契约 §5.7：仅重生成指定段落（section 枚举，须存在于候选 structure）。"""
+    section: str
+
+    @field_validator("section")
+    @classmethod
+    def _sec(cls, v: str) -> str:
+        if v not in SECTIONS:
+            raise ValueError(f"section 必须为 {SECTIONS} 之一")
+        return v
+
+
+class LyricDraftRequest(BaseModel):
+    """V1.1 歌词草稿云端持久化（单用户单草稿）。"""
+    text: str = Field(default="", max_length=4000)
+
+
 class SwitchPlanRequest(BaseModel):
     plan: str
 

@@ -90,7 +90,8 @@ def check_generation_content(payload: dict) -> None:
         raise err_sensitive()
 
 
-def _check_free_daily_limit(db: Session, user: User) -> None:
+def check_free_daily_limit(db: Session, user: User) -> None:
+    """免费档每日生成限额（含 extend/variant/regen-section 派生任务）。"""
     if user.plan != "free":
         return
     from datetime import datetime, timedelta
@@ -109,7 +110,7 @@ def _check_free_daily_limit(db: Session, user: User) -> None:
 
 def submit_generation(db: Session, user: User, payload: dict) -> dict:
     check_generation_content(payload)
-    _check_free_daily_limit(db, user)
+    check_free_daily_limit(db, user)
 
     resolved = resolve_generation_request(payload)
     params = resolved["params"]
@@ -211,6 +212,7 @@ def execute_generation(task_id: str) -> None:
 
     try:
         payload_row = task.request_payload or {}
+        derived_spec = payload_row.get("_derived") if isinstance(payload_row, dict) else None
         resolved = payload_row.get("_resolved") or {}
         params = resolved["params"]
         req = SongRequest(
@@ -234,7 +236,12 @@ def execute_generation(task_id: str) -> None:
                 t = db2.get(Task, task_id)
                 return bool(t and t.cancel_requested)
 
-        output = provider.generate(req, progress, should_cancel, str(dest))
+        if derived_spec:
+            base_dir = str(settings.audio_path / derived_spec["base_dir"])
+            output = provider.generate_derived(req, derived_spec, base_dir,
+                                               progress, should_cancel, str(dest))
+        else:
+            output = provider.generate(req, progress, should_cancel, str(dest))
 
         with SessionLocal() as db:
             _persist_success(db, task_id, user_id, output)
@@ -243,17 +250,20 @@ def execute_generation(task_id: str) -> None:
         with SessionLocal() as db:
             _finish_task(db, task_id, "canceled", None, None)
             _refund(db, task_id)
+            rollback_empty_current_version(db, task_id)
             db.commit()
     except TimeoutError as e:
         with SessionLocal() as db:
             _finish_task(db, task_id, "failed", 50002, f"生成失败：渲染超时 {e}")
             _refund(db, task_id)
+            rollback_empty_current_version(db, task_id)
             db.commit()
     except Exception as e:  # noqa: BLE001 —— 任务级兜底，退款 + 50002
         logger.exception(f"generation {task_id} failed: {e}")
         with SessionLocal() as db:
             _finish_task(db, task_id, "failed", 50002, f"生成失败：{type(e).__name__} {e}")
             _refund(db, task_id)
+            rollback_empty_current_version(db, task_id)
             db.commit()
 
 
@@ -279,6 +289,7 @@ def _persist_success(db: Session, task_id: str, user_id: str, output) -> None:
     version = db.get(Version, task.version_id)
     now = utc_now_iso()
     result_candidates = []
+    first_cand = None
     for art in output.candidates:
         cand = Candidate(
             version_id=version.id, label=art.label, adopted=False, seed=art.seed,
@@ -290,6 +301,8 @@ def _persist_success(db: Session, task_id: str, user_id: str, output) -> None:
         )
         db.add(cand)
         db.flush()
+        if first_cand is None:
+            first_cand = cand
         for fmeta in art.files:
             db.add(File(
                 work_id=work.id, version_id=version.id, candidate_id=cand.id,
@@ -324,8 +337,24 @@ def _persist_success(db: Session, task_id: str, user_id: str, output) -> None:
     version.inferred_structure = bool(output.inferred_structure)
     if version.active_candidate_id is None and result_candidates:
         pass  # 不自动采用，等待用户 adopt（契约语义）
+    # V1.1 派生任务（extend/variant/regen-section）：子版本自动 adopt 首个候选，
+    # 避免出现「无活跃候选的空壳子版本」（不写 human adopt 事件，不计入人工参与统计）
+    derived_spec = (task.request_payload or {}).get("_derived") if task.request_payload else None
+    if derived_spec and first_cand is not None:
+        first_cand.adopted = True
+        version.active_candidate_id = first_cand.id
+        work.bpm = first_cand.bpm
+        work.key_tonic = first_cand.key_tonic
+        work.key_mode = first_cand.key_mode
+        work.duration_sec = first_cand.duration_sec
+        work.model = version.params.get("model", work.model)
+        work.active_version_id = version.id
+        if result_candidates and result_candidates[0].get("preview_file_id"):
+            work.preview_file_id = result_candidates[0]["preview_file_id"]
     works_svc.add_event(db, user_id=user_id, action="generate", actor="ai",
                         detail={"task_id": task.id, "provider": "localsynth",
+                                "derived_op": derived_spec.get("op") if derived_spec else None,
+                                "auto_adopted": bool(derived_spec),
                                 "candidates": [rc["label"] for rc in result_candidates]},
                         work_id=work.id, version_id=version.id)
     task.status = "succeeded"
@@ -373,6 +402,37 @@ def _refund(db: Session, task_id: str) -> None:
     refund(db, user.id, t.cost_credits, t.id)
 
 
+def _fallback_current_version(db: Session, work_id: str, exclude_id: str) -> str | None:
+    """最近的非空版本（候选数 > 0）；无则 None。"""
+    row = db.execute(
+        select(Version).where(Version.work_id == work_id, Version.id != exclude_id,
+                              Version.candidate_count > 0)
+        .order_by(Version.created_at.desc(), Version.id.desc()).limit(1)
+    ).scalars().first()
+    return row.id if row else None
+
+
+def rollback_empty_current_version(db: Session, task_id: str) -> None:
+    """任务终态（canceled/failed）后回滚空版本电流向（模拟用户测试发现 #4）。
+
+    任务在提交时已建版本；失败/取消后该版本 candidate_count=0，
+    若 work.current 正指向它，则回滚到最近的非空版本（通常为 parent）。
+    不删除版本行（任务/事件外键仍引用），版本树 current 解析另跳过空版本。
+    """
+    t = db.get(Task, task_id)
+    if t is None or t.version_id is None:
+        return
+    version = db.get(Version, t.version_id)
+    if version is None or version.candidate_count > 0:
+        return
+    work = db.get(Work, version.work_id)
+    if work is None:
+        return
+    if work.active_version_id == version.id:
+        work.active_version_id = _fallback_current_version(db, work.id, version.id)
+        work.updated_at = utc_now_iso()
+
+
 # ---------- 查询 / 取消 ----------
 
 def get_task_owned(db: Session, task_id: str, user: User) -> Task:
@@ -412,7 +472,8 @@ def cancel_task(db: Session, user: User, task_id: str) -> dict:
         task.finished_at = utc_now_iso()
         task.updated_at = utc_now_iso()
         _refund(db, task.id)
-        db.commit()  # 终态与退款同事务提交
+        rollback_empty_current_version(db, task.id)
+        db.commit()  # 终态、退款与电流向回滚同事务提交
         db.refresh(task)
         return task_to_dict(task)
     # running：置取消标志，渲染循环在阶段边界到达

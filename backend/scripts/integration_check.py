@@ -1,10 +1,10 @@
-# -*- coding: utf-8 -*-
 """M5 联调补充核对：导出全链路 + F-6 正向 + 新作品作品库闭环
 用法: python -X utf8 scripts/integration_check.py
 """
 import json
 import os
 import sys
+import time
 import urllib.request
 
 BASE = "http://localhost:5173/api/v1"  # 经 Vite 代理，等价于前端真实链路
@@ -75,7 +75,7 @@ def main():
             st2, d2 = call("GET", f"/tasks/{etid}", token=tok)
             if d2["data"]["status"] in ("succeeded", "failed"):
                 break
-            import time; time.sleep(1)
+            time.sleep(1)
         t = d2["data"]
         files = (t.get("result") or {}).get("files", [])
         names = [(f["name"], f["bytes"]) for f in files]

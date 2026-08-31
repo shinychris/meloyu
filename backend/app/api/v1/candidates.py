@@ -1,4 +1,4 @@
-"""候选路由（6 接口 + 版本候选列表在 versions.py）。"""
+"""候选路由（6 接口 + 版本候选列表在 versions.py；extend/variant/regen-section 为 V1.1 真实实现）。"""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -6,11 +6,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core import audio_files as af
-from app.core.errors import err_not_found, err_not_implemented, err_validation
+from app.core.errors import err_not_found, err_validation
 from app.core.responses import ok
 from app.core.security import get_current_user, get_current_user_optional
 from app.database import get_db
 from app.models import File, User
+from app.schemas.auth import ExtendRequest, RegenSectionRequest, VariantRequest
+from app.services import editing as edit_svc
 from app.services import generation as gen_svc
 from app.services.serializers import candidate_to_dict
 
@@ -47,16 +49,24 @@ def candidate_audio(candidate_id: str, request: Request,
     return af.file_stream_response(request, f)
 
 
-@router.post("/{candidate_id}/extend")
-def extend(candidate_id: str, user: User = Depends(get_current_user)):
-    raise err_not_implemented("extend")
+@router.post("/{candidate_id}/extend", status_code=201)
+def extend(candidate_id: str, body: ExtendRequest,
+           user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """从候选结尾续写 15~60 秒：同 key/BPM/风格/人声，尾部延续并交叉淡化拼接建子版本。"""
+    return ok(edit_svc.submit_extend(db, user, candidate_id, body.seconds), status_code=201)
 
 
-@router.post("/{candidate_id}/variant")
-def variant(candidate_id: str, user: User = Depends(get_current_user)):
-    raise err_not_implemented("variant")
+@router.post("/{candidate_id}/variant", status_code=201)
+def variant(candidate_id: str, body: VariantRequest,
+            user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """同结构（段落划分/时长逐段一致）换编曲风格，生成新候选建子版本。"""
+    return ok(edit_svc.submit_variant(db, user, candidate_id, body.style_prompt),
+              status_code=201)
 
 
-@router.post("/{candidate_id}/regen-section")
-def regen_section(candidate_id: str, user: User = Depends(get_current_user)):
-    raise err_not_implemented("regen-section")
+@router.post("/{candidate_id}/regen-section", status_code=201)
+def regen_section(candidate_id: str, body: RegenSectionRequest,
+                  user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """仅重生成指定段落：非选区段音频逐字节不变（sha256 校验），建子版本。"""
+    return ok(edit_svc.submit_regen_section(db, user, candidate_id, body.section),
+              status_code=201)

@@ -1,4 +1,4 @@
-"""WAV 写盘（stdlib wave）：16bit 预览中间格式 / 24bit 母带与分轨。"""
+"""WAV 读写（stdlib wave）：16bit 预览中间格式 / 24bit 母带与分轨。"""
 from __future__ import annotations
 
 import wave
@@ -41,3 +41,28 @@ def write_wav(path: str | Path, channels: list[np.ndarray], bits: int = 24,
         wf.setframerate(sample_rate)
         wf.writeframes(raw)
     return path.stat().st_size
+
+
+def read_wav(path: str | Path) -> list[np.ndarray]:
+    """读 WAV → 各声道 float [-1,1] 数组列表（write_wav 的逆操作，逐样本无损）。
+
+    24bit 定点 ↔ float 往返精确（|v| < 2^53 内浮点乘除无损），保证
+    regen-section 复制非选区采样后重新写盘字节级不变（FR-6 验收基础）。
+    """
+    with wave.open(str(path), "rb") as wf:
+        ch, sw = wf.getnchannels(), wf.getsampwidth()
+        sr = wf.getframerate()
+        raw = wf.readframes(wf.getnframes())
+    if sr != SAMPLE_RATE:
+        raise ValueError(f"采样率不符（{sr} != {SAMPLE_RATE}）：{path}")
+    if sw == 3:
+        b = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 3).astype(np.int32)
+        v = b[:, 0] | (b[:, 1] << 8) | (b[:, 2] << 16)
+        v = np.where(v >= 1 << 23, v - (1 << 24), v)
+        data = v.astype(np.float64) / float(1 << 23)
+    else:
+        dt = "<i2" if sw == 2 else "<i4"
+        data = np.frombuffer(raw, dtype=dt).astype(np.float64) / float(1 << (8 * sw - 1))
+    if ch == 1:
+        return [data]
+    return [data[i::ch] for i in range(ch)]

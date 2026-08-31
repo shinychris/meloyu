@@ -38,10 +38,12 @@ def _safe_run(fn, task_id: str) -> None:
 
 
 def recover_zombie_tasks() -> int:
-    """启动自愈：① running/queued 僵尸任务置 failed(50003) 并退款（终态与退款同事务）；
-    ② 兜底扫描历史「已终态、已扣积分、无退款流水」的任务补退款（幂等，覆盖旧版本崩溃窗口遗留）。"""
+    """启动自愈：① running/queued 僵尸任务置 failed(50003) 并退款（终态、退款与
+    空版本电流向回滚同事务）；② 兜底扫描历史「已终态、已扣积分、无退款流水」的
+    任务补退款（幂等，覆盖旧版本崩溃窗口遗留）。"""
     from app.models import CreditTransaction
     from app.services.credits import refund
+    from app.services.generation import rollback_empty_current_version
 
     recovered = 0
     with SessionLocal() as db:
@@ -56,6 +58,7 @@ def recover_zombie_tasks() -> int:
             recovered += 1
             if t.cost_credits > 0:
                 refund(db, t.user_id, t.cost_credits, t.id)
+            rollback_empty_current_version(db, t.id)
         db.commit()
 
         compensated = 0

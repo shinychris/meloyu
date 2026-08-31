@@ -1,14 +1,12 @@
 """版本路由（4 接口）+ 版本候选列表（candidates 列表归此处路径）。"""
 from __future__ import annotations
 
-import json
-
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core import audio_files as af
-from app.core.errors import err_conflict, err_not_found
+from app.core.errors import err_conflict, err_not_found, err_validation
 from app.core.responses import ok
 from app.core.security import get_current_user, get_current_user_optional
 from app.database import get_db
@@ -58,13 +56,17 @@ def version_audio(version_id: str, request: Request,
 
 
 @router.get("/versions/{version_id}/certificate")
-def version_certificate(version_id: str, user: User = Depends(get_current_user),
+def version_certificate(version_id: str,
+                        format: str = Query(default="json"),
+                        user: User = Depends(get_current_user),
                         db: Session = Depends(get_db)):
+    """授权证书下载（format=json 契约 §8.4；format=pdf 为 V1.1 扩展）。"""
+    if format not in cert_svc.CERT_FORMATS:
+        raise err_validation(f"format 必须为 {'/'.join(cert_svc.CERT_FORMATS)}")
     version = works_svc.get_version_owned(db, version_id, user)
-    cert, filename = cert_svc.issue_certificate(db, user, version)
-    content = json.dumps(cert, ensure_ascii=False, indent=2)
+    _, filename, payload, mime = cert_svc.issue_certificate(db, user, version, fmt=format)
     return Response(
-        content=content,
-        media_type="application/json",
+        content=payload,
+        media_type=mime,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

@@ -1,4 +1,4 @@
-"""作品库服务：CRUD / 收藏 / 回收站 / 事件留痕 / 版本树。"""
+"""作品库服务：CRUD / 收藏 / 回收站 / 事件留痕 / 版本树 / 导出格式徽标。"""
 from __future__ import annotations
 
 import shutil
@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import TRASH_RETENTION_DAYS, settings
 from app.core.errors import err_conflict, err_forbidden, err_not_found
-from app.models import EditEvent, User, Version, Work
+from app.models import EditEvent, Task, User, Version, Work
 from app.models.base import utc_now_iso
 from app.repositories import counters
 from app.services.serializers import event_to_dict, work_to_dict
@@ -27,6 +27,29 @@ def _get_work_owned(db: Session, work_id: str, user: User) -> Work:
 def get_work_row(db: Session, work_id: str, user: User) -> Work:
     """公开的归属校验取行（services 间复用）。"""
     return _get_work_owned(db, work_id, user)
+
+
+def exported_formats_map(db: Session, work_ids: list[str]) -> dict[str, list[str]]:
+    """一批 work 的已导出格式（succeeded 导出任务 format 去重升序）。
+
+    一条聚合查询消除前端列表页 N+1 拉导出任务的根因（契约 §14 R1 转正）。
+    """
+    if not work_ids:
+        return {}
+    rows = db.execute(
+        select(Task.work_id, Task.format).where(
+            Task.work_id.in_(work_ids), Task.type == "export",
+            Task.status == "succeeded").distinct()
+    ).all()
+    grouped: dict[str, set[str]] = {}
+    for wid, fmt in rows:
+        grouped.setdefault(wid, set()).add(fmt)
+    return {wid: sorted(fmts) for wid, fmts in grouped.items()}
+
+
+def _serialize(db: Session, work: Work) -> dict:
+    fmts = exported_formats_map(db, [work.id]).get(work.id, [])
+    return work_to_dict(work, exported_formats=fmts)
 
 
 def list_works(db: Session, user: User, *, q: str | None, tag: str | None,
@@ -56,13 +79,14 @@ def list_works(db: Session, user: User, *, q: str | None, tag: str | None,
     order_col = sort_col.desc() if order == "desc" else sort_col.asc()
     rows = db.execute(base.order_by(order_col, Work.id.desc())
                       .offset((page - 1) * page_size).limit(page_size)).scalars().all()
-    items = [work_to_dict(w) for w in rows]
+    fmt_map = exported_formats_map(db, [w.id for w in rows])
+    items = [work_to_dict(w, exported_formats=fmt_map.get(w.id, [])) for w in rows]
     from app.services.credits import paginate_meta
     return paginate_meta(items, total, page, page_size)
 
 
 def get_work(db: Session, work_id: str, user: User) -> dict:
-    return work_to_dict(_get_work_owned(db, work_id, user))
+    return _serialize(db, _get_work_owned(db, work_id, user))
 
 
 def update_work(db: Session, work_id: str, user: User, *, title: str | None,
@@ -83,7 +107,7 @@ def update_work(db: Session, work_id: str, user: User, *, title: str | None,
                      action="update", actor="human", detail=changes))
     db.commit()
     db.refresh(work)
-    return work_to_dict(work)
+    return _serialize(db, work)
 
 
 def delete_work(db: Session, work_id: str, user: User, permanent: bool) -> dict:
@@ -113,7 +137,7 @@ def restore_work(db: Session, work_id: str, user: User) -> dict:
                      action="restore", actor="human", detail={}))
     db.commit()
     db.refresh(work)
-    return work_to_dict(work)
+    return _serialize(db, work)
 
 
 def _physical_delete(db: Session, work: Work) -> None:
@@ -161,11 +185,14 @@ def version_tree(db: Session, work_id: str, user: User) -> dict:
         "source": v.source, "active_candidate_id": v.active_candidate_id,
         "candidate_count": v.candidate_count, "created_at": v.created_at,
     } for v in rows]
+    # 电流向解析：优先采用链回写的 active_version_id；无采用记录时取最近「非空」版本，
+    # 跳过取消/失败残留的空版本（candidate_count=0），避免「当前指向空版本」
     current = None
     if work.active_version_id:
         current = work.active_version_id
-    elif rows:
-        current = rows[-1].id
+    else:
+        nonempty = [v for v in rows if v.candidate_count > 0]
+        current = nonempty[-1].id if nonempty else (rows[-1].id if rows else None)
     return {"current_version_id": current, "nodes": nodes}
 
 

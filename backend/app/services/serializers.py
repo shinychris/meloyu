@@ -79,7 +79,7 @@ def candidate_to_dict(c: Candidate, files: list[File] | None = None) -> dict:
     }
 
 
-def work_to_dict(w: Work) -> dict:
+def work_to_dict(w: Work, exported_formats: list[str] | None = None) -> dict:
     return {
         "id": w.id,
         "display_code": w.display_code,
@@ -95,6 +95,8 @@ def work_to_dict(w: Work) -> dict:
         "version_count": w.version_count,
         "active_version_id": w.active_version_id,
         "preview_file_id": w.preview_file_id,
+        # 派生字段（契约 §14 R1 转正）：该 work 全部 succeeded 导出任务 format 去重升序
+        "exported_formats": sorted(set(exported_formats or [])),
         "created_at": w.created_at,
         "updated_at": w.updated_at,
         "trashed_at": w.trashed_at,

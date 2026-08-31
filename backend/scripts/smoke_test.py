@@ -1,4 +1,4 @@
-"""WP-B8 冒烟测试：覆盖 38 个契约接口 + 确定性验证 + Range/错误码抽查。
+"""WP-B8 冒烟测试：38+ 契约接口 + V1.1 派生生成（extend/variant/regen-section）+ 确定性验证。
 
 用法（后端需已在 127.0.0.1:8000 运行，且已灌种子）：
     ./.venv/Scripts/python scripts/smoke_test.py [--base http://127.0.0.1:8000]
@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import sys
 import time
 import uuid
+import wave
 
 import httpx
 
@@ -49,6 +51,23 @@ def wait_task(client: httpx.Client, task_id: str, token: str, timeout: float = 2
     raise TimeoutError(f"task {task_id} not finished in {timeout}s")
 
 
+def wav_segment_sha(content: bytes, start_sec: float, end_sec: float) -> str | None:
+    """按 structure 暴露的秒边界（2 位小数 → int(round(sec*48000))）切片求 sha256。
+
+    与引擎 regen-section 的采样区间公式一致，用于 FR-6 非选区段字节级比对。
+    """
+    try:
+        with wave.open(io.BytesIO(content), "rb") as wf:
+            sr = wf.getframerate()
+            a = int(round(start_sec * sr))
+            b = int(round(end_sec * sr))
+            b = min(b, wf.getnframes())
+            wf.setpos(a)
+            return hashlib.sha256(wf.readframes(b - a)).hexdigest()
+    except (wave.Error, OSError):
+        return None
+
+
 def main() -> int:
     global BASE, API
     parser = argparse.ArgumentParser()
@@ -73,8 +92,10 @@ def main() -> int:
                and len(b["data"]["models"]) == 2
                and b["data"]["models"][0]["credit_cost"] == 12
                and len(b["data"]["keys"]) == 24
-               and b["data"]["generation_limits"]["max_duration_sec"] == 240)
-    check("12.2 GET /system/meta", meta_ok, json.dumps(b)[:120])
+               and b["data"]["generation_limits"]["max_duration_sec"] == 240
+               and len(b["data"].get("edit_operations", [])) == 3
+               and all(op["credit_cost"] == 6 for op in b["data"]["edit_operations"]))
+    check("12.2 GET /system/meta（含 V1.1 派生操作价目）", meta_ok, json.dumps(b)[:120])
 
     # ============ auth ============
     r = client.post(f"{API}/auth/register",
@@ -139,6 +160,23 @@ def main() -> int:
     check("6.4 POST /lyrics/complete-tags", r.status_code == 200 and b["code"] == 0
           and b["data"]["inferred"] is True and "[Verse]" in b["data"]["lyrics"]
           and len(b["data"]["detected"]) >= 1)
+
+    # ============ V1.1 歌词草稿云端持久化 ============
+    r = client.get(f"{API}/lyrics/draft", headers=auth_headers(token))
+    b = unwrap(r)
+    check("6.5 GET /lyrics/draft（初始空草稿）", r.status_code == 200 and b["code"] == 0
+          and b["data"]["text"] == "" and b["data"]["updated_at"] is None)
+
+    r = client.put(f"{API}/lyrics/draft", headers=auth_headers(token),
+                   json={"text": generated_lyrics})
+    b = unwrap(r)
+    check("6.5 PUT /lyrics/draft", r.status_code == 200 and b["code"] == 0
+          and b["data"]["text"] == generated_lyrics and b["data"]["updated_at"])
+
+    r = client.get(f"{API}/lyrics/draft", headers=auth_headers(token))
+    b = unwrap(r)
+    check("6.5 草稿读回一致（upsert 单草稿）", b["data"]["text"] == generated_lyrics
+          and b["data"]["updated_at"] is not None)
 
     # ============ 生成（4） ============
     gen_body = {
@@ -218,6 +256,16 @@ def main() -> int:
           canceled["status"] == "canceled"
           and (b["code"] == 0 or b["code"] == 40901), json.dumps(canceled)[:120])
 
+    # T2（模拟用户测试发现 #4）：取消的重新生成不应把空版本留成当前版本
+    canceled_version_id = lb["data"]["task"]["version_id"]
+    r = client.get(f"{API}/works/{work_id}/versions", headers=auth_headers(token))
+    tree = unwrap(r)["data"]
+    cur_node = next((n for n in tree["nodes"] if n["id"] == tree["current_version_id"]), None)
+    check("T2 发现#4：取消后当前版本不指向空版本",
+          tree["current_version_id"] != canceled_version_id
+          and cur_node is not None and cur_node["candidate_count"] > 0,
+          json.dumps(tree)[:200])
+
     # 取消终态任务 → 40901
     r = client.post(f"{API}/tasks/{cancel_task_id}/cancel", headers=auth_headers(token))
     b = unwrap(r)
@@ -250,6 +298,17 @@ def main() -> int:
     b = unwrap(r)
     check("5.3 重复采用 → 40901", r.status_code == 409 and b["code"] == 40901)
 
+    # 7.2 快照回写（adopt 后立即校验；后续 V1.1 派生会改写电流向）
+    r = client.get(f"{API}/works/{work_id}", headers=auth_headers(token))
+    b = unwrap(r)
+    work_ok = (r.status_code == 200 and b["data"]["active_version_id"] == version_id
+               and b["data"]["preview_file_id"] == cand_a["preview_file_id"]
+               and b["data"]["duration_sec"] == cand_a["duration_sec"]
+               and isinstance(b["data"]["cover_color"], str)
+               and b["data"]["exported_formats"] == [])
+    check("7.2 GET /works/{id}（快照回写 + exported_formats 空初始）", work_ok,
+          json.dumps(b)[:200])
+
     r = client.get(f"{API}/candidates/{cand_a['id']}/audio", headers=auth_headers(token),
                    params={"quality": "preview"})
     check("5.4 GET /candidates/{id}/audio 200",
@@ -262,13 +321,143 @@ def main() -> int:
           and r.headers.get("content-range", "").startswith("bytes 0-1023/")
           and len(r.content) == 1024)
 
-    for endpoint in ("extend", "variant", "regen-section"):
-        r = client.post(f"{API}/candidates/{cand_a['id']}/{endpoint}",
-                        headers=auth_headers(token), json={})
-        b = unwrap(r)
-        check(f"5.{5 + ['extend', 'variant', 'regen-section'].index(endpoint)} "
-              f"POST /candidates/{{id}}/{endpoint} → 501",
-              r.status_code == 501 and b["code"] == 50101 and b["data"]["feature"] == endpoint)
+    # ============ V1.1 派生生成（5.5~5.7 真实实现） ============
+    # 免费档每日 5 次生成已用 3 次（gen1/gen2/取消），派生任务同计限额 → 先切 studio
+    r = client.get(f"{API}/credits/balance", headers=auth_headers(token))
+    pre_switch_balance = unwrap(r)["data"]["balance"]
+    r = client.post(f"{API}/subscriptions/switch", headers=auth_headers(token),
+                    json={"plan": "studio"})
+    b = unwrap(r)
+    check("11.2(前置) 切换 studio（解除每日限额）", r.status_code == 200
+          and b["data"]["plan"] == "studio"
+          and b["data"]["credits"]["balance"] == pre_switch_balance + 10000)
+
+    cand_detail = unwrap(client.get(f"{API}/candidates/{cand_a['id']}",
+                                    headers=auth_headers(token)))["data"]
+    orig_structure = cand_detail["structure"]
+    orig_master_file_id = master_file_id(cand_a["id"])
+    orig_master_bytes = client.get(f"{API}/files/{orig_master_file_id}/download",
+                                   headers=auth_headers(token)).content
+    orig_master_sha = hashlib.sha256(orig_master_bytes).hexdigest()
+
+    # ---- 5.5 extend：续写 15s ----
+    r = client.post(f"{API}/candidates/{cand_a['id']}/extend", headers=auth_headers(token),
+                    json={"seconds": 15})
+    b = unwrap(r)
+    check("5.5 POST /candidates/{id}/extend 提交（type=generation，6 积分）",
+          r.status_code == 201 and b["code"] == 0
+          and b["data"]["task"]["type"] == "generation"
+          and b["data"]["cost_credits"] == 6, json.dumps(b)[:200])
+    ext_task = wait_task(client, b["data"]["task"]["id"], token)
+    ext_cand = ext_task["result"]["candidates"][0]
+    check("5.5 extend 成功且续写时长正确（原+15s±2.5s）",
+          ext_task["status"] == "succeeded" and len(ext_task["result"]["candidates"]) == 1
+          and abs(ext_cand["duration_sec"] - (cand_detail["duration_sec"] + 15)) <= 2.5,
+          json.dumps(ext_task.get("result", {}))[:200])
+    ext_version = unwrap(client.get(f"{API}/versions/{ext_task['version_id']}",
+                                    headers=auth_headers(token)))["data"]
+    check("5.5 extend 子版本：source=extend、parent 正确、自动采用活跃候选",
+          ext_version["source"] == "extend"
+          and ext_version["parent_version_id"] == version_id
+          and ext_version["active_candidate_id"] == ext_cand["id"]
+          and ext_version["candidate_count"] == 1, json.dumps(ext_version)[:200])
+    ext_cand_detail = unwrap(client.get(f"{API}/candidates/{ext_cand['id']}",
+                                        headers=auth_headers(token)))["data"]
+    check("5.5 extend 同 key/BPM/人声且结构尾部延续",
+          ext_cand_detail["key"] == cand_detail["key"]
+          and ext_cand_detail["bpm"] == cand_detail["bpm"]
+          and ext_cand_detail["vocal"] == cand_detail["vocal"]
+          and len(ext_cand_detail["structure"]) == len(orig_structure) + 1,
+          json.dumps(ext_cand_detail.get("structure"))[:200])
+
+    # ---- 5.6 variant：同结构换风格 ----
+    variant_prompt = "国风古筝笛子，戏腔民乐编曲，鼓点疏朗"
+    r = client.post(f"{API}/candidates/{cand_a['id']}/variant", headers=auth_headers(token),
+                    json={"style_prompt": variant_prompt})
+    b = unwrap(r)
+    check("5.6 POST /candidates/{id}/variant 提交", r.status_code == 201 and b["code"] == 0
+          and b["data"]["cost_credits"] == 6, json.dumps(b)[:200])
+    var_task = wait_task(client, b["data"]["task"]["id"], token)
+    var_cand = var_task["result"]["candidates"][0]
+    var_version = unwrap(client.get(f"{API}/versions/{var_task['version_id']}",
+                                    headers=auth_headers(token)))["data"]
+    var_cand_detail = unwrap(client.get(f"{API}/candidates/{var_cand['id']}",
+                                        headers=auth_headers(token)))["data"]
+    var_struct_key = [(s["section"], s["bars"]) for s in var_cand_detail["structure"]]
+    orig_struct_key = [(s["section"], s["bars"]) for s in orig_structure]
+    var_master_sha = file_sha256(master_file_id(var_cand["id"]))
+    check("5.6 variant 成功且结构逐段一致（section/bars）",
+          var_task["status"] == "succeeded" and var_struct_key == orig_struct_key
+          and abs(var_cand["duration_sec"] - cand_detail["duration_sec"]) <= 1,
+          json.dumps(var_cand_detail.get("structure"))[:200])
+    check("5.6 variant 子版本与音频已变化（source=variant、风格标签换新）",
+          var_version["source"] == "variant"
+          and var_version["parent_version_id"] == version_id
+          and var_version["active_candidate_id"] == var_cand["id"]
+          and var_master_sha != orig_master_sha
+          and var_cand_detail["style_tags"] != cand_detail["style_tags"],
+          json.dumps(var_cand_detail.get("style_tags"))[:120])
+
+    # ---- 5.7 regen-section：仅重生成 chorus ----
+    r = client.post(f"{API}/candidates/{cand_a['id']}/regen-section",
+                    headers=auth_headers(token), json={"section": "chorus"})
+    b = unwrap(r)
+    check("5.7 POST /candidates/{id}/regen-section 提交", r.status_code == 201
+          and b["code"] == 0 and b["data"]["cost_credits"] == 6, json.dumps(b)[:200])
+    regen_task = wait_task(client, b["data"]["task"]["id"], token)
+    regen_cand = regen_task["result"]["candidates"][0]
+    regen_version = unwrap(client.get(f"{API}/versions/{regen_task['version_id']}",
+                                      headers=auth_headers(token)))["data"]
+    check("5.7 regen-section 成功建子版本（source=regen_section、自动采用）",
+          regen_task["status"] == "succeeded"
+          and regen_version["source"] == "regen_section"
+          and regen_version["parent_version_id"] == version_id
+          and regen_version["active_candidate_id"] == regen_cand["id"],
+          json.dumps(regen_version)[:200])
+
+    # FR-6 验收：非选区段 sha256 不变、选区段变化（按 structure 秒边界切片比对）
+    regen_master_bytes = client.get(
+        f"{API}/files/{master_file_id(regen_cand['id'])}/download",
+        headers=auth_headers(token)).content
+    keep_ok, changed_ok, seg_detail = True, False, ""
+    for seg in orig_structure:
+        s1 = wav_segment_sha(orig_master_bytes, seg["start_sec"], seg["end_sec"])
+        s2 = wav_segment_sha(regen_master_bytes, seg["start_sec"], seg["end_sec"])
+        if s1 is None or s2 is None:
+            keep_ok = changed_ok = False
+            seg_detail = "wav 解析失败"
+            break
+        if seg["section"] == "chorus":
+            changed_ok = changed_ok or (s1 != s2)
+        else:
+            if s1 != s2:
+                keep_ok = False
+                seg_detail = f"{seg['section']} 段 sha 不一致"
+    check("5.7 FR-6：非选区段 sha256 逐段不变", keep_ok, seg_detail)
+    check("5.7 FR-6：选区段（chorus）音频已变化", changed_ok)
+
+    # 确定性：同候选同 section 再次 regen → master 逐字节一致
+    r = client.post(f"{API}/candidates/{cand_a['id']}/regen-section",
+                    headers=auth_headers(token), json={"section": "chorus"})
+    b2 = unwrap(r)
+    regen2_task = wait_task(client, b2["data"]["task"]["id"], token)
+    regen2_master_bytes = client.get(
+        f"{API}/files/{master_file_id(regen2_task['result']['candidates'][0]['id'])}/download",
+        headers=auth_headers(token)).content
+    check("5.7 确定性：同参数 regen-section 两次 master 逐字节一致",
+          regen2_task["status"] == "succeeded"
+          and hashlib.sha256(regen2_master_bytes).hexdigest()
+          == hashlib.sha256(regen_master_bytes).hexdigest())
+
+    # 校验类错误：seconds 越界 / 候选结构不存在的段落
+    r = client.post(f"{API}/candidates/{cand_a['id']}/extend", headers=auth_headers(token),
+                    json={"seconds": 10})
+    b = unwrap(r)
+    check("5.5 extend seconds=10 → 40001", r.status_code == 422 and b["code"] == 40001)
+    r = client.post(f"{API}/candidates/{cand_a['id']}/regen-section",
+                    headers=auth_headers(token), json={"section": "bridge"})
+    b = unwrap(r)
+    check("5.7 regen-section 不存在段落 → 40001", r.status_code == 422 and b["code"] == 40001)
 
     # ============ 作品库（6） ============
     r = client.get(f"{API}/works", headers=auth_headers(token))
@@ -278,11 +467,12 @@ def main() -> int:
 
     r = client.get(f"{API}/works/{work_id}", headers=auth_headers(token))
     b = unwrap(r)
-    work_ok = (r.status_code == 200 and b["data"]["active_version_id"] == version_id
-               and b["data"]["preview_file_id"] == cand_a["preview_file_id"]
-               and b["data"]["duration_sec"] == cand_a["duration_sec"]
-               and isinstance(b["data"]["cover_color"], str))
-    check("7.2 GET /works/{id}（快照回写）", work_ok, json.dumps(b)[:200])
+    work_ok = (r.status_code == 200
+               and b["data"]["active_version_id"] == regen2_task["version_id"]
+               and isinstance(b["data"]["cover_color"], str)
+               and b["data"]["exported_formats"] == [])
+    check("7.2 GET /works/{id}（派生自动采用后电流向 + exported_formats 空）", work_ok,
+          json.dumps(b)[:200])
 
     r = client.patch(f"{API}/works/{work_id}", headers=auth_headers(token),
                      json={"title": "冒烟作品改名", "tags": ["冒烟", "测试"], "favorite": True})
@@ -323,13 +513,19 @@ def main() -> int:
     r = client.get(f"{API}/works/{work_id}/versions", headers=auth_headers(token))
     b = unwrap(r)
     nodes = b["data"]["nodes"]
-    tree_ok = (r.status_code == 200 and b["data"]["current_version_id"] == version_id
-               and len(nodes) >= 2)
+    tree_ok = (r.status_code == 200 and len(nodes) >= 2
+               and b["data"]["current_version_id"] == regen2_task["version_id"])
     if tree_ok:
         v2_node = [n for n in nodes if n["version_no"] == "v2"]
         tree_ok = bool(v2_node) and v2_node[0]["parent_version_id"] == version_id
-    check("8.1 GET /works/{id}/versions（版本树 v1→v2）", tree_ok,
-          json.dumps(b["data"])[:200])
+        derived_nodes = [n for n in nodes
+                         if n["source"] in ("extend", "variant", "regen_section")]
+        cur_node = [n for n in nodes if n["id"] == b["data"]["current_version_id"]]
+        tree_ok = (tree_ok and len(derived_nodes) == 4
+                   and all(n["parent_version_id"] == version_id for n in derived_nodes)
+                   and bool(cur_node) and cur_node[0]["candidate_count"] == 1)
+    check("8.1 GET /works/{id}/versions（版本树 v1→v2 + 4 个派生子版本）", tree_ok,
+          json.dumps(b["data"])[:250])
 
     r = client.get(f"{API}/versions/{version_id}", headers=auth_headers(token))
     b = unwrap(r)
@@ -350,10 +546,21 @@ def main() -> int:
                and r.headers.get("content-disposition", "").startswith("attachment")
                and cert.get("model", {}).get("provider") == "localsynth"
                and cert.get("model", {}).get("seed") == cand_detail["seed"]
-               and cert.get("license", {}).get("type") == "non_commercial"
+               and cert.get("license", {}).get("type") == "commercial"  # 已切 studio 档
                and len(cert.get("fingerprint", {}).get("master_wav_sha256", "")) == 64
                and "human_participation" in cert)
     check("8.4 GET /versions/{id}/certificate", cert_ok, json.dumps(cert)[:200])
+
+    r = client.get(f"{API}/versions/{version_id}/certificate", headers=auth_headers(token),
+                   params={"format": "pdf"})
+    check("8.4 GET /versions/{id}/certificate?format=pdf（V1.1）",
+          r.status_code == 200 and r.headers.get("content-type") == "application/pdf"
+          and r.content[:5] == b"%PDF-"
+          and r.headers.get("content-disposition", "").endswith('.pdf"'))
+    r = client.get(f"{API}/versions/{version_id}/certificate", headers=auth_headers(token),
+                   params={"format": "docx"})
+    b = unwrap(r)
+    check("8.4 证书非法 format → 40001", r.status_code == 422 and b["code"] == 40001)
 
     # ============ 导出（4 格式） ============
     for fmt in ("mp3", "wav", "midi", "stems"):
@@ -382,6 +589,18 @@ def main() -> int:
                   and r.headers.get("content-disposition", "").startswith("attachment")
                   and r.content[:2] == b"PK")
             globals()["downloaded_zip_sha"] = hashlib.sha256(r.content).hexdigest()
+
+    # 契约 §14 R1 转正：exported_formats 派生字段（succeeded 导出格式去重升序）
+    r = client.get(f"{API}/works/{work_id}", headers=auth_headers(token))
+    b = unwrap(r)
+    check("R1 work.exported_formats（详情：四格式去重升序）",
+          r.status_code == 200 and b["data"]["exported_formats"]
+          == ["midi", "mp3", "stems", "wav"], json.dumps(b["data"])[:120])
+    r = client.get(f"{API}/works", headers=auth_headers(token))
+    b = unwrap(r)
+    hit = next((w for w in b["data"]["items"] if w["id"] == work_id), None)
+    check("R1 work.exported_formats（列表与详情一致）",
+          hit is not None and hit["exported_formats"] == ["midi", "mp3", "stems", "wav"])
 
     # ============ 文件（3） ============
     file_id = cand_a["preview_file_id"]
@@ -418,7 +637,7 @@ def main() -> int:
     r = client.get(f"{API}/credits/balance", headers=auth_headers(token))
     b = unwrap(r)
     balance_now = b["data"]["balance"]
-    check("10.1 GET /credits/balance", r.status_code == 200 and b["data"]["plan"] == "free"
+    check("10.1 GET /credits/balance", r.status_code == 200 and b["data"]["plan"] == "studio"
           and b["data"]["balance"] >= 0)
 
     r = client.get(f"{API}/credits/transactions", headers=auth_headers(token))
@@ -431,27 +650,28 @@ def main() -> int:
     for t in sorted(txs, key=lambda x: x["created_at"]):
         chain_ok = chain_ok and (prev + t["delta"] == t["balance_after"] or True)
     check("10.2 GET /credits/transactions", r.status_code == 200
-          and len(gen_txs) == 3 and len(refund_txs) >= 1
+          and len(gen_txs) == 7 and len(refund_txs) >= 1
           and all(t["balance_after"] >= 0 for t in txs))
 
-    # 注册赠送 200 - 12*3 + 12 退款 = 176
-    check("10.2 账本自洽（200 − 36 + 12 = 176）", balance_now == 200 - 36 + 12,
-          f"balance={balance_now}")
+    # 注册 200 + studio 切换 10000 − 整曲 12×3 − 派生 6×4 + 取消退款 12 = 10152
+    check("10.2 账本自洽（200 + 10000 − 36 − 24 + 12 = 10152）",
+          balance_now == 200 + 10000 - 36 - 24 + 12, f"balance={balance_now}")
 
     # ============ 订阅（2） ============
     r = client.get(f"{API}/subscriptions/plans", headers=auth_headers(token))
     b = unwrap(r)
     plans = b["data"]["plans"]
     check("11.1 GET /subscriptions/plans", r.status_code == 200 and len(plans) == 4
-          and plans[0]["code"] == "free" and plans[0]["current"] is True
+          and plans[0]["code"] == "free" and plans[0]["current"] is False
+          and plans[2]["code"] == "studio" and plans[2]["current"] is True
           and plans[3]["code"] == "team")
 
     r = client.post(f"{API}/subscriptions/switch", headers=auth_headers(token),
                     json={"plan": "studio"})
     b = unwrap(r)
-    check("11.2 POST /subscriptions/switch → studio", r.status_code == 200
+    check("11.2 同档切换幂等（不再发放积分）", r.status_code == 200
           and b["data"]["plan"] == "studio"
-          and b["data"]["credits"]["balance"] == balance_now + 10000)
+          and b["data"]["credits"]["balance"] == balance_now)
 
     r = client.post(f"{API}/subscriptions/switch", headers=auth_headers(token),
                     json={"plan": "team"})

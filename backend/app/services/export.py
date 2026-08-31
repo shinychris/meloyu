@@ -107,6 +107,7 @@ def _register(db: Session, work: Work, version: Version, *, kind: str, relpath: 
               mime: str, path: Path, duration_sec: float | None, name: str,
               stem_name: str | None = None) -> File:
     import hashlib
+
     from sqlalchemy import select
     h = hashlib.sha256()
     with open(path, "rb") as f:

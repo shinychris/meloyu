@@ -16,6 +16,8 @@ APP_VERSION = "0.1.0"
 
 # 模型积分单价（架构 §9.1：v1_pro=12、v1_fast=6）
 MODEL_CREDIT_COST: dict[str, int] = {"v1_pro": 12, "v1_fast": 6}
+# V1.1 派生操作积分单价（extend/variant/regen-section，约为整曲生成一半）
+EDIT_OPERATION_CREDIT_COST: dict[str, int] = {"extend": 6, "variant": 6, "regen_section": 6}
 # 注册赠送积分
 SIGNUP_BONUS_CREDITS = 200
 # 任务超时熔断（秒）：单候选渲染超过该值中止并退款（架构 §7.9 为 70s，留余量取整任务 90s）

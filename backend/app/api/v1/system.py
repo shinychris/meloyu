@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.config import APP_VERSION, MODEL_CREDIT_COST
+from app.config import APP_VERSION, EDIT_OPERATION_CREDIT_COST, MODEL_CREDIT_COST
 from app.core.responses import ok
 from app.database import get_db
 from app.models import File, Task
@@ -62,6 +62,19 @@ def meta():
             {"value": "v1_fast", "label": "V1 · 快速草稿",
              "credit_cost": MODEL_CREDIT_COST["v1_fast"],
              "capabilities": {"vocals": True, "midi": True, "stems": 4}},
+        ],
+        "edit_operations": [
+            {"value": "extend", "label": "续写", "endpoint": "/candidates/{id}/extend",
+             "credit_cost": EDIT_OPERATION_CREDIT_COST["extend"],
+             "limits": {"min_seconds": 15, "max_seconds": 60}},
+            {"value": "variant", "label": "风格变奏", "endpoint": "/candidates/{id}/variant",
+             "credit_cost": EDIT_OPERATION_CREDIT_COST["variant"],
+             "limits": {"max_style_prompt": 500}},
+            {"value": "regen_section", "label": "段落重生成",
+             "endpoint": "/candidates/{id}/regen-section",
+             "credit_cost": EDIT_OPERATION_CREDIT_COST["regen_section"],
+             "limits": {"sections": ["intro", "verse", "pre_chorus", "chorus",
+                                     "bridge", "outro"]}},
         ],
         "keys": keys,
         "time_signatures": list(TIME_SIGNATURES),
