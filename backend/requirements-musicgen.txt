@@ -1,0 +1,9 @@
+# MusicGen 本地通道可选依赖（V1.4）：体积较大，未随主 requirements 安装。
+# 启用本机开源歌曲模型（facebook/musicgen-small|medium）时安装：
+#   ./.venv/Scripts/python -m pip install -r requirements-musicgen.txt
+#
+# 注：Windows 下 PyPI 默认 torch 轮子含 CUDA（约 2.5GB）。仅需 CPU 推理时可用：
+#   ./.venv/Scripts/python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch>=2.3
+transformers>=4.40
+accelerate>=0.30

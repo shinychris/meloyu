@@ -37,6 +37,8 @@ export type StageKey =
   | 'queued' | 'writing' | 'structure' | 'harmony' | 'melody' | 'arrange' | 'vocal' | 'mixdown' | 'serialize' | 'done'
   /** 外部歌曲 API 通道阶段（V1.3）：提交/排队/生成中/下载 */
   | 'api_submit' | 'api_queue' | 'api_render' | 'api_download'
+  /** 本机开源模型（MusicGen）通道阶段（V1.4） */
+  | 'model_load' | 'model_sample' | 'model_export'
 export type CreditReason = 'signup_bonus' | 'generation' | 'refund' | 'plan_grant' | 'plan_switch'
 export type EventAction = 'generate' | 'adopt' | 'update' | 'export' | 'trash' | 'restore' | 'certificate' | 'plan_switch'
 export type EventActor = 'human' | 'ai' | 'system'
@@ -110,8 +112,8 @@ export interface Task {
   stage_key: StageKey
   stage_label: string
   error: TaskError | null
-  /** 执行引擎留痕（V1.3）：localsynth=本地合成 / api=外部歌曲生成 API */
-  provider: 'localsynth' | 'api' | null
+  /** 执行引擎留痕（V1.3；V1.4 增 replicate/musicgen_local） */
+  provider: 'localsynth' | 'api' | 'replicate' | 'musicgen_local' | null
   work_id: string | null
   version_id: string | null
   result: TaskResult | null
@@ -487,8 +489,8 @@ export interface WorkDeleteResult {
 /* ============ models（V1.2 模型中心，契约 §5.8） ============ */
 export type LyricsBackend = 'localsynth' | 'ollama' | 'openai_compat'
 
-/** 歌曲生成引擎通道（V1.3）：本地合成 / 外部歌曲生成 API（Suno 兼容） */
-export type MusicBackend = 'localsynth' | 'api'
+/** 歌曲生成引擎通道：本地合成 / Suno 兼容网关 / Replicate 开源模型托管 / 本机 MusicGen */
+export type MusicBackend = 'localsynth' | 'api' | 'replicate' | 'musicgen_local'
 
 export interface OllamaRuntime {
   host: string
@@ -505,6 +507,48 @@ export interface ModelsRuntime {
   engine: string
   music_backend: MusicBackend
   song_engine: string
+  replicate: { token_saved: boolean }
+}
+
+/** 开源歌曲模型目录项（V1.4，GET /models/music-catalog） */
+export interface MusicCatalogModel {
+  id: string
+  name: string
+  vendor: string
+  license: string
+  params: string
+  capabilities: {
+    vocals: boolean
+    lyrics_input: boolean
+    max_duration_sec: number
+    languages: string
+  }
+  benchmark: { score: number; source: string; notes: string }
+  channels: MusicBackend[]
+  local_runnable: boolean
+  local_hf_id: string | null
+  local_size_mb: number
+  local_note: string
+  replicate_slug: string
+  replicate_slug_default: string
+  replicate_slug_overridden: boolean
+  recommended: boolean
+  recommend_reason: string
+  rank: number
+  local_status: 'not_applicable' | 'deps_missing' | 'not_downloaded' | 'ready'
+  selected: boolean
+}
+
+export interface MusicCatalog {
+  models: MusicCatalogModel[]
+  machine: {
+    musicgen_deps_installed: boolean
+    install_hint: string
+    downloaded_ids: string[]
+  }
+  selected: { music_backend: MusicBackend; music_model: string | null }
+  replicate: { token_saved: boolean }
+  disclaimer: string
 }
 
 export interface LocalModelInfo {
@@ -526,7 +570,8 @@ export interface RecommendedModel {
 
 export interface ModelOpInfo {
   id: string
-  op_type: 'pull' | 'delete'
+  /** V1.4 新增 music_pull/music_delete：开源歌曲模型（MusicGen）本地下载/删除 */
+  op_type: 'pull' | 'delete' | 'music_pull' | 'music_delete'
   target: string
   status: 'queued' | 'running' | 'succeeded' | 'failed'
   progress: number
@@ -556,6 +601,11 @@ export interface LLMSettings {
   music_api_base_url: string
   music_api_model: string
   music_api_key: { has_key: boolean; key_tail: string }
+  /** V1.4：开源歌曲模型目录当前选用（如 ace-step / musicgen-small） */
+  music_model: string
+  /** V1.4：Replicate Token（脱敏；显式空串=清除） */
+  replicate_api_token: { has_key: boolean; key_tail: string }
+  replicate_slugs: Record<string, string>
 }
 
 export interface LLMSettingsUpdate {
@@ -570,6 +620,11 @@ export interface LLMSettingsUpdate {
   music_api_base_url?: string
   music_api_model?: string
   music_api_key?: string
+  /** V1.4：目录模型 id（后端按模型通道自动推断 music_backend） */
+  music_model?: string
+  /** V1.4：显式空串 = 清除 Token */
+  replicate_api_token?: string
+  replicate_slugs?: Record<string, string>
 }
 
 export interface ExternalTestResult {

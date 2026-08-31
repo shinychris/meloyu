@@ -6,6 +6,7 @@ import zipfile
 from pathlib import Path
 
 import numpy as np
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -141,15 +142,20 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
     exports_dir.mkdir(parents=True, exist_ok=True)
     out: list[dict] = []
 
-    # 外部模型候选（Suno 兼容通道）产物为整曲 mp3，无 WAV 母带/分轨/MIDI（ADR-010）
+    # 模型整曲候选（Suno 兼容 API / Replicate / 本机 MusicGen）无分轨与 MIDI；
+    # wav 母带是否可导出取决于产物格式（Replicate/MusicGen 有 wav，Suno 网关仅 mp3）
     master = _candidate_file(db, cand.id, "master")
-    external_candidate = (master.mime or "").startswith("audio/mpeg")
-    if external_candidate and fmt in ("wav", "midi", "stems"):
-        raise err_conflict("该候选由外部歌曲模型生成（整曲 mp3），仅支持 MP3 导出；"
-                           "WAV 母带/分轨/MIDI 为本地引擎产物")
+    has_stems = db.execute(
+        select(File.id).where(File.candidate_id == cand.id, File.kind == "stem")
+    ).first() is not None
+    mp3_master = (master.mime or "").startswith("audio/mpeg")
+    if fmt in ("midi", "stems") and not has_stems:
+        raise err_conflict("该候选为模型整曲产物（无分轨/MIDI）；分轨与 MIDI 为本地引擎产物")
+    if fmt == "wav" and mp3_master:
+        raise err_conflict("该候选母带为 mp3（外部歌曲 API 通道），仅支持 MP3 导出")
 
     if fmt == "mp3":
-        if external_candidate:
+        if mp3_master:
             # 母带即 mp3：直接复制（无 WAV 可解码，不做有损→有损二压）
             p = exports_dir / "export.mp3"
             p.write_bytes(_abs(master.path).read_bytes())

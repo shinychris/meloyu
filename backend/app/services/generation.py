@@ -435,6 +435,8 @@ def _persist_success(db: Session, task_id: str, user_id: str, output, provider) 
                                 "provider_display": provider.display_name,
                                 "lyrics_engine": resolved_snapshot.get("lyrics_engine"),
                                 "lyrics_fallback": resolved_snapshot.get("lyrics_fallback"),
+                                # 器乐模型承接人声请求时的如实降级留痕（MusicGen）
+                                "vocals_downgraded": bool(getattr(provider, "vocals_downgraded", False)),
                                 "derived_op": derived_spec.get("op") if derived_spec else None,
                                 "auto_adopted": bool(derived_spec),
                                 "candidates": [rc["label"] for rc in result_candidates]},

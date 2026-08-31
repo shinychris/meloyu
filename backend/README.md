@@ -1,6 +1,6 @@
 # Meloyu Backend · FastAPI 单体服务
 
-AI 音乐创作系统的后端：49 个契约接口 + 双引擎生成（本地确定性合成 / 外部歌曲生成 API·Suno 兼容）+ 歌词 LLM 双通道（Ollama / OpenAI 兼容）+ SQLite 任务/积分/作品库。
+AI 音乐创作系统的后端：53 个契约接口 + 四通道歌曲生成（本地合成 / Suno 网关 / Replicate 开源模型托管 / 本机 MusicGen）+ 歌词 LLM 双通道（Ollama / OpenAI 兼容）+ SQLite 任务/积分/作品库。
 
 ## 环境要求
 
@@ -54,11 +54,12 @@ cp .env.example .env   # 如需自定义 JWT_SECRET
 ./.venv/Scripts/python scripts/smoke_test.py
 ```
 
-覆盖 49 个契约接口（注册登录→提交生成→轮询→候选→Range 试听→作品 CRUD→歌词→四种导出
-→证书→积分→订阅→模型中心双引擎→错误码抽查），含「同 seed 两次生成 master.wav SHA-256 一致」
-确定性验证与「simple 模式执行线程自动写词回填」真实链路验证。退出码 0 = 全部通过。
+覆盖 53 个契约接口（注册登录→提交生成→轮询→候选→Range 试听→作品 CRUD→歌词→四种导出
+→证书→积分→订阅→模型中心（双引擎+开源模型目录）→错误码抽查），含「同 seed 两次生成
+master.wav SHA-256 一致」确定性验证与「simple 模式执行线程自动写词回填」真实链路验证。
+退出码 0 = 全部通过。
 
-## 真实模型对接（V1.3 起）
+## 真实模型对接（V1.3/V1.4）
 
 两条生成链路均可对接真实模型，在**模型中心**（前端 /models，或 PUT /api/v1/models/settings）配置：
 
@@ -67,11 +68,23 @@ cp .env.example .env   # 如需自定义 JWT_SECRET
 | 歌词生成（助手 + 生成管线自动写词/simple 扩写） | 本地开源模型 Ollama | `lyrics_backend=ollama` + 模型下载/选用 |
 | 同上 | 外部 API（OpenAI 兼容） | `lyrics_backend=openai_compat` + base_url/model/api_key |
 | 歌曲/整曲生成 | 外部歌曲生成 API（Suno 兼容） | `music_backend=api` + `music_api_base_url`（网关根，自动补 /api/v1）+ Key |
+| 同上 | **Replicate 开源模型托管（V1.4）** | `music_backend=replicate` + `replicate_api_token` + 目录选模型（ACE-Step/YuE/DiffRhythm/MusicGen…） |
+| 同上 | **本机 MusicGen（V1.4，离线免 Key）** | `music_backend=musicgen_local` + 目录选 musicgen-small|medium + 下载权重 |
 | 同上 | 本地合成引擎（离线兜底） | `music_backend=localsynth`（默认） |
 
-- 歌曲外部通道协议：`POST {base}/api/v1/generate` + `GET {base}/api/v1/get?ids=…`，
-  GoAPI / suno-api 自建网关及各类中转站可直连；整曲约 1~5 分钟，任务超时 900s。
-- 外部候选为整曲 mp3（含人声演唱），无分轨/MIDI：派生编辑与 wav/midi/stems 导出返回 40901，mp3 导出可用。
+- **开源模型目录**（GET /models/music-catalog）：7 个开源歌曲模型按**外部测评参考分**降序
+  （ACE-Step 9.0 / YuE 8.3 / DiffRhythm 8.0 / MusicGen 大中小 / Stable Audio Open），
+  含能力矩阵、来源与免责声明（分数综合自公开论文/技术报告，非本系统实测）；推荐
+  ACE-Step（云端首选）与 MusicGen Small（离线免 Key 首选）。
+- Replicate 通道：一个 Token 接全部目录模型；每模型白名单 input 适配；一次并行 2 个
+  prediction 对应 A/B 候选；社区 slug 变动可在 `replicate_slugs` 覆盖。
+- 本机 MusicGen：HF 真实下载（POST /models/music-pull，进度轮询）+ transformers CPU 推理；
+  可选依赖 `pip install -r requirements-musicgen.txt`（torch/transformers，未装时全链路
+  fail-fast 给安装指引）；仅器乐，人声请求自动降级并留痕 vocals_downgraded。
+- Suno 网关协议：`POST {base}/api/v1/generate` + `GET {base}/api/v1/get?ids=…`，
+  GoAPI / suno-api 自建网关及各类中转站可直连；整曲约 1~5 分钟，任务超时 900s（MusicGen 1800s）。
+- 模型整曲候选无分轨/MIDI：派生编辑与 midi/stems 导出返回 40901；wav 母带（Replicate wav
+  输出/MusicGen）可导出 WAV+MP3，mp3 母带（Suno 网关）仅 MP3。
 - LLM 失败自动回退本地规则（歌词）/本地合成（歌曲），响应与任务留痕如实标注（engine/fallback/provider）。
 - 启动时自动执行 SQLite 幂等迁移（补列/表重建），详见 app/core/migrations.py。
 

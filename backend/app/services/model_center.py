@@ -1,5 +1,6 @@
 """模型中心服务：本地开源模型（Ollama）下载/删除/列举 + 外部 API 配置
-+ 歌词引擎工厂（V1.2）+ 外部歌曲生成 API 通道（V1.3）。
++ 歌词引擎工厂（V1.2）+ 外部歌曲生成 API 通道（V1.3）
++ 开源歌曲模型目录/Replicate 托管/本机 MusicGen（V1.4）。
 
 进度写库节流（≥2% 或 ≥1s 才落一次），拉取线程与生成任务线程池隔离（各 1 worker）。
 """
@@ -20,6 +21,22 @@ from app.providers.llm import LLMError, OllamaClient, OpenAICompatClient
 from app.providers.lyrics_llm import LLMLyricsProvider, valid_model_tag
 from app.providers.lyrics_local import LocalLyricsProvider
 from app.providers.music_api import APIMusicProvider, MusicAPIError, SunoCompatClient
+from app.providers.music_catalog import (
+    CATALOG_BY_ID,
+    CATALOG_DISCLAIMER,
+    LOCAL_RUNNABLE_IDS,
+    catalog_sorted,
+)
+from app.providers.music_musicgen import (
+    MusicGenLocalError,
+    MusicGenLocalProvider,
+    delete_local,
+    local_downloaded_ids,
+    musicgen_deps_installed,
+    musicgen_install_hint,
+    pull_local,
+)
+from app.providers.music_replicate import ReplicateClient, ReplicateError, ReplicateMusicProvider
 
 _op_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="meloyu-model-op")
 
@@ -91,7 +108,13 @@ def get_settings(db: Session) -> dict:
         "music_api_base_url": s.music_api_base_url,
         "music_api_model": s.music_api_model,
         "music_api_key": _mask_key(s.music_api_key),
+        "music_model": s.music_model,
+        "replicate_api_token": _mask_key(s.replicate_api_token),
+        "replicate_slugs": s.replicate_slugs or {},
     }
+
+
+_MUSIC_BACKENDS = ("localsynth", "api", "replicate", "musicgen_local")
 
 
 def update_settings(db: Session, patch: dict) -> dict:
@@ -107,14 +130,41 @@ def update_settings(db: Session, patch: dict) -> dict:
         if not base or not model:
             raise err_validation("外部 API 通道需要 base_url 与 model")
 
-    music_backend = patch.get("music_backend", s.music_backend)
-    if music_backend not in ("localsynth", "api"):
-        raise err_validation("music_backend 必须为 localsynth/api")
+    music_backend = patch.get("music_backend")
+    music_model = str(patch.get("music_model") or "").strip()
+    if not music_model and "music_model" not in patch:
+        music_model = s.music_model
+    if music_backend is None:
+        music_backend = s.music_backend
+        # 仅选模型未显式给通道：按模型可用通道自动切换（显式 music_backend 优先）
+        if music_model and music_model != s.music_model:
+            entry = CATALOG_BY_ID.get(music_model)
+            if entry:
+                channels = entry.get("channels", [])
+                if "replicate" in channels and (
+                        patch.get("replicate_api_token") or s.replicate_api_token):
+                    music_backend = "replicate"
+                elif "musicgen_local" in channels:
+                    music_backend = "musicgen_local"
+    if music_backend not in _MUSIC_BACKENDS:
+        raise err_validation("music_backend 必须为 localsynth/api/replicate/musicgen_local")
     if music_backend == "api" and not (patch.get("music_api_base_url") or s.music_api_base_url):
         raise err_validation("外部歌曲 API 通道需要先配置 base_url")
+    if music_backend in ("replicate", "musicgen_local"):
+        entry = CATALOG_BY_ID.get(music_model)
+        if entry is None:
+            raise err_validation(f"开源模型目录中不存在：{music_model or '（未选择模型）'}")
+        if music_backend not in entry.get("channels", []):
+            raise err_validation(f"模型 {music_model} 不支持 {music_backend} 通道"
+                                 f"（可用：{'/'.join(entry['channels'])}）")
+        if music_backend == "replicate" and not (
+                patch.get("replicate_api_token") or s.replicate_api_token):
+            raise err_validation("Replicate 通道需要先配置 API Token")
+        if music_backend == "musicgen_local" and music_model not in LOCAL_RUNNABLE_IDS:
+            raise err_validation(f"模型 {music_model} 不支持本机运行（需 GPU 档请走 Replicate）")
 
     for field in ("ollama_host", "ollama_model", "external_base_url", "external_model",
-                  "music_api_base_url", "music_api_model"):
+                  "music_api_base_url", "music_api_model", "music_model"):
         if field in patch and patch[field] is not None:
             v = str(patch[field]).strip()
             if len(v) > 300:
@@ -124,6 +174,19 @@ def update_settings(db: Session, patch: dict) -> dict:
         s.external_api_key = str(patch["external_api_key"]).strip()
     if patch.get("music_api_key"):
         s.music_api_key = str(patch["music_api_key"]).strip()
+    if "replicate_api_token" in patch:  # V1.4：显式空串=清除（前端仅在输入时携带该字段）
+        s.replicate_api_token = str(patch.get("replicate_api_token") or "").strip()
+    if isinstance(patch.get("replicate_slugs"), dict):
+        slugs = {}
+        for mid, slug in patch["replicate_slugs"].items():
+            if mid not in CATALOG_BY_ID:
+                raise err_validation(f"replicate_slugs 含未知模型：{mid}")
+            v = str(slug or "").strip()
+            if len(v) > 120 or any(c in v for c in " ?#") or v.count("/") > 1:
+                raise err_validation(f"slug 不合法（应为 owner/name）：{mid}={v[:60]}")
+            if v:
+                slugs[mid] = v
+        s.replicate_slugs = slugs
     s.lyrics_backend = backend
     s.music_backend = music_backend
     db.commit()
@@ -157,6 +220,7 @@ def runtime_status(db: Session) -> dict:
         "engine": engine_label(db),
         "music_backend": s.music_backend,
         "song_engine": song_engine_label(db),
+        "replicate": {"token_saved": bool(s.replicate_api_token)},
     }
 
 
@@ -179,6 +243,13 @@ def song_engine_label(db: Session) -> str:
         except Exception as e:  # noqa: BLE001 —— 展示用标签，构造失败不阻断
             logger.warning(f"song engine label 构造失败: {e}")
             return "外部歌曲API（配置异常）"
+    entry = CATALOG_BY_ID.get(s.music_model) if s.music_model else None
+    if s.music_backend == "replicate" and entry:
+        return f"Replicate · {entry['name']}"
+    if s.music_backend == "musicgen_local" and entry:
+        return f"MusicGen 本地 · {entry['name']}"
+    if s.music_backend in ("replicate", "musicgen_local"):
+        return "开源模型（未选择模型）"
     return "本地合成引擎（离线可用）"
 
 
@@ -385,19 +456,163 @@ def get_lyrics_chat(db: Session):
 def current_music_backend(db: Session) -> str:
     """提交时留痕用：只读配置不构造客户端。"""
     s = db.get(LLMSetting, SETTING_ID)
-    if s is not None and s.music_backend == "api" and s.music_api_base_url:
+    if s is None:
+        return "localsynth"
+    if s.music_backend == "api" and s.music_api_base_url:
         return "api"
+    if s.music_backend == "replicate" and s.replicate_api_token and s.music_model:
+        return "replicate"
+    if s.music_backend == "musicgen_local" and s.music_model:
+        return "musicgen_local"
     return "localsynth"
 
 
 def get_music_provider(db: Session):
     """按全局配置返回歌曲 provider；配置异常一律回退本地合成引擎。"""
     s = db.get(LLMSetting, SETTING_ID)
-    if s is not None and s.music_backend == "api" and s.music_api_base_url:
+    if s is not None:
+        entry = CATALOG_BY_ID.get(s.music_model) if s.music_model else None
         try:
-            return APIMusicProvider(s.music_api_base_url, s.music_api_key,
-                                    s.music_api_model)
+            if s.music_backend == "api" and s.music_api_base_url:
+                return APIMusicProvider(s.music_api_base_url, s.music_api_key,
+                                        s.music_api_model)
+            if s.music_backend == "replicate" and s.replicate_api_token and entry:
+                slug = (s.replicate_slugs or {}).get(s.music_model) \
+                    or entry.get("replicate_slug") or ""
+                return ReplicateMusicProvider(s.replicate_api_token, s.music_model, slug)
+            if s.music_backend == "musicgen_local" and entry:
+                return MusicGenLocalProvider(s.music_model)
         except Exception as e:  # noqa: BLE001 —— 配置构造失败回退本地引擎，创作不中断
             logger.warning(f"music provider 构造失败，回退本地引擎: {e}")
     from app.providers.music_local import LocalSynthProvider
     return LocalSynthProvider()
+
+
+# ---------- 开源歌曲模型目录（V1.4） ----------
+
+def get_music_catalog(db: Session) -> dict:
+    """目录（按外部测评参考分降序）+ 本机状态 + 当前选用 + 免责声明。"""
+    s = _setting_row(db)
+    deps = musicgen_deps_installed()
+    downloaded = set(local_downloaded_ids())
+    slugs: dict = s.replicate_slugs or {}
+    models = []
+    for rank, m in enumerate(catalog_sorted(), start=1):
+        entry = dict(m)
+        entry["rank"] = rank
+        slug_default = m.get("replicate_slug") or ""
+        override = str(slugs.get(m["id"]) or "").strip()
+        entry["replicate_slug"] = override or slug_default
+        entry["replicate_slug_default"] = slug_default
+        entry["replicate_slug_overridden"] = bool(override)
+        if "musicgen_local" in m["channels"]:
+            if not deps:
+                entry["local_status"] = "deps_missing"
+            elif m["id"] in downloaded:
+                entry["local_status"] = "ready"
+            else:
+                entry["local_status"] = "not_downloaded"
+        else:
+            entry["local_status"] = "not_applicable"
+        entry["selected"] = bool(
+            s.music_backend in ("replicate", "musicgen_local")
+            and s.music_model == m["id"])
+        models.append(entry)
+    return {
+        "models": models,
+        "machine": {"musicgen_deps_installed": deps,
+                    "install_hint": "" if deps else musicgen_install_hint(),
+                    "downloaded_ids": sorted(downloaded)},
+        "selected": {"music_backend": s.music_backend,
+                     "music_model": s.music_model or None},
+        "replicate": {"token_saved": bool(s.replicate_api_token)},
+        "disclaimer": CATALOG_DISCLAIMER,
+    }
+
+
+def _execute_music_pull(op_id: str, model_id: str) -> None:
+    _write_op(op_id, status="running", message="准备下载模型权重…")
+    last = {"t": 0.0, "pct": -1}
+
+    def on_progress(pct: int, message: str) -> None:
+        now = time.monotonic()
+        if pct < 100 and pct - last["pct"] < 2 and now - last["t"] < 1.0:
+            return
+        last.update(t=now, pct=pct)
+        _write_op(op_id, progress=max(pct, 0), message=message[:280])
+
+    try:
+        pull_local(model_id, on_progress)
+        _write_op(op_id, status="succeeded", progress=100, message=f"已下载 {model_id}")
+    except MusicGenLocalError as e:
+        _write_op(op_id, status="failed", message="下载失败", error_message=e.message[:280])
+    except Exception as e:  # noqa: BLE001 —— 线程兜底
+        logger.exception(f"music pull {model_id} crashed: {e}")
+        _write_op(op_id, status="failed", message="下载失败", error_message=str(e)[:280])
+
+
+def start_music_pull(db: Session, user_id: str, model_id: str) -> dict:
+    model_id = model_id.strip()
+    entry = CATALOG_BY_ID.get(model_id)
+    if entry is None or "musicgen_local" not in entry.get("channels", []):
+        raise err_validation(f"模型不支持本地下载：{model_id}")
+    running = db.execute(select(ModelOp).where(
+        ModelOp.status.in_(("queued", "running")))).scalars().all()
+    if any(op.target == model_id for op in running):
+        raise err_conflict(f"模型 {model_id} 正在下载中")
+    if running:
+        raise err_conflict("已有模型下载任务进行中，请等待完成后再发起")
+    op = ModelOp(id=new_uuid(), user_id=user_id, op_type="music_pull", target=model_id,
+                 status="queued", message="排队中")
+    db.add(op)
+    db.commit()
+    db.refresh(op)
+    _op_executor.submit(_safe_op, _execute_music_pull, op.id, model_id)
+    return op.to_dict()
+
+
+def run_music_delete(db: Session, user_id: str, model_id: str) -> dict:
+    model_id = model_id.strip()
+    entry = CATALOG_BY_ID.get(model_id)
+    if entry is None or not entry.get("local_hf_id"):
+        raise err_validation(f"模型不支持本地删除：{model_id}")
+    op = ModelOp(id=new_uuid(), user_id=user_id, op_type="music_delete", target=model_id,
+                 status="running", message="删除中")
+    db.add(op)
+    db.commit()
+    db.refresh(op)
+    try:
+        delete_local(model_id)
+    except MusicGenLocalError as e:
+        op.status, op.message = "failed", "删除失败"
+        op.error_message = e.message[:280]
+        db.commit()
+        db.refresh(op)
+        return op.to_dict()
+    s = _setting_row(db)
+    if s.music_model == model_id and s.music_backend == "musicgen_local":
+        s.music_backend, s.music_model = "localsynth", ""  # 删掉选用模型 → 回退本地合成
+        db.commit()
+    op.status, op.progress, op.message = "succeeded", 100, f"已删除 {model_id}"
+    db.commit()
+    db.refresh(op)
+    return op.to_dict()
+
+
+def test_replicate(api_token: str, base_url: str = "", model: str = "") -> dict:
+    if not (api_token or "").strip():
+        raise err_validation("API Token 必填")
+    try:
+        client = ReplicateClient(api_token, base_url or "")
+        acct = client.account()
+        username = acct.get("username") or acct.get("type") or "ok"
+        message = f"Token 有效（账号 {username}）"
+        sample = ""
+        slug = (model or "").strip()
+        if slug:
+            m = client.get_model(slug)
+            sample = f"{m.get('owner')}/{m.get('name')}"
+            message += f"；模型 {sample} 存在"
+        return {"ok": True, "sample": sample[:80] or str(username)[:80], "message": message}
+    except ReplicateError as e:
+        return {"ok": False, "sample": "", "message": e.message}

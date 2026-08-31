@@ -85,9 +85,17 @@ describe('views render smoke', () => {
     const html = render(<ModelCenterView />)
     expect(html).toContain('歌词引擎通道')
     expect(html).toContain('歌曲生成引擎通道')
-    expect(html).toContain('外部歌曲生成 API（Suno 兼容）')
+    expect(html).toContain('外部歌曲 API（Suno 兼容）')
     expect(html).toContain('BASE URL（Suno 兼容网关根，自动补 /api/v1）')
     expect(html).toContain('测试连接')
+  })
+
+  it('ModelCenterView 渲染开源歌曲模型目录区（V1.4 外部测评排序）', () => {
+    const html = render(<ModelCenterView />)
+    expect(html).toContain('开源歌曲模型目录（按外部测评排序）')
+    expect(html).toContain('REPLICATE API TOKEN')
+    expect(html).toContain('Replicate 开源模型托管')
+    expect(html).toContain('本机 MusicGen（开源）')
   })
 })
 

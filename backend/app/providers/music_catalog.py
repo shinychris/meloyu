@@ -1,0 +1,191 @@
+"""歌曲生成开源模型目录（V1.4「多类开源模型接入」批）。
+
+收录可经本系统两条通道使用的开源歌曲/音乐生成模型：
+  - musicgen_local：本机 transformers 直跑（真实 HF 下载 + CPU/GPU 推理，器乐）
+  - replicate：Replicate 托管推理（统一 HTTP 协议，一个 Token 接全部模型，含人声歌词成曲）
+
+benchmark.score 为**公开论文/技术报告/社区横评的综合参考分（0-10）**，仅用于选型
+排序，非本系统实测；来源见 benchmark.source。分数与结论随来源公开资料整理，
+不声称本系统复测结果（ADR-015）。
+
+replicate_slug：平台默认 slug；YuE/DiffRhythm/Stable Audio Open 的社区托管 slug
+变动频繁，默认留空，由用户在模型中心填写（存 llm_settings.replicate_slugs）。
+"""
+from __future__ import annotations
+
+MUSIC_CATALOG: list[dict] = [
+    {
+        "id": "ace-step",
+        "name": "ACE-Step",
+        "vendor": "ACE Studio × StepFun",
+        "license": "Apache-2.0（开源权重）",
+        "params": "3.5B（MoE）",
+        "capabilities": {"vocals": True, "lyrics_input": True, "max_duration_sec": 240,
+                         "languages": "中/英/日/韩等 19 种"},
+        "benchmark": {
+            "score": 9.0,
+            "source": "ACE-Step 官方技术报告与社区横评（2025）",
+            "notes": "开源歌词成曲 SOTA：人声清晰度与编曲完成度接近 Suno V3.5 档，"
+                     "支持 remix/retake 等后处理；云端托管推荐首选",
+        },
+        "channels": ["replicate"],
+        "local_runnable": False,
+        "local_hf_id": None,
+        "local_size_mb": 0,
+        "local_note": "本地部署需 8GB+ 显存 GPU；本机 CPU 请走 Replicate 托管",
+        "replicate_slug": "ace-step/ace-step",
+        "recommended": True,
+        "recommend_reason": "外部测评最优且能力完整（人声+歌词+多语言），云端一键使用",
+    },
+    {
+        "id": "yue",
+        "name": "YuE",
+        "vendor": "HKUST / 昆仑万维等联合开源",
+        "license": "Apache-2.0 代码（权重见模型卡）",
+        "params": "LLaMA2 7B/13B 双编解码",
+        "capabilities": {"vocals": True, "lyrics_input": True, "max_duration_sec": 240,
+                         "languages": "中/英等多语"},
+        "benchmark": {
+            "score": 8.3,
+            "source": "YuE 技术报告（2025）主观评测",
+            "notes": "音乐性与演唱自然度强、风格控制细；推理慢、显存需求高（24GB+），"
+                     "长结构一致性弱于 ACE-Step",
+        },
+        "channels": ["replicate"],
+        "local_runnable": False,
+        "local_hf_id": None,
+        "local_size_mb": 0,
+        "local_note": "本地部署需 24GB+ 显存；请走 Replicate 托管（slug 需自查填写）",
+        "replicate_slug": "",   # 社区托管 slug 变动频繁，默认留空由用户填写
+        "recommended": False,
+        "recommend_reason": "",
+    },
+    {
+        "id": "diffrhythm",
+        "name": "DiffRhythm",
+        "vendor": "ASLP-lab（西北工业大学）等",
+        "license": "开源（见模型卡）",
+        "params": "潜变量全曲 Diffusion",
+        "capabilities": {"vocals": True, "lyrics_input": True, "max_duration_sec": 240,
+                         "languages": "中/英"},
+        "benchmark": {
+            "score": 8.0,
+            "source": "DiffRhythm 技术报告（2025）与社区横评",
+            "notes": "全曲一次成形、生成速度极快（秒级~十秒级），质量中上；"
+                     "细节与咬字弱于 ACE-Step",
+        },
+        "channels": ["replicate"],
+        "local_runnable": False,
+        "local_hf_id": None,
+        "local_size_mb": 0,
+        "local_note": "请走 Replicate 托管（slug 需自查填写）",
+        "replicate_slug": "",
+        "recommended": False,
+        "recommend_reason": "",
+    },
+    {
+        "id": "musicgen-large",
+        "name": "MusicGen Large",
+        "vendor": "Meta（AudioCraft）",
+        "license": "CC-BY-NC 4.0（权重）+ MIT（代码）",
+        "params": "3.3B",
+        "capabilities": {"vocals": False, "lyrics_input": False, "max_duration_sec": 120,
+                         "languages": "器乐（无歌词/人声）"},
+        "benchmark": {
+            "score": 7.8,
+            "source": "MusicGen 论文（Meta，arXiv:2306.05284）FAD/FD 基准",
+            "notes": "文生器乐基准最强档；无人声/歌词输入；长音频成本高",
+        },
+        "channels": ["replicate"],
+        "local_runnable": False,
+        "local_hf_id": "facebook/musicgen-large",
+        "local_size_mb": 6300,
+        "local_note": "3.3B 权重约 6GB，本机 CPU 不实际；走 Replicate 托管",
+        "replicate_slug": "meta/musicgen",
+        "recommended": False,
+        "recommend_reason": "",
+    },
+    {
+        "id": "musicgen-medium",
+        "name": "MusicGen Medium",
+        "vendor": "Meta（AudioCraft）",
+        "license": "CC-BY-NC 4.0（权重）+ MIT（代码）",
+        "params": "1.5B",
+        "capabilities": {"vocals": False, "lyrics_input": False, "max_duration_sec": 90,
+                         "languages": "器乐（无歌词/人声）"},
+        "benchmark": {
+            "score": 7.2,
+            "source": "MusicGen 论文（Meta，arXiv:2306.05284）FAD/FD 基准",
+            "notes": "器乐质量/速度折中档；本机 CPU 可跑（30s 约 5~15 分钟）",
+        },
+        "channels": ["musicgen_local", "replicate"],
+        "local_runnable": True,
+        "local_hf_id": "facebook/musicgen-medium",
+        "local_size_mb": 3100,
+        "local_note": "本机 CPU 可用但较慢；长音频建议走 Replicate 托管",
+        "replicate_slug": "meta/musicgen",
+        "recommended": False,
+        "recommend_reason": "",
+    },
+    {
+        "id": "musicgen-small",
+        "name": "MusicGen Small",
+        "vendor": "Meta（AudioCraft）",
+        "license": "CC-BY-NC 4.0（权重）+ MIT（代码）",
+        "params": "300M",
+        "capabilities": {"vocals": False, "lyrics_input": False, "max_duration_sec": 60,
+                         "languages": "器乐（无歌词/人声）"},
+        "benchmark": {
+            "score": 6.4,
+            "source": "MusicGen 论文（Meta，arXiv:2306.05284）FAD/FD 基准",
+            "notes": "轻量验证档：权重约 2.2GB，CPU 30s 约 2~6 分钟；"
+                     "离线/免 Key 首选，质量低于中大档",
+        },
+        "channels": ["musicgen_local", "replicate"],
+        "local_runnable": True,
+        "local_hf_id": "facebook/musicgen-small",
+        "local_size_mb": 2200,
+        "local_note": "离线推荐档：无需任何 API Key，本机真实下载后可生成器乐",
+        "replicate_slug": "meta/musicgen",
+        "recommended": True,
+        "recommend_reason": "离线/免 Key 推荐：本机下载即可真实生成（器乐）",
+    },
+    {
+        "id": "stable-audio-open",
+        "name": "Stable Audio Open",
+        "vendor": "Stability AI",
+        "license": "Stability Community License（非商业免费）",
+        "params": "约 1.1B",
+        "capabilities": {"vocals": False, "lyrics_input": False, "max_duration_sec": 47,
+                         "languages": "音效/短器乐向"},
+        "benchmark": {
+            "score": 7.2,
+            "source": "Stable Audio Open 模型卡（Stability AI，2024）",
+            "notes": "短音频/音效质量好，非歌曲结构（47s 上限）；多用于素材",
+        },
+        "channels": ["replicate"],
+        "local_runnable": False,
+        "local_hf_id": None,
+        "local_size_mb": 0,
+        "local_note": "请走 Replicate 托管（slug 需自查填写）",
+        "replicate_slug": "",
+        "recommended": False,
+        "recommend_reason": "",
+    },
+]
+
+CATALOG_DISCLAIMER = (
+    "目录按外部测评参考分排序；分数综合自各模型公开论文/技术报告/社区横评（来源见"
+    "每项 benchmark.source），仅作选型参考，非本系统实测结果。"
+)
+
+# 本机可下载运行的模型（musicgen_local 通道）
+LOCAL_RUNNABLE_IDS = [m["id"] for m in MUSIC_CATALOG if "musicgen_local" in m["channels"]]
+
+CATALOG_BY_ID = {m["id"]: m for m in MUSIC_CATALOG}
+
+
+def catalog_sorted() -> list[dict]:
+    """按外部测评参考分降序（同分按能力完整度：人声>纯器乐）。"""
+    return sorted(MUSIC_CATALOG,
+                  key=lambda m: (-m["benchmark"]["score"], not m["capabilities"]["vocals"]))

@@ -12,6 +12,7 @@ from sqlalchemy.engine import Engine
 from app.core.logging import logger
 
 # M-20260831-a：llm_settings 补 V1.3 歌曲模型通道列（localsynth|api）
+# M-20260901-a：llm_settings 补 V1.4 开源歌曲模型目录通道列（replicate/musicgen_local）
 _ADD_COLUMNS: list[tuple[str, str]] = [
     ("music_backend",
      "ALTER TABLE llm_settings ADD COLUMN music_backend VARCHAR(16) NOT NULL DEFAULT 'localsynth'"),
@@ -21,6 +22,12 @@ _ADD_COLUMNS: list[tuple[str, str]] = [
      "ALTER TABLE llm_settings ADD COLUMN music_api_key VARCHAR(300) NOT NULL DEFAULT ''"),
     ("music_api_model",
      "ALTER TABLE llm_settings ADD COLUMN music_api_model VARCHAR(120) NOT NULL DEFAULT ''"),
+    ("replicate_api_token",
+     "ALTER TABLE llm_settings ADD COLUMN replicate_api_token VARCHAR(300) NOT NULL DEFAULT ''"),
+    ("music_model",
+     "ALTER TABLE llm_settings ADD COLUMN music_model VARCHAR(60) NOT NULL DEFAULT ''"),
+    ("replicate_slugs",
+     "ALTER TABLE llm_settings ADD COLUMN replicate_slugs JSON NOT NULL DEFAULT '{}'"),
 ]
 
 
@@ -42,13 +49,13 @@ def run(engine: Engine) -> list[str]:
             _rebuild_table(conn, "candidates", "candidates__v13")
             applied.append("candidates.quality_score → nullable")
 
-        # M-20260831-c：tasks.stage_key 约束补 V1.3 枚举（writing / api_*）
+        # M-20260831-c：tasks.stage_key 约束补 V1.3/V1.4 枚举（writing / api_* / model_*）
         ddl = conn.execute(
             text("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'")
         ).scalar_one_or_none()
-        if ddl and "'writing'" not in ddl:
-            _rebuild_table(conn, "tasks", "tasks__v13")
-            applied.append("tasks.stage_key 增加 writing/api_* 枚举")
+        if ddl and "'model_load'" not in ddl:
+            _rebuild_table(conn, "tasks", "tasks__v14")
+            applied.append("tasks.stage_key 增加 model_* 枚举")
     if applied:
         logger.info(f"sqlite migrations applied: {', '.join(applied)}")
     return applied

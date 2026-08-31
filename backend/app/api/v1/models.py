@@ -1,8 +1,9 @@
-"""模型中心路由（契约 v1.4 §5.8，11 接口，登录即可用）。
+"""模型中心路由（契约 v1.5 §5.8，15 接口，登录即可用）。
 
 本地开源模型（Ollama）下载/删除/列举/选用 + 外部 API（OpenAI 兼容）配置与连通性
 测试 + 歌词引擎通道切换（V1.2）；外部歌曲生成 API（Suno 兼容）配置/探活/通道切换
-（V1.3）。MVP 单机自用场景未做管理员角色收权（RAID 登记 P2）。
+（V1.3）；开源歌曲模型目录（外部测评排序+推荐）/Replicate 托管/本机 MusicGen
+下载/删除/探活（V1.4）。MVP 单机自用场景未做管理员角色收权（RAID 登记 P2）。
 """
 from __future__ import annotations
 
@@ -14,11 +15,13 @@ from app.core.security import get_current_user
 from app.database import get_db
 from app.models import User
 from app.schemas.models import (
+    CatalogModelRequest,
     ExternalTestRequest,
     LLMSettingsRequest,
     ModelDeleteRequest,
     ModelPullRequest,
     MusicTestRequest,
+    ReplicateTestRequest,
 )
 from app.services import model_center as svc
 
@@ -93,6 +96,34 @@ def test_music(body: MusicTestRequest,
                user: User = Depends(get_current_user)):
     """外部歌曲生成 API（Suno 兼容）端点探活（get 探针 id，不落库）。"""
     return ok(svc.test_music(body.base_url, body.api_key, body.model))
+
+
+@router.post("/test-replicate")
+def test_replicate(body: ReplicateTestRequest,
+                   user: User = Depends(get_current_user)):
+    """Replicate Token 校验（GET /v1/account）+ 可选模型存在性（不落库）。"""
+    return ok(svc.test_replicate(body.api_token, body.base_url, body.model))
+
+
+@router.get("/music-catalog")
+def music_catalog(db: Session = Depends(get_db),
+                  user: User = Depends(get_current_user)):
+    """开源歌曲模型目录：按外部测评参考分降序 + 能力矩阵 + 本机状态 + 推荐。"""
+    return ok(svc.get_music_catalog(db))
+
+
+@router.post("/music-pull")
+def music_pull(body: CatalogModelRequest, db: Session = Depends(get_db),
+               user: User = Depends(get_current_user)):
+    """下载本机开源歌曲模型（MusicGen，HF 真实下载，异步轮询 ops/{id} 看进度）。"""
+    return ok(svc.start_music_pull(db, user.id, body.model), status_code=202)
+
+
+@router.post("/music-delete")
+def music_delete(body: CatalogModelRequest, db: Session = Depends(get_db),
+                 user: User = Depends(get_current_user)):
+    """删除本机开源歌曲模型（同步返回结果；删选用中模型自动回退本地合成）。"""
+    return ok(svc.run_music_delete(db, user.id, body.model))
 
 
 @router.get("/presets")

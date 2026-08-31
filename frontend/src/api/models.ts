@@ -7,6 +7,7 @@ import type {
   ModelOpInfo,
   ModelsPresets,
   ModelsRuntime,
+  MusicCatalog,
 } from '../types/api'
 
 /** GET /models/runtime —— Ollama 运行状态 + 当前生效引擎 */
@@ -65,6 +66,30 @@ export function testMusic(body: {
   model?: string
 }): Promise<ExternalTestResult> {
   return apiPost<ExternalTestResult>('/models/test-music', body)
+}
+
+/** GET /models/music-catalog —— 开源歌曲模型目录（外部测评排序+推荐+本机状态，V1.4） */
+export function getMusicCatalog(): Promise<MusicCatalog> {
+  return apiGet<MusicCatalog>('/models/music-catalog')
+}
+
+/** POST /models/music-pull —— 下载本机开源歌曲模型（MusicGen，202，轮询 ops/{id}） */
+export function pullMusicModel(model: string): Promise<ModelOpInfo> {
+  return apiPost<ModelOpInfo>('/models/music-pull', { model })
+}
+
+/** POST /models/music-delete —— 删除本机开源歌曲模型（同步返回） */
+export function deleteMusicModel(model: string): Promise<ModelOpInfo> {
+  return apiPost<ModelOpInfo>('/models/music-delete', { model })
+}
+
+/** POST /models/test-replicate —— Replicate Token 校验 + 可选模型存在性（V1.4） */
+export function testReplicate(body: {
+  api_token: string
+  base_url?: string
+  model?: string
+}): Promise<ExternalTestResult> {
+  return apiPost<ExternalTestResult>('/models/test-replicate', body)
 }
 
 /** GET /models/presets —— 外部厂商预设 + 推荐 pull 清单 */

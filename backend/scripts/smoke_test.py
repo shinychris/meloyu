@@ -180,16 +180,19 @@ def main() -> int:
 
     # ============ 模型中心（V1.2：本地开源模型 + 外部 API） ============
     # 环境归一：llm_settings 为全局单行，此前真机联测/历次冒烟可能残留 ollama/api 配置——
-    # 先还原 localsynth 并清空外部歌曲 API 连接，保证后续断言与生成用例走可控引擎
+    # 先还原 localsynth 并清空歌曲 API/开源模型连接，保证后续断言走可控引擎
     r = client.put(f"{API}/models/settings", headers=auth_headers(token),
                    json={"lyrics_backend": "localsynth", "music_backend": "localsynth",
-                         "music_api_base_url": "", "music_api_model": ""})
+                         "music_api_base_url": "", "music_api_model": "",
+                         "music_model": "", "replicate_api_token": ""})
     b = unwrap(r)
-    check("13.1(前置) 环境归一（双通道还原 localsynth，清空歌曲 API 连接）",
+    check("13.1(前置) 环境归一（双通道还原 localsynth，清空歌曲 API/开源模型连接）",
           r.status_code == 200 and b["code"] == 0
           and b["data"]["lyrics_backend"] == "localsynth"
           and b["data"]["music_backend"] == "localsynth"
-          and b["data"]["music_api_base_url"] == "")
+          and b["data"]["music_api_base_url"] == ""
+          and b["data"]["music_model"] == ""
+          and b["data"]["replicate_api_token"]["has_key"] is False)
 
     r = client.get(f"{API}/models/runtime", headers=auth_headers(token))
     b = unwrap(r)
@@ -276,6 +279,17 @@ def main() -> int:
               r.status_code == 200 and b["data"]["lyrics_backend"] == "localsynth")
     else:
         print("SKIP 13.5~13.10：本机 Ollama 未运行或无本地模型（LLM 通道用例跳过）")
+
+    # 14/15 两节将多次提交生成（api 通道取消/写词回填/musicgen 留痕）+ 生成 3 次，
+    # 超出免费档每日 5 次限额 → 提前切 studio（原派生节前置步骤移此）
+    r = client.get(f"{API}/credits/balance", headers=auth_headers(token))
+    pre_switch_balance = unwrap(r)["data"]["balance"]
+    r = client.post(f"{API}/subscriptions/switch", headers=auth_headers(token),
+                    json={"plan": "studio"})
+    b = unwrap(r)
+    check("11.2(前置) 切换 studio（解除每日限额，覆盖 14/15/4.x 多次提交）",
+          r.status_code == 200 and b["data"]["plan"] == "studio"
+          and b["data"]["credits"]["balance"] == pre_switch_balance + 10000)
 
     # ============ 模型中心 V1.3：歌曲生成引擎（外部歌曲 API 通道） ============
     r = client.put(f"{API}/models/settings", headers=auth_headers(token),
@@ -365,6 +379,129 @@ def main() -> int:
               and "[Verse]" in (vb["data"].get("lyrics") or "")
               and len(vb["data"].get("lyrics") or "") > 40,
               f"lyrics_head={(vb['data'].get('lyrics') or '')[:60]!r}")
+
+    # ============ 模型中心 V1.4：开源歌曲模型目录（Replicate / 本机 MusicGen） ============
+    smoke_state = {"mg6_refunded": False}  # 15.6 终态自适应（未就绪=退款；真机成功=扣费）
+    r = client.get(f"{API}/models/music-catalog", headers=auth_headers(token))
+    b = unwrap(r)
+    cat = b["data"]["models"] if r.status_code == 200 and b["code"] == 0 else []
+    scores = [m["benchmark"]["score"] for m in cat]
+    check("15.1 GET /models/music-catalog（≥6 项，外部测评降序，含来源与推荐）",
+          r.status_code == 200 and b["code"] == 0 and len(cat) >= 6
+          and scores == sorted(scores, reverse=True)
+          and all(m["benchmark"]["source"] for m in cat)
+          and any(m["recommended"] for m in cat)
+          and all(m["rank"] == i + 1 for i, m in enumerate(cat))
+          and isinstance(b["data"]["disclaimer"], str)
+          and "machine" in b["data"] and "replicate" in b["data"],
+          json.dumps(b)[:200])
+    catalog_ids = [m["id"] for m in cat]
+
+    r = client.put(f"{API}/models/settings", headers=auth_headers(token),
+                   json={"music_backend": "replicate", "music_model": "ace-step"})
+    b = unwrap(r)
+    check("15.2 切 replicate 未配 Token → 40001",
+          r.status_code == 422 and b["code"] == 40001)
+
+    r = client.put(f"{API}/models/settings", headers=auth_headers(token),
+                   json={"music_backend": "musicgen_local", "music_model": "ace-step"})
+    b = unwrap(r)
+    check("15.3 切 musicgen_local 选非本机模型 → 40001",
+          r.status_code == 422 and b["code"] == 40001)
+
+    r = client.put(f"{API}/models/settings", headers=auth_headers(token),
+                   json={"music_backend": "replicate", "music_model": "ace-step",
+                         "replicate_api_token": "r8_smoke_fake_token"})
+    b = unwrap(r)
+    check("15.4 保存 replicate 配置（Token 脱敏，自动选模型）",
+          r.status_code == 200 and b["code"] == 0
+          and b["data"]["music_backend"] == "replicate"
+          and b["data"]["music_model"] == "ace-step"
+          and isinstance(b["data"]["replicate_api_token"], dict)
+          and b["data"]["replicate_api_token"]["has_key"] is True)
+    r = client.get(f"{API}/models/runtime", headers=auth_headers(token))
+    b = unwrap(r)
+    check("15.4 runtime 歌曲引擎显示 Replicate 模型",
+          b["data"]["song_engine"].startswith("Replicate · ACE-Step")
+          and b["data"]["replicate"]["token_saved"] is True,
+          b["data"].get("song_engine", ""))
+
+    r = client.post(f"{API}/models/test-replicate", headers=auth_headers(token),
+                    json={"api_token": "", "base_url": "http://127.0.0.1:9"})
+    b = unwrap(r)
+    check("15.5 test-replicate 空 Token → 422", r.status_code == 422)
+    r = client.post(f"{API}/models/test-replicate", headers=auth_headers(token),
+                    json={"api_token": "r8_smoke_fake_token",
+                          "base_url": "http://127.0.0.1:9"})
+    b = unwrap(r)
+    check("15.5 test-replicate 端点不可达 → ok=false",
+          r.status_code == 200 and b["code"] == 0 and b["data"]["ok"] is False)
+
+    # 本机 MusicGen 通道留痕：切 musicgen-small（依赖未装时执行侧如实失败并退款；
+    # 已装但未下载同理 fail-fast，均不产生外部调用）
+    r = client.put(f"{API}/models/settings", headers=auth_headers(token),
+                   json={"music_backend": "musicgen_local", "music_model": "musicgen-small"})
+    b = unwrap(r)
+    mg_ok = r.status_code == 200 and b["data"]["music_backend"] == "musicgen_local"
+    check("15.6 切 musicgen_local（musicgen-small）", mg_ok, json.dumps(b)[:200])
+    if mg_ok:
+        r = client.get(f"{API}/models/runtime", headers=auth_headers(token))
+        b = unwrap(r)
+        check("15.6 runtime 歌曲引擎显示 MusicGen 本地",
+              b["data"]["song_engine"].startswith("MusicGen 本地 · MusicGen Small"),
+              b["data"].get("song_engine", ""))
+        r = client.post(f"{API}/generations", headers=auth_headers(token), json={
+            "mode": "simple", "simple_prompt": "雪原上的极光", "seed": 900115,
+            "params": {"duration_sec": 30, "vocal": "instrumental"},
+        })
+        b = unwrap(r)
+        mg_submit = (r.status_code == 201 and b["code"] == 0
+                     and b["data"]["task"]["provider"] == "musicgen_local")
+        check("15.6 musicgen 通道提交（task.provider 留痕）", mg_submit, json.dumps(b)[:200])
+        if mg_submit:
+            t = wait_task(client, b["data"]["task"]["id"], token, timeout=120)
+            mg_failed_clean = (
+                t["status"] == "succeeded"  # 依赖已装且模型已下载（真机）
+                or (t["status"] == "failed" and t["error"] is not None
+                    and ("依赖未安装" in t["error"]["message"]
+                         or "未下载" in t["error"]["message"])))
+            smoke_state["mg6_refunded"] = t["status"] == "failed"
+            check("15.6 musicgen 执行终态（未就绪→fail-fast 可读指引；就绪→成功）",
+                  mg_failed_clean, json.dumps(t.get("error"))[:200])
+
+    r = client.post(f"{API}/models/music-pull", headers=auth_headers(token),
+                    json={"model": "ace-step"})
+    b = unwrap(r)
+    check("15.7 music-pull 非本机模型 → 40001", r.status_code == 422 and b["code"] == 40001)
+
+    r = client.post(f"{API}/models/music-pull", headers=auth_headers(token),
+                    json={"model": "musicgen-small"})
+    b = unwrap(r)
+    mp_ok = r.status_code == 202 and b["code"] == 0 and b["data"]["id"]
+    check("15.8 music-pull（202 异步受理，music_pull 留痕）", mp_ok, json.dumps(b)[:200])
+    if mp_ok:
+        mop_id = b["data"]["id"]
+        mop = {"status": "timeout"}
+        for _ in range(60):  # 依赖未装 → 秒级失败；已装 → 真实下载（2.2GB，仅真机场景）
+            time.sleep(2)
+            r2 = client.get(f"{API}/models/ops/{mop_id}", headers=auth_headers(token))
+            mop = unwrap(r2)["data"]
+            if mop["status"] not in ("queued", "running"):
+                break
+        check("15.8 music-pull 终态（未装依赖→failed 可读指引；真机→succeeded）",
+              mop["status"] == "succeeded"
+              or (mop["status"] == "failed" and "requirements-musicgen" in mop["error_message"]),
+              json.dumps(mop)[:200])
+
+    r = client.put(f"{API}/models/settings", headers=auth_headers(token),
+                   json={"music_backend": "localsynth", "music_model": "",
+                         "replicate_api_token": ""})
+    b = unwrap(r)
+    check("15.9 还原 localsynth（清空目录模型选择与 Replicate Token）",
+          r.status_code == 200 and b["code"] == 0
+          and b["data"]["music_backend"] == "localsynth"
+          and b["data"]["music_model"] == ""
+          and b["data"]["replicate_api_token"]["has_key"] is False)
 
     # ============ 生成（4） ============
     gen_body = {
@@ -510,15 +647,7 @@ def main() -> int:
           and len(r.content) == 1024)
 
     # ============ V1.1 派生生成（5.5~5.7 真实实现） ============
-    # 免费档每日 5 次生成已用 3 次（gen1/gen2/取消），派生任务同计限额 → 先切 studio
-    r = client.get(f"{API}/credits/balance", headers=auth_headers(token))
-    pre_switch_balance = unwrap(r)["data"]["balance"]
-    r = client.post(f"{API}/subscriptions/switch", headers=auth_headers(token),
-                    json={"plan": "studio"})
-    b = unwrap(r)
-    check("11.2(前置) 切换 studio（解除每日限额）", r.status_code == 200
-          and b["data"]["plan"] == "studio"
-          and b["data"]["credits"]["balance"] == pre_switch_balance + 10000)
+    # （studio 已在 14 节前切换以解除每日限额）
 
     cand_detail = unwrap(client.get(f"{API}/candidates/{cand_a['id']}",
                                     headers=auth_headers(token)))["data"]
@@ -869,13 +998,15 @@ def main() -> int:
     for t in sorted(txs, key=lambda x: x["created_at"]):
         chain_ok = chain_ok and (prev + t["delta"] == t["balance_after"] or True)
     check("10.2 GET /credits/transactions", r.status_code == 200
-          and len(gen_txs) == 10 and len(refund_txs) >= 2
+          and len(gen_txs) == 11 and len(refund_txs) >= 2
           and all(t["balance_after"] >= 0 for t in txs))
 
-    # 注册 200 + studio 切换 10000 − 整曲 12×5（14.7/14.9/4.1/确定性/长任务）
-    # − 派生 6×5 + 取消退款 12×2（14.7 外部不可达 / 长任务取消）= 10134
-    check("10.2 账本自洽（200 + 10000 − 60 − 30 + 24 = 10134）",
-          balance_now == 200 + 10000 - 60 - 30 + 24, f"balance={balance_now}")
+    # 注册 200 + studio 切换 10000 − 整曲 12×6（14.7/14.9/15.6/4.1/确定性/长任务）
+    # − 派生 6×5 + 取消退款（14.7/长任务 恒 2 笔；15.6 未就绪时 +1）= 10134 / 10122
+    expected_balance = 200 + 10000 - 72 - 30 + (36 if smoke_state["mg6_refunded"] else 24)
+    check(f"10.2 账本自洽（200 + 10000 − 72 − 30 + {36 if smoke_state['mg6_refunded'] else 24}"
+          f" = {expected_balance}）",
+          balance_now == expected_balance, f"balance={balance_now}")
 
     # ============ 订阅（2） ============
     r = client.get(f"{API}/subscriptions/plans", headers=auth_headers(token))

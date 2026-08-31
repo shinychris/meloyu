@@ -24,6 +24,10 @@ SIGNUP_BONUS_CREDITS = 200
 GENERATION_TASK_TIMEOUT_SEC = 180
 # 外部歌曲 API 通道的任务超时（秒）：云端整曲生成实测 1~5 分钟（ADR-010）
 MUSIC_API_TASK_TIMEOUT_SEC = 900
+# 本机 MusicGen 通道的任务超时（秒）：CPU 上 30s 器乐约 2~6 分钟（small），留足余量
+MUSICGEN_TASK_TIMEOUT_SEC = 1800
+# Replicate 官方 API（V1.4 开源模型托管通道；测试连接支持 base 覆盖以便自建代理）
+REPLICATE_API_BASE = "https://api.replicate.com"
 # 免费档回收站清扫天数
 TRASH_RETENTION_DAYS = 30
 # stream-token 有效期（秒）

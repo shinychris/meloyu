@@ -24,9 +24,11 @@ class ModelDeleteRequest(ModelPullRequest):
 
 
 class LLMSettingsRequest(BaseModel):
-    """PUT /models/settings：切换引擎通道与连接配置（*_api_key 空串=保持不变）。
+    """PUT /models/settings：切换引擎通道与连接配置（*_api_key/token 空串=保持不变）。
 
-    V1.3 新增歌曲生成通道：music_backend ∈ localsynth|api（api=Suno 兼容外部歌曲 API）。
+    V1.3 新增歌曲生成通道：music_backend ∈ localsynth|api；
+    V1.4 扩展：music_backend 增 replicate|musicgen_local（开源模型目录通道，
+    music_model 为目录模型 id；replicate_slugs 覆盖目录默认 slug）。
     """
     lyrics_backend: str | None = None
     ollama_host: str | None = Field(default=None, max_length=200)
@@ -38,6 +40,9 @@ class LLMSettingsRequest(BaseModel):
     music_api_base_url: str | None = Field(default=None, max_length=300)
     music_api_model: str | None = Field(default=None, max_length=120)
     music_api_key: str | None = Field(default=None, max_length=300)
+    music_model: str | None = Field(default=None, max_length=60)
+    replicate_api_token: str | None = Field(default=None, max_length=300)
+    replicate_slugs: dict[str, str] | None = None
 
     @field_validator("lyrics_backend")
     @classmethod
@@ -49,8 +54,8 @@ class LLMSettingsRequest(BaseModel):
     @field_validator("music_backend")
     @classmethod
     def _music_backend(cls, v: str | None) -> str | None:
-        if v is not None and v not in ("localsynth", "api"):
-            raise ValueError("music_backend 必须为 localsynth/api")
+        if v is not None and v not in ("localsynth", "api", "replicate", "musicgen_local"):
+            raise ValueError("music_backend 必须为 localsynth/api/replicate/musicgen_local")
         return v
 
 
@@ -66,3 +71,15 @@ class MusicTestRequest(BaseModel):
     base_url: str = Field(min_length=1, max_length=300)
     api_key: str = Field(default="", max_length=300)
     model: str = Field(default="", max_length=120)
+
+
+class ReplicateTestRequest(BaseModel):
+    """POST /models/test-replicate：Replicate Token 校验 + 可选模型存在性（不落库）。"""
+    api_token: str = Field(min_length=1, max_length=300)
+    base_url: str = Field(default="", max_length=300)
+    model: str = Field(default="", max_length=120)
+
+
+class CatalogModelRequest(BaseModel):
+    """POST /models/music-pull | /models/music-delete：目录模型 id（如 musicgen-small）。"""
+    model: str = Field(min_length=1, max_length=60)
