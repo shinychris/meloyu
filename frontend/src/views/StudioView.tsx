@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStudioStore } from '../stores/studio'
 import { useMetaStore } from '../stores/meta'
 import { toast } from '../stores/toast'
 import { countStructureTags } from '../lib/structure'
+import { getModelsRuntime } from '../api/models'
 import StepBar from '../components/studio/StepBar'
 import InspireBox from '../components/studio/InspireBox'
 import ParamPanel from '../components/studio/ParamPanel'
@@ -20,6 +22,7 @@ const MODE_HINTS: Record<string, string> = {
 /** 创作工作台（原型核心视图：左控制 / 中结果 / 右版本树） */
 export default function StudioView() {
   const navigate = useNavigate()
+  const [songEngine, setSongEngine] = useState('')
   const form = useStudioStore((s) => s.form)
   const { patchForm, markStep, submitGeneration } = useStudioStore()
   const task = useStudioStore((s) => s.task)
@@ -34,6 +37,13 @@ export default function StudioView() {
   const tagCount = countStructureTags(form.lyrics)
   const generating =
     submitting || (task != null && (task.status === 'queued' || task.status === 'running'))
+
+  // V1.3：显示当前歌曲引擎（模型中心可切换：本地合成 / 外部歌曲 API）
+  useEffect(() => {
+    getModelsRuntime()
+      .then((rt) => setSongEngine(rt.song_engine))
+      .catch(() => {})
+  }, [])
 
   const onMode = (mode: string) => {
     if (mode === 'ref' || mode === 'hum') {
@@ -81,9 +91,16 @@ export default function StudioView() {
               <span className="dot" style={{ background: 'var(--acc)' }}></span>
               {modelLabel} · 中文人声优化
             </span>
-            <span className="num" style={{ color: 'var(--dim)' }}>
-              本地演示引擎
-            </span>
+            {songEngine && (
+              <span
+                className="text-[10px] font-bold px-2 py-1 cursor-pointer"
+                style={{ background: 'var(--bg2)', border: '1px solid var(--line)', color: 'var(--dim)' }}
+                title="在模型中心切换歌曲引擎（本地合成 / 外部歌曲生成 API）；歌词引擎也在此配置"
+                onClick={() => navigate('/models')}
+              >
+                歌曲引擎：{songEngine} ⇄
+              </span>
+            )}
           </div>
         </div>
         <StepBar />

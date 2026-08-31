@@ -1,7 +1,8 @@
-"""模型中心路由（契约 v1.3 §5.8，10 接口，登录即可用）。
+"""模型中心路由（契约 v1.4 §5.8，11 接口，登录即可用）。
 
 本地开源模型（Ollama）下载/删除/列举/选用 + 外部 API（OpenAI 兼容）配置与连通性
-测试 + 歌词引擎通道切换。MVP 单机自用场景未做管理员角色收权（RAID 登记 P2）。
+测试 + 歌词引擎通道切换（V1.2）；外部歌曲生成 API（Suno 兼容）配置/探活/通道切换
+（V1.3）。MVP 单机自用场景未做管理员角色收权（RAID 登记 P2）。
 """
 from __future__ import annotations
 
@@ -17,6 +18,7 @@ from app.schemas.models import (
     LLMSettingsRequest,
     ModelDeleteRequest,
     ModelPullRequest,
+    MusicTestRequest,
 )
 from app.services import model_center as svc
 
@@ -40,14 +42,14 @@ def local_models(db: Session = Depends(get_db),
 @router.get("/settings")
 def get_settings(db: Session = Depends(get_db),
                  user: User = Depends(get_current_user)):
-    """歌词引擎通道配置（api_key 脱敏）。"""
+    """引擎通道配置（歌词 + 歌曲；api_key 脱敏）。"""
     return ok(svc.get_settings(db))
 
 
 @router.put("/settings")
 def put_settings(body: LLMSettingsRequest, db: Session = Depends(get_db),
                  user: User = Depends(get_current_user)):
-    """切换歌词引擎通道 / 更新连接配置。"""
+    """切换引擎通道 / 更新连接配置（歌词 lyrics_backend + 歌曲 music_backend）。"""
     return ok(svc.update_settings(db, body.model_dump(exclude_unset=True)))
 
 
@@ -86,8 +88,16 @@ def test_external(body: ExternalTestRequest,
     return ok(svc.test_external(body.base_url, body.api_key, body.model))
 
 
+@router.post("/test-music")
+def test_music(body: MusicTestRequest,
+               user: User = Depends(get_current_user)):
+    """外部歌曲生成 API（Suno 兼容）端点探活（get 探针 id，不落库）。"""
+    return ok(svc.test_music(body.base_url, body.api_key, body.model))
+
+
 @router.get("/presets")
 def presets(user: User = Depends(get_current_user)):
-    """外部 API 厂商预设（base_url 与推荐 model 名）。"""
+    """外部 API 厂商预设 + 推荐 pull 清单。"""
     return ok({"external_presets": svc.EXTERNAL_PRESETS,
+               "music_api_presets": svc.MUSIC_API_PRESETS,
                "recommended_models": svc.RECOMMENDED_MODELS})

@@ -33,6 +33,8 @@ def _source_context(db: Session, user: User, candidate_id: str,
     required = {("master", None), ("preview", None)} | {
         ("stem", s) for s in ("vocals", "drums", "bass", "other")}
     if not required.issubset(have):
+        if not any(kind == "stem" for kind, _ in have):
+            raise err_conflict("外部模型候选不含分轨文件，暂不支持延长/变体/段落重生成")
         raise err_conflict("源候选产物不完整，无法衍生")
     base_dir = settings.audio_path / work.id / version.id / "candidates" / cand.label
     for rel in ("master.wav", "preview.mp3",

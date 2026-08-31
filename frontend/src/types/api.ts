@@ -34,7 +34,9 @@ export type PlanCode = 'free' | 'pro' | 'studio' | 'team'
 export type TaskType = 'generation' | 'export'
 export type TaskStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled'
 export type StageKey =
-  | 'queued' | 'structure' | 'harmony' | 'melody' | 'arrange' | 'vocal' | 'mixdown' | 'serialize' | 'done'
+  | 'queued' | 'writing' | 'structure' | 'harmony' | 'melody' | 'arrange' | 'vocal' | 'mixdown' | 'serialize' | 'done'
+  /** 外部歌曲 API 通道阶段（V1.3）：提交/排队/生成中/下载 */
+  | 'api_submit' | 'api_queue' | 'api_render' | 'api_download'
 export type CreditReason = 'signup_bonus' | 'generation' | 'refund' | 'plan_grant' | 'plan_switch'
 export type EventAction = 'generate' | 'adopt' | 'update' | 'export' | 'trash' | 'restore' | 'certificate' | 'plan_switch'
 export type EventActor = 'human' | 'ai' | 'system'
@@ -89,7 +91,8 @@ export interface TaskError {
 export interface CandidateSummary {
   id: string
   label: string
-  quality_score: number
+  /** V1.3 起外部模型候选为 null（不产出 AI 质量分） */
+  quality_score: number | null
   duration_sec: number
   preview_file_id: string
 }
@@ -107,6 +110,8 @@ export interface Task {
   stage_key: StageKey
   stage_label: string
   error: TaskError | null
+  /** 执行引擎留痕（V1.3）：localsynth=本地合成 / api=外部歌曲生成 API */
+  provider: 'localsynth' | 'api' | null
   work_id: string | null
   version_id: string | null
   result: TaskResult | null
@@ -126,6 +131,8 @@ export interface StructureSegment {
   start_bar: number
   start_sec: number
   end_sec: number
+  /** 外部模型候选仅有段落名与行数（V1.3，无本地小节网格） */
+  line_count?: number
 }
 
 export interface Candidate {
@@ -134,7 +141,8 @@ export interface Candidate {
   label: string
   adopted: boolean
   seed: number
-  quality_score: number
+  /** V1.3 起外部模型候选为 null（不产出 AI 质量分） */
+  quality_score: number | null
   duration_sec: number
   bpm: number
   key: KeyInfo
@@ -479,6 +487,9 @@ export interface WorkDeleteResult {
 /* ============ models（V1.2 模型中心，契约 §5.8） ============ */
 export type LyricsBackend = 'localsynth' | 'ollama' | 'openai_compat'
 
+/** 歌曲生成引擎通道（V1.3）：本地合成 / 外部歌曲生成 API（Suno 兼容） */
+export type MusicBackend = 'localsynth' | 'api'
+
 export interface OllamaRuntime {
   host: string
   running: boolean
@@ -492,6 +503,8 @@ export interface ModelsRuntime {
   ollama: OllamaRuntime
   active_backend: LyricsBackend
   engine: string
+  music_backend: MusicBackend
+  song_engine: string
 }
 
 export interface LocalModelInfo {
@@ -539,6 +552,10 @@ export interface LLMSettings {
   external_base_url: string
   external_model: string
   external_api_key: { has_key: boolean; key_tail: string }
+  music_backend: MusicBackend
+  music_api_base_url: string
+  music_api_model: string
+  music_api_key: { has_key: boolean; key_tail: string }
 }
 
 export interface LLMSettingsUpdate {
@@ -549,12 +566,23 @@ export interface LLMSettingsUpdate {
   external_model?: string
   /** 空串/省略 = 保持不变（脱敏读回无法回显） */
   external_api_key?: string
+  music_backend?: MusicBackend
+  music_api_base_url?: string
+  music_api_model?: string
+  music_api_key?: string
 }
 
 export interface ExternalTestResult {
   ok: boolean
   sample: string
   message: string
+}
+
+/** 外部歌曲生成 API 厂商预设（GET /models/presets，V1.3） */
+export interface MusicApiPreset {
+  vendor: string
+  base_url: string
+  model_hint: string
 }
 
 export interface ExternalPreset {
@@ -565,5 +593,6 @@ export interface ExternalPreset {
 
 export interface ModelsPresets {
   external_presets: ExternalPreset[]
+  music_api_presets: MusicApiPreset[]
   recommended_models: RecommendedModel[]
 }

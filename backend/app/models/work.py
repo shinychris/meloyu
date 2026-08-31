@@ -156,7 +156,8 @@ class Candidate(BaseModel):
     label: Mapped[str] = mapped_column(String(2), nullable=False)
     adopted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     seed: Mapped[int] = mapped_column(Integer, nullable=False)
-    quality_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    # V1.3 起允许空：外部模型候选不产出 AI 质量分（不造假分）；本地引擎候选保留确定性启发分
+    quality_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     duration_sec: Mapped[int] = mapped_column(Integer, nullable=False)
     bpm: Mapped[int] = mapped_column(Integer, nullable=False)
     key_tonic: Mapped[str] = mapped_column(String(2), nullable=False)

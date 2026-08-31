@@ -45,6 +45,8 @@ def task_to_dict(t: Task) -> dict:
         "stage_key": t.stage_key,
         "stage_label": t.stage_label,
         "error": error,
+        # V1.3：执行引擎留痕（localsynth=本地合成 / api=外部歌曲生成 API）
+        "provider": t.provider,
         "work_id": t.work_id,
         "version_id": t.version_id,
         "result": t.result,

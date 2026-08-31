@@ -22,9 +22,11 @@ SUBSCRIPTION_SOURCES = ("signup", "switch")
 # 任务
 TASK_TYPES = ("generation", "export")
 TASK_STATUSES = ("queued", "running", "succeeded", "failed", "canceled")
+# V1.3 新增：writing=执行线程 LLM 写词/扩写；api_*=外部歌曲 API 通道阶段
 STAGE_KEYS = (
-    "queued", "structure", "harmony", "melody",
+    "queued", "writing", "structure", "harmony", "melody",
     "arrange", "vocal", "mixdown", "serialize", "done",
+    "api_submit", "api_queue", "api_render", "api_download",
 )
 EXPORT_FORMATS = ("mp3", "wav", "midi", "stems")
 

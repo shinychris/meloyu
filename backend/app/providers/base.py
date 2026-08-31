@@ -11,6 +11,7 @@ CancelCheck = Callable[[], bool]
 
 STAGE_LABELS: dict[str, tuple[str, int, int]] = {
     # stage_key: (label, 进度区间)
+    "writing": ("AI 写词", 2, 8),
     "structure": ("结构规划", 5, 10),
     "harmony": ("和声进行", 10, 20),
     "melody": ("旋律生成", 20, 35),
@@ -44,9 +45,12 @@ class MusicProvider(Protocol):
 
 
 class CandidateArtifact:
-    """单候选的产物元数据（文件已落盘，由 service 层登记 files 表）。"""
+    """单候选的产物元数据（文件已落盘，由 service 层登记 files 表）。
 
-    def __init__(self, label: str, seed: int, quality_score: int, duration_sec: float,
+    quality_score 允许 None：外部模型候选不产出质量分（V1.3，ADR-012）。
+    """
+
+    def __init__(self, label: str, seed: int, quality_score: int | None, duration_sec: float,
                  structure: list[dict], style_tags: list[str], bpm: int,
                  tonic: str, mode: str, time_signature: str, vocal: str, language: str,
                  files: list[dict]):
@@ -74,10 +78,5 @@ class GenerationOutput:
         self.inferred_structure = inferred_structure
 
 
-def get_music_provider() -> MusicProvider:
-    from app.config import settings
-    from app.providers.music_local import LocalSynthProvider
-
-    if settings.music_provider == "localsynth":
-        return LocalSynthProvider()
-    raise ValueError(f"未知 MUSIC_PROVIDER: {settings.music_provider}")
+# Provider 工厂已移至 services/model_center.get_music_provider（V1.3：DB 配置驱动，
+# 支持 localsynth / api 双通道）；config.music_provider 环境变量随之废弃。

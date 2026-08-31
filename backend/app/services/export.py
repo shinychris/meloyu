@@ -141,27 +141,37 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
     exports_dir.mkdir(parents=True, exist_ok=True)
     out: list[dict] = []
 
+    # 外部模型候选（Suno 兼容通道）产物为整曲 mp3，无 WAV 母带/分轨/MIDI（ADR-010）
+    master = _candidate_file(db, cand.id, "master")
+    external_candidate = (master.mime or "").startswith("audio/mpeg")
+    if external_candidate and fmt in ("wav", "midi", "stems"):
+        raise err_conflict("该候选由外部歌曲模型生成（整曲 mp3），仅支持 MP3 导出；"
+                           "WAV 母带/分轨/MIDI 为本地引擎产物")
+
     if fmt == "mp3":
-        master = _candidate_file(db, cand.id, "master")
-        with wav_mod.open(str(_abs(master.path)), "rb") as wf:
-            n = wf.getnframes()
-            ch = wf.getnchannels()
-            sw = wf.getsampwidth()
-            raw = wf.readframes(n)
-        data = _wav_bytes_to_float(raw, sw)
-        if ch == 1:
-            left = right = data
+        if external_candidate:
+            # 母带即 mp3：直接复制（无 WAV 可解码，不做有损→有损二压）
+            p = exports_dir / "export.mp3"
+            p.write_bytes(_abs(master.path).read_bytes())
         else:
-            left, right = data[0::2], data[1::2]
-        p = exports_dir / "export.mp3"
-        encode_mp3(p, left, right, bitrate=320)
+            with wav_mod.open(str(_abs(master.path)), "rb") as wf:
+                n = wf.getnframes()
+                ch = wf.getnchannels()
+                sw = wf.getsampwidth()
+                raw = wf.readframes(n)
+            data = _wav_bytes_to_float(raw, sw)
+            if ch == 1:
+                left = right = data
+            else:
+                left, right = data[0::2], data[1::2]
+            p = exports_dir / "export.mp3"
+            encode_mp3(p, left, right, bitrate=320)
         row = _register(db, work, version, kind="export_mp3", relpath=f"{base}/export.mp3",
                         mime="audio/mpeg", path=p, duration_sec=master.duration_sec,
                         name=f"{work.display_code}_{version.version_no}_export_mp3.mp3")
         out.append(file_ref(row))
 
     elif fmt == "wav":
-        master = _candidate_file(db, cand.id, "master")
         p = exports_dir / "master.wav"
         p.write_bytes(_abs(master.path).read_bytes())
         row = _register(db, work, version, kind="export_wav", relpath=f"{base}/master.wav",

@@ -10,5 +10,7 @@ from app.seed_data import run_seed
 
 if __name__ == "__main__":
     Base.metadata.create_all(engine)
+    from app.core.migrations import run as run_migrations
+    run_migrations(engine)
     reset = "--reset" in sys.argv
     run_seed(reset=reset)

@@ -47,7 +47,7 @@ class Task(BaseModel):
     type: Mapped[str] = mapped_column(String(10), nullable=False)
     status: Mapped[str] = mapped_column(String(10), nullable=False, default="queued")
     progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    stage_key: Mapped[str] = mapped_column(String(10), nullable=False, default="queued")
+    stage_key: Mapped[str] = mapped_column(String(16), nullable=False, default="queued")
     stage_label: Mapped[str] = mapped_column(String(32), nullable=False, default="排队中")
     error_code: Mapped[int | None] = mapped_column(Integer)
     error_message: Mapped[str | None] = mapped_column(Text)

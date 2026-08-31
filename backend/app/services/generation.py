@@ -24,31 +24,53 @@ from app.core.seed import cover_color_for_seed, derive_seed
 from app.database import SessionLocal
 from app.models import Candidate, File, Task, User, Version, Work
 from app.models.base import utc_now_iso
-from app.providers.base import STAGE_LABELS, SynthCancelled, get_music_provider
-from app.providers.lyrics_local import LocalLyricsProvider, check_sensitive
+from app.providers.base import STAGE_LABELS, SynthCancelled
+from app.providers.lyrics_local import check_sensitive
+from app.services import model_center
 from app.services import works as works_svc
 from app.services.serializers import candidate_to_dict, task_to_dict
 from app.synth.ir import SongRequest
-
-_lyrics_provider = LocalLyricsProvider()
 
 
 # ---------- 提交 ----------
 
 def expand_simple_prompt(simple_prompt: str) -> str:
-    """simple 模式：一句话扩写为 style_prompt（规则引擎）。"""
+    """simple 模式：一句话扩写为 style_prompt（规则引擎，LLM 不可用时的兜底）。"""
     base = (simple_prompt or "").strip().rstrip("。，,.")
     return f"{base}，流行编曲，钢琴与弦乐铺底，人声旋律清晰，情绪自然流动"
 
 
+_STYLE_EXPAND_SYSTEM = (
+    "你是音乐制作总监。把用户的一句话创意扩写成 30~60 字的中文风格描述，"
+    "涵盖编曲思路、乐器、情绪与节奏；只输出风格描述本身，不要解释或引号。"
+)
+
+
+def expand_style_by_llm(chat, simple_prompt: str) -> str:
+    """simple 模式风格扩写（走歌词引擎同一 LLM 配置）；失败/坏输出返回空串由规则兜底。"""
+    try:
+        text = chat(_STYLE_EXPAND_SYSTEM, f"一句话创意：{simple_prompt}").strip()
+        text = text.strip('"“”‘’').strip()
+        return text[:120] if 8 <= len(text) <= 200 else ""
+    except Exception as e:  # noqa: BLE001 —— 扩写失败回退规则拼接，不阻断生成
+        logger.warning(f"LLM 风格扩写失败，回退规则引擎: {e}")
+        return ""
+
+
 def resolve_generation_request(payload: dict) -> dict:
-    """规范化请求：simple 扩写、歌词自动生成、simplified 减半、seed 派生。"""
+    """规范化请求：simplified 减半、seed 派生，标记延迟任务。
+
+    V1.3 起（ADR-011）：simple 扩写与歌词自动生成延迟到执行线程完成
+    （统一走模型中心配置的真实 LLM，本地规则仅作回退），提交接口保持快速返回；
+    seed 以提交时的规范化参数派生，确定性语义不变。
+    """
     mode = payload.get("mode", "simple")
     simplified = bool(payload.get("simplified", False))
     params = dict(payload.get("params") or {})
 
     if mode == "simple":
-        style_prompt = expand_simple_prompt(payload.get("simple_prompt") or "")
+        # 未扩写原文：仅用于 seed 派生与标题；真实扩写在执行线程完成
+        style_prompt = (payload.get("simple_prompt") or "").strip()
     else:
         style_prompt = payload.get("style_prompt") or ""
     if simplified and style_prompt:
@@ -57,11 +79,7 @@ def resolve_generation_request(payload: dict) -> dict:
 
     lyrics = payload.get("lyrics") or ""
     vocal = params.get("vocal", "female_air")
-    if not lyrics and vocal != "instrumental":
-        theme = payload.get("simple_prompt") or style_prompt[:60]
-        gen = _lyrics_provider.generate(theme=theme, style_hint=style_prompt[:80],
-                                        mood=None, language=params.get("language", "zh"))
-        lyrics = gen["lyrics"]
+    auto_lyrics = (not lyrics) and vocal != "instrumental"
 
     full_params = {
         "mode": mode, "style_prompt": style_prompt,
@@ -78,7 +96,9 @@ def resolve_generation_request(payload: dict) -> dict:
     if seed is None:
         seed = derive_seed(full_params, settings.server_nonce)
     return {"style_prompt": style_prompt, "lyrics": lyrics, "params": full_params,
-            "seed": int(seed) & 0xFFFFFFFF}
+            "seed": int(seed) & 0xFFFFFFFF,
+            "auto_lyrics": auto_lyrics,
+            "expand_prompt": mode == "simple" and bool(style_prompt)}
 
 
 def check_generation_content(payload: dict) -> None:
@@ -164,7 +184,8 @@ def submit_generation(db: Session, user: User, payload: dict) -> dict:
     }
     task = Task(user_id=user.id, type="generation", status="queued", progress=0,
                 stage_key="queued", stage_label="排队中", work_id=work.id,
-                version_id=version.id, provider="localsynth", seed=resolved["seed"],
+                version_id=version.id,
+                provider=model_center.current_music_backend(db), seed=resolved["seed"],
                 cost_credits=cost, request_payload=request_snapshot,
                 created_at=now, updated_at=now)
     db.add(task)
@@ -198,6 +219,48 @@ def _derive_title(payload: dict, params: dict) -> str:
 
 # ---------- 执行（线程池内）----------
 
+def _prepare_generation_inputs(db, task_id: str, payload_row: dict, resolved: dict) -> None:
+    """执行前准备模型输入：simple 扩写 + 自动写词（V1.3 起走模型中心配置的真实引擎）。
+
+    LLM 失败时 provider 内部自动回退本地规则（响应带 fallback 留痕）；
+    引擎与回退信息写入任务快照 _resolved、歌词回填 version.lyrics，供审计与前端展示。
+    """
+    params = resolved["params"]
+    changed = False
+    if payload_row.get("mode") == "simple" and payload_row.get("simple_prompt"):
+        _write_progress(task_id, "writing", 2, "AI 扩写风格描述…")
+        simple = str(payload_row["simple_prompt"]).strip()
+        style = expand_simple_prompt(simple)
+        chat = model_center.get_lyrics_chat(db)
+        if chat is not None:
+            style = expand_style_by_llm(chat, simple) or style
+        params["style_prompt"] = style
+        resolved["style_prompt"] = style
+        resolved["style_expanded"] = True
+        changed = True
+    if resolved.get("auto_lyrics") and not resolved.get("lyrics"):
+        _write_progress(task_id, "writing", 4, "AI 创作歌词…")
+        theme = payload_row.get("simple_prompt") or (params.get("style_prompt") or "")[:60]
+        gen = model_center.get_lyrics_provider(db).generate(
+            theme=theme, style_hint=(params.get("style_prompt") or "")[:80],
+            mood=None, language=params.get("language", "zh"))
+        resolved["lyrics"] = gen.get("lyrics") or ""
+        resolved["lyrics_engine"] = gen.get("engine", "")
+        resolved["lyrics_fallback"] = bool(gen.get("fallback"))
+        changed = True
+    if not changed:
+        return
+    task = db.get(Task, task_id)
+    if task is None:
+        return
+    task.request_payload = {**(task.request_payload or {}), "_resolved": resolved}
+    version = db.get(Version, task.version_id)
+    if version is not None:
+        version.lyrics = resolved.get("lyrics") or ""
+        version.params = params
+    db.commit()
+
+
 def execute_generation(task_id: str) -> None:
     t_start = time.monotonic()
     with SessionLocal() as db:
@@ -213,8 +276,22 @@ def execute_generation(task_id: str) -> None:
     try:
         payload_row = task.request_payload or {}
         derived_spec = payload_row.get("_derived") if isinstance(payload_row, dict) else None
-        resolved = payload_row.get("_resolved") or {}
+        resolved = dict(payload_row.get("_resolved") or {})
         params = resolved["params"]
+
+        # 引擎选择（V1.3，ADR-010）：普通生成走模型中心配置（localsynth/api 双通道）；
+        # 派生编辑固定本地引擎（波形手术依赖本地渲染产物，外部候选已被产物校验拦截）
+        with SessionLocal() as db:
+            if derived_spec:
+                from app.providers.music_local import LocalSynthProvider
+                provider = LocalSynthProvider()
+            else:
+                provider = model_center.get_music_provider(db)
+                _prepare_generation_inputs(db, task_id, payload_row, resolved)
+        # 写词/扩写在真实模型上可能耗时数分钟（CPU 本地模型），不计入渲染超时
+        t_start = time.monotonic()
+        timeout_sec = getattr(provider, "timeout_sec", GENERATION_TASK_TIMEOUT_SEC)
+
         req = SongRequest(
             style_prompt=params["style_prompt"], negative_prompt=params["negative_prompt"],
             model=params["model"], lyrics=resolved.get("lyrics") or "",
@@ -224,11 +301,10 @@ def execute_generation(task_id: str) -> None:
             instrument_density=params["instrument_density"], seed=resolved["seed"],
         )
         dest = settings.audio_path / task.work_id / task.version_id
-        provider = get_music_provider()
 
         def progress(stage_key: str, pct: int, label: str) -> None:
-            if time.monotonic() - t_start > GENERATION_TASK_TIMEOUT_SEC:
-                raise TimeoutError(f"超过 {GENERATION_TASK_TIMEOUT_SEC}s 熔断")
+            if time.monotonic() - t_start > timeout_sec:
+                raise TimeoutError(f"超过 {timeout_sec}s 熔断")
             _write_progress(task_id, stage_key, pct, label)
 
         def should_cancel() -> bool:
@@ -244,8 +320,9 @@ def execute_generation(task_id: str) -> None:
             output = provider.generate(req, progress, should_cancel, str(dest))
 
         with SessionLocal() as db:
-            _persist_success(db, task_id, user_id, output)
-        logger.info(f"generation {task_id} done in {time.monotonic() - t_start:.1f}s")
+            _persist_success(db, task_id, user_id, output, provider)
+        logger.info(f"generation {task_id} done in {time.monotonic() - t_start:.1f}s "
+                    f"provider={provider.name}")
     except SynthCancelled:
         with SessionLocal() as db:
             _finish_task(db, task_id, "canceled", None, None)
@@ -281,10 +358,11 @@ def _write_progress(task_id: str, stage_key: str, pct: int, label: str) -> None:
         db.commit()
 
 
-def _persist_success(db: Session, task_id: str, user_id: str, output) -> None:
+def _persist_success(db: Session, task_id: str, user_id: str, output, provider) -> None:
     task = db.get(Task, task_id)
     if task is None or task.status not in ("running", "queued"):
         return
+    task.provider = provider.name  # 执行时实际引擎（提交与执行间配置可能已切换）
     work = db.get(Work, task.work_id)
     version = db.get(Version, task.version_id)
     now = utc_now_iso()
@@ -351,8 +429,12 @@ def _persist_success(db: Session, task_id: str, user_id: str, output) -> None:
         work.active_version_id = version.id
         if result_candidates and result_candidates[0].get("preview_file_id"):
             work.preview_file_id = result_candidates[0]["preview_file_id"]
+    resolved_snapshot = (task.request_payload or {}).get("_resolved") or {}
     works_svc.add_event(db, user_id=user_id, action="generate", actor="ai",
-                        detail={"task_id": task.id, "provider": "localsynth",
+                        detail={"task_id": task.id, "provider": provider.name,
+                                "provider_display": provider.display_name,
+                                "lyrics_engine": resolved_snapshot.get("lyrics_engine"),
+                                "lyrics_fallback": resolved_snapshot.get("lyrics_fallback"),
                                 "derived_op": derived_spec.get("op") if derived_spec else None,
                                 "auto_adopted": bool(derived_spec),
                                 "candidates": [rc["label"] for rc in result_candidates]},

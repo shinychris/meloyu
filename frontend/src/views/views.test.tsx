@@ -9,6 +9,7 @@ import PricingView from './PricingView'
 import ComingSoonView from './ComingSoonView'
 import WorkDetailView from './WorkDetailView'
 import LoginView from './LoginView'
+import ModelCenterView from './ModelCenterView'
 import CandidateCard from '../components/studio/CandidateCard'
 import DerivePanel from '../components/studio/DerivePanel'
 import type { Candidate } from '../types/api'
@@ -79,6 +80,15 @@ describe('views render smoke', () => {
     expect(render(<ComingSoonView kind="edit" />)).toContain('非破坏性音频剪辑')
     expect(render(<ComingSoonView kind="pitch" />)).toContain('旋律修调工坊')
   })
+
+  it('ModelCenterView 渲染双引擎通道区（V1.3 歌曲生成引擎）', () => {
+    const html = render(<ModelCenterView />)
+    expect(html).toContain('歌词引擎通道')
+    expect(html).toContain('歌曲生成引擎通道')
+    expect(html).toContain('外部歌曲生成 API（Suno 兼容）')
+    expect(html).toContain('BASE URL（Suno 兼容网关根，自动补 /api/v1）')
+    expect(html).toContain('测试连接')
+  })
 })
 
 /* ============ V1.1 候选派生操作（延长/变体/段落重生成） ============ */
@@ -116,6 +126,17 @@ describe('CandidateCard V1.1 派生操作', () => {
     expect(html).toContain('变体')
     expect(html).toContain('段落重生成')
     expect(html).not.toContain('V1.1')
+  })
+
+  it('外部模型候选（quality_score=null）显示「外部模型」而非假质量分（V1.3）', () => {
+    const external = { ...candidateFixture, quality_score: null }
+    const html = render(
+      <CandidateCard candidate={external} index={0} workTitle="测试作品" modelLabel="V1 Pro" />,
+    )
+    expect(html).toContain('外部模型')
+    // 徽标本体不得出现数字分（tooltip 文案允许提及「AI 质量」）
+    expect(html).not.toMatch(/AI 质量 \d/)
+    expect(html).not.toContain('AI 质量 null')
   })
 })
 

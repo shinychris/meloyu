@@ -16,6 +16,7 @@ from pathlib import Path
 
 import numpy as np
 
+from app.config import GENERATION_TASK_TIMEOUT_SEC
 from app.core.seed import candidate_seed
 from app.providers.base import (
     STAGE_LABELS,
@@ -117,6 +118,7 @@ class LocalSynthProvider:
     name = "localsynth"
     display_name = "Meloyu 本地引擎"
     supports_vocals = True
+    timeout_sec = GENERATION_TASK_TIMEOUT_SEC
 
     def generate(
         self,

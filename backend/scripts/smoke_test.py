@@ -179,6 +179,18 @@ def main() -> int:
           and b["data"]["updated_at"] is not None)
 
     # ============ 模型中心（V1.2：本地开源模型 + 外部 API） ============
+    # 环境归一：llm_settings 为全局单行，此前真机联测/历次冒烟可能残留 ollama/api 配置——
+    # 先还原 localsynth 并清空外部歌曲 API 连接，保证后续断言与生成用例走可控引擎
+    r = client.put(f"{API}/models/settings", headers=auth_headers(token),
+                   json={"lyrics_backend": "localsynth", "music_backend": "localsynth",
+                         "music_api_base_url": "", "music_api_model": ""})
+    b = unwrap(r)
+    check("13.1(前置) 环境归一（双通道还原 localsynth，清空歌曲 API 连接）",
+          r.status_code == 200 and b["code"] == 0
+          and b["data"]["lyrics_backend"] == "localsynth"
+          and b["data"]["music_backend"] == "localsynth"
+          and b["data"]["music_api_base_url"] == "")
+
     r = client.get(f"{API}/models/runtime", headers=auth_headers(token))
     b = unwrap(r)
     rt_ok = (r.status_code == 200 and b["code"] == 0 and "ollama" in b["data"]
@@ -188,7 +200,7 @@ def main() -> int:
 
     r = client.get(f"{API}/models/settings", headers=auth_headers(token))
     b = unwrap(r)
-    check("13.2 GET /models/settings（默认 localsynth，key 脱敏）",
+    check("13.2 GET /models/settings（归一后 localsynth，key 脱敏）",
           r.status_code == 200 and b["code"] == 0
           and b["data"]["lyrics_backend"] == "localsynth"
           and isinstance(b["data"]["external_api_key"], dict), json.dumps(b)[:150])
@@ -264,6 +276,95 @@ def main() -> int:
               r.status_code == 200 and b["data"]["lyrics_backend"] == "localsynth")
     else:
         print("SKIP 13.5~13.10：本机 Ollama 未运行或无本地模型（LLM 通道用例跳过）")
+
+    # ============ 模型中心 V1.3：歌曲生成引擎（外部歌曲 API 通道） ============
+    r = client.put(f"{API}/models/settings", headers=auth_headers(token),
+                   json={"music_backend": "bogus"})
+    b = unwrap(r)
+    check("14.1 PUT /models/settings 非法 music_backend → 40001",
+          r.status_code == 422 and b["code"] == 40001)
+
+    r = client.put(f"{API}/models/settings", headers=auth_headers(token),
+                   json={"music_backend": "api"})
+    b = unwrap(r)
+    check("14.2 切 api 未配 base_url → 40001",
+          r.status_code == 422 and b["code"] == 40001)
+
+    r = client.get(f"{API}/models/runtime", headers=auth_headers(token))
+    b = unwrap(r)
+    check("14.3 GET /models/runtime 含歌曲引擎字段（默认本地合成）",
+          r.status_code == 200 and b["code"] == 0
+          and b["data"]["music_backend"] == "localsynth"
+          and isinstance(b["data"]["song_engine"], str) and b["data"]["song_engine"])
+
+    # 保存 api 通道（base 指向保留端口 9，不产生真实外部调用）
+    r = client.put(f"{API}/models/settings", headers=auth_headers(token),
+                   json={"music_backend": "api",
+                         "music_api_base_url": "http://127.0.0.1:9/suno"})
+    b = unwrap(r)
+    check("14.4 保存 api 通道配置（key 脱敏）",
+          r.status_code == 200 and b["code"] == 0
+          and b["data"]["music_backend"] == "api"
+          and b["data"]["music_api_base_url"] == "http://127.0.0.1:9/suno"
+          and isinstance(b["data"]["music_api_key"], dict)
+          and b["data"]["music_api_key"]["has_key"] is False)
+
+    r = client.post(f"{API}/models/test-music", headers=auth_headers(token),
+                    json={"base_url": "http://127.0.0.1:9"})
+    b = unwrap(r)
+    check("14.5 POST /models/test-music 端点不可达 → ok=false",
+          r.status_code == 200 and b["code"] == 0 and b["data"]["ok"] is False)
+
+    r = client.post(f"{API}/models/test-music", headers=auth_headers(token),
+                    json={"base_url": ""})
+    b = unwrap(r)
+    check("14.6 POST /models/test-music 空 base_url → 422", r.status_code == 422)
+
+    # 引擎留痕：api 通道提交生成立即取消。两种可接受终态：
+    # canceled（抢在执行前取消）或 failed（外部不可达快速熔断退款）——均证明 api 通道接线
+    r = client.post(f"{API}/generations", headers=auth_headers(token), json={
+        "mode": "simple", "simple_prompt": "黄昏海岸线上的散步", "seed": 900113,
+        "params": {"duration_sec": 30, "vocal": "female_air"},
+    })
+    b = unwrap(r)
+    api_submit_ok = (r.status_code == 201 and b["code"] == 0
+                     and b["data"]["task"]["provider"] == "api")
+    check("14.7 api 通道提交生成（201，task.provider=api 留痕）", api_submit_ok,
+          json.dumps(b)[:200])
+    if api_submit_ok:
+        api_task_id = b["data"]["task"]["id"]
+        client.post(f"{API}/tasks/{api_task_id}/cancel", headers=auth_headers(token))
+        t = wait_task(client, api_task_id, token, timeout=60)
+        check("14.7 api 通道任务终态（canceled 或 外部不可达 failed+退款）",
+              t["status"] == "canceled"
+              or (t["status"] == "failed" and t["error"] is not None),
+              json.dumps(t.get("error"))[:150])
+
+    r = client.put(f"{API}/models/settings", headers=auth_headers(token),
+                   json={"music_backend": "localsynth"})
+    b = unwrap(r)
+    check("14.8 还原 music_backend=localsynth",
+          r.status_code == 200 and b["data"]["music_backend"] == "localsynth")
+
+    # simple 模式自动写词（V1.3：延迟到执行线程走模型中心歌词引擎，完成后回填）
+    r = client.post(f"{API}/generations", headers=auth_headers(token), json={
+        "mode": "simple", "simple_prompt": "清晨骑车上学的少年", "seed": 900114,
+        "params": {"duration_sec": 30, "vocal": "female_air"},
+    })
+    b = unwrap(r)
+    auto_ok = (r.status_code == 201 and b["code"] == 0
+               and b["data"]["task"]["provider"] == "localsynth")
+    check("14.9 simple 模式无歌词提交（写词延迟执行，provider=localsynth）",
+          auto_ok, json.dumps(b)[:200])
+    if auto_ok:
+        auto_task = wait_task(client, b["data"]["task"]["id"], token)
+        vb = unwrap(client.get(f"{API}/versions/{auto_task['version_id']}",
+                               headers=auth_headers(token)))
+        check("14.9 执行线程自动写词回填 version.lyrics",
+              auto_task["status"] == "succeeded"
+              and "[Verse]" in (vb["data"].get("lyrics") or "")
+              and len(vb["data"].get("lyrics") or "") > 40,
+              f"lyrics_head={(vb['data'].get('lyrics') or '')[:60]!r}")
 
     # ============ 生成（4） ============
     gen_body = {
@@ -768,12 +869,13 @@ def main() -> int:
     for t in sorted(txs, key=lambda x: x["created_at"]):
         chain_ok = chain_ok and (prev + t["delta"] == t["balance_after"] or True)
     check("10.2 GET /credits/transactions", r.status_code == 200
-          and len(gen_txs) == 8 and len(refund_txs) >= 1
+          and len(gen_txs) == 10 and len(refund_txs) >= 2
           and all(t["balance_after"] >= 0 for t in txs))
 
-    # 注册 200 + studio 切换 10000 − 整曲 12×3 − 派生 6×5 + 取消退款 12 = 10146
-    check("10.2 账本自洽（200 + 10000 − 36 − 30 + 12 = 10146）",
-          balance_now == 200 + 10000 - 36 - 30 + 12, f"balance={balance_now}")
+    # 注册 200 + studio 切换 10000 − 整曲 12×5（14.7/14.9/4.1/确定性/长任务）
+    # − 派生 6×5 + 取消退款 12×2（14.7 外部不可达 / 长任务取消）= 10134
+    check("10.2 账本自洽（200 + 10000 − 60 − 30 + 24 = 10134）",
+          balance_now == 200 + 10000 - 60 - 30 + 24, f"balance={balance_now}")
 
     # ============ 订阅（2） ============
     r = client.get(f"{API}/subscriptions/plans", headers=auth_headers(token))

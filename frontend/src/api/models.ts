@@ -58,6 +58,15 @@ export function testExternal(body: {
   return apiPost<ExternalTestResult>('/models/test-external', body)
 }
 
+/** POST /models/test-music —— 外部歌曲生成 API（Suno 兼容）探活（不落库，V1.3） */
+export function testMusic(body: {
+  base_url: string
+  api_key: string
+  model?: string
+}): Promise<ExternalTestResult> {
+  return apiPost<ExternalTestResult>('/models/test-music', body)
+}
+
 /** GET /models/presets —— 外部厂商预设 + 推荐 pull 清单 */
 export function getModelsPresets(): Promise<ModelsPresets> {
   return apiGet<ModelsPresets>('/models/presets')

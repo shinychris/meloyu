@@ -124,8 +124,9 @@ export default function CandidateCard({
             <span
               className="text-[9px] px-1.5 py-0.5 font-bold num"
               style={{ background: 'var(--acc-dim)', color: 'var(--acc)' }}
+              title={candidate.quality_score == null ? '外部模型候选不产出 AI 质量分' : undefined}
             >
-              AI 质量 {candidate.quality_score}
+              {candidate.quality_score == null ? '外部模型' : `AI 质量 ${candidate.quality_score}`}
             </span>
             {candidate.adopted && (
               <span

@@ -22,6 +22,8 @@ EDIT_OPERATION_CREDIT_COST: dict[str, int] = {"extend": 6, "variant": 6, "regen_
 SIGNUP_BONUS_CREDITS = 200
 # 任务超时熔断（秒）：单候选渲染超过该值中止并退款（架构 §7.9 为 70s，留余量取整任务 90s）
 GENERATION_TASK_TIMEOUT_SEC = 180
+# 外部歌曲 API 通道的任务超时（秒）：云端整曲生成实测 1~5 分钟（ADR-010）
+MUSIC_API_TASK_TIMEOUT_SEC = 900
 # 免费档回收站清扫天数
 TRASH_RETENTION_DAYS = 30
 # stream-token 有效期（秒）
@@ -36,7 +38,6 @@ class Settings(BaseSettings):
     data_dir: str = ""
     host: str = "127.0.0.1"
     port: int = 8000
-    music_provider: str = "localsynth"
     cors_origins: str = "http://localhost:5173"
 
     @property

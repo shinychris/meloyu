@@ -290,7 +290,7 @@ export default function WorkDetailView() {
                       <div className="flex items-center gap-2">
                         <span className="text-[13px] font-semibold">候选 {c.label}</span>
                         <span className="text-[9px] px-1.5 py-0.5 font-bold num" style={{ background: 'var(--acc-dim)', color: 'var(--acc)' }}>
-                          AI 质量 {c.quality_score}
+                          {c.quality_score == null ? '外部模型' : `AI 质量 ${c.quality_score}`}
                         </span>
                         {c.adopted && (
                           <span className="text-[9px] px-1.5 py-0.5 font-bold" style={{ background: 'var(--acc)', color: '#000' }}>已定稿</span>

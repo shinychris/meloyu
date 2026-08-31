@@ -5,6 +5,7 @@ import type {
   LyricsBackend,
   ModelOpInfo,
   ModelsRuntime,
+  MusicBackend,
 } from '../types/api'
 import {
   deleteModel,
@@ -16,6 +17,7 @@ import {
   listModelOps,
   pullModel,
   testExternal,
+  testMusic,
   updateLLMSettings,
 } from '../api/models'
 import type { LocalModelsResult, ModelsPresets } from '../types/api'
@@ -36,6 +38,11 @@ const BACKENDS: { value: LyricsBackend; title: string; desc: string }[] = [
   { value: 'openai_compat', title: '外部 API（OpenAI 兼容）', desc: '智谱 / DeepSeek / OpenAI 等云端模型 · 需 API Key' },
 ]
 
+const MUSIC_BACKENDS: { value: MusicBackend; title: string; desc: string }[] = [
+  { value: 'localsynth', title: '本地合成引擎', desc: '离线可用 · 算法作曲实时渲染 · 含分轨/MIDI（默认）' },
+  { value: 'api', title: '外部歌曲生成 API（Suno 兼容）', desc: '真实整曲模型（人声演唱）· 需网关与 Key · 约 1~5 分钟/首' },
+]
+
 /** 模型中心：歌词引擎通道切换 + 本地开源模型下载管理 + 外部 API 配置（契约 §5.8） */
 export default function ModelCenterView() {
   const confirm = useConfirmStore((s) => s.confirm)
@@ -47,6 +54,14 @@ export default function ModelCenterView() {
 
   const [backend, setBackend] = useState<LyricsBackend>('localsynth')
   const [pickedModel, setPickedModel] = useState('')
+
+  const [musicBackend, setMusicBackend] = useState<MusicBackend>('localsynth')
+  const [musicBase, setMusicBase] = useState('')
+  const [musicKey, setMusicKey] = useState('')
+  const [musicModel, setMusicModel] = useState('')
+  const [musicTesting, setMusicTesting] = useState(false)
+  const [musicTestResult, setMusicTestResult] = useState<ExternalTestResult | null>(null)
+  const [musicSaving, setMusicSaving] = useState(false)
 
   const [pullTag, setPullTag] = useState('')
   const [activeOp, setActiveOp] = useState<ModelOpInfo | null>(null)
@@ -75,6 +90,9 @@ export default function ModelCenterView() {
     setPickedModel(st.ollama_model || lc.models[0]?.name || '')
     setExtBase(st.external_base_url)
     setExtModel(st.external_model)
+    setMusicBackend(st.music_backend)
+    setMusicBase(st.music_api_base_url)
+    setMusicModel(st.music_api_model)
   }, [])
 
   useEffect(() => {
@@ -213,6 +231,55 @@ export default function ModelCenterView() {
     }
   }
 
+  const runMusicTest = async () => {
+    if (!musicBase.trim()) {
+      toast('base_url 必填')
+      return
+    }
+    setMusicTesting(true)
+    setMusicTestResult(null)
+    try {
+      setMusicTestResult(await testMusic({
+        base_url: musicBase.trim(), api_key: musicKey.trim(), model: musicModel.trim(),
+      }))
+    } catch {
+      /* 拦截器已 toast */
+    } finally {
+      setMusicTesting(false)
+    }
+  }
+
+  const saveMusic = async (target: MusicBackend, extra: Record<string, string> = {}) => {
+    if (target === 'api' && !(musicBase || extra.music_api_base_url)) {
+      toast('请先在下方完成外部歌曲 API 配置')
+      return
+    }
+    setMusicSaving(true)
+    try {
+      const st = await updateLLMSettings({
+        music_backend: target,
+        ...(target === 'api'
+          ? {
+              music_api_base_url: musicBase.trim(),
+              music_api_model: musicModel.trim(),
+              ...(musicKey.trim() ? { music_api_key: musicKey.trim() } : {}),
+            }
+          : {}),
+        ...extra,
+      })
+      setSettings(st)
+      setMusicBackend(st.music_backend)
+      setMusicKey('')
+      const rt = await getModelsRuntime()
+      setRuntime(rt)
+      toast(`歌曲引擎已切换：${rt.song_engine}`)
+    } catch {
+      /* 拦截器已 toast */
+    } finally {
+      setMusicSaving(false)
+    }
+  }
+
   const ollama = runtime?.ollama
 
   return (
@@ -221,8 +288,9 @@ export default function ModelCenterView() {
         <div className="label">模型中心 · MODEL HUB</div>
         <h1 className="text-[22px] font-extrabold tracking-tight mt-2">AI 引擎与模型管理</h1>
         <p className="text-[12px] mt-2" style={{ color: 'var(--dim)' }}>
-          歌词生成支持三种引擎通道：本地规则（离线兜底）、本地开源模型（Ollama，数据不出本机）、
-          外部 API（OpenAI 兼容协议，覆盖智谱 / DeepSeek / OpenAI 等）。引擎失败时自动回退本地规则，创作不中断。
+          歌词引擎：本地规则（离线兜底）/ 本地开源模型（Ollama）/ 外部 API（OpenAI 兼容，覆盖智谱 /
+          DeepSeek / OpenAI 等）；歌曲引擎：本地合成（离线兜底）/ 外部歌曲生成 API（Suno 兼容协议，
+          真实整曲模型）。引擎失败时自动回退本地引擎，创作不中断。
         </p>
 
         {/* 运行时状态 */}
@@ -255,9 +323,147 @@ export default function ModelCenterView() {
             </div>
           )}
           <div className="text-right flex-none">
-            <div className="label">当前引擎</div>
+            <div className="label">歌词引擎</div>
             <div className="text-[12px] font-bold mt-1" style={{ color: 'var(--acc)' }}>
               {runtime?.engine || '…'}
+            </div>
+            <div className="label mt-2">歌曲引擎</div>
+            <div className="text-[12px] font-bold mt-1" style={{ color: 'var(--acc)' }}>
+              {runtime?.song_engine || '…'}
+            </div>
+          </div>
+        </div>
+
+        {/* 歌曲生成引擎通道（V1.3） */}
+        <div className="mt-8">
+          <div className="label mb-3">歌曲生成引擎通道</div>
+          <div className="grid grid-cols-2 gap-3">
+            {MUSIC_BACKENDS.map((b) => {
+              const on = musicBackend === b.value
+              return (
+                <div
+                  key={b.value}
+                  className={`card p-4 cursor-pointer transition-all ${on ? '' : 'opacity-70 hover:opacity-100'}`}
+                  style={on ? { borderColor: 'var(--acc)' } : undefined}
+                  onClick={() => {
+                    if (b.value === 'api' && !musicBase && settings?.music_backend !== 'api') {
+                      toast('请先在下方完成外部歌曲 API 配置')
+                      return
+                    }
+                    setMusicBackend(b.value)
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] font-bold">{b.title}</span>
+                    <span
+                      className="text-[10px] font-bold px-1.5 py-0.5"
+                      style={{
+                        background: on ? 'var(--acc)' : 'var(--bg3)',
+                        color: on ? '#000' : 'var(--dim)',
+                      }}
+                    >
+                      {on ? '使用中' : '选择'}
+                    </span>
+                  </div>
+                  <div className="text-[11px] mt-2" style={{ color: 'var(--dim)' }}>{b.desc}</div>
+                </div>
+              )
+            })}
+          </div>
+          {musicBackend !== settings?.music_backend && (
+            <div className="mt-3 flex items-center gap-3">
+              <button className="btn btn-acc" disabled={musicSaving} onClick={() => void saveMusic(musicBackend)}>
+                {musicSaving ? '切换中…' : '应用切换'}
+              </button>
+              <span className="text-[11px]" style={{ color: 'var(--dim)' }}>
+                切换立即生效，影响工作台的整曲生成（歌词助手不受影响）
+              </span>
+            </div>
+          )}
+
+          {/* 外部歌曲 API 配置 */}
+          <div className="card mt-3 p-5">
+            <div className="flex flex-wrap gap-2 mb-4">
+              {(presets?.music_api_presets || []).map((p) => (
+                <span
+                  key={p.vendor}
+                  className="chip"
+                  title={`${p.base_url}${p.model_hint ? ` · ${p.model_hint}` : ''}`}
+                  onClick={() => setMusicBase(p.base_url)}
+                >
+                  {p.vendor}
+                </span>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <div className="label mb-1">BASE URL（Suno 兼容网关根，自动补 /api/v1）</div>
+                <input
+                  className="w-full px-3 py-2 text-[12px]"
+                  style={{
+                    background: 'var(--bg)', border: '1px solid var(--line)',
+                    color: 'var(--txt)', outline: 'none',
+                  }}
+                  placeholder="https://api.goapi.ai/suno 或 http://localhost:3000"
+                  value={musicBase}
+                  onChange={(e) => setMusicBase(e.target.value)}
+                />
+              </div>
+              <div>
+                <div className="label mb-1">
+                  API KEY{' '}
+                  {settings?.music_api_key.has_key && (
+                    <span style={{ color: 'var(--dim)' }}>
+                      （已保存 ····{settings.music_api_key.key_tail}，留空即沿用）
+                    </span>
+                  )}
+                </div>
+                <input
+                  className="w-full px-3 py-2 text-[12px]"
+                  type="password"
+                  style={{
+                    background: 'var(--bg)', border: '1px solid var(--line)',
+                    color: 'var(--txt)', outline: 'none',
+                  }}
+                  placeholder={settings?.music_api_key.has_key ? '••••••••（不变）' : 'sk-…'}
+                  value={musicKey}
+                  onChange={(e) => setMusicKey(e.target.value)}
+                />
+              </div>
+              <div>
+                <div className="label mb-1">MODEL（可选，网关区分模型时填写）</div>
+                <input
+                  className="w-full px-3 py-2 text-[12px]"
+                  style={{
+                    background: 'var(--bg)', border: '1px solid var(--line)',
+                    color: 'var(--txt)', outline: 'none',
+                  }}
+                  placeholder="如 V3 / V4 / V4_5，留空用网关默认"
+                  value={musicModel}
+                  onChange={(e) => setMusicModel(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-3 mt-4">
+              <button className="btn" disabled={musicTesting} onClick={() => void runMusicTest()}>
+                {musicTesting ? '测试中…' : '测试连接'}
+              </button>
+              <button className="btn btn-acc" disabled={musicSaving} onClick={() => void saveMusic('api')}>
+                {musicSaving ? '保存中…' : '保存并启用'}
+              </button>
+              {musicTestResult && (
+                <span
+                  className="text-[11px]"
+                  style={{ color: musicTestResult.ok ? 'var(--acc)' : 'var(--bad)' }}
+                >
+                  {musicTestResult.ok ? '✓' : '✕'} {musicTestResult.message}
+                </span>
+              )}
+            </div>
+            <div className="text-[10px] mt-3 leading-relaxed" style={{ color: 'var(--dim)' }}>
+              采用社区通行的 Suno 兼容协议（POST /api/v1/generate + GET /api/v1/get），
+              GoAPI / suno-api 自建网关及各类中转站均可直连。外部候选为整曲 mp3（含人声演唱），
+              不含分轨/MIDI；派生编辑与 WAV/分轨/MIDI 导出仅支持本地引擎候选，MP3 导出可用。
             </div>
           </div>
         </div>

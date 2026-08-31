@@ -77,6 +77,8 @@ def _startup() -> None:
     from app.services.works import purge_expired
 
     Base.metadata.create_all(engine)
+    from app.core.migrations import run as run_migrations
+    run_migrations(engine)
     recovered = recover_zombie_tasks()
     from app.services.model_center import recover_stale_ops
     stale_ops = recover_stale_ops()

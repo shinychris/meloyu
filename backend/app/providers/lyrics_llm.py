@@ -47,6 +47,11 @@ class LLMLyricsProvider:
         self.display_name = display_name
         self._local = LocalLyricsProvider()
 
+    @property
+    def chat(self) -> ChatFn:
+        """底层 chat 函数（供生成管线做风格扩写等轻量文本任务复用同一配置）。"""
+        return self._chat
+
     # ---- 回退包装 ----
     def _fallback(self, method: str, reason: str, kwargs: dict) -> dict:
         out = getattr(self._local, method)(**kwargs)

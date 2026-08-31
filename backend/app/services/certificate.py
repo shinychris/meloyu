@@ -11,15 +11,29 @@ from sqlalchemy.orm import Session
 
 from app.config import API_PREFIX
 from app.core.errors import err_conflict
-from app.models import Candidate, Certificate, EditEvent, File, User, Version, Work
+from app.models import Candidate, Certificate, EditEvent, File, Task, User, Version, Work
 from app.models.base import utc_now_iso
 from app.repositories import counters
 from app.services import works as works_svc
 
-DISCLOSURE = ("本作品由 AI 辅助生成（Meloyu 本地合成引擎 {model}），"
+DISCLOSURE = ("本作品由 AI 辅助生成（{provider_display} {model}），"
               "人类创作参与记录见 human_participation。")
 
 CERT_FORMATS = ("json", "pdf")
+
+
+def _version_provider(db: Session, version: Version) -> tuple[str, str]:
+    """版本生成引擎留痕：取该版本生成任务的 provider（V1.3 起为真实引擎，不再硬编码）。"""
+    task = db.execute(
+        select(Task).where(Task.version_id == version.id, Task.type == "generation")
+        .order_by(Task.created_at.desc(), Task.id.desc()).limit(1)
+    ).scalars().first()
+    from app.providers.music_api import APIMusicProvider
+    from app.providers.music_local import LocalSynthProvider
+    display = {LocalSynthProvider.name: LocalSynthProvider.display_name,
+               APIMusicProvider.name: APIMusicProvider.base_display}
+    provider = (task.provider if task and task.provider else LocalSynthProvider.name)
+    return provider, display.get(provider, provider)
 
 _ACTION_LABELS = [
     ("update", "歌词人工撰写/编辑"),
@@ -54,13 +68,14 @@ def issue_certificate(db: Session, user: User, version: Version, fmt: str = "jso
                               .where(EditEvent.work_id == work.id)).scalar_one()
     human_summary = _human_summary(db, work.id)
 
+    provider_name, provider_display = _version_provider(db, version)
     license_type = "non_commercial" if user.plan == "free" else "commercial"
     cert_dict = {
         "certificate_id": cert_code,
         "work": {"id": work.id, "display_code": work.display_code, "title": work.title},
         "version": {"id": version.id, "version_no": version.version_no,
                     "active_candidate_id": version.active_candidate_id},
-        "model": {"provider": "localsynth", "provider_display": "Meloyu 本地引擎",
+        "model": {"provider": provider_name, "provider_display": provider_display,
                   "model": version.params.get("model", "v1_pro"), "seed": cand.seed},
         "generated_at": version.created_at,
         "license": {"type": license_type, "plan": user.plan, "valid": True},
@@ -74,7 +89,8 @@ def issue_certificate(db: Session, user: User, version: Version, fmt: str = "jso
             "master_wav_sha256": master.sha256 if master else "",
             "preview_mp3_sha256": preview.sha256 if preview else "",
         },
-        "disclosure": DISCLOSURE.format(model=version.params.get("model", "v1_pro")),
+        "disclosure": DISCLOSURE.format(
+            provider_display=provider_display, model=version.params.get("model", "v1_pro")),
         "issued_at": now,
     }
 
@@ -105,7 +121,7 @@ def issue_certificate(db: Session, user: User, version: Version, fmt: str = "jso
     db.flush()
 
     db.add(Certificate(certificate_code=cert_code, work_id=work.id, version_id=version.id,
-                       provider="localsynth", provider_display="Meloyu 本地引擎",
+                       provider=provider_name, provider_display=provider_display,
                        model=version.params.get("model", "v1_pro"), seed=cand.seed,
                        generated_at=version.created_at, license_type=license_type,
                        plan_at_issuance=user.plan, license_valid=True,

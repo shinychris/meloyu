@@ -1,4 +1,5 @@
-"""模型中心服务：本地开源模型（Ollama）下载/删除/列举 + 外部 API 配置 + 歌词引擎工厂。
+"""模型中心服务：本地开源模型（Ollama）下载/删除/列举 + 外部 API 配置
++ 歌词引擎工厂（V1.2）+ 外部歌曲生成 API 通道（V1.3）。
 
 进度写库节流（≥2% 或 ≥1s 才落一次），拉取线程与生成任务线程池隔离（各 1 worker）。
 """
@@ -18,6 +19,7 @@ from app.models.base import new_uuid, utc_now_iso
 from app.providers.llm import LLMError, OllamaClient, OpenAICompatClient
 from app.providers.lyrics_llm import LLMLyricsProvider, valid_model_tag
 from app.providers.lyrics_local import LocalLyricsProvider
+from app.providers.music_api import APIMusicProvider, MusicAPIError, SunoCompatClient
 
 _op_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="meloyu-model-op")
 
@@ -50,6 +52,14 @@ EXTERNAL_PRESETS: list[dict] = [
      "model_hint": "moonshot-v1-8k"},
 ]
 
+# 外部歌曲生成 API 预设（Suno 兼容协议，ADR-010）：base 填网关根，自动补 /api/v1
+MUSIC_API_PRESETS: list[dict] = [
+    {"vendor": "GoAPI（Suno 中转）", "base_url": "https://api.goapi.ai/suno",
+     "model_hint": "" },
+    {"vendor": "自建 suno-api 网关", "base_url": "http://localhost:3000",
+     "model_hint": ""},
+]
+
 
 # ---------- 配置 ----------
 
@@ -77,6 +87,10 @@ def get_settings(db: Session) -> dict:
         "external_base_url": s.external_base_url,
         "external_model": s.external_model,
         "external_api_key": _mask_key(s.external_api_key),
+        "music_backend": s.music_backend,
+        "music_api_base_url": s.music_api_base_url,
+        "music_api_model": s.music_api_model,
+        "music_api_key": _mask_key(s.music_api_key),
     }
 
 
@@ -92,7 +106,15 @@ def update_settings(db: Session, patch: dict) -> dict:
         model = patch.get("external_model", s.external_model)
         if not base or not model:
             raise err_validation("外部 API 通道需要 base_url 与 model")
-    for field in ("ollama_host", "ollama_model", "external_base_url", "external_model"):
+
+    music_backend = patch.get("music_backend", s.music_backend)
+    if music_backend not in ("localsynth", "api"):
+        raise err_validation("music_backend 必须为 localsynth/api")
+    if music_backend == "api" and not (patch.get("music_api_base_url") or s.music_api_base_url):
+        raise err_validation("外部歌曲 API 通道需要先配置 base_url")
+
+    for field in ("ollama_host", "ollama_model", "external_base_url", "external_model",
+                  "music_api_base_url", "music_api_model"):
         if field in patch and patch[field] is not None:
             v = str(patch[field]).strip()
             if len(v) > 300:
@@ -100,7 +122,10 @@ def update_settings(db: Session, patch: dict) -> dict:
             setattr(s, field, v)
     if patch.get("external_api_key"):  # 空串=保持不变（脱敏读回无法回显）
         s.external_api_key = str(patch["external_api_key"]).strip()
+    if patch.get("music_api_key"):
+        s.music_api_key = str(patch["music_api_key"]).strip()
     s.lyrics_backend = backend
+    s.music_backend = music_backend
     db.commit()
     db.refresh(s)
     return get_settings(db)
@@ -130,6 +155,8 @@ def runtime_status(db: Session) -> dict:
         },
         "active_backend": s.lyrics_backend,
         "engine": engine_label(db),
+        "music_backend": s.music_backend,
+        "song_engine": song_engine_label(db),
     }
 
 
@@ -140,6 +167,19 @@ def engine_label(db: Session) -> str:
     if s.lyrics_backend == "openai_compat" and s.external_model:
         return f"外部API · {s.external_model}"
     return "本地规则引擎（离线可用）"
+
+
+def song_engine_label(db: Session) -> str:
+    s = _setting_row(db)
+    if s.music_backend == "api" and s.music_api_base_url:
+        try:
+            provider = APIMusicProvider(s.music_api_base_url, s.music_api_key,
+                                        s.music_api_model)
+            return provider.display_name
+        except Exception as e:  # noqa: BLE001 —— 展示用标签，构造失败不阻断
+            logger.warning(f"song engine label 构造失败: {e}")
+            return "外部歌曲API（配置异常）"
+    return "本地合成引擎（离线可用）"
 
 
 def list_local_models(db: Session) -> dict:
@@ -288,7 +328,19 @@ def test_external(base_url: str, api_key: str, model: str) -> dict:
         return {"ok": False, "sample": "", "message": e.message}
 
 
-# ---------- 歌词引擎工厂（services/lyrics 消费） ----------
+# ---------- 外部歌曲 API 连通性 ----------
+
+def test_music(base_url: str, api_key: str, model: str = "") -> dict:
+    if not base_url.strip():
+        raise err_validation("base_url 必填")
+    try:
+        sample = SunoCompatClient(base_url, api_key, model).test()
+        return {"ok": True, "sample": sample[:80], "message": "连接成功，端点可用"}
+    except MusicAPIError as e:
+        return {"ok": False, "sample": "", "message": e.message}
+
+
+# ---------- 歌词引擎工厂（services/lyrics 与 generation 消费） ----------
 
 def get_lyrics_provider(db: Session):
     """按全局配置返回歌词 provider；配置异常一律回退本地规则引擎。"""
@@ -316,3 +368,36 @@ def get_lyrics_provider(db: Session):
     except Exception as e:  # noqa: BLE001 —— 配置构造失败不阻断歌词功能
         logger.warning(f"lyrics provider 构造失败，回退本地引擎: {e}")
     return LocalLyricsProvider()
+
+
+def get_lyrics_chat(db: Session):
+    """当前歌词引擎的底层 chat 函数（LLM 通道）；localsynth 返回 None。
+
+    供生成管线做 simple 模式风格扩写等轻量文本任务复用同一模型配置。
+    """
+    provider = get_lyrics_provider(db)
+    chat = getattr(provider, "chat", None)
+    return chat if callable(chat) else None
+
+
+# ---------- 歌曲引擎工厂（services/generation 消费） ----------
+
+def current_music_backend(db: Session) -> str:
+    """提交时留痕用：只读配置不构造客户端。"""
+    s = db.get(LLMSetting, SETTING_ID)
+    if s is not None and s.music_backend == "api" and s.music_api_base_url:
+        return "api"
+    return "localsynth"
+
+
+def get_music_provider(db: Session):
+    """按全局配置返回歌曲 provider；配置异常一律回退本地合成引擎。"""
+    s = db.get(LLMSetting, SETTING_ID)
+    if s is not None and s.music_backend == "api" and s.music_api_base_url:
+        try:
+            return APIMusicProvider(s.music_api_base_url, s.music_api_key,
+                                    s.music_api_model)
+        except Exception as e:  # noqa: BLE001 —— 配置构造失败回退本地引擎，创作不中断
+            logger.warning(f"music provider 构造失败，回退本地引擎: {e}")
+    from app.providers.music_local import LocalSynthProvider
+    return LocalSynthProvider()
