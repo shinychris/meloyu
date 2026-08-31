@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8000
     cors_origins: str = "http://localhost:5173"
+    # HuggingFace 端点覆盖（.env 配 HF_ENDPOINT=https://hf-mirror.com 走国内镜像）
+    hf_endpoint: str = ""
 
     @property
     def data_path(self) -> Path:

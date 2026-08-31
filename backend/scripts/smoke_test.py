@@ -459,7 +459,8 @@ def main() -> int:
                      and b["data"]["task"]["provider"] == "musicgen_local")
         check("15.6 musicgen 通道提交（task.provider 留痕）", mg_submit, json.dumps(b)[:200])
         if mg_submit:
-            t = wait_task(client, b["data"]["task"]["id"], token, timeout=120)
+            # 真机已部署时为真实推理（30s×2 实测 GPU ~190s / CPU ~175s），放宽到 900s
+            t = wait_task(client, b["data"]["task"]["id"], token, timeout=900)
             mg_failed_clean = (
                 t["status"] == "succeeded"  # 依赖已装且模型已下载（真机）
                 or (t["status"] == "failed" and t["error"] is not None
@@ -533,6 +534,9 @@ def main() -> int:
           json.dumps(task)[:200])
     cand_a = task["result"]["candidates"][0]
     _cand_b = task["result"]["candidates"][1]
+    check("4.3 两候选 preview_file_id 均回填（autoflush 回归：末轮候选曾恒 null）",
+          all(c["preview_file_id"] for c in task["result"]["candidates"]),
+          json.dumps(task["result"]["candidates"])[:200])
 
     # 确定性：同 seed 再生成一次（挂在同一 work 下 → 版本树 v1→v2），比对 master sha256
     gen_body_2 = dict(gen_body)

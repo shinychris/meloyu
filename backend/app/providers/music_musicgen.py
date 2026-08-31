@@ -44,6 +44,18 @@ def musicgen_install_hint() -> str:
     return _INSTALL_HINT
 
 
+def _apply_hf_endpoint() -> None:
+    """HF_ENDPOINT 覆盖（.env 配 hf_endpoint=https://hf-mirror.com 走国内镜像）。
+
+    同时禁用 hf-xet 传输协议：xet 走独立 CDN 端点，过代理/镜像时常挂起
+    （本机部署实测 72% 停滞）；普通 HTTPS 支持断点续传，代理友好。
+    """
+    import os
+    os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+    if settings.hf_endpoint:
+        os.environ.setdefault("HF_ENDPOINT", settings.hf_endpoint)
+
+
 class MusicGenLocalError(Exception):
     """MusicGen 本地通道错误。kind ∈ deps|download|runtime。"""
 
@@ -96,6 +108,8 @@ def pull_local(model_id: str, on_progress) -> None:
         raise MusicGenLocalError("deps", _INSTALL_HINT)
     from huggingface_hub import snapshot_download
     from tqdm import tqdm
+
+    _apply_hf_endpoint()
 
     class _OpTqdm(tqdm):
         """把 HF 的下载进度条回调映射到 model_ops 进度（以主权重文件为准）。"""
@@ -169,24 +183,37 @@ class MusicGenLocalProvider:
         import torch
         from transformers import AutoProcessor, MusicgenForConditionalGeneration
 
+        _apply_hf_endpoint()
+
+        # GPU 优先（RTX 等独显较 CPU 快一个量级）；无 CUDA 环境回退 CPU
+        device = "cuda" if torch.cuda.is_available() else "cpu"
         duration = min(request.duration_sec, self.max_duration)
         _stage(progress, should_cancel, "model_load", 4,
-               f"加载本地模型 {self.hf_id}（首次加载较慢）")
+               f"加载本地模型 {self.hf_id}（{device.upper()}，首次加载较慢）")
         model = MusicgenForConditionalGeneration.from_pretrained(
-            self.hf_id, cache_dir=str(hf_cache_dir()))
+            self.hf_id, cache_dir=str(hf_cache_dir())).to(device)
         processor = AutoProcessor.from_pretrained(self.hf_id, cache_dir=str(hf_cache_dir()))
         sr = model.config.audio_encoder.sampling_rate
 
         desc = (f"{request.style_prompt or 'instrumental music'}. "
                 f"{request.bpm} BPM, {request.mode} key, instrumental.")
-        inputs = processor(text=[desc, desc], padding=True, return_tensors="pt")
+        inputs = processor(text=[desc, desc], padding=True, return_tensors="pt").to(device)
 
-        est_min = max(1, round(duration / 10))
+        if device == "cuda":
+            # 实测 RTX 4060 Ti：300M 自回归逐 token 生成，30s×2 约 2~3 分钟（kernel 开销为主）
+            est = f"GPU 约 {max(30, duration * 3)}~{duration * 6}s"
+        else:
+            est_min = max(1, round(duration / 10))
+            est = f"CPU 约 {est_min}~{est_min * 3} 分钟"
         _stage(progress, should_cancel, "model_sample", 25,
-               f"模型采样中（{duration}s 器乐 ×2 候选，本机约 {est_min}~{est_min * 3} 分钟）")
+               f"模型采样中（{duration}s 器乐 ×2 候选，{est}）")
         torch.manual_seed(request.seed)
-        audio = model.generate(**inputs, do_sample=True, guidance_scale=3.0,
-                               max_new_tokens=int(duration * 50))
+        if device == "cuda":
+            torch.cuda.manual_seed_all(request.seed)
+        with torch.no_grad():
+            audio = model.generate(**inputs, do_sample=True, guidance_scale=3.0,
+                                   max_new_tokens=int(duration * 50))
+        audio = audio.cpu()
         _stage(progress, should_cancel, "model_export", 88, "导出音频…")
 
         dest = Path(dest_dir)

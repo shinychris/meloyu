@@ -78,7 +78,8 @@ master.wav SHA-256 一致」确定性验证与「simple 模式执行线程自动
   ACE-Step（云端首选）与 MusicGen Small（离线免 Key 首选）。
 - Replicate 通道：一个 Token 接全部目录模型；每模型白名单 input 适配；一次并行 2 个
   prediction 对应 A/B 候选；社区 slug 变动可在 `replicate_slugs` 覆盖。
-- 本机 MusicGen：HF 真实下载（POST /models/music-pull，进度轮询）+ transformers CPU 推理；
+- 本机 MusicGen：HF 真实下载（POST /models/music-pull，进度轮询）+ transformers 推理
+  （**自动检测 CUDA**，独显走 GPU；本机实录：RTX 4060 Ti，30s×2 候选 GPU/CPU 均 ~3 分钟）；
   可选依赖 `pip install -r requirements-musicgen.txt`（torch/transformers，未装时全链路
   fail-fast 给安装指引）；仅器乐，人声请求自动降级并留痕 vocals_downgraded。
 - Suno 网关协议：`POST {base}/api/v1/generate` + `GET {base}/api/v1/get?ids=…`，

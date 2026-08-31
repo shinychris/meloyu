@@ -400,7 +400,9 @@ def _persist_success(db: Session, task_id: str, user_id: str, output, provider) 
             "preview_file_id": None,  # 占位，flush 后回填
             "_preview_relpath": preview["relpath"] if preview else None,
         })
-    # 回填 preview_file_id
+    # 回填 preview_file_id（autoflush=False：须先 flush 才能在查询中看到本轮 File 行，
+    # 否则末轮加入的候选——如 B——的 preview 永远查不到，本机 MusicGen 真机生成实测命中）
+    db.flush()
     for rc, _art in zip(result_candidates, output.candidates, strict=False):
         if rc["_preview_relpath"]:
             row = db.execute(select(File).where(
