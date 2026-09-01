@@ -381,8 +381,9 @@ def main() -> int:
               f"lyrics_head={(vb['data'].get('lyrics') or '')[:60]!r}")
 
     # ============ 模型中心 V1.4：开源歌曲模型目录（Replicate / 本机 MusicGen） ============
-    smoke_state = {"mg6_refunded": False, "ace_ran": False, "ace_refunded": False}
-    # 15.6/15.10 终态自适应（未就绪=退款；真机成功=扣费不退）
+    smoke_state = {"mg6_refunded": False, "ace_ran": False, "ace_refunded": False,
+                   "svc_ran": 0, "svc_refunded": 0}
+    # 15.6/15.10/15.11~15.12 终态自适应（未就绪=退款；真机成功=扣费不退）
     r = client.get(f"{API}/models/music-catalog", headers=auth_headers(token))
     b = unwrap(r)
     cat = b["data"]["models"] if r.status_code == 200 and b["code"] == 0 else []
@@ -552,6 +553,53 @@ def main() -> int:
             smoke_state["ace_refunded"] = t["status"] == "failed"
             check("15.10 acestep 执行终态（未就绪→fail-fast 指引；就绪→人声成曲成功）",
                   ac_end, json.dumps(t.get("error") or t.get("result"))[:200])
+
+    # 自托管推理服务通道（V1.5.1，ADR-017）：服务在用户自己的环境跑，端点可配；
+    # 本机无服务时 fail-fast 可读指引并退款，有服务时（smoke 机器装了 Studio/SGLang）
+    # 真实生成——两侧皆为合法终态
+    svc_models = {"mmax_local": ("minimax-music-3", "SGLang"), "songgen_local": ("songgeneration-2", "Studio")}
+    for svc_ch, (svc_mid, svc_label) in svc_models.items():
+        r = client.get(f"{API}/models/music-catalog", headers=auth_headers(token))
+        cat_now = unwrap(r)["data"]["models"] if r.status_code == 200 else []
+        svc_entry = next((m for m in cat_now if m["id"] == svc_mid), {})
+        svc_running = svc_entry.get("local_status") == "ready"
+        r = client.post(f"{API}/models/music-pull", headers=auth_headers(token),
+                        json={"model": svc_mid})
+        b = unwrap(r)
+        check(f"15.11 music-pull {svc_mid}（服务型通道→40001 可读指引）",
+              r.status_code == 422 and b["code"] == 40001
+              and "自托管" in str(b.get("message") or ""), str(b.get("message"))[:120])
+
+        r = client.put(f"{API}/models/settings", headers=auth_headers(token),
+                       json={"music_backend": svc_ch, "music_model": svc_mid})
+        b = unwrap(r)
+        sv_ok = r.status_code == 200 and b["data"]["music_backend"] == svc_ch
+        check(f"15.12 切 {svc_ch}（{svc_mid}）", sv_ok, json.dumps(b)[:200])
+        if sv_ok:
+            r = client.get(f"{API}/models/runtime", headers=auth_headers(token))
+            b = unwrap(r)
+            check(f"15.12 runtime 歌曲引擎显示 {svc_label} 自托管",
+                  "自托管" in b["data"]["song_engine"], b["data"].get("song_engine", ""))
+            r = client.post(f"{API}/generations", headers=auth_headers(token), json={
+                "mode": "simple", "simple_prompt": "晚风与街灯", "seed": 700003,
+                "params": {"duration_sec": 30, "vocal": "female_air"},
+            })
+            b = unwrap(r)
+            sv_submit = (r.status_code == 201 and b["code"] == 0
+                         and b["data"]["task"]["provider"] == svc_ch)
+            check(f"15.12 {svc_ch} 提交（task.provider 留痕）", sv_submit, json.dumps(b)[:200])
+            if sv_submit:
+                t = wait_task(client, b["data"]["task"]["id"], token, timeout=900)
+                sv_end = (
+                    (t["status"] == "succeeded" and t["result"]
+                     and len(t["result"]["candidates"]) == 2)
+                    or (t["status"] == "failed" and t["error"] is not None
+                        and "推理服务未运行" in t["error"]["message"]))
+                smoke_state["svc_ran"] += 1
+                if t["status"] == "failed":
+                    smoke_state["svc_refunded"] += 1
+                check(f"15.12 {svc_ch} 执行终态（无服务→fail-fast 指引；服务在线→真实生成）",
+                      sv_end, json.dumps(t.get("error") or t.get("result"))[:200])
 
     r = client.put(f"{API}/models/settings", headers=auth_headers(token),
                    json={"music_backend": "localsynth", "music_model": "",
@@ -1061,19 +1109,23 @@ def main() -> int:
     for t in sorted(txs, key=lambda x: x["created_at"]):
         chain_ok = chain_ok and (prev + t["delta"] == t["balance_after"] or True)
     check("10.2 GET /credits/transactions", r.status_code == 200
-          and len(gen_txs) == 11 + (1 if smoke_state["ace_ran"] else 0)
+          and len(gen_txs) == (11 + (1 if smoke_state["ace_ran"] else 0)
+                               + smoke_state["svc_ran"])
           and len(refund_txs) >= 2
           and all(t["balance_after"] >= 0 for t in txs))
 
     # 注册 200 + studio 切换 10000 − 整曲 12×（14.7/14.9/15.6/4.1/确定性/长任务
-    # [+15.10 acestep 真机]）− 派生 6×5 + 取消退款（14.7/长任务 恒 2 笔；
-    # 15.6/15.10 未就绪时各 +1）
+    # [+15.10 acestep 真机] [+15.11~15.12 自托管通道×2]）− 派生 6×5 + 取消退款
+    # （14.7/长任务 恒 2 笔；15.6/15.10 未就绪时 +1；自托管无服务时逐笔 +1）
     ace_cost = 12 if smoke_state["ace_ran"] else 0
     ace_refund = 12 if smoke_state["ace_refunded"] else 0
-    expected_balance = (200 + 10000 - 72 - ace_cost - 30
-                        + (36 if smoke_state["mg6_refunded"] else 24) + ace_refund)
-    check(f"10.2 账本自洽（200 + 10000 − {72 + ace_cost} − 30 + "
-          f"{(36 if smoke_state['mg6_refunded'] else 24) + ace_refund}"
+    svc_cost = 12 * smoke_state["svc_ran"]
+    svc_refund = 12 * smoke_state["svc_refunded"]
+    expected_balance = (200 + 10000 - 72 - ace_cost - svc_cost - 30
+                        + (36 if smoke_state["mg6_refunded"] else 24)
+                        + ace_refund + svc_refund)
+    check(f"10.2 账本自洽（200 + 10000 − {72 + ace_cost + svc_cost} − 30 + "
+          f"{(36 if smoke_state['mg6_refunded'] else 24) + ace_refund + svc_refund}"
           f" = {expected_balance}）",
           balance_now == expected_balance, f"balance={balance_now}")
 

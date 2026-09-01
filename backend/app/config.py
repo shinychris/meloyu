@@ -28,6 +28,12 @@ MUSIC_API_TASK_TIMEOUT_SEC = 900
 MUSICGEN_TASK_TIMEOUT_SEC = 1800
 # 本机 ACE-Step 通道的任务超时（秒）：GPU turbo 档 1~3 分钟/首，首次含 venv 冷启动留余量
 ACESTEP_TASK_TIMEOUT_SEC = 1800
+# 自托管推理服务通道（V1.5.1，ADR-017）的任务超时：大模型 CPU offload / 双卡服务不确定度高，留足
+SELFHOSTED_TASK_TIMEOUT_SEC = 1800
+# 自托管推理服务默认端点（MiniMax Music 3=SGLang-Omni / SongGeneration=Studio model server）
+SELFHOSTED_DEFAULT_HOSTS = {"mmax_local": "http://127.0.0.1:8300",
+                            "songgen_local": "http://127.0.0.1:42100"}
+SELFHOSTED_PROBE_TIMEOUT_SEC = 2.0
 # Replicate 官方 API（V1.4 开源模型托管通道；测试连接支持 base 覆盖以便自建代理）
 REPLICATE_API_BASE = "https://api.replicate.com"
 # 免费档回收站清扫天数

@@ -13,3 +13,5 @@ loguru>=0.7.2
 python-dotenv>=1.0
 httpx>=0.27
 fpdf2>=2.8
+# 自托管通道（V1.5.1）：SongGeneration-Studio 输出 flac 解码
+soundfile>=0.12

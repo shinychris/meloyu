@@ -103,6 +103,12 @@ describe('views render smoke', () => {
     expect(html).toContain('本机 ACE-Step v1.5（开源·人声成曲）')
     expect(html).toContain('歌词→真人声演唱完整歌曲')
   })
+
+  it('ModelCenterView 渲染自托管服务通道卡（V1.5.1 MiniMax/SongGeneration）', () => {
+    const html = render(<ModelCenterView />)
+    expect(html).toContain('MiniMax Music 3 · 自托管服务')
+    expect(html).toContain('SongGeneration · 自托管服务')
+  })
 })
 
 /* ============ V1.1 候选派生操作（延长/变体/段落重生成） ============ */

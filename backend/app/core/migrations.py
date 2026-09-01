@@ -28,6 +28,9 @@ _ADD_COLUMNS: list[tuple[str, str]] = [
      "ALTER TABLE llm_settings ADD COLUMN music_model VARCHAR(60) NOT NULL DEFAULT ''"),
     ("replicate_slugs",
      "ALTER TABLE llm_settings ADD COLUMN replicate_slugs JSON NOT NULL DEFAULT '{}'"),
+    # M-20260901-b：V1.5.1 自托管推理服务通道端点（mmax_local/songgen_local）
+    ("local_service_hosts",
+     "ALTER TABLE llm_settings ADD COLUMN local_service_hosts JSON NOT NULL DEFAULT '{}'"),
 ]
 
 

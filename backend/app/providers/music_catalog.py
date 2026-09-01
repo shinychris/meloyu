@@ -1,13 +1,17 @@
-"""歌曲生成开源模型目录（V1.4「多类开源模型接入」批；V1.5 增本机 ACE-Step 与新模型）。
+"""歌曲生成开源模型目录（V1.4「多类开源模型接入」批；V1.5 增本机 ACE-Step 与新模型；
+V1.5.1 增自托管推理服务通道）。
 
-收录可经本系统三条通道使用的开源歌曲/音乐生成模型：
+收录可经本系统五条通道使用的开源歌曲/音乐生成模型：
   - acestep_local：ACE-Step v1.5 本机子进程推理（歌词→人声成曲，8GB 显存档）
   - musicgen_local：本机 transformers 直跑 MusicGen（真实 HF 下载，器乐）
+  - mmax_local / songgen_local：自托管推理服务（V1.5.1，ADR-017）——模型装在
+    用户自己的环境（SGLang-Omni / SongGeneration-Studio），端点可配置
   - replicate：Replicate 托管推理（统一 HTTP 协议，一个 Token 接全部模型）
 
 benchmark.score 为**公开论文/技术报告/社区横评的综合参考分（0-10）**，仅用于选型
 排序，非本系统实测；来源见 benchmark.source。分数与结论随来源公开资料整理，
-不声称本系统复测结果（ADR-015）。
+不声称本系统复测结果（ADR-015）。环境/显存需求仅为标注信息，不构成接入门槛
+（用户测试时自行选择，ADR-017）。
 
 replicate_slug：平台默认 slug；多数模型的社区托管 slug 变动频繁，默认留空，
 由用户在模型中心填写（存 llm_settings.replicate_slugs）。
@@ -45,8 +49,8 @@ MUSIC_CATALOG: list[dict] = [
         "id": "minimax-music-3",
         "name": "MiniMax Music 3",
         "vendor": "MiniMax",
-        "license": "开源权重（见模型卡，2026.8.13 开放）",
-        "params": "Qwen3-8B 底座",
+        "license": "开源权重（MiniMax 社区许可，2026.8.13 开放，商用条款见 LICENSE）",
+        "params": "8B 全局 LLM + 0.6B 局部 LLM + 2.4B Flow Matching",
         "capabilities": {"vocals": True, "lyrics_input": True, "max_duration_sec": 300,
                          "languages": "中/英等多语"},
         "benchmark": {
@@ -55,11 +59,13 @@ MUSIC_CATALOG: list[dict] = [
             "notes": "单次前向生成最长 5 分钟完整歌曲（无拼接），长程结构与情绪递进"
                      "强、乐器音色真实；新发布实测样本尚少，32kHz 输出",
         },
-        "channels": ["replicate"],
+        "channels": ["replicate", "mmax_local"],
         "local_runnable": False,
-        "local_hf_id": None,
+        "local_hf_id": "MiniMaxAI/MiniMax-Music3",
         "local_size_mb": 0,
-        "local_note": "8B 底座需 16GB+ 显存，本机不可跑；走 Replicate 托管（slug 需自查填写）",
+        "local_note": "本机通道=自托管 SGLang-Omni 服务（官方唯一推理路径，需 Linux + "
+                      "双 CUDA GPU；8B+0.6B+2.4B 组件）：服务机 sgl-omni serve 起服务后"
+                      "在模型中心配置端点即可；权重由服务侧管理（HF MiniMaxAI/MiniMax-Music3）",
         "replicate_slug": "",
         "recommended": False,
         "recommend_reason": "",
@@ -68,7 +74,7 @@ MUSIC_CATALOG: list[dict] = [
         "id": "songgeneration-2",
         "name": "SongGeneration 2（LeVo 2）",
         "vendor": "腾讯 AI Lab × 清华大学",
-        "license": "开源（见模型卡）",
+        "license": "开源（官方权重仓 gated 需申请，社区镜像公开）",
         "params": "4B（LLM+Diffusion 混合，分层表征）",
         "capabilities": {"vocals": True, "lyrics_input": True, "max_duration_sec": 270,
                          "languages": "中/英等多语"},
@@ -78,12 +84,14 @@ MUSIC_CATALOG: list[dict] = [
             "notes": "开源音质天花板档：歌词音素错误率低至 8.55%，人声/伴奏多轨表征"
                      "精准控制，社区称效果对标 Suno 高版本",
         },
-        "channels": ["replicate"],
+        "channels": ["replicate", "songgen_local"],
         "local_runnable": False,
-        "local_hf_id": None,
+        "local_hf_id": "lglg666/SongGeneration-large",
         "local_size_mb": 0,
-        "local_note": "官方部署需 24GB+ 显存（社区量化版约 12GB），本机不可跑；"
-                      "走 Replicate 托管（slug 需自查填写）",
+        "local_note": "本机通道=SongGeneration-Studio 自托管服务（Windows 可跑的低显存封装，"
+                      "v1 权重 base/full≈11GB / large≈21GB，标注显存 10~22GB，低显存可 offload"
+                      "换时长；v2/LeVo 2 权重需 Linux+ComfyUI 路径自建）：Studio 起服务后在"
+                      "模型中心配置端点，权重经 Studio 下载（官方仓 gated，走社区镜像）",
         "replicate_slug": "",
         "recommended": False,
         "recommend_reason": "",
@@ -129,7 +137,8 @@ MUSIC_CATALOG: list[dict] = [
         "local_runnable": False,
         "local_hf_id": None,
         "local_size_mb": 0,
-        "local_note": "本地部署需 24GB+ 显存；请走 Replicate 托管（slug 需自查填写）",
+        "local_note": "暂无可核实的公开代码/权重仓库（2026-09 核查），本机通道待其"
+                      "开源后接入；走 Replicate 托管（slug 需自查填写）",
         "replicate_slug": "",
         "recommended": False,
         "recommend_reason": "",

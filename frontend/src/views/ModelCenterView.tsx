@@ -47,13 +47,17 @@ const BACKENDS: { value: LyricsBackend; title: string; desc: string }[] = [
 const MUSIC_BACKENDS: { value: MusicBackend; title: string; desc: string }[] = [
   { value: 'localsynth', title: '本地合成引擎', desc: '离线可用 · 算法作曲实时渲染 · 含分轨/MIDI（默认）' },
   { value: 'acestep_local', title: '本机 ACE-Step v1.5（开源·人声成曲）', desc: '歌词→真人声演唱完整歌曲 · 独立 venv 部署 · 8GB 显存档 · GPU 约 1~3 分钟/首' },
+  { value: 'mmax_local', title: 'MiniMax Music 3 · 自托管服务', desc: '官方推理路径 SGLang-Omni（需 Linux+双卡环境）· 端点可配 · 5 分钟长歌 · 32kHz' },
+  { value: 'songgen_local', title: 'SongGeneration · 自托管服务', desc: 'SongGeneration-Studio 服务（Windows 可跑，v1 权重 11~21GB，低显存可 offload）· 端点可配' },
   { value: 'replicate', title: 'Replicate 开源模型托管', desc: '多类开源歌曲模型（ACE-Step/YuE/MusicGen…）· 一个 Token 全可用' },
   { value: 'api', title: '外部歌曲 API（Suno 兼容）', desc: '商业整曲模型（人声演唱）· 需网关与 Key · 约 1~5 分钟/首' },
   { value: 'musicgen_local', title: '本机 MusicGen（开源）', desc: '本地真实下载与推理（器乐）· 免 API Key · CPU 可跑' },
 ]
 
-/** 支持本机下载运行的通道（目录按钮/状态按此泛化渲染） */
-const LOCAL_CHANNELS: MusicBackend[] = ['acestep_local', 'musicgen_local']
+/** 支持本机/自托管运行的通道（目录按钮/状态按此泛化渲染） */
+const LOCAL_CHANNELS: MusicBackend[] = ['acestep_local', 'musicgen_local', 'mmax_local', 'songgen_local']
+/** 下载型本机通道（权重经模型中心下载）；其余本机通道为自托管服务型（端点可配） */
+const DOWNLOAD_CHANNELS: MusicBackend[] = ['acestep_local', 'musicgen_local']
 const localChannelOf = (m: MusicCatalogModel): MusicBackend | undefined =>
   m.channels.find((c) => LOCAL_CHANNELS.includes(c))
 
@@ -66,6 +70,7 @@ function localStatusText(m: MusicCatalogModel): { text: string; color: string } 
   if (m.local_status === 'ready') return { text: '本机已就绪', color: 'var(--acc)' }
   if (m.local_status === 'deps_missing') return { text: '依赖未安装', color: 'var(--bad)' }
   if (m.local_status === 'not_downloaded') return { text: '未下载', color: 'var(--dim)' }
+  if (m.local_status === 'not_running') return { text: '服务未运行', color: 'var(--bad)' }
   return { text: '仅托管', color: 'var(--dim)' }
 }
 
@@ -95,6 +100,7 @@ export default function ModelCenterView() {
   const [replicateTestResult, setReplicateTestResult] = useState<ExternalTestResult | null>(null)
   const [replicateSaving, setReplicateSaving] = useState(false)
   const [slugEdits, setSlugEdits] = useState<Record<string, string>>({})
+  const [hostEdits, setHostEdits] = useState<Record<string, string>>({})
   const [catalogBusy, setCatalogBusy] = useState(false)
 
   const [pullTag, setPullTag] = useState('')
@@ -129,6 +135,7 @@ export default function ModelCenterView() {
     setMusicBase(st.music_api_base_url)
     setMusicModel(st.music_api_model)
     setSlugEdits(st.replicate_slugs || {})
+    setHostEdits(st.local_service_hosts || {})
   }, [])
 
   useEffect(() => {
@@ -295,7 +302,8 @@ export default function ModelCenterView() {
       toast('Replicate 通道需先保存 API Token（见下方开源模型目录）')
       return
     }
-    if ((target === 'replicate' || target === 'musicgen_local' || target === 'acestep_local')
+    if ((target === 'replicate' || target === 'musicgen_local' || target === 'acestep_local'
+        || target === 'mmax_local' || target === 'songgen_local')
         && !settings?.music_model) {
       toast('请先在下方目录中选择一个开源模型')
       return
@@ -441,6 +449,25 @@ export default function ModelCenterView() {
     }
   }
 
+  /** 保存自托管服务端点（channel → base_url，空串=回退默认端口） */
+  const saveHost = async (channel: MusicBackend) => {
+    setCatalogBusy(true)
+    try {
+      const st = await updateLLMSettings({
+        local_service_hosts: { [channel]: (hostEdits[channel] ?? '').trim() },
+      })
+      setSettings(st)
+      const cat = await getMusicCatalog()
+      setCatalog(cat)
+      const svc = cat.machine.services?.[channel]
+      toast(svc?.running ? `端点已保存，服务在线：${svc.detail}` : '端点已保存（服务未运行）')
+    } catch {
+      /* 拦截器已 toast */
+    } finally {
+      setCatalogBusy(false)
+    }
+  }
+
   const ollama = runtime?.ollama
 
   return (
@@ -516,7 +543,8 @@ export default function ModelCenterView() {
                       toast('请先在下方目录区保存 Replicate API Token')
                       return
                     }
-                    if ((b.value === 'musicgen_local' || b.value === 'acestep_local')
+                    if ((b.value === 'musicgen_local' || b.value === 'acestep_local'
+                        || b.value === 'mmax_local' || b.value === 'songgen_local')
                         && !settings?.music_model) {
                       toast('请先在下方目录选择支持本机运行的模型')
                       return
@@ -701,6 +729,7 @@ export default function ModelCenterView() {
             {(catalog?.models || []).map((m) => {
               const st = localStatusText(m)
               const localChannel = localChannelOf(m)
+              const isService = !!localChannel && !DOWNLOAD_CHANNELS.includes(localChannel)
               return (
                 <div key={m.id} className="card p-4" style={m.selected ? { borderColor: 'var(--acc)' } : undefined}>
                   <div className="flex items-start gap-3 flex-wrap">
@@ -768,7 +797,7 @@ export default function ModelCenterView() {
                           云端使用
                         </button>
                       )}
-                      {localChannel && (
+                      {localChannel && !isService && (
                         <>
                           <button
                             className="btn !py-1 !px-2.5 text-[11px]"
@@ -797,26 +826,64 @@ export default function ModelCenterView() {
                           )}
                         </>
                       )}
-                    </div>
-                  </div>
-                  {m.channels.includes('replicate') && (
-                    <div className="flex items-center gap-2 mt-3" title="Replicate 模型 slug（社区托管变动时可覆盖）">
-                      <span className="text-[10px] flex-none" style={{ color: 'var(--dim)' }}>slug</span>
-                      <input
-                        className="flex-1 px-2 py-1 text-[11px]"
-                        style={{
-                          background: 'var(--bg)', border: '1px solid var(--line)',
-                          color: 'var(--txt)', outline: 'none',
-                        }}
-                        placeholder={m.replicate_slug_default || 'owner/name（replicate.com 查询后填写）'}
-                        value={slugEdits[m.id] ?? ''}
-                        onChange={(e) => setSlugEdits((p) => ({ ...p, [m.id]: e.target.value }))}
-                      />
-                      {m.replicate_slug_overridden && (
-                        <span className="text-[10px] flex-none" style={{ color: 'var(--dim)' }}>已覆盖</span>
+                      {isService && localChannel && (
+                        <button
+                          className="btn !py-1 !px-2.5 text-[11px]"
+                          disabled={catalogBusy || m.selected}
+                          onClick={() => void useCatalogModel(m, localChannel)}
+                        >
+                          自托管使用
+                        </button>
                       )}
                     </div>
-                  )}
+                  </div>
+                      {m.channels.includes('replicate') && (
+                        <div className="flex items-center gap-2 mt-3" title="Replicate 模型 slug（社区托管变动时可覆盖）">
+                          <span className="text-[10px] flex-none" style={{ color: 'var(--dim)' }}>slug</span>
+                          <input
+                            className="flex-1 px-2 py-1 text-[11px]"
+                            style={{
+                              background: 'var(--bg)', border: '1px solid var(--line)',
+                              color: 'var(--txt)', outline: 'none',
+                            }}
+                            placeholder={m.replicate_slug_default || 'owner/name（replicate.com 查询后填写）'}
+                            value={slugEdits[m.id] ?? ''}
+                            onChange={(e) => setSlugEdits((p) => ({ ...p, [m.id]: e.target.value }))}
+                          />
+                          {m.replicate_slug_overridden && (
+                            <span className="text-[10px] flex-none" style={{ color: 'var(--dim)' }}>已覆盖</span>
+                          )}
+                        </div>
+                      )}
+                      {isService && localChannel && (
+                        <div className="mt-3" title="自托管推理服务端点（模型装在你自己的环境，此处只配地址）">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] flex-none" style={{ color: 'var(--dim)' }}>端点</span>
+                            <input
+                              className="flex-1 px-2 py-1 text-[11px]"
+                              style={{
+                                background: 'var(--bg)', border: '1px solid var(--line)',
+                                color: 'var(--txt)', outline: 'none',
+                              }}
+                              placeholder={catalog?.machine.services?.[localChannel]?.host || 'http://127.0.0.1:…'}
+                              value={hostEdits[localChannel] ?? ''}
+                              onChange={(e) => setHostEdits((p) => ({ ...p, [localChannel]: e.target.value }))}
+                            />
+                            <button
+                              className="btn !py-1 !px-2.5 text-[11px] flex-none"
+                              disabled={catalogBusy}
+                              onClick={() => void saveHost(localChannel)}
+                            >
+                              保存端点
+                            </button>
+                          </div>
+                          <div className="text-[10px] mt-1" style={{ color: m.local_status === 'ready' ? 'var(--acc)' : 'var(--dim)' }}>
+                            {m.service_detail || catalog?.machine.services?.[localChannel]?.detail}
+                            {m.local_status !== 'ready' && catalog?.machine.services?.[localChannel]?.hint
+                              ? ` —— ${catalog.machine.services[localChannel].hint}` : ''}
+                          </div>
+                        </div>
+                      )}
                 </div>
               )
             })}

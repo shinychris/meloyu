@@ -30,6 +30,8 @@ class LLMSettingsRequest(BaseModel):
     V1.4 扩展：music_backend 增 replicate|musicgen_local（开源模型目录通道，
     music_model 为目录模型 id；replicate_slugs 覆盖目录默认 slug）。
     V1.5 扩展：music_backend 增 acestep_local（本机 ACE-Step v1.5 人声成曲）。
+    V1.5.1 扩展：music_backend 增 mmax_local|songgen_local（自托管推理服务通道，
+    local_service_hosts 配置端点，ADR-017）。
     """
     lyrics_backend: str | None = None
     ollama_host: str | None = Field(default=None, max_length=200)
@@ -44,6 +46,7 @@ class LLMSettingsRequest(BaseModel):
     music_model: str | None = Field(default=None, max_length=60)
     replicate_api_token: str | None = Field(default=None, max_length=300)
     replicate_slugs: dict[str, str] | None = None
+    local_service_hosts: dict[str, str] | None = None
 
     @field_validator("lyrics_backend")
     @classmethod
@@ -56,9 +59,10 @@ class LLMSettingsRequest(BaseModel):
     @classmethod
     def _music_backend(cls, v: str | None) -> str | None:
         if v is not None and v not in (
-                "localsynth", "api", "replicate", "musicgen_local", "acestep_local"):
+                "localsynth", "api", "replicate", "musicgen_local", "acestep_local",
+                "mmax_local", "songgen_local"):
             raise ValueError("music_backend 必须为 localsynth/api/replicate/"
-                             "musicgen_local/acestep_local")
+                             "musicgen_local/acestep_local/mmax_local/songgen_local")
         return v
 
 

@@ -41,6 +41,9 @@ class LLMSetting(BaseModel):
     music_model: Mapped[str] = mapped_column(String(60), nullable=False, default="")
     # Replicate 模型 slug 覆盖（dict[model_id, slug]，社区托管 slug 变动由用户维护）
     replicate_slugs: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    # 自托管推理服务端点（V1.5.1，dict[channel, base_url]；mmax_local=SGLang-Omni、
+    # songgen_local=SongGeneration-Studio，用户在任意环境起服务后在此配置）
+    local_service_hosts: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<LLMSetting backend={self.lyrics_backend}>"

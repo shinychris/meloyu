@@ -489,9 +489,11 @@ export interface WorkDeleteResult {
 /* ============ models（V1.2 模型中心，契约 §5.8） ============ */
 export type LyricsBackend = 'localsynth' | 'ollama' | 'openai_compat'
 
-/** 歌曲生成引擎通道：本地合成 / Suno 兼容网关 / Replicate 开源模型托管 /
- *  本机 MusicGen（器乐）/ 本机 ACE-Step v1.5（人声成曲） */
-export type MusicBackend = 'localsynth' | 'api' | 'replicate' | 'musicgen_local' | 'acestep_local'
+/** 歌曲生成引擎通道：本地合成 / Suno 兼容网关 / Replicate 托管 / 本机 MusicGen /
+ *  本机 ACE-Step v1.5 / 自托管推理服务（MiniMax=SGLang-Omni、SongGeneration=Studio） */
+export type MusicBackend =
+  | 'localsynth' | 'api' | 'replicate' | 'musicgen_local' | 'acestep_local'
+  | 'mmax_local' | 'songgen_local'
 
 export interface OllamaRuntime {
   host: string
@@ -536,7 +538,9 @@ export interface MusicCatalogModel {
   recommended: boolean
   recommend_reason: string
   rank: number
-  local_status: 'not_applicable' | 'deps_missing' | 'not_downloaded' | 'ready'
+  local_status: 'not_applicable' | 'deps_missing' | 'not_downloaded' | 'not_running' | 'ready'
+  /** 自托管服务型通道的探活详情（mmax_local/songgen_local 专属） */
+  service_detail?: string
   selected: boolean
 }
 
@@ -548,6 +552,7 @@ export interface MusicCatalog {
     downloaded_ids: string[]
     acestep_deps_installed: boolean
     acestep_install_hint: string
+    services: Record<string, { running: boolean; detail: string; hint: string; host: string }>
   }
   selected: { music_backend: MusicBackend; music_model: string | null }
   replicate: { token_saved: boolean }
@@ -609,6 +614,8 @@ export interface LLMSettings {
   /** V1.4：Replicate Token（脱敏；显式空串=清除） */
   replicate_api_token: { has_key: boolean; key_tail: string }
   replicate_slugs: Record<string, string>
+  /** 自托管推理服务端点（mmax_local/songgen_local → base_url，V1.5.1） */
+  local_service_hosts: Record<string, string>
 }
 
 export interface LLMSettingsUpdate {
@@ -628,6 +635,7 @@ export interface LLMSettingsUpdate {
   /** V1.4：显式空串 = 清除 Token */
   replicate_api_token?: string
   replicate_slugs?: Record<string, string>
+  local_service_hosts?: Record<string, string>
 }
 
 export interface ExternalTestResult {
