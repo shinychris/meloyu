@@ -71,7 +71,7 @@ master.wav SHA-256 一致」确定性验证与「simple 模式执行线程自动
 | 同上 | **Replicate 开源模型托管（V1.4）** | `music_backend=replicate` + `replicate_api_token` + 目录选模型（ACE-Step/YuE/DiffRhythm/MusicGen…） |
 | 同上 | **本机 MusicGen（V1.4，离线免 Key）** | `music_backend=musicgen_local` + 目录选 musicgen-small|medium + 下载权重 |
 | 同上 | **本机 ACE-Step v1.5（V1.5，人声成曲）** | 先 `python scripts/setup_acestep.py`（独立 venv，约 4GB 依赖），再 `music_backend=acestep_local` + 目录选 ace-step + 下载权重（约 11GB） |
-| 同上 | **自托管推理服务（V1.5.1，ADR-017）** | 在自己的环境起服务（MiniMax Music 3=SGLang-Omni `sgl-omni serve`，Linux+双卡；SongGeneration=SongGeneration-Studio model server，Windows 可跑），再 `music_backend=mmax_local`/`songgen_local` + 模型中心配置端点（权重归服务侧，此处不下载） |
+| 同上 | **自托管推理服务（V1.5.1，ADR-017）** | MiniMax Music 3 双形态：①本机 audio.cpp（`data/audiocpp/`：CLI+GGUF Q4 约 8.4GB，Windows CUDA 可跑，实测 4060 Ti 约 16 分钟/10s 曲）优先；②SGLang-Omni 服务端点（Linux+双卡，速度快）。SongGeneration=SongGeneration-Studio model server（Windows 可跑）。均经 `music_backend=mmax_local`/`songgen_local` + 模型中心配置 |
 | 同上 | 本地合成引擎（离线兜底） | `music_backend=localsynth`（默认） |
 
 - **开源模型目录**（GET /models/music-catalog）：10 个开源歌曲模型按**外部测评参考分**降序

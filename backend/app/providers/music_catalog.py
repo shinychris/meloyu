@@ -62,10 +62,11 @@ MUSIC_CATALOG: list[dict] = [
         "channels": ["replicate", "mmax_local"],
         "local_runnable": False,
         "local_hf_id": "MiniMaxAI/MiniMax-Music3",
-        "local_size_mb": 0,
-        "local_note": "本机通道=自托管 SGLang-Omni 服务（官方唯一推理路径，需 Linux + "
-                      "双 CUDA GPU；8B+0.6B+2.4B 组件）：服务机 sgl-omni serve 起服务后"
-                      "在模型中心配置端点即可；权重由服务侧管理（HF MiniMaxAI/MiniMax-Music3）",
+        "local_size_mb": 8400,
+        "local_note": "双形态本机通道（优先级自动选择）：①本机 audio.cpp（llama.cpp 音频"
+                      "分支 GGUF Q4/Q8/Q4，Windows CUDA 可跑，8GB 显存贴线，实测 4060 Ti "
+                      "约 16 分钟/10s 曲——速度慢但零外部依赖）；②SGLang-Omni 自托管服务"
+                      "（官方路径，Linux+双卡，速度快）；权重部署见模型中心状态提示",
         "replicate_slug": "",
         "recommended": False,
         "recommend_reason": "",

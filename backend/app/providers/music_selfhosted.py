@@ -68,6 +68,28 @@ MMAX_HINT = ("MiniMax Music 3 推理服务未运行：官方路径为 SGLang-Omn
 SONGGEN_HINT = ("SongGeneration 推理服务未运行：在装有 SongGeneration-Studio 的环境启动其 "
                 "model server（端口默认 42100，Windows 可跑），或在模型中心把端点改为服务机"
                 "地址；权重经 Studio 界面下载（HF lglg666/SongGeneration-*）")
+MMAX_LOCAL_HINT = ("MiniMax Music 3 本机推理未就绪：部署 audio.cpp（llama.cpp 音频分支，"
+                   "Windows CUDA 预编译）与 GGUF 权重——backend/data/audiocpp/ 下放置 "
+                   "audiocpp_cli.exe（GitHub 0xShug0/audio.cpp releases 的 windows-x64-"
+                   "cuda12.4 包 + cudart 包解压）与 MiniMax-Music3-GGUF/（HF audio-cpp/"
+                   "MiniMax-Music3-GGUF 默认 Q4/Q8/Q4 组件，约 8.4GB）")
+
+
+def _audiocpp_home() -> Path:
+    from app.config import settings
+    if settings.audiocpp_home:
+        return Path(settings.audiocpp_home).resolve()
+    return settings.data_path / "audiocpp"
+
+
+def audiocpp_ready() -> bool:
+    """本地 audio.cpp 形态就绪：CLI 与默认 GGUF 组件齐备（Q4 LM + Q8 RVQ + Q4 Flow）。"""
+    home = _audiocpp_home()
+    gguf = home / "MiniMax-Music3-GGUF"
+    need = ("language_model_q4_0.gguf", "rvq_depth_decoder_q8_0.gguf",
+            "transformer_q4_0.gguf", "condition_encoder.gguf", "vocoder.gguf")
+    return ((home / "audiocpp_cli.exe").exists()
+            and all((gguf / n).exists() for n in need))
 
 
 def service_host(channel: str, hosts: dict | None) -> str:
@@ -78,19 +100,29 @@ def service_host(channel: str, hosts: dict | None) -> str:
 
 
 def probe_service(channel: str, hosts: dict | None) -> dict:
-    """探活（供目录 local_status 与通道校验）：{running, detail, hint}。"""
+    """探活（供目录 local_status 与通道校验）：{running, detail, hint}。
+
+    mmax_local 双形态：本地 audio.cpp（CLI+GGUF 齐备即可用，优先）或 SGLang-Omni
+    端点（用户自托管服务）——任一就绪即 running。
+    """
     host = service_host(channel, hosts)
     if channel == "mmax_local":
+        if audiocpp_ready():
+            return {"running": True,
+                    "detail": "本机 audio.cpp · MiniMax-Music3 GGUF Q4/Q8/Q4（已部署）",
+                    "hint": MMAX_LOCAL_HINT, "host": "local"}
         hint = MMAX_HINT
         try:
             with httpx.Client(timeout=SELFHOSTED_PROBE_TIMEOUT_SEC, trust_env=False) as c:
                 r = c.get(f"{host}/v1/models")
             ok = r.status_code == 200
-            return {"running": ok, "detail": f"{host} · SGLang-Omni {'在线' if ok else '异常'}",
+            return {"running": ok, "detail": f"{host} · SGLang-Omni {'在线' if ok else '异常'}"
+                                             f"（本机 audio.cpp 未部署）",
                     "hint": hint, "host": host}
         except Exception as e:  # noqa: BLE001 —— 探活失败=服务不在
-            return {"running": False, "detail": f"{host} · {type(e).__name__}", "hint": hint,
-                    "host": host}
+            return {"running": False,
+                    "detail": f"{host} · {type(e).__name__}；本机 audio.cpp 未部署",
+                    "hint": hint, "host": host}
     if channel == "songgen_local":
         hint = SONGGEN_HINT
         try:
@@ -187,7 +219,8 @@ def _check_channel(model_id: str, channel: str) -> None:
 
 
 class MiniMaxSelfHostedProvider:
-    """MusicProvider：MiniMax Music 3 经 SGLang-Omni（OpenAI 兼容 speech API）。"""
+    """MusicProvider：MiniMax Music 3——本机 audio.cpp（GGUF 量化，优先）或
+    SGLang-Omni 服务（OpenAI 兼容 speech API，官方路径）。"""
 
     name = "mmax_local"
     base_display = "MiniMax Music 3 · 自托管服务"
@@ -200,11 +233,104 @@ class MiniMaxSelfHostedProvider:
         self.display_name = f"MiniMax Music 3 · {CATALOG_BY_ID[model_id]['name']}（自托管）"
         self.host = service_host(self.name, hosts)
 
+    # ---------- 本地 audio.cpp 形态 ----------
+    def _generate_local(self, request, progress, should_cancel, dest: Path):
+        import queue
+        import subprocess
+        import sys
+        import threading
+
+        from app.config import AUDIOCPP_TASK_TIMEOUT_SEC
+        # 本地 Q4 量化实测 RTF~94（双候选可能 1 小时+），放宽任务熔断
+        self.timeout_sec = AUDIOCPP_TASK_TIMEOUT_SEC
+        home = _audiocpp_home()
+        lyrics = (request.lyrics or "").strip() or "[Instrumental]"
+        duration = max(10, min(int(request.duration_sec), 300))
+        instructions = _caption(request)
+        if request.vocal == "instrumental":
+            instructions = f"{instructions}, instrumental, no vocals"
+        candidates: list[CandidateArtifact] = []
+        # RTF 实测 ~94（4060 Ti 8GB 跑 Q4 8B）：双候选如实双倍时长，
+        # 目录 note 已标注速度，用户自行权衡时长
+        for i in range(2):
+            label = chr(ord("A") + i)
+            _stage(progress, should_cancel, "model_sample", 15 + i * 35,
+                   f"MiniMax Music 3（本机 audio.cpp Q4/Q8/Q4）生成候选 {label}"
+                   f"（约 {duration * 94 // 60 + 1} 分钟/候选）…")
+            out_wav = dest / f"_mmax_{label}.wav"
+            cmd = [str(home / "audiocpp_cli.exe"), "--task", "gen",
+                   "--family", "minimax_music3", "--model", "MiniMax-Music3-GGUF",
+                   "--backend", "cuda", "--threads", "8",
+                   "--text", instructions[:500],
+                   "--request-option", f"lyrics={lyrics[:2000]}",
+                   "--request-option", f"duration_sec={duration}",
+                   "--request-option", "num_inference_steps=30",
+                   "--out", str(out_wav)]
+            flags = 0x08000000 if sys.platform == "win32" else 0
+            proc = subprocess.Popen(
+                cmd, cwd=str(home), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, encoding="utf-8", errors="replace",
+                creationflags=flags)
+            # CLI 输出行稀疏（TIMING 间歇刷）：同步 readline 会数十秒~分钟级阻塞、
+            # 取消标志无人查询（E2E 实测命中）——reader 线程 + 队列 1s 轮询取消
+            lines: "queue.Queue[str]" = queue.Queue()
+
+            def _pump(p=proc, q=lines):
+                try:
+                    for ln in p.stdout or []:
+                        q.put(ln)
+                finally:
+                    q.put("")  # EOF 哨兵
+
+            threading.Thread(target=_pump, daemon=True).start()
+
+            def _kill():
+                try:
+                    proc.kill()
+                except OSError:  # noqa: BLE001
+                    pass
+
+            watchdog = threading.Timer(self.timeout_sec, _kill)
+            watchdog.daemon = True
+            watchdog.start()
+            tail = ""
+            try:
+                while True:
+                    try:
+                        line = lines.get(timeout=1.0)
+                    except queue.Empty:
+                        if should_cancel():
+                            _kill()
+                            raise SynthCancelled()
+                        continue
+                    if line == "":
+                        break
+                    tail = (tail + line)[-600:]
+                proc.wait(timeout=60)
+                if should_cancel():  # EOF 也可能由取消 kill 引起
+                    raise SynthCancelled()
+                if proc.returncode != 0 or not out_wav.exists():
+                    raise SelfHostedError(
+                        "runtime", f"audio.cpp 生成失败（码 {proc.returncode}）：{tail[-300:]}")
+            finally:
+                watchdog.cancel()
+                _kill()
+            _stage(progress, should_cancel, "model_export", 80 + i * 8, "导出音频…")
+            meta = _finalize_audio(out_wav, dest, label, sr_expected=44100)
+            out_wav.unlink(missing_ok=True)
+            candidates.append(
+                _artifact(request, label, meta, candidate_seed(request.seed, label)))
+        self.vocals_downgraded = False
+        return GenerationOutput(candidates, [], False)
+
+    # ---------- SGLang-Omni 端点形态 ----------
     def generate(self, request, progress: ProgressCallback, should_cancel: CancelCheck,
                  dest_dir: str) -> GenerationOutput:
         dest = Path(dest_dir)
         dest.mkdir(parents=True, exist_ok=True)
         st = probe_service(self.name, {self.name: self.host})
+        if audiocpp_ready():
+            return self._generate_local(request, progress, should_cancel, dest)
         if not st["running"]:
             raise SelfHostedError("service", st["hint"])
 

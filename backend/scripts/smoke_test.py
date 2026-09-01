@@ -587,19 +587,45 @@ def main() -> int:
             b = unwrap(r)
             sv_submit = (r.status_code == 201 and b["code"] == 0
                          and b["data"]["task"]["provider"] == svc_ch)
+            smoke_state["svc_ran"] += 1
             check(f"15.12 {svc_ch} 提交（task.provider 留痕）", sv_submit, json.dumps(b)[:200])
             if sv_submit:
-                t = wait_task(client, b["data"]["task"]["id"], token, timeout=900)
-                sv_end = (
-                    (t["status"] == "succeeded" and t["result"]
-                     and len(t["result"]["candidates"]) == 2)
-                    or (t["status"] == "failed" and t["error"] is not None
-                        and "推理服务未运行" in t["error"]["message"]))
-                smoke_state["svc_ran"] += 1
-                if t["status"] == "failed":
+                sv_tid = b["data"]["task"]["id"]
+                # mmax_local 本机 audio.cpp 形态 RTF~94（30s 曲双候选 90 分钟+）：
+                # 冒烟验证提交→running→取消→退款链路，真实出歌由 scripts/mmax_e2e.py 覆盖
+                if svc_ch == "mmax_local" and svc_running:
+                    running_seen = False
+                    for _ in range(24):
+                        time.sleep(10)
+                        r2 = client.get(f"{API}/tasks/{sv_tid}", headers=auth_headers(token))
+                        t2 = unwrap(r2)["data"]
+                        if t2["status"] == "running" and t2["stage_key"] in (
+                                "model_sample", "model_export"):
+                            running_seen = True
+                            break
+                        if t2["status"] not in ("queued", "running"):
+                            break
+                    check(f"15.12 {svc_ch} running 推进（audio.cpp 子进程拉起）",
+                          running_seen, json.dumps(t2)[:120])
+                    r2 = client.post(f"{API}/tasks/{sv_tid}/cancel",
+                                     headers=auth_headers(token))
+                    time.sleep(8)
+                    r2 = client.get(f"{API}/tasks/{sv_tid}", headers=auth_headers(token))
+                    t2 = unwrap(r2)["data"]
                     smoke_state["svc_refunded"] += 1
-                check(f"15.12 {svc_ch} 执行终态（无服务→fail-fast 指引；服务在线→真实生成）",
-                      sv_end, json.dumps(t.get("error") or t.get("result"))[:200])
+                    check(f"15.12 {svc_ch} 取消+退款（慢速本机形态不阻塞冒烟）",
+                          t2["status"] == "canceled", json.dumps(t2)[:120])
+                else:
+                    t = wait_task(client, sv_tid, token, timeout=900)
+                    sv_end = (
+                        (t["status"] == "succeeded" and t["result"]
+                         and len(t["result"]["candidates"]) == 2)
+                        or (t["status"] == "failed" and t["error"] is not None
+                            and "推理服务未运行" in t["error"]["message"]))
+                    if t["status"] == "failed":
+                        smoke_state["svc_refunded"] += 1
+                    check(f"15.12 {svc_ch} 执行终态（无服务→fail-fast 指引；服务在线→真实生成）",
+                          sv_end, json.dumps(t.get("error") or t.get("result"))[:200])
 
     r = client.put(f"{API}/models/settings", headers=auth_headers(token),
                    json={"music_backend": "localsynth", "music_model": "",

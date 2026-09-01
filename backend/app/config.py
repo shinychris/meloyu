@@ -30,6 +30,9 @@ MUSICGEN_TASK_TIMEOUT_SEC = 1800
 ACESTEP_TASK_TIMEOUT_SEC = 1800
 # 自托管推理服务通道（V1.5.1，ADR-017）的任务超时：大模型 CPU offload / 双卡服务不确定度高，留足
 SELFHOSTED_TASK_TIMEOUT_SEC = 1800
+# MiniMax Music 3 本机 audio.cpp 形态超时：Q4 量化 4060 Ti 实测 RTF~94（10s 曲约 16 分钟，
+# 双候选 30 分钟+），按双候选 300s 曲上限放宽
+AUDIOCPP_TASK_TIMEOUT_SEC = 4 * 3600
 # 自托管推理服务默认端点（MiniMax Music 3=SGLang-Omni / SongGeneration=Studio model server）
 SELFHOSTED_DEFAULT_HOSTS = {"mmax_local": "http://127.0.0.1:8300",
                             "songgen_local": "http://127.0.0.1:42100"}
@@ -56,6 +59,9 @@ class Settings(BaseSettings):
     # ACE-Step 独立部署目录（默认 backend/data/acestep：代码+独立 venv+checkpoints，
     # gitignored；其依赖钉死 torch 2.7.1+cu128 与后端 venv 互斥，故隔离部署）
     acestep_home: str = ""
+    # MiniMax Music 3 本机 audio.cpp 部署目录（默认 backend/data/audiocpp：CLI+
+    # GGUF 权重，gitignored；.env 可覆盖）
+    audiocpp_home: str = ""
 
     @property
     def data_path(self) -> Path:
@@ -76,6 +82,12 @@ class Settings(BaseSettings):
         if self.acestep_home:
             return Path(self.acestep_home).resolve()
         return self.data_path / "acestep"
+
+    @property
+    def audiocpp_path(self) -> Path:
+        if self.audiocpp_home:
+            return Path(self.audiocpp_home).resolve()
+        return self.data_path / "audiocpp"
 
 
 settings = Settings()
