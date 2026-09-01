@@ -83,7 +83,7 @@ def probe_service(channel: str, hosts: dict | None) -> dict:
     if channel == "mmax_local":
         hint = MMAX_HINT
         try:
-            with httpx.Client(timeout=SELFHOSTED_PROBE_TIMEOUT_SEC) as c:
+            with httpx.Client(timeout=SELFHOSTED_PROBE_TIMEOUT_SEC, trust_env=False) as c:
                 r = c.get(f"{host}/v1/models")
             ok = r.status_code == 200
             return {"running": ok, "detail": f"{host} · SGLang-Omni {'在线' if ok else '异常'}",
@@ -215,7 +215,7 @@ class MiniMaxSelfHostedProvider:
             instructions = f"{instructions}, instrumental, no vocals"
         candidates: list[CandidateArtifact] = []
         seeds = [request.seed, request.seed ^ 0x9E3779B9]
-        with httpx.Client(timeout=self.timeout_sec) as client:
+        with httpx.Client(timeout=self.timeout_sec, trust_env=False) as client:
             for i, seed in enumerate(seeds):
                 label = chr(ord("A") + i)
                 _stage(progress, should_cancel, "model_sample", 20 + i * 35,
@@ -281,7 +281,7 @@ class SongGenSelfHostedProvider:
         work = dest / "_sg2_work"
         work.mkdir(parents=True, exist_ok=True)
         try:
-            with httpx.Client(timeout=self.timeout_sec) as client:
+            with httpx.Client(timeout=self.timeout_sec, trust_env=False) as client:
                 _stage(progress, should_cancel, "model_load", 8, "检查 Studio 模型载入…")
                 loaded = self._ensure_model(client)
                 for i in range(2):
@@ -293,6 +293,7 @@ class SongGenSelfHostedProvider:
                     input_path.write_text(json.dumps({
                         "gt_lyric": (request.lyrics or "").strip() or "[Instrumental]",
                         "descriptions": description, "idx": label,
+                        "duration": max(10, min(int(request.duration_sec), 270)),
                         "temperature": 0.9, "cfg_coef": 1.5,
                     }, ensure_ascii=False), encoding="utf-8")
                     r = client.post(f"{self.host}/generate", json={
