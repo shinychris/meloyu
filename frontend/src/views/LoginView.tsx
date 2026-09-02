@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { login, register } from '../api/auth'
+import { login, register, forgotPassword } from '../api/auth'
 import { useSessionStore } from '../stores/session'
+import { toast } from '../stores/toast'
 import { useT } from '../i18n'
 import LangSwitch from '../components/common/LangSwitch'
 import type { AuthData } from '../types/api'
@@ -10,6 +11,69 @@ type Tab = 'login' | 'register'
 
 function isEmail(v: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+}
+
+/** 忘记密码弹窗（v0.7.0）：输邮箱 → POST /auth/forgot-password（无论存在与否都 ok，防枚举） */
+function ForgotPasswordModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const t = useT()
+  const [email, setEmail] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  if (!open) return null
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!isEmail(email)) {
+      setError(t('auth.forgot.emailInvalid'))
+      return
+    }
+    setError(null)
+    setBusy(true)
+    try {
+      await forgotPassword({ email })
+      // 无论账号是否存在都提示「已发送」，防止账号枚举
+      onClose()
+      toast(t('auth.forgot.sent'))
+    } catch {
+      /* 拦截器已 toast */
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[95] flex items-center justify-center" style={{ background: 'rgba(0,0,0,.72)' }}>
+      <div className="card pop w-[380px] p-6">
+        <div className="text-[15px] font-bold">{t('auth.forgot.title')}</div>
+        <div className="text-[12px] mt-2 leading-relaxed" style={{ color: 'var(--muted)' }}>
+          {t('auth.forgot.desc')}
+        </div>
+        <form onSubmit={submit} className="mt-4 space-y-3">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            autoComplete="email"
+          />
+          {error && (
+            <div className="text-[11px]" style={{ color: 'var(--bad)' }}>
+              {error}
+            </div>
+          )}
+          <div className="flex gap-2 justify-end">
+            <button type="button" className="btn btn-ghost !py-1.5 !px-4 text-[12px]" onClick={onClose}>
+              {t('common.cancel')}
+            </button>
+            <button type="submit" className="btn btn-acc !py-1.5 !px-4 text-[12px]" disabled={busy}>
+              {busy ? t('auth.forgot.sending') : t('auth.forgot.submit')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
 }
 
 /** 登录/注册页（原型未含，按同一设计令牌扩展的暗色极简页） */
@@ -21,6 +85,7 @@ export default function LoginView() {
   const [nickname, setNickname] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [forgotOpen, setForgotOpen] = useState(false)
   const setAuthenticated = useSessionStore((s) => s.setAuthenticated)
   const navigate = useNavigate()
   const location = useLocation()
@@ -130,8 +195,18 @@ export default function LoginView() {
               />
             </div>
             <div>
-              <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>
-                {t('login.password.label')}
+              <div className="text-[10px] mb-1 flex items-center justify-between" style={{ color: 'var(--dim)' }}>
+                <span>{t('login.password.label')}</span>
+                {tab === 'login' && (
+                  <button
+                    type="button"
+                    className="font-bold"
+                    style={{ color: 'var(--acc)' }}
+                    onClick={() => setForgotOpen(true)}
+                  >
+                    {t('auth.forgot.link')}
+                  </button>
+                )}
               </div>
               <input
                 type="password"
@@ -172,6 +247,8 @@ export default function LoginView() {
           </div>
         </div>
       </div>
+
+      <ForgotPasswordModal open={forgotOpen} onClose={() => setForgotOpen(false)} />
     </div>
   )
 }

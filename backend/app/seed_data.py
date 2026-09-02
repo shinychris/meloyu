@@ -165,7 +165,7 @@ WORK_SPECS = {
 
 PLANS_ROWS = [
     ("free", "免费", 0, 0, 5, 0, "mp3", False, True, True, 10,
-     ["每日 5 次生成", "仅 MP3 导出", "非商用 · 含水印"]),
+     ["每日 5 次生成", "仅 MP3 导出", "非商用 · 指纹登记"]),
     ("pro", "个人 Pro", 58, 46, None, 2500, "wav", True, False, True, 20,
      ["商用授权 + 证书", "WAV 48k/24bit · MIDI · 4 Stems", "每月 2,500 积分可结转"]),
     ("studio", "创作人 Studio", 168, 134, None, 10000, "wav", True, False, True, 30,
@@ -258,7 +258,7 @@ def _seed_all() -> None:
                         commercial_license=row[7], watermark=row[8], switchable=row[9],
                         sort_order=row[10], features=row[11], created_at=ts, updated_at=ts))
         db.add(User(id=U_DEMO, email=DEMO_EMAIL, password_hash=hash_password(DEMO_PASSWORD),
-                    nickname="岛民", plan="studio", credit_balance=12616,
+                    nickname="岛民", plan="studio", is_admin=True, credit_balance=12616,
                     credit_monthly_grant=10000, credit_carried_over=2700,
                     credit_next_grant_at="2026-09-01T00:00:00Z",
                     created_at="2026-08-01T10:00:00Z", updated_at="2026-08-31T08:00:00Z"))

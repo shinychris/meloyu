@@ -254,7 +254,7 @@ class APIMusicProvider:
             statuses = [str(c.get("status") or "").lower() for c in clips]
             if clips and all(s == "complete" for s in statuses):
                 return clips
-            for c, s in zip(clips, statuses):
+            for c, s in zip(clips, statuses, strict=False):
                 if s in ("error", "failed"):
                     raise MusicAPIError(
                         "bad_output",

@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.errors import err_forbidden, err_not_found, err_unauthenticated
+from app.core.i18n import tr
 from app.core.security import verify_stream_token
 from app.models import File, User, Work
-from app.core.i18n import tr
 
 MIME_WHITELIST = {"audio/mpeg", "audio/wav", "audio/midi", "application/zip",
                   "application/json"}

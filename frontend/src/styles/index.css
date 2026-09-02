@@ -146,3 +146,60 @@ details.faq > summary::-webkit-details-marker { display: none }
 details.faq[open] { border-color: var(--line2) }
 .faq-plus { transition: transform .2s ease }
 details.faq[open] .faq-plus { transform: rotate(45deg) }
+
+/* ---------- 账号菜单（Sidebar 底部弹出，v0.7.0） ---------- */
+.accmenu { position: absolute; bottom: 100%; left: 0; right: 0; margin-bottom: 6px; background: var(--bg2); border: 1px solid var(--line2); z-index: 60; animation: pop .2s ease both }
+.accmenu-item { display: block; width: 100%; text-align: left; padding: 9px 12px; font-size: 12px; color: var(--muted); cursor: pointer; border: none; background: transparent; font-family: inherit; transition: all .15s ease }
+.accmenu-item:hover { color: var(--txt); background: var(--bg3) }
+.accmenu-item.danger { color: var(--bad) }
+.accmenu-item.danger:hover { background: var(--bad); color: #fff }
+
+/* ---------- 响应式基础（v0.7.0：窄窗口可用不破版，不求完美移动端） ----------
+ * 本节规则不进 @layer，优先于 tailwind utilities 生效；按档收窄：
+ * ≤1280 工作台三栏收窄 / ≤1024 侧栏图标化 / ≤768 主要视图单列、落地页网格 1 列 */
+@media (max-width: 1280px) {
+  .grid-cols-\[360px_1fr_200px\] { grid-template-columns: 300px minmax(0,1fr) 180px }
+  .grid-cols-\[1fr_320px\] { grid-template-columns: minmax(0,1fr) 260px }
+  .grid-cols-\[1fr_300px\] { grid-template-columns: minmax(0,1fr) 260px }
+  .grid-cols-\[220px_1fr\] { grid-template-columns: 180px minmax(0,1fr) }
+  .grid-cols-4 { grid-template-columns: repeat(2, minmax(0,1fr)) }
+}
+
+@media (max-width: 1024px) {
+  /* 侧栏折叠为图标列：logo 方块 + 导航圆点；分组标题/文字/快捷键隐藏 */
+  .sidebar { width: 48px }
+  .sidebar-head { padding: 18px 0 12px; display: flex; justify-content: center }
+  .sidebar-head-text { display: none }
+  .sidebar .label { display: none }
+  .sidebar .nav-item { font-size: 0; padding: 11px 0; height: 16px; align-items: center; justify-content: center }
+  .sidebar .nav-item .dot { width: 7px; height: 7px; background: var(--muted) }
+  .sidebar .nav-item.on .dot { background: var(--acc); box-shadow: 0 0 0 3px var(--acc-dim) }
+  .sidebar .nav-item .kbd { display: none }
+  .sidebar-bottom { padding: 12px 6px 84px; display: flex; flex-direction: column; align-items: center }
+  .sidebar-bottom > .btn { display: none } /* 新手引导按钮折叠态隐藏 */
+  .sidebar-lang { display: none } /* 折叠态放不下语言切换：登录/落地页仍有入口 */
+  /* 档位文字隐藏，账号入口缩为「···」，弹出的菜单加宽贴左，仍可操作 */
+  .accmenu { left: 6px; width: 176px; right: auto }
+  .acc-plan { display: none }
+  .acc-trigger { font-size: 0 }
+  .acc-trigger::after { content: '···'; font-size: 11px }
+}
+
+@media (max-width: 768px) {
+  /* 工作台/详情/合规等主要视图单列堆叠；表单小网格与落地页网格一并 1 列 */
+  .grid-cols-\[360px_1fr_200px\],
+  .grid-cols-\[1fr_320px\],
+  .grid-cols-\[1fr_300px\],
+  .grid-cols-\[220px_1fr\],
+  .grid-cols-2,
+  .grid-cols-3,
+  .grid-cols-4 { grid-template-columns: minmax(0,1fr) }
+  .sm\:grid-cols-2 { grid-template-columns: minmax(0,1fr) }
+  .md\:grid-cols-2 { grid-template-columns: minmax(0,1fr) }
+  /* 固定列宽的表格行（曲库 8 列 / 积分流水 5 列）：容器横向滚动，行保持最小可读宽度 */
+  .list-scroll, .tx-rows { overflow-x: auto }
+  .list-scroll .row { min-width: 760px }
+  .tx-rows .row { min-width: 580px }
+  /* 三栏塌成一列后，中栏滚动改为整页滚动 */
+  .view .grid > div { overflow: visible }
+}

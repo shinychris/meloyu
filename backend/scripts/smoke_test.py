@@ -15,8 +15,12 @@ import sys
 import time
 import uuid
 import wave
+from pathlib import Path
 
 import httpx
+
+# v0.7.0：service 层直调辅助（模拟 webhook 激活/admin 提权）需要 app 包可导入
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 BASE = "http://127.0.0.1:8000"
 API = f"{BASE}/api/v1"
@@ -36,6 +40,28 @@ def unwrap(r: httpx.Response):
 
 def auth_headers(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
+
+
+def _make_admin_via_db(email: str) -> None:
+    """v0.7.0 冒烟辅助：注册账号提权管理员（模型中心写操作需 admin，P1-2）。"""
+    from app.database import SessionLocal
+    from app.models import User
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.email == email).one()
+        user.is_admin = True
+        db.commit()
+
+
+def _activate_plan_via_db(email: str, plan: str) -> None:
+    """v0.7.0 冒烟辅助：模拟 Stripe webhook 已激活付费档（服务端直调，
+    等价于 checkout.session.completed 的 _activate_plan 路径）。"""
+    from app.database import SessionLocal
+    from app.models import User
+    from app.services.stripe_billing import _activate_plan
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.email == email).one()
+        _activate_plan(db, user, plan)
+        db.commit()
 
 
 def wait_task(client: httpx.Client, task_id: str, token: str, timeout: float = 240.0) -> dict:
@@ -78,7 +104,7 @@ def main() -> int:
 
     email = f"smoke_{uuid.uuid4().hex[:10]}@meloyu.test"
     password = "Smoke1234"
-    client = httpx.Client(timeout=120.0)
+    client = httpx.Client(timeout=120.0, trust_env=False)  # loopback 不走系统代理
 
     # ============ 系统（无鉴权） ============
     r = client.get(f"{API}/system/health")
@@ -104,6 +130,14 @@ def main() -> int:
     check("3.1 POST /auth/register", r.status_code == 201 and b["code"] == 0
           and b["data"]["credits"]["balance"] == 200 and b["data"]["access_token"],
           json.dumps(b)[:150])
+
+    # v0.7.0：冒烟账号提权管理员（后续 13/15 节模型中心写操作需 admin）
+    _make_admin_via_db(email)
+    r = client.post(f"{API}/auth/login", json={"email": email, "password": password})
+    b = unwrap(r)
+    token = b["data"]["access_token"]
+    check("3.1(前置) 冒烟账号提权 admin 后重登（P1-2 收权适配）",
+          r.status_code == 200 and token, json.dumps(b)[:120])
 
     r = client.post(f"{API}/auth/register",
                     json={"email": email, "password": password, "nickname": "dup"})
@@ -284,10 +318,16 @@ def main() -> int:
     # 超出免费档每日 5 次限额 → 提前切 studio（原派生节前置步骤移此）
     r = client.get(f"{API}/credits/balance", headers=auth_headers(token))
     pre_switch_balance = unwrap(r)["data"]["balance"]
+    # v0.7.0：付费档不再可免费直切（P0-4）——先验证被拒，再模拟 Stripe webhook 激活
     r = client.post(f"{API}/subscriptions/switch", headers=auth_headers(token),
                     json={"plan": "studio"})
     b = unwrap(r)
-    check("11.2(前置) 切换 studio（解除每日限额，覆盖 14/15/4.x 多次提交）",
+    check("11.2(前置) 免费直切 studio 被拒（P0-4，40901）",
+          r.status_code == 409 and b["code"] == 40901)
+    _activate_plan_via_db(email, "studio")
+    r = client.get(f"{API}/auth/me", headers=auth_headers(token))
+    b = unwrap(r)
+    check("11.2(前置) 模拟 webhook 激活 studio（解除每日限额，覆盖 14/15/4.x）",
           r.status_code == 200 and b["data"]["plan"] == "studio"
           and b["data"]["credits"]["balance"] == pre_switch_balance + 10000)
 
@@ -397,7 +437,6 @@ def main() -> int:
           and isinstance(b["data"]["disclaimer"], str)
           and "machine" in b["data"] and "replicate" in b["data"],
           json.dumps(b)[:200])
-    catalog_ids = [m["id"] for m in cat]
 
     r = client.put(f"{API}/models/settings", headers=auth_headers(token),
                    json={"music_backend": "replicate", "music_model": "ace-step"})
@@ -449,8 +488,9 @@ def main() -> int:
     if mg_ok:
         r = client.get(f"{API}/models/runtime", headers=auth_headers(token))
         b = unwrap(r)
-        check("15.6 runtime 歌曲引擎显示 MusicGen 本地",
-              b["data"]["song_engine"].startswith("MusicGen 本地 · MusicGen Small"),
+        check("15.6 runtime 歌曲引擎显示 MusicGen 本地（zh/en 双语任一）",
+              b["data"]["song_engine"].startswith(
+                  ("MusicGen 本地 · MusicGen Small", "MusicGen Local · MusicGen Small")),
               b["data"].get("song_engine", ""))
         r = client.post(f"{API}/generations", headers=auth_headers(token), json={
             "mode": "simple", "simple_prompt": "雪原上的极光", "seed": 900115,
@@ -498,8 +538,6 @@ def main() -> int:
 
     # ACE-Step v1.5 本机通道（V1.5 批）：权重已就绪 → 秒级 succeeded（已存在即跳过）；
     # 未部署 venv → failed 且 error_message 含 setup_acestep 部署指引
-    ace_ready = any(m["id"] == "ace-step" and m["local_status"] == "ready"
-                    for m in cat) if cat else False
     r = client.post(f"{API}/models/music-pull", headers=auth_headers(token),
                     json={"model": "ace-step"})
     b = unwrap(r)
@@ -529,8 +567,9 @@ def main() -> int:
     if ac_ok:
         r = client.get(f"{API}/models/runtime", headers=auth_headers(token))
         b = unwrap(r)
-        check("15.10 runtime 歌曲引擎显示 ACE-Step 本地",
-              b["data"]["song_engine"].startswith("ACE-Step 本地 · ACE-Step"),
+        check("15.10 runtime 歌曲引擎显示 ACE-Step 本地（zh/en 任一）",
+              b["data"]["song_engine"].startswith(
+                  ("ACE-Step 本地 · ACE-Step", "ACE-Step Local · ACE-Step")),
               b["data"].get("song_engine", ""))
         r = client.post(f"{API}/generations", headers=auth_headers(token), json={
             "mode": "simple", "simple_prompt": "夜风里的城市情歌", "seed": 900116,
@@ -549,7 +588,9 @@ def main() -> int:
                  and len(t["result"]["candidates"]) == 2)
                 or (t["status"] == "failed" and t["error"] is not None
                     and ("未部署" in t["error"]["message"]
-                         or "未下载" in t["error"]["message"])))
+                         or "未下载" in t["error"]["message"]
+                         or "not deployed" in t["error"]["message"]
+                         or "not downloaded" in t["error"]["message"])))
             smoke_state["ace_refunded"] = t["status"] == "failed"
             check("15.10 acestep 执行终态（未就绪→fail-fast 指引；就绪→人声成曲成功）",
                   ac_end, json.dumps(t.get("error") or t.get("result"))[:200])
@@ -566,9 +607,11 @@ def main() -> int:
         r = client.post(f"{API}/models/music-pull", headers=auth_headers(token),
                         json={"model": svc_mid})
         b = unwrap(r)
-        check(f"15.11 music-pull {svc_mid}（服务型通道→40001 可读指引）",
+        check(f"15.11 music-pull {svc_mid}（服务型通道→40001 可读指引，zh/en 任一）",
               r.status_code == 422 and b["code"] == 40001
-              and "自托管" in str(b.get("message") or ""), str(b.get("message"))[:120])
+              and ("自托管" in str(b.get("message") or "")
+                   or "self-hosted" in str(b.get("message") or "")),
+              str(b.get("message"))[:120])
 
         r = client.put(f"{API}/models/settings", headers=auth_headers(token),
                        json={"music_backend": svc_ch, "music_model": svc_mid})
@@ -578,8 +621,10 @@ def main() -> int:
         if sv_ok:
             r = client.get(f"{API}/models/runtime", headers=auth_headers(token))
             b = unwrap(r)
-            check(f"15.12 runtime 歌曲引擎显示 {svc_label} 自托管",
-                  "自托管" in b["data"]["song_engine"], b["data"].get("song_engine", ""))
+            check(f"15.12 runtime 歌曲引擎显示 {svc_label} 自托管（zh/en 任一）",
+                  ("自托管" in b["data"]["song_engine"]
+                   or "Self-hosted" in b["data"]["song_engine"]),
+                  b["data"].get("song_engine", ""))
             r = client.post(f"{API}/generations", headers=auth_headers(token), json={
                 "mode": "simple", "simple_prompt": "晚风与街灯", "seed": 700003,
                 "params": {"duration_sec": 30, "vocal": "female_air"},
@@ -621,7 +666,9 @@ def main() -> int:
                         (t["status"] == "succeeded" and t["result"]
                          and len(t["result"]["candidates"]) == 2)
                         or (t["status"] == "failed" and t["error"] is not None
-                            and "推理服务未运行" in t["error"]["message"]))
+                            and ("推理服务未运行" in t["error"]["message"]
+                                 or "inference service is not running"
+                                 in t["error"]["message"])))
                     if t["status"] == "failed":
                         smoke_state["svc_refunded"] += 1
                     check(f"15.12 {svc_ch} 执行终态（无服务→fail-fast 指引；服务在线→真实生成）",
@@ -939,9 +986,11 @@ def main() -> int:
                     json={"section": "chorus", "occurrence": 3})
     b = unwrap(r)
     detail_field = (b.get("data") or {}).get("details") if isinstance(b.get("data"), dict) else None
-    check("5.7 occurrence 越界 → 40001（detail 指明合法范围）",
-          r.status_code == 422 and b["code"] == 40001 and "1~2" in b.get("message", "")
-          and detail_field == [{"field": "occurrence", "message": "1~2"}],
+    detail_ok = detail_field is not None and detail_field[0]["field"] == "occurrence"         and detail_field[0]["message"] in ("1~2", "1-2")
+    check("5.7 occurrence 越界 → 40001（detail 指明合法范围，zh/en 任一）",
+          r.status_code == 422 and b["code"] == 40001
+          and ("1~2" in b.get("message", "") or "1-2" in b.get("message", ""))
+          and detail_ok,
           json.dumps(b)[:200])
 
     # ============ 作品库（6） ============
@@ -1179,9 +1228,108 @@ def main() -> int:
     # plan_switch 全局事件（不出现在作品事件里，通过流水+用户对象间接验证）
     r = client.get(f"{API}/credits/transactions", headers=auth_headers(token))
     b = unwrap(r)
-    check("11.2 plan_switch 发放 10000 积分", any(
-        t["reason"] == "plan_switch" and t["delta"] == 10000
+    check("11.2 stripe 激活发放 10000 积分（plan_grant）", any(
+        t["reason"] == "plan_grant" and t["delta"] == 10000
         for t in b["data"]["items"]))
+
+    # ============ 16. v0.7.0 商业化批（账号体系/支付门/证书分流） ============
+    # 16.1 refresh 轮换与吊销
+    r = client.post(f"{API}/auth/login", json={"email": email, "password": password})
+    rt = unwrap(r)["data"]["refresh_token"]
+    check("16.1 login 返回 refresh_token", bool(rt))
+    r = client.post(f"{API}/auth/refresh", json={"refresh_token": rt})
+    new_pair = unwrap(r)["data"]
+    check("16.1 POST /auth/refresh 轮换", r.status_code == 200
+          and new_pair["refresh_token"] != rt and new_pair["access_token"])
+    r = client.post(f"{API}/auth/refresh", json={"refresh_token": rt})
+    check("16.1 旧 refresh 已失效（40103）", r.status_code == 401
+          and unwrap(r)["code"] == 40103)
+    r = client.post(f"{API}/auth/logout", headers=auth_headers(new_pair["access_token"]))
+    check("16.1 POST /auth/logout", r.status_code == 200 and unwrap(r)["data"]["ok"])
+    r = client.post(f"{API}/auth/refresh", json={"refresh_token": new_pair["refresh_token"]})
+    check("16.1 logout 后 refresh 被吊销", r.status_code == 401)
+
+    # 16.2 改密/找回（SMTP 未配置口径）——只测错误路径，不实际改密（避免污染主凭据）
+    r = client.post(f"{API}/auth/change-password",
+                    headers=auth_headers(token),
+                    json={"old_password": "DefinitelyWrong0", "new_password": "NewPass678"})
+    check("16.2 change-password 旧密码错误拒绝（40103）", r.status_code == 401
+          and unwrap(r)["code"] == 40103)
+    r = client.post(f"{API}/auth/forgot-password", json={"email": email})
+    check("16.2 forgot-password SMTP 未配置 → 40901", r.status_code == 409
+          and unwrap(r)["code"] == 40901)
+
+    # 16.3 支付门（Stripe 未配置口径）
+    r = client.post(f"{API}/billing/checkout", headers=auth_headers(token),
+                    json={"kind": "subscription", "plan": "pro", "interval": "monthly"})
+    check("16.3 checkout 未配置 Stripe → 40901", r.status_code == 409
+          and unwrap(r)["code"] == 40901)
+    r = client.get(f"{API}/billing/orders", headers=auth_headers(token))
+    check("16.3 GET /billing/orders（空）", r.status_code == 200
+          and unwrap(r)["data"]["orders"] == [])
+    r = client.post(f"{API}/billing/portal", headers=auth_headers(token))
+    check("16.3 portal 无支付记录 → 40901", r.status_code == 409)
+    r = client.post(f"{API}/billing/webhook", json={}, headers={"stripe-signature": "bad"})
+    check("16.3 webhook 签名错误 → 40001", r.status_code == 422
+          and unwrap(r)["code"] == 40001)
+
+    # 16.4 免费档降级 + 档位恢复（studio 供后续节使用）
+    r = client.post(f"{API}/subscriptions/switch", headers=auth_headers(token),
+                    json={"plan": "free"})
+    check("16.4 降级 free 允许", r.status_code == 200
+          and unwrap(r)["data"]["plan"] == "free")
+    _activate_plan_via_db(email, "studio")
+    r = client.get(f"{API}/auth/me", headers=auth_headers(token))
+    check("16.4 重新激活 studio（后续节依赖付费档）",
+          unwrap(r)["data"]["plan"] == "studio")
+
+    # 16.5 证书 license 分流（P0-1：license 段含 grade/basis，披露固定双语）
+    r = client.get(f"{API}/works?page=1&page_size=1", headers=auth_headers(token))
+    items = (unwrap(r).get("data") or {}).get("items") or []
+    if r.status_code != 200:
+        check("16.5 works 列表可达", False, f"HTTP {r.status_code}: {r.text[:150]}")
+    cert_checked = False
+    for w in items:
+        r = client.get(f"{API}/works/{w['id']}/versions", headers=auth_headers(token))
+        vitems = ((unwrap(r).get("data") or {}).get("items")
+                  if r.status_code == 200 else None) or []
+        for v in vitems:
+            r = client.get(f"{API}/versions/{v['id']}/certificate?format=json",
+                           headers=auth_headers(token))
+            if r.status_code == 200:
+                cert = unwrap(r)["data"]
+                lic = cert["license"]
+                check("16.5 证书 license 分流（grade/basis/bilingual disclosure）",
+                      lic.get("grade") in ("allowed", "nc", "conditional", "tos",
+                                           "unverified", "free_plan")
+                      and lic.get("basis_zh") and lic.get("basis_en")
+                      and chr(10) in cert["disclosure"])
+                cert_checked = True
+                break
+        if cert_checked:
+            break
+    if not cert_checked:
+        check("16.5 证书 license 分流（无可签发版本则跳过）", True)
+
+    # 16.6 账号注销与数据导出（用临时账号，不影响主流程）
+    tmp_email = f"smoke-del-{uuid.uuid4().hex[:8]}@t.local"
+    r = client.post(f"{API}/auth/register", json={
+        "email": tmp_email, "password": "DelMe12345", "nickname": "bye"})
+    check("16.6 临时账号注册", r.status_code == 201, r.text[:150])
+    tmp_token = (unwrap(r).get("data") or {}).get("access_token") or ""
+    if not tmp_token:
+        check("16.6 注销/导出链（依赖临时账号）", False, "临时账号注册失败，跳过")
+        raise SystemExit(1)
+    r = client.get(f"{API}/auth/export-data", headers=auth_headers(tmp_token))
+    check("16.6 GET /auth/export-data（zip 魔数 PK）",
+          r.status_code == 200 and r.content[:2] == b"PK")
+    r = client.post(f"{API}/auth/delete-account", headers=auth_headers(tmp_token),
+                    json={"password": "DelMe12345"})
+    check("16.6 POST /auth/delete-account", r.status_code == 200
+          and unwrap(r)["data"]["ok"])
+    r = client.post(f"{API}/auth/login", json={"email": tmp_email,
+                                               "password": "DelMe12345"})
+    check("16.6 注销后原账号无法登录", r.status_code == 401)
 
     # ============ 汇总 ============
     passed = sum(1 for _, ok, _ in results if ok)

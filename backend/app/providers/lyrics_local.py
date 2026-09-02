@@ -12,8 +12,8 @@ from pathlib import Path
 
 from pypinyin import Style, pinyin
 
-from app.synth.structure import SECTION_ALIASES, TAG_RE, parse_lyrics
 from app.core.i18n import tr
+from app.synth.structure import SECTION_ALIASES, TAG_RE, parse_lyrics
 
 BANKS_DIR = Path(__file__).parent / "lyrics" / "banks"
 
@@ -27,6 +27,29 @@ _IMAGERY = _load("imagery.json")
 _RHYMES = _load("rhymes.json")
 _TEMPLATES = _load("templates.json")
 SENSITIVE_WORDS: list[str] = _load("sensitive_words.json")["words"]
+
+
+def _load_extra_words() -> list[str]:
+    """外置扩展词库（P1-4）：backend/data/content_policy/extra_words.json 自动合并。
+
+    部署方按目标市场监管要求放置运营词库（结构 {"words": [...]}），无需改代码；
+    文件不存在/格式错误时静默跳过。
+    """
+    import json as _json
+
+    from app.config import settings
+    path = settings.data_path / "content_policy" / "extra_words.json"
+    if not path.exists():
+        return []
+    try:
+        data = _json.loads(path.read_text(encoding="utf-8"))
+        return [str(w) for w in data.get("words", []) if w]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+SENSITIVE_WORDS = SENSITIVE_WORDS + [
+    w for w in _load_extra_words() if w not in SENSITIVE_WORDS]
 
 # final → 13 辙
 _FINAL_TO_GROUP: dict[str, str] = {}

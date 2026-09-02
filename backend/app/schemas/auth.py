@@ -24,6 +24,8 @@ class RegisterRequest(BaseModel):
     email: str = Field(max_length=120)
     password: str = Field(min_length=8, max_length=64)
     nickname: str = Field(min_length=1, max_length=24)
+    # P0-6：email_verification_enabled 开启时必填（6 位数字验证码）
+    code: str | None = Field(default=None, max_length=6)
 
     @field_validator("email")
     @classmethod
@@ -51,6 +53,65 @@ class LoginRequest(BaseModel):
         if not EMAIL_RE.match(v):
             raise ValueError(tr("email 格式不正确", "Invalid email address"))
         return v.lower()
+
+
+# ---- P1-3 账号体系补全（v0.7.0）----
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=10, max_length=128)
+
+
+class SendCodeRequest(BaseModel):
+    email: str = Field(max_length=120)
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, v: str) -> str:
+        if not EMAIL_RE.match(v):
+            raise ValueError(tr("email 格式不正确", "Invalid email address"))
+        return v.lower()
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(max_length=120)
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, v: str) -> str:
+        if not EMAIL_RE.match(v):
+            raise ValueError(tr("email 格式不正确", "Invalid email address"))
+        return v.lower()
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=10, max_length=512)
+    new_password: str = Field(min_length=8, max_length=64)
+
+    @field_validator("new_password")
+    @classmethod
+    def _pwd(cls, v: str) -> str:
+        if not re.search(r"[A-Za-z]", v) or not re.search(r"\d", v):
+            raise ValueError(tr("密码须同时包含字母和数字",
+                             "password must contain both letters and numbers"))
+        return v
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str = Field(min_length=1, max_length=64)
+    new_password: str = Field(min_length=8, max_length=64)
+
+    @field_validator("new_password")
+    @classmethod
+    def _pwd(cls, v: str) -> str:
+        if not re.search(r"[A-Za-z]", v) or not re.search(r"\d", v):
+            raise ValueError(tr("密码须同时包含字母和数字",
+                             "password must contain both letters and numbers"))
+        return v
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=64)
 
 
 class KeySchema(BaseModel):

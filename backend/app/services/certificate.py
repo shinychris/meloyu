@@ -76,16 +76,22 @@ def issue_certificate(db: Session, user: User, version: Version, fmt: str = "jso
     human_summary = _human_summary(db, work.id)
 
     provider_name, provider_display = _version_provider(db, version)
-    license_type = "non_commercial" if user.plan == "free" else "commercial"
+    model_id = version.params.get("model", "v1_pro")
+    # P0-1 证书×许可分流：授权类型 = 用户档位 × 通道/模型许可双重判定（不再只看 plan）
+    from app.services import licensing
+    lic = licensing.license_for_generation(user.plan, provider_name, model_id)
+    license_type = lic["type"]
     cert_dict = {
         "certificate_id": cert_code,
         "work": {"id": work.id, "display_code": work.display_code, "title": work.title},
         "version": {"id": version.id, "version_no": version.version_no,
                     "active_candidate_id": version.active_candidate_id},
         "model": {"provider": provider_name, "provider_display": provider_display,
-                  "model": version.params.get("model", "v1_pro"), "seed": cand.seed},
+                  "model": model_id, "seed": cand.seed},
         "generated_at": version.created_at,
-        "license": {"type": license_type, "plan": user.plan, "valid": True},
+        "license": {"type": license_type, "plan": user.plan, "valid": True,
+                    "grade": lic["grade"],
+                    "basis_zh": lic["basis_zh"], "basis_en": lic["basis_en"]},
         "human_participation": {
             "edit_events_count": events_count,
             "summary": human_summary,
@@ -96,10 +102,12 @@ def issue_certificate(db: Session, user: User, version: Version, fmt: str = "jso
             "master_wav_sha256": master.sha256 if master else "",
             "preview_mp3_sha256": preview.sha256 if preview else "",
         },
-        "disclosure": tr(DISCLOSURE.format(
-            provider_display=provider_display, model=version.params.get("model", "v1_pro")),
-            DISCLOSURE_EN.format(
-                provider_display=provider_display, model=version.params.get("model", "v1_pro"))),
+        # R-42 修复：披露文案固定双语锚定（zh + en 并存），不随下载者请求头漂移，
+        # 保证同一版本多次签发的证书记录披露内容一致
+        "disclosure": (DISCLOSURE.format(provider_display=provider_display, model=model_id)
+                       + "\n"
+                       + DISCLOSURE_EN.format(provider_display=provider_display,
+                                              model=model_id)),
         "issued_at": now,
     }
 
@@ -133,6 +141,7 @@ def issue_certificate(db: Session, user: User, version: Version, fmt: str = "jso
                        provider=provider_name, provider_display=provider_display,
                        model=version.params.get("model", "v1_pro"), seed=cand.seed,
                        generated_at=version.created_at, license_type=license_type,
+                       license_grade=lic["grade"],
                        plan_at_issuance=user.plan, license_valid=True,
                        edit_events_count=events_count, human_summary=human_summary,
                        master_sha256=master.sha256 if master else "",
@@ -218,6 +227,9 @@ def render_certificate_pdf(cert: dict) -> bytes:
         (t("授权类型", "License"),
          tr(_LICENSE_LABELS_ZH.get(cert["license"]["type"], str(cert["license"]["type"])),
             _LICENSE_LABELS_EN.get(cert["license"]["type"], str(cert["license"]["type"])))),
+        (t("授权依据", "License Basis"),
+         tr(str(cert["license"].get("basis_zh", "")),
+            str(cert["license"].get("basis_en", "")))),
         (t("签发时间", "Issued At"), str(cert.get("issued_at", ""))),
     ]
     for label, value in rows:

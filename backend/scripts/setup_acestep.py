@@ -11,6 +11,7 @@ backend/data/acestep/（gitignored）：源码、.venv、checkpoints（约 11GB 
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -21,7 +22,11 @@ from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 DEST = BACKEND_DIR / "data" / "acestep"
-REPO_ZIP = "https://codeload.github.com/ACE-Step/ACE-Step-1.5/zip/refs/heads/main"
+# P1-10 供应链钉版：默认钉 commit（R-36——钉分支会被上游破坏性更新打断）；
+# 升级时显式改此值（或 env ACE_STEP_REF 覆盖）并重新部署验证。
+# 2026-09-02 核验：ca1e85f = upstream main HEAD（"fix(jetson): remove GPL video codecs…"）
+ACE_STEP_REF = os.environ.get("ACE_STEP_REF", "ca1e85fe9430179831e6bc6be790c332190a3866")
+REPO_ZIP = (f"https://codeload.github.com/ACE-Step/ACE-Step-1.5/zip/{ACE_STEP_REF}")
 
 
 def main() -> int:

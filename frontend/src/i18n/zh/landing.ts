@@ -281,4 +281,5 @@ export const landingZh: Record<keyof typeof landingEn, string> = {
   'landing.data.milestone.5.title': 'Replicate + 本机 MusicGen，目录 10 模型',
   'landing.data.milestone.6.title': '本机 ACE-Step v1.5 人声成曲',
   'landing.data.milestone.7.title': '自托管 MiniMax Music 3 + SongGeneration，七通道全通',
+  'landing.data.milestone.8.title': '商业化：Stripe 订阅、积分充值与账号中心',
 }

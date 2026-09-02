@@ -144,6 +144,21 @@ def _wav_sample_rate(path: Path) -> int | None:
         return None
 
 
+def _mark_aigc(path: Path, fmt: str) -> None:
+    """P0-3：导出产物写入 AIGC 显式标识（mp3=ID3v2 / wav=RIFF LIST）。
+
+    标识写入失败不阻断导出（记日志）——文件内容变化会体现在 sha256 登记中。
+    """
+    from app.synth.id3 import mark_mp3, mark_wav
+    try:
+        data = path.read_bytes()
+        marked = mark_mp3(data) if fmt == "mp3" else mark_wav(data)
+        if marked != data:
+            path.write_bytes(marked)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"AIGC marking failed for {path.name}: {e}")
+
+
 def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate,
                       fmt: str) -> list[dict]:
     # 路径含候选标签：换候选重导出不会撞路径；同候选重导出由 _register 复用记录
@@ -192,6 +207,7 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
             # 按母带真实采样率编码：外部模型母带可能非 48kHz（如 MusicGen 32kHz），
             # 若按默认 48k 编码会把全部样本时间轴压缩（时长缩水、变速变调）
             encode_mp3(p, left, right, bitrate=320, sample_rate=src_rate)
+        _mark_aigc(p, "mp3")
         row = _register(db, work, version, kind="export_mp3", relpath=f"{base}/export.mp3",
                         mime="audio/mpeg", path=p, duration_sec=master.duration_sec,
                         name=f"{work.display_code}_{version.version_no}_export_mp3.mp3",
@@ -201,6 +217,7 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
     elif fmt == "wav":
         p = exports_dir / "master.wav"
         p.write_bytes(_abs(master.path).read_bytes())
+        _mark_aigc(p, "wav")
         row = _register(db, work, version, kind="export_wav", relpath=f"{base}/master.wav",
                         mime="audio/wav", path=p, duration_sec=master.duration_sec,
                         name=f"{work.display_code}_{version.version_no}_export_wav.wav",
@@ -240,6 +257,7 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
             src = _abs(src_row.path)
             p = exports_dir / f"stems_{stem}.wav"
             p.write_bytes(src.read_bytes())
+            _mark_aigc(p, "wav")
             srow = _register(db, work, version, kind="stem", stem_name=stem,
                              relpath=f"{base}/stems_{stem}.wav", mime="audio/wav", path=p,
                              duration_sec=src_row.duration_sec,

@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from app.synth.ir import BAR_QUARTER_UNITS, DrumHit, Note, SongIR
 from app.core.i18n import tr
+from app.synth.ir import BAR_QUARTER_UNITS, DrumHit, Note, SongIR
 
 # 16 分网格位置（4/4 用 16 格；3/4 与 6/8 用 12 格）
 PATTERNS: dict[str, dict[str, list[int]]] = {

@@ -3,6 +3,10 @@ import { appEn } from '../en/app'
 export const appZh: Record<keyof typeof appEn, string> = {
   'app.loading': 'MELOYU · 载入中…',
   'app.title': 'Meloyu 旋律屿 · 专业 AI 音乐制作工作台',
+  // ErrorBoundary 崩溃兜底（v0.7.0）
+  'app.error.title': '界面出错了',
+  'app.error.desc': '界面遇到意外错误，重载页面通常即可恢复。',
+  'app.error.reload': '重载页面',
   'app.sidebar.tagline': '旋律屿 · 专业 AI 音乐制作',
   'app.sidebar.group.create': '创作',
   'app.sidebar.group.produce': '制作',

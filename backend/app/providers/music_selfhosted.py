@@ -25,9 +25,9 @@ from pathlib import Path
 
 import httpx
 
-from app.core.i18n import tr
 from app.config import SELFHOSTED_DEFAULT_HOSTS, SELFHOSTED_PROBE_TIMEOUT_SEC
 from app.config import SELFHOSTED_TASK_TIMEOUT_SEC as _TIMEOUT
+from app.core.i18n import tr
 from app.core.logging import logger
 from app.core.seed import candidate_seed
 from app.providers.base import (
@@ -111,14 +111,88 @@ def _audiocpp_home() -> Path:
     return settings.data_path / "audiocpp"
 
 
-def audiocpp_ready() -> bool:
-    """本地 audio.cpp 形态就绪：CLI 与默认 GGUF 组件齐备（Q4 LM + Q8 RVQ + Q4 Flow）。"""
+# R-37：audio.cpp 通道级并发上限（生成线程池共 2 worker，慢通道独占 1）
+_AUDIOCPP_SEMAPHORE = __import__("threading").BoundedSemaphore(1)
+
+
+def _kill_process_tree(proc) -> None:
+    """R-39：击杀整个进程树（子进程可能派生孙进程占显存，单 kill 泄漏）。
+
+    Windows：taskkill /T /F；POSIX：进程组 SIGKILL 兜底单进程 kill。
+    """
+    import subprocess
+    import sys
+    try:
+        if sys.platform == "win32" and proc.pid:
+            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                           capture_output=True, check=False,
+                           creationflags=0x08000000)
+        else:
+            import os
+            import signal
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError, OSError):
+                proc.kill()
+    except OSError:  # noqa: BLE001 —— 进程已退出的竞态
+        pass
+
+
+def _audiocpp_files() -> list:
     home = _audiocpp_home()
     gguf = home / "MiniMax-Music3-GGUF"
     need = ("language_model_q4_0.gguf", "rvq_depth_decoder_q8_0.gguf",
             "transformer_q4_0.gguf", "condition_encoder.gguf", "vocoder.gguf")
-    return ((home / "audiocpp_cli.exe").exists()
-            and all((gguf / n).exists() for n in need))
+    return [home / "audiocpp_cli.exe"] + [gguf / n for n in need]
+
+
+def audiocpp_verify() -> tuple[bool, str]:
+    """P1-10 供应链校验：data/audiocpp/SHA256SUMS 存在时逐文件校验（进程内缓存一次）。
+
+    部署方生成清单（在部署目录执行）：
+      certutil -hashfile audiocpp_cli.exe SHA256  →  逐行 "<sha256>  <相对路径>" 写入
+    清单不存在 = 宽松模式（仅存在性检查，兼容现状）；存在即严格模式。
+    """
+    global _AUDIOCPP_VERIFIED
+    if _AUDIOCPP_VERIFIED is not None:
+        return _AUDIOCPP_VERIFIED
+    import hashlib
+    home = _audiocpp_home()
+    manifest = home / "SHA256SUMS"
+    if not manifest.exists():
+        _AUDIOCPP_VERIFIED = (True, "")
+        return _AUDIOCPP_VERIFIED
+    expected: dict[str, str] = {}
+    for line in manifest.read_text(encoding="utf-8").splitlines():
+        parts = line.split(maxsplit=1)
+        if len(parts) == 2:
+            expected[parts[1].strip().replace("\\", "/")] = parts[0].strip().lower()
+    for f in _audiocpp_files():
+        rel = f.relative_to(home).as_posix()
+        want = expected.get(rel)
+        if want is None:
+            continue
+        h = hashlib.sha256()
+        with open(f, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 22), b""):
+                h.update(chunk)
+        if h.hexdigest() != want:
+            msg = f"integrity check failed: {rel}"
+            _AUDIOCPP_VERIFIED = (False, msg)
+            return _AUDIOCPP_VERIFIED
+    _AUDIOCPP_VERIFIED = (True, "")
+    return _AUDIOCPP_VERIFIED
+
+
+_AUDIOCPP_VERIFIED: tuple[bool, str] | None = None
+
+
+def audiocpp_ready() -> bool:
+    """本地 audio.cpp 形态就绪：CLI 与默认 GGUF 组件齐备 + 完整性清单（如提供）。"""
+    if not all(f.exists() for f in _audiocpp_files()):
+        return False
+    ok, _ = audiocpp_verify()
+    return ok
 
 
 def service_host(channel: str, hosts: dict | None) -> str:
@@ -161,7 +235,8 @@ def probe_service(channel: str, hosts: dict | None) -> dict:
     if channel == "songgen_local":
         hint = songgen_hint()
         try:
-            with httpx.Client(timeout=SELFHOSTED_PROBE_TIMEOUT_SEC) as c:
+            # trust_env=False：TUN 系统代理会劫持 loopback 长连接（v0.6.1 修复漏网处）
+            with httpx.Client(timeout=SELFHOSTED_PROBE_TIMEOUT_SEC, trust_env=False) as c:
                 h = c.get(f"{host}/health")
                 s = c.get(f"{host}/status").json() if h.status_code == 200 else {}
             ok = h.status_code == 200
@@ -278,14 +353,31 @@ class MiniMaxSelfHostedProvider:
         self.host = service_host(self.name, hosts)
 
     # ---------- 本地 audio.cpp 形态 ----------
+
     def _generate_local(self, request, progress, should_cancel, dest: Path):
+
+        from app.config import AUDIOCPP_TASK_TIMEOUT_SEC
+        # 本地 Q4 量化实测 RTF~94（双候选可能 1 小时+），放宽任务熔断
+        self.timeout_sec = AUDIOCPP_TASK_TIMEOUT_SEC
+        # R-37 容量治理：audio.cpp 单任务可占 GPU 数十分钟~4h，通道级并发上限 1，
+        # 防止两个慢任务占满 2-worker 生成池拖瘫全站
+        if not _AUDIOCPP_SEMAPHORE.acquire(blocking=False):
+            _stage(progress, should_cancel, "model_load", 5,
+                   tr("audio.cpp 通道忙碌（并发上限 1），排队等待…",
+                      "audio.cpp channel busy (concurrency limit 1), waiting in queue…"))
+            _AUDIOCPP_SEMAPHORE.acquire()
+        try:
+            return self._generate_local_inner(request, progress, should_cancel, dest)
+        finally:
+            _AUDIOCPP_SEMAPHORE.release()
+
+    def _generate_local_inner(self, request, progress, should_cancel, dest: Path):
         import queue
         import subprocess
         import sys
         import threading
 
         from app.config import AUDIOCPP_TASK_TIMEOUT_SEC
-        # 本地 Q4 量化实测 RTF~94（双候选可能 1 小时+），放宽任务熔断
         self.timeout_sec = AUDIOCPP_TASK_TIMEOUT_SEC
         home = _audiocpp_home()
         lyrics = (request.lyrics or "").strip() or "[Instrumental]"
@@ -320,7 +412,7 @@ class MiniMaxSelfHostedProvider:
                 creationflags=flags)
             # CLI 输出行稀疏（TIMING 间歇刷）：同步 readline 会数十秒~分钟级阻塞、
             # 取消标志无人查询（E2E 实测命中）——reader 线程 + 队列 1s 轮询取消
-            lines: "queue.Queue[str]" = queue.Queue()
+            lines: queue.Queue[str] = queue.Queue()
 
             def _pump(p=proc, q=lines):
                 try:
@@ -331,11 +423,8 @@ class MiniMaxSelfHostedProvider:
 
             threading.Thread(target=_pump, daemon=True).start()
 
-            def _kill():
-                try:
-                    proc.kill()
-                except OSError:  # noqa: BLE001
-                    pass
+            def _kill(p=proc):  # 默认参绑定：防循环变量延迟绑定（B023）
+                _kill_process_tree(p)
 
             watchdog = threading.Timer(self.timeout_sec, _kill)
             watchdog.daemon = True
@@ -348,7 +437,7 @@ class MiniMaxSelfHostedProvider:
                     except queue.Empty:
                         if should_cancel():
                             _kill()
-                            raise SynthCancelled()
+                            raise SynthCancelled() from None
                         continue
                     if line == "":
                         break

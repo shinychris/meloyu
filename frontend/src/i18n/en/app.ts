@@ -5,6 +5,10 @@
 export const appEn = {
   'app.loading': 'MELOYU · Loading…',
   'app.title': 'Meloyu · Professional AI Music Workstation',
+  // ErrorBoundary 崩溃兜底（v0.7.0）
+  'app.error.title': 'Something went wrong',
+  'app.error.desc': 'The interface hit an unexpected error. Reloading the page usually fixes it.',
+  'app.error.reload': 'Reload page',
   // Sidebar
   'app.sidebar.tagline': 'Melody Isle · Pro AI Music Studio',
   'app.sidebar.group.create': 'Create',

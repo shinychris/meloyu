@@ -60,7 +60,7 @@ def refund(db: Session, user_id: str, amount: int, ref_task_id: str | None) -> i
 
 def grant(db: Session, user: User, amount: int, reason: str,
           set_carry_over: bool = False) -> int:
-    """入账（signup_bonus / plan_grant / plan_switch）。"""
+    """入账（signup_bonus / plan_grant / plan_switch / topup）。"""
     before = user.credit_balance
     db.execute(
         text("UPDATE users SET credit_balance = credit_balance + :amt, updated_at = :now "
@@ -71,6 +71,21 @@ def grant(db: Session, user: User, amount: int, reason: str,
     _add_transaction(db, user.id, amount, reason, None, user.credit_balance)
     if set_carry_over:
         user.credit_carried_over = before
+    return user.credit_balance
+
+
+def deduct_refund(db: Session, user: User, amount: int) -> int:
+    """支付退款后的积分扣回：余额不足时扣至 0（不为负，CHECK 约束保护）。"""
+    if amount <= 0:
+        return user.credit_balance
+    actual = min(amount, user.credit_balance)
+    db.execute(
+        text("UPDATE users SET credit_balance = credit_balance - :amt, updated_at = :now "
+             "WHERE id = :uid AND credit_balance >= :amt"),
+        {"amt": actual, "uid": user.id, "now": utc_now_iso()},
+    )
+    db.refresh(user)
+    _add_transaction(db, user.id, -actual, "refund", None, user.credit_balance)
     return user.credit_balance
 
 

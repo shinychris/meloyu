@@ -10,11 +10,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import err_sensitive
+from app.core.i18n import tr
 from app.models import LyricsProject, User
 from app.models.base import utc_now_iso
 from app.providers.lyrics_local import check_sensitive
 from app.services.model_center import get_lyrics_provider
-from app.core.i18n import tr
 
 
 def _guard(text: str) -> None:

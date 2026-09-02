@@ -1,20 +1,25 @@
 import { HashRouter, Navigate, Route, Routes, Outlet, useLocation } from 'react-router-dom'
-import { useEffect, useRef } from 'react'
+import { Suspense, lazy, useEffect, useRef } from 'react'
 import Sidebar from './components/layout/Sidebar'
 import TransportBar from './components/layout/TransportBar'
 import Onboarding from './components/layout/Onboarding'
 import ToastHost from './components/common/ToastHost'
 import ConfirmDialog from './components/common/ConfirmDialog'
+import ErrorBoundary from './components/common/ErrorBoundary'
+// 首屏关键路径直接 import：落地页与登录页
 import LoginView from './views/LoginView'
 import LandingView from './views/LandingView'
-import StudioView from './views/StudioView'
-import LyricsView from './views/LyricsView'
-import LibraryView from './views/LibraryView'
-import WorkDetailView from './views/WorkDetailView'
-import RightsView from './views/RightsView'
-import PricingView from './views/PricingView'
-import ModelCenterView from './views/ModelCenterView'
-import ComingSoonView from './views/ComingSoonView'
+// 其余视图 lazy（代码分割；React.lazy + Suspense，不引入新依赖）
+const StudioView = lazy(() => import('./views/StudioView'))
+const LyricsView = lazy(() => import('./views/LyricsView'))
+const LibraryView = lazy(() => import('./views/LibraryView'))
+const WorkDetailView = lazy(() => import('./views/WorkDetailView'))
+const RightsView = lazy(() => import('./views/RightsView'))
+const PricingView = lazy(() => import('./views/PricingView'))
+const ModelCenterView = lazy(() => import('./views/ModelCenterView'))
+const ComingSoonView = lazy(() => import('./views/ComingSoonView'))
+const BillingReturnView = lazy(() => import('./views/BillingReturnView'))
+const ResetPasswordView = lazy(() => import('./views/ResetPasswordView'))
 import { useSessionStore } from './stores/session'
 import { useMetaStore } from './stores/meta'
 import { useUiStore, hasOnboarded } from './stores/ui'
@@ -33,6 +38,16 @@ const SHORTCUT_ROUTES: Record<string, string> = {
   '7': '/rights',
   '8': '/pricing',
   '9': '/models',
+}
+
+/** 路由级 Suspense 兜底（lazy chunk 加载中） */
+function RouteFallback() {
+  const t = useT()
+  return (
+    <div className="h-full flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+      <span className="label">{t('app.loading')}</span>
+    </div>
+  )
 }
 
 function AppLayout() {
@@ -147,6 +162,9 @@ function RootRoutes() {
       <Route path="/landing" element={<LandingView />} />
       <Route path="/" element={hasToken ? <Navigate to="/studio" replace /> : <LandingView />} />
       <Route path="/login" element={<LoginGuard />} />
+      {/* v0.7.0 商业化：Stripe 支付回跳（独立于工作台壳，登录与否都可看）与邮件重置密码 */}
+      <Route path="/billing/return" element={<BillingReturnView />} />
+      <Route path="/reset-password" element={<ResetPasswordView />} />
       {hasToken ? (
         <Route element={<AppLayout />}>
           <Route path="/studio" element={<StudioView />} />
@@ -171,7 +189,11 @@ function RootRoutes() {
 export default function App() {
   return (
     <HashRouter>
-      <RootRoutes />
+      <ErrorBoundary>
+        <Suspense fallback={<RouteFallback />}>
+          <RootRoutes />
+        </Suspense>
+      </ErrorBoundary>
       <ToastHost />
       <ConfirmDialog />
     </HashRouter>

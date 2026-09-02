@@ -3,7 +3,8 @@
  *
  * 全部为静态内嵌：落地页必须不依赖后端即可完整渲染。
  * 通道/模型目录与 backend/app/providers/music_catalog.py 对齐；
- * 定价与 backend/app/seed_data.py PLANS_ROWS 对齐；版本号取交付报告口径（v0.6.1）。
+ * 定价与 backend/app/seed_data.py PLANS_ROWS 对齐；版本号取交付报告口径（v0.7.0），
+ * 并由 landing-data.test.ts 断言与 package.json version 严格同步。
  *
  * i18n：所有用户可见文本字段值为字典 key（landing.data.*，见 src/i18n/en/landing.ts），
  * 类型即 TranslationKey，组件渲染处统一 t(field) 求值——语言切换即时生效，
@@ -11,14 +12,14 @@
  */
 import type { TranslationKey } from '../i18n'
 
-export const LANDING_VERSION = 'v0.6.1'
+export const LANDING_VERSION = 'v0.7.0'
 
 /** Hero 指标条 */
 export const LANDING_METRICS: Array<{ value: string; label: TranslationKey }> = [
   { value: '7', label: 'landing.data.metric.channels' },
   { value: '10', label: 'landing.data.metric.models' },
   { value: '53', label: 'landing.data.metric.api' },
-  { value: '145', label: 'landing.data.metric.smoke' },
+  { value: '146', label: 'landing.data.metric.smoke' },
   { value: '4', label: 'landing.data.metric.langs' },
 ]
 
@@ -390,4 +391,5 @@ export const MILESTONES: Array<{ ver: string; date: string; title: TranslationKe
   { ver: 'v0.5.0', date: '2026-08', title: 'landing.data.milestone.5.title' },
   { ver: 'v0.6.0', date: '2026-08', title: 'landing.data.milestone.6.title' },
   { ver: 'v0.6.1', date: '2026-09', title: 'landing.data.milestone.7.title' },
+  { ver: 'v0.7.0', date: '2026-09', title: 'landing.data.milestone.8.title' },
 ]

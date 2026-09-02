@@ -272,4 +272,5 @@ export const landingEn = {
   'landing.data.milestone.5.title': 'Replicate + local MusicGen — a 10-model catalog',
   'landing.data.milestone.6.title': 'Local ACE-Step v1.5 vocal songs',
   'landing.data.milestone.7.title': 'Self-hosted MiniMax Music 3 + SongGeneration — all seven engines live',
+  'landing.data.milestone.8.title': 'Commercialization: Stripe subscriptions, credit top-ups, account center',
 } as const

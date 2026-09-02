@@ -3,11 +3,14 @@
  * - baseURL /api/v1（Vite 代理 → 127.0.0.1:8000）
  * - 请求自动注入 Authorization: Bearer <token>
  * - 成功解包 {code,message,data} → 直接返回 data
- * - code!==0 / HTTP 4xx/5xx → 抛 ApiError 并统一 toast（401 静默跳登录）
+ * - code!==0 / HTTP 4xx/5xx → 抛 ApiError 并统一 toast（401 静默处理）
+ * - 40102（access 过期）：有 refresh_token 时静默刷新（单飞防并发重复刷新）
+ *   并重放原请求一次；无 refresh_token / 刷新失败 → 清 token 跳登录
+ * - 40101（未认证）→ 直接清 token 跳登录
  * - responseType=blob 的请求（文件流/证书）不解包
  */
-import axios, { AxiosError, type AxiosRequestConfig } from 'axios'
-import { getToken, clearToken } from '../lib/token'
+import axios, { AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios'
+import { getToken, getRefreshToken, setToken, setRefreshToken, clearToken } from '../lib/token'
 import { useToastStore } from '../stores/toast'
 import { t, getLocale } from '../i18n'
 
@@ -54,6 +57,70 @@ interface EnvelopeLike {
   message?: string
 }
 
+/** 刷新接口的 data 形状（契约 v0.7.0：轮换式，旧 refresh 即刻失效） */
+interface RefreshData {
+  access_token: string
+  refresh_token: string
+}
+
+/** 拦截器内部标记：已重放过一次 / 刷新请求自身（防递归刷新） */
+interface RetriableConfig extends InternalAxiosRequestConfig {
+  _meloyuAuthRetried?: boolean
+  _meloyuSkipAuthRefresh?: boolean
+}
+
+/** 单飞刷新：并发多个 40102 共享同一次 /auth/refresh；成功落新 token 对。
+ *  注意：句柄清空走 then 微任务而非 IIFE 内 finally —— 无 refresh_token 时 IIFE
+ *  同步落定，finally 会在外层赋值之前执行，随后赋值把已落定的 promise 装回句柄，
+ *  毒化后续所有刷新（测试抓到的真实缺陷）。 */
+let refreshInFlight: Promise<boolean> | null = null
+
+async function refreshAccessToken(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight
+  const attempt = (async (): Promise<boolean> => {
+    try {
+      const refreshToken = getRefreshToken()
+      if (!refreshToken) return false
+      // 响应拦截器已解包 envelope，此处拿到的即 data（与 apiPost 同理，类型需断言）
+      const res = await instance.post(
+        '/auth/refresh',
+        { refresh_token: refreshToken },
+        { _meloyuSkipAuthRefresh: true } as AxiosRequestConfig,
+      )
+      const data = res as unknown as RefreshData
+      if (!data?.access_token || !data?.refresh_token) return false
+      setToken(data.access_token)
+      setRefreshToken(data.refresh_token)
+      return true
+    } catch {
+      return false
+    }
+  })()
+  refreshInFlight = attempt
+  const reset = (): void => {
+    if (refreshInFlight === attempt) refreshInFlight = null
+  }
+  void attempt.then(reset, reset)
+  return attempt
+}
+
+/** 40102 统一处置：能刷新则重放原请求（一次）；否则踢登录并抛错 */
+async function handleAuthExpired(
+  code: number,
+  config: RetriableConfig | undefined,
+  makeError: () => ApiError,
+): Promise<never | ReturnType<typeof instance.request>> {
+  if (code === 40102 && config && !config._meloyuAuthRetried) {
+    const refreshed = await refreshAccessToken()
+    if (refreshed) {
+      config._meloyuAuthRetried = true
+      return instance.request(config)
+    }
+  }
+  redirectToLogin()
+  throw makeError()
+}
+
 instance.interceptors.response.use(
   (res) => {
     // 文件流（blob）不解包
@@ -61,12 +128,14 @@ instance.interceptors.response.use(
     const body = res.data as EnvelopeLike
     if (body && typeof body === 'object' && typeof body.code === 'number') {
       if (body.code !== 0) {
-        const err = new ApiError(body.code, body.message ?? t('api.requestFailed'), res.config.url ?? '')
-        if (isAuthExpired(err.code)) {
-          redirectToLogin()
-        } else {
-          useToastStore.getState().push(err.message)
+        const makeError = () =>
+          new ApiError(body.code!, body.message ?? t('api.requestFailed'), res.config.url ?? '')
+        if (isAuthExpired(body.code)) {
+          // 40102 尝试静默刷新重放；40101 直接踢登录
+          return handleAuthExpired(body.code, res.config as RetriableConfig, makeError)
         }
+        const err = makeError()
+        useToastStore.getState().push(err.message)
         throw err
       }
       return res.data?.data
@@ -86,13 +155,21 @@ instance.interceptors.response.use(
     } else if (error.code === 'ECONNABORTED') {
       message = t('api.timeout')
     }
-    const err = new ApiError(code, message, error.config?.url ?? '')
+    const makeError = () => new ApiError(code, message, error.config?.url ?? '')
+    const cfg = error.config as RetriableConfig | undefined
+    if (isAuthExpired(code) && !cfg?._meloyuSkipAuthRefresh) {
+      return handleAuthExpired(code, cfg, makeError)
+    }
     if (isAuthExpired(code)) {
+      // 刷新请求自身失败（refresh token 也过期）：直接踢登录，不再递归
       redirectToLogin()
-    } else {
+      throw makeError()
+    }
+    if (!cfg?._meloyuSkipAuthRefresh) {
+      // 后台静默刷新的网络/服务端错误不 toast（外层统一踢登录），其余照常提示
       useToastStore.getState().push(message)
     }
-    throw err
+    throw makeError()
   },
 )
 

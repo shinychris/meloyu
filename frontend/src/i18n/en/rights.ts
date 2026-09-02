@@ -1,4 +1,5 @@
-/** rights 命名空间：合规与权利中心（RightsView） */
+/** rights 命名空间：合规与权利中心（RightsView）。v0.7.0「去虚还实」：
+ *  checklist 只陈述真实能力；原三个摆设开关整段下架，改为静态授权说明。 */
 export const rightsEn = {
   // 页头
   'rights.label': 'Rights / Compliance & Rights Center',
@@ -32,25 +33,18 @@ export const rightsEn = {
   // 空状态
   'rights.empty':
     'No works in your library yet — create your first song in the Studio, then come back to issue a certificate.',
-  // 发行合规检查
+  // 发行合规检查（v0.7.0：真实数据驱动，只陈述实际存在的能力）
   'rights.check.title': 'Release compliance check',
-  'rights.check.disclosure': 'AI participation statement written into metadata (ready for streaming disclosure)',
-  'rights.check.watermarkFree':
-    'Free-plan exports embed a watermark (currently via SHA-256 fingerprint registration) · paid plans export watermark-free',
-  'rights.check.watermarkPaid':
-    'Inaudible watermark embedded on export — the local engine currently implements this via SHA-256 fingerprint registration, traceable to the source',
-  'rights.check.loudness':
-    'Loudness −14 LUFS · true peak −1.0 dBTP — export target spec (streaming preset), not measured per track',
-  'rights.check.safety': 'Sensitive-word check at generation · no celebrity voice imitation or protected samples detected',
-  // 全局设置
-  'rights.settings': 'Global settings',
-  'rights.setting.disclosure': 'Embed AI disclosure on export',
-  'rights.setting.disclosureDesc': 'Automatically declares AI participation in metadata',
-  'rights.setting.watermark': 'Inaudible watermark',
-  'rights.setting.watermarkDesc':
-    'Registers a SHA-256 content fingerprint on export for traceability (spectral watermark lands in V1.1)',
-  'rights.setting.voiceVerify': 'Voice-clone dual verification',
-  'rights.setting.voiceVerifyDesc': 'Owner only · random passphrase liveness reading',
+  'rights.check.disclosure': 'AI generation disclosure written into every license certificate',
+  'rights.check.fingerprint': 'SHA-256 fingerprint registered for every work (master / preview)',
+  'rights.check.loudness': '−14 LUFS is the export target spec, not measured per track',
+  'rights.check.safety': 'Built-in basic sensitive-word filtering (extensible operations wordlists)',
+  // 授权说明（替代原三个摆设开关；商用权利跟随通道模型许可）
+  'rights.licenseNotes.title': 'Licensing notes',
+  'rights.licenseNotes.intro': 'Commercial rights follow the model license of the channel that generated the work:',
+  'rights.licenseNotes.commercial': 'Commercial-use channels: local synthesis engine · ACE-Step (MIT) · Apache-2.0 models',
+  'rights.licenseNotes.nonCommercial': 'Non-commercial: MusicGen (CC-BY-NC weights) · SongGeneration (Tencent academic license)',
+  'rights.licenseNotes.conditional': 'Conditional: MiniMax / Stable Audio — subject to the revenue threshold in their community licenses',
   'rights.settingsNote':
     'Certificates are issued by the system per contract §8.4: AI disclosure, human participation audit trail and SHA-256 fingerprint are frozen with each work version. PDF certificates arrive in V1.1.',
 } as const

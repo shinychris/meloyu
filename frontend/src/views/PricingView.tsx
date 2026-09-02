@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { CreditTransaction, PlanInfo } from '../types/api'
 import { getCreditTransactions, getPlans, switchPlan } from '../api/account'
+import { checkout, openPortal, redirectToUrl } from '../api/billing'
 import { useSessionStore } from '../stores/session'
 import { toast } from '../stores/toast'
 import { creditReasonLabel, formatDateTime, formatNum, planLabel } from '../lib/format'
@@ -9,12 +10,22 @@ import { useT } from '../i18n'
 
 const PAGE_SIZE = 10
 
-/** 定价与积分：四档卡片（月/年切换）+ 升级调订阅接口 + 积分流水表 */
+/** 充值积分包口径（与后端 topup SKU 对齐）：$9.99 / 1,000 credits */
+const TOPUP_PRICE_USD = '$9.99'
+const TOPUP_CREDITS = '1,000'
+
+/**
+ * 定价与积分：四档卡片（月/年切换）+ 积分流水表。
+ * v0.7.0 支付流：付费档发起 Stripe 订阅（跳 checkout url）；免费档=降级（/subscriptions/switch）；
+ * team 恒「联系销售」；另有充值积分包（kind=topup）与管理订阅（Stripe 门户）入口。
+ */
 export default function PricingView() {
   const [plans, setPlans] = useState<PlanInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [yearly, setYearly] = useState(true)
   const [switching, setSwitching] = useState<string | null>(null)
+  const [topupBuying, setTopupBuying] = useState(false)
+  const [portalOpening, setPortalOpening] = useState(false)
   const [txs, setTxs] = useState<CreditTransaction[]>([])
   const [txPage, setTxPage] = useState(1)
   const [txTotalPages, setTxTotalPages] = useState(1)
@@ -51,24 +62,89 @@ export default function PricingView() {
     void loadTxs(txPage)
   }, [loadTxs, txPage])
 
-  const onSwitch = async (plan: PlanInfo) => {
+  /** 付费档：发起 Stripe 订阅（Stripe 未配置时后端返 40901，拦截器已 toast） */
+  const onCheckout = async (plan: PlanInfo) => {
+    if (switching) return
+    setSwitching(plan.code)
+    try {
+      const res = await checkout({
+        kind: 'subscription',
+        plan: plan.code as 'pro' | 'studio',
+        interval: yearly ? 'yearly' : 'monthly',
+      })
+      if (res?.url) {
+        redirectToUrl(res.url)
+        return // 整页跳转中，保持按钮态
+      }
+    } catch {
+      /* 拦截器已 toast（40901 Stripe 未配置 / 会话过期等） */
+    } finally {
+      setSwitching(null)
+    }
+  }
+
+  /** 免费档：降级（后端 v0.7.0 起允许降回 free） */
+  const onDowngrade = async (plan: PlanInfo) => {
+    if (switching) return
+    setSwitching(plan.code)
+    try {
+      const user = await switchPlan(plan.code as 'free')
+      useSessionStore.setState({ user })
+      await loadPlans()
+      void refreshUser()
+      toast(t('pricing.switched', { name: planLabel(plan.code) }))
+    } catch {
+      /* 拦截器已 toast */
+    } finally {
+      setSwitching(null)
+    }
+  }
+
+  const onSwitch = (plan: PlanInfo) => {
     if (switching) return
     if (plan.code === 'team') {
       toast(t('pricing.contactSalesToast'), 'warn')
       return
     }
     if (plan.current) return
-    setSwitching(plan.code)
+    if (plan.code === 'free') {
+      void onDowngrade(plan)
+    } else {
+      void onCheckout(plan)
+    }
+  }
+
+  /** 充值积分包：一次性购买（kind=topup） */
+  const onTopup = async () => {
+    if (topupBuying) return
+    setTopupBuying(true)
     try {
-      const user = await switchPlan(plan.code as 'free' | 'pro' | 'studio')
-      useSessionStore.setState({ user })
-      await loadPlans()
-      void refreshUser()
-      toast(t('pricing.switched', { name: planLabel(plan.code) }))
+      const res = await checkout({ kind: 'topup' })
+      if (res?.url) {
+        redirectToUrl(res.url)
+        return
+      }
     } catch {
-      /* 拦截器已 toast（40001 团队版等） */
+      /* 拦截器已 toast */
     } finally {
-      setSwitching(null)
+      setTopupBuying(false)
+    }
+  }
+
+  /** 管理订阅：Stripe 客户门户（无支付记录时后端返 40901，拦截器已 toast） */
+  const onPortal = async () => {
+    if (portalOpening) return
+    setPortalOpening(true)
+    try {
+      const res = await openPortal()
+      if (res?.url) {
+        redirectToUrl(res.url)
+        return
+      }
+    } catch {
+      /* 拦截器已 toast */
+    } finally {
+      setPortalOpening(false)
     }
   }
 
@@ -79,13 +155,23 @@ export default function PricingView() {
           <div className="label">{t('pricing.label')}</div>
           <h1 className="text-[28px] font-extrabold tracking-tight mt-1">{t('pricing.title')}</h1>
         </div>
-        <div className="flex items-center gap-3 text-[12px]" style={{ color: 'var(--muted)' }}>
-          {t('pricing.monthly')}
-          <button className={`toggle ${yearly ? 'on' : ''}`} onClick={() => setYearly((v) => !v)}></button>
-          {t('pricing.yearly')}
-          <span className="text-[11px] px-1.5 py-0.5 font-bold" style={{ background: 'var(--acc)', color: '#000' }}>
-            {t('pricing.save20')}
-          </span>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-3 text-[12px]" style={{ color: 'var(--muted)' }}>
+            {t('pricing.monthly')}
+            <button className={`toggle ${yearly ? 'on' : ''}`} onClick={() => setYearly((v) => !v)}></button>
+            {t('pricing.yearly')}
+            <span className="text-[11px] px-1.5 py-0.5 font-bold" style={{ background: 'var(--acc)', color: '#000' }}>
+              {t('pricing.save20')}
+            </span>
+          </div>
+          <button
+            className="btn btn-ghost !py-1.5 !px-3 text-[11px]"
+            title={t('billing.manageTitle')}
+            disabled={portalOpening}
+            onClick={() => void onPortal()}
+          >
+            {portalOpening ? t('billing.manageOpening') : t('billing.manage')}
+          </button>
         </div>
       </header>
 
@@ -136,7 +222,7 @@ export default function PricingView() {
                   {p.features.map((f) => (
                     <li key={f}>· {f}</li>
                   ))}
-                  {p.monthly_credits != null && !p.features.some((f) => f.includes('积分') || /credit/i.test(f)) && (
+                  {p.monthly_credits != null && !p.features.some((f) => f.includes('积分') || f.toLowerCase().includes('credit')) && (
                     <li>
                       · {t('pricing.monthlyCredits.pre')} <span className="num">{formatNum(p.monthly_credits)}</span> {t('pricing.monthlyCredits.post')}
                     </li>
@@ -145,12 +231,14 @@ export default function PricingView() {
                 <button
                   className={`btn w-full mt-8 ${!current && p.code !== 'team' ? 'btn-acc' : ''} ${popular && !current ? 'font-bold' : ''}`}
                   disabled={current || switching === p.code}
-                  onClick={() => void onSwitch(p)}
+                  onClick={() => onSwitch(p)}
                 >
                   {current
                     ? t('pricing.current')
                     : switching === p.code
-                      ? t('pricing.switching')
+                      ? p.code === 'free'
+                        ? t('pricing.switching')
+                        : t('billing.checkout.redirecting')
                       : p.code === 'team'
                         ? t('pricing.contactSales')
                         : p.code === 'free'
@@ -163,6 +251,31 @@ export default function PricingView() {
         </div>
       )}
 
+      {/* 充值积分包（一次性购买，积分永不过期） */}
+      <div
+        className="rule-t px-8 py-5 flex items-center justify-between gap-6 flex-wrap"
+        style={{ background: 'var(--bg2)' }}
+      >
+        <div className="min-w-0">
+          <div className="label">{t('billing.topup.label')}</div>
+          <div className="text-[14px] font-bold mt-1">{t('billing.topup.title')}</div>
+          <div className="text-[11px] mt-1 leading-relaxed max-w-[640px]" style={{ color: 'var(--dim)' }}>
+            {t('billing.topup.desc')}
+          </div>
+        </div>
+        <div className="flex items-center gap-6 flex-none">
+          <div className="text-right">
+            <span className="num font-extrabold text-[26px] tracking-tight">{TOPUP_PRICE_USD}</span>
+            <div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
+              <span className="num font-bold" style={{ color: 'var(--acc)' }}>{TOPUP_CREDITS}</span> {t('pricing.monthlyCredits.post')}
+            </div>
+          </div>
+          <button className="btn btn-acc !py-2.5" disabled={topupBuying} onClick={() => void onTopup()}>
+            {topupBuying ? t('billing.topup.buying') : t('billing.topup.cta')}
+          </button>
+        </div>
+      </div>
+
       <div className="rule-t px-8 py-4 text-[11px]" style={{ color: 'var(--dim)' }}>
         {t('pricing.footnote')}
         <span className="num font-bold mx-1" style={{ color: 'var(--acc)' }}>{formatNum(user?.credits.balance ?? 0)}</span>
@@ -170,7 +283,7 @@ export default function PricingView() {
       </div>
 
       {/* 积分流水 */}
-      <div className="rule-t px-8 py-4">
+      <div className="rule-t px-8 py-4 tx-rows">
         <div className="label mb-3">{t('pricing.tx.title')}</div>
         <div className="row !cursor-default" style={{ color: 'var(--dim)', gridTemplateColumns: '170px 90px 110px 100px 1fr' }}>
           <span className="label">{t('pricing.tx.time')}</span>

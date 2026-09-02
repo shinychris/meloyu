@@ -17,7 +17,8 @@ SECTIONS = ("intro", "verse", "pre_chorus", "chorus", "bridge", "outro")
 PLANS = ("free", "pro", "studio", "team")
 MAX_EXPORTS = ("mp3", "wav")
 SUBSCRIPTION_STATUSES = ("active", "canceled")
-SUBSCRIPTION_SOURCES = ("signup", "switch")
+# v0.7.0 商业化批增 stripe（webhook 激活订阅来源）——需 subscriptions 表重建迁移
+SUBSCRIPTION_SOURCES = ("signup", "switch", "stripe")
 
 # 任务
 TASK_TYPES = ("generation", "export")
@@ -33,7 +34,8 @@ STAGE_KEYS = (
 EXPORT_FORMATS = ("mp3", "wav", "midi", "stems")
 
 # 积分
-CREDIT_REASONS = ("signup_bonus", "generation", "refund", "plan_grant", "plan_switch")
+# v0.7.0 增 topup（Stripe 充值包发放）——需 credit_transactions 表重建迁移
+CREDIT_REASONS = ("signup_bonus", "generation", "refund", "plan_grant", "plan_switch", "topup")
 
 # 留痕
 EVENT_ACTIONS = (
@@ -48,6 +50,10 @@ FILE_KINDS = (
     "export_mp3", "export_wav", "export_midi", "export_stems_zip", "certificate",
 )
 STEM_NAMES = ("vocals", "drums", "bass", "other")
+
+# 支付订单（v0.7.0，Stripe）
+ORDER_KINDS = ("subscription", "topup")
+ORDER_STATUSES = ("pending", "paid", "failed", "refunded")
 
 # 作品/版本/证书
 WORK_STATUSES = ("active", "trash")

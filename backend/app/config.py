@@ -12,7 +12,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 REPO_DIR = BACKEND_DIR.parent
 
 API_PREFIX = "/api/v1"
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.7.0"
 
 # 模型积分单价（架构 §9.1：v1_pro=12、v1_fast=6）
 MODEL_CREDIT_COST: dict[str, int] = {"v1_pro": 12, "v1_fast": 6}
@@ -54,6 +54,37 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8000
     cors_origins: str = "http://localhost:5173"
+    # 运行环境：dev（默认，本地开发）| production（启用生产断言：弱密钥拒启动、
+    # 禁 demo 播种、关闭 /api/docs；见 main.py _assert_production）
+    env: str = "dev"
+    # ---- Stripe 支付（D-2 决策：海外市场 Stripe；未配置时付费档不可订阅）----
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    # 对外可达基础 URL（Checkout 回跳/门户跳转用；如 https://app.meloyu.example）
+    app_base_url: str = "http://localhost:5173"
+    # 订阅价格 ID（Stripe Dashboard 创建后填入；月/年 x pro/studio）
+    stripe_price_pro_monthly: str = ""
+    stripe_price_pro_yearly: str = ""
+    stripe_price_studio_monthly: str = ""
+    stripe_price_studio_yearly: str = ""
+    # 积分充值包（一次性）：金额美分 → 积分（默认值可按运营调整）
+    stripe_topup_price: str = ""
+    stripe_topup_amount_usd: int = 999   # $9.99
+    stripe_topup_credits: int = 1000
+    # ---- SMTP 邮件（找回密码/注册验证码；未配置 host 时相关功能禁用）----
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = "Meloyu <no-reply@meloyu.example>"
+    email_verification_enabled: bool = False
+    # ---- 安全/加密 ----
+    # llm_settings API Key 落库加密密钥（Fernet，32 字节 base64）；空 = 明文存储（dev）
+    key_encryption_secret: str = ""
+    # 注册时自动授予管理员角色的邮箱（逗号分隔；模型中心写操作需 admin）
+    admin_emails: str = ""
+    # ---- 监控 ----
+    sentry_dsn: str = ""
     # HuggingFace 端点覆盖（.env 配 HF_ENDPOINT=https://hf-mirror.com 走国内镜像）
     hf_endpoint: str = ""
     # ACE-Step 独立部署目录（默认 backend/data/acestep：代码+独立 venv+checkpoints，

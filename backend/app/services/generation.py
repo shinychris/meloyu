@@ -19,7 +19,7 @@ from app.core.errors import (
     err_payment_required,
     err_sensitive,
 )
-from app.core.i18n import tr
+from app.core.i18n import current_locale, tr
 from app.core.logging import logger
 from app.core.seed import cover_color_for_seed, derive_seed
 from app.database import SessionLocal
@@ -31,8 +31,6 @@ from app.services import model_center
 from app.services import works as works_svc
 from app.services.serializers import candidate_to_dict, task_to_dict
 from app.synth.ir import SongRequest
-from app.core.i18n import current_locale
-
 
 # ---------- 提交 ----------
 
@@ -119,6 +117,8 @@ def check_free_daily_limit(db: Session, user: User) -> None:
     if user.plan != "free":
         return
     from datetime import datetime, timedelta
+
+    from app.models import Plan
     # 自然日按 UTC+8：当日 00:00 (UTC+8) = 前一日 16:00 UTC
     now_cn = datetime.now(UTC) + timedelta(hours=8)
     day_start_utc = (now_cn.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -128,7 +128,10 @@ def check_free_daily_limit(db: Session, user: User) -> None:
             Task.user_id == user.id, Task.type == "generation",
             Task.created_at >= day_start_utc)
     ).scalar_one()
-    if count >= 5:
+    # P1-14：限额读 Plan 表（运营调表即时生效，不再硬编码 5）
+    plan = db.get(Plan, "free")
+    limit = plan.daily_generations if plan and plan.daily_generations else 5
+    if count >= limit:
         raise err_payment_required(
             tr("今日免费生成次数已用完", "Today's free generations are used up"))
 

@@ -1,15 +1,20 @@
-"""模型中心路由（契约 v1.5 §5.8，15 接口，登录即可用）。
+"""模型中心路由（契约 v1.5 §5.8，15 接口）。
 
 本地开源模型（Ollama）下载/删除/列举/选用 + 外部 API（OpenAI 兼容）配置与连通性
 测试 + 歌词引擎通道切换（V1.2）；外部歌曲生成 API（Suno 兼容）配置/探活/通道切换
-（V1.3）；开源歌曲模型目录（外部测评排序+推荐）/Replicate 托管/本机 MusicGen
-下载/删除/探活（V1.4）。MVP 单机自用场景未做管理员角色收权（RAID 登记 P2）。
+（V1.3）；开源歌曲模型目录/Replicate 托管/本机 MusicGen 下载/删除/探活（V1.4）。
+
+P1-2（v0.7.0）：全局配置写操作收权管理员（users.is_admin：settings.admin_emails
+注册自动授予 + demo 种子账号）；读/探活/目录仍登录即可用。API key 落库经
+core/crypto.py Fernet 加密（KEY_ENCRYPTION_SECRET 配置后生效）。
 """
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.core.errors import err_forbidden
+from app.core.i18n import tr
 from app.core.responses import ok
 from app.core.security import get_current_user
 from app.database import get_db
@@ -26,6 +31,16 @@ from app.schemas.models import (
 from app.services import model_center as svc
 
 router = APIRouter(prefix="/models", tags=["models"])
+
+
+def require_admin(user: User = Depends(get_current_user)) -> User:
+    """模型中心写操作需管理员（全局配置影响所有用户的通道与费用）。"""
+    if not user.is_admin:
+        raise err_forbidden(tr(
+            "模型中心写操作需管理员权限（平台级全局配置）",
+            "Model center write operations require administrator rights "
+            "(platform-level global configuration)"))
+    return user
 
 
 @router.get("/runtime")
@@ -51,21 +66,21 @@ def get_settings(db: Session = Depends(get_db),
 
 @router.put("/settings")
 def put_settings(body: LLMSettingsRequest, db: Session = Depends(get_db),
-                 user: User = Depends(get_current_user)):
+                 user: User = Depends(require_admin)):
     """切换引擎通道 / 更新连接配置（歌词 lyrics_backend + 歌曲 music_backend）。"""
     return ok(svc.update_settings(db, body.model_dump(exclude_unset=True)))
 
 
 @router.post("/pull")
 def pull(body: ModelPullRequest, db: Session = Depends(get_db),
-         user: User = Depends(get_current_user)):
+         user: User = Depends(require_admin)):
     """发起模型下载（异步，轮询 GET /models/ops/{id} 看进度）。"""
     return ok(svc.start_pull(db, user.id, body.model), status_code=202)
 
 
 @router.post("/delete")
 def delete(body: ModelDeleteRequest, db: Session = Depends(get_db),
-           user: User = Depends(get_current_user)):
+           user: User = Depends(require_admin)):
     """删除本地模型（同步返回结果）。"""
     return ok(svc.run_delete(db, user.id, body.model))
 
@@ -114,14 +129,14 @@ def music_catalog(db: Session = Depends(get_db),
 
 @router.post("/music-pull")
 def music_pull(body: CatalogModelRequest, db: Session = Depends(get_db),
-               user: User = Depends(get_current_user)):
+               user: User = Depends(require_admin)):
     """下载本机开源歌曲模型（MusicGen，HF 真实下载，异步轮询 ops/{id} 看进度）。"""
     return ok(svc.start_music_pull(db, user.id, body.model), status_code=202)
 
 
 @router.post("/music-delete")
 def music_delete(body: CatalogModelRequest, db: Session = Depends(get_db),
-                 user: User = Depends(get_current_user)):
+                 user: User = Depends(require_admin)):
     """删除本机开源歌曲模型（同步返回结果；删选用中模型自动回退本地合成）。"""
     return ok(svc.run_music_delete(db, user.id, body.model))
 

@@ -14,6 +14,8 @@ import { pricingEn } from './pricing'
 import { modelsEn } from './models'
 import { loginEn } from './login'
 import { layoutEn } from './layout'
+import { authEn } from './auth'
+import { billingEn } from './billing'
 
 export const en = {
   ...commonEn,
@@ -28,4 +30,6 @@ export const en = {
   ...modelsEn,
   ...loginEn,
   ...layoutEn,
+  ...authEn,
+  ...billingEn,
 } as const

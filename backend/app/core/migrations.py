@@ -13,24 +13,36 @@ from app.core.logging import logger
 
 # M-20260831-a：llm_settings 补 V1.3 歌曲模型通道列（localsynth|api）
 # M-20260901-a：llm_settings 补 V1.4 开源歌曲模型目录通道列（replicate/musicgen_local）
-_ADD_COLUMNS: list[tuple[str, str]] = [
-    ("music_backend",
+# M-20260902-a/b：v0.7.0 商业化批（users/certificates 补列）
+# 元素：(表名, 列名, DDL)
+_ADD_COLUMNS: list[tuple[str, str, str]] = [
+    ("llm_settings", "music_backend",
      "ALTER TABLE llm_settings ADD COLUMN music_backend VARCHAR(16) NOT NULL DEFAULT 'localsynth'"),
-    ("music_api_base_url",
+    ("llm_settings", "music_api_base_url",
      "ALTER TABLE llm_settings ADD COLUMN music_api_base_url VARCHAR(300) NOT NULL DEFAULT ''"),
-    ("music_api_key",
+    ("llm_settings", "music_api_key",
      "ALTER TABLE llm_settings ADD COLUMN music_api_key VARCHAR(300) NOT NULL DEFAULT ''"),
-    ("music_api_model",
+    ("llm_settings", "music_api_model",
      "ALTER TABLE llm_settings ADD COLUMN music_api_model VARCHAR(120) NOT NULL DEFAULT ''"),
-    ("replicate_api_token",
+    ("llm_settings", "replicate_api_token",
      "ALTER TABLE llm_settings ADD COLUMN replicate_api_token VARCHAR(300) NOT NULL DEFAULT ''"),
-    ("music_model",
+    ("llm_settings", "music_model",
      "ALTER TABLE llm_settings ADD COLUMN music_model VARCHAR(60) NOT NULL DEFAULT ''"),
-    ("replicate_slugs",
+    ("llm_settings", "replicate_slugs",
      "ALTER TABLE llm_settings ADD COLUMN replicate_slugs JSON NOT NULL DEFAULT '{}'"),
     # M-20260901-b：V1.5.1 自托管推理服务通道端点（mmax_local/songgen_local）
-    ("local_service_hosts",
+    ("llm_settings", "local_service_hosts",
      "ALTER TABLE llm_settings ADD COLUMN local_service_hosts JSON NOT NULL DEFAULT '{}'"),
+    # M-20260902-a：v0.7.0 商业化批——users 补 admin/邮箱验证/刷新令牌列
+    ("users", "is_admin",
+     "ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0"),
+    ("users", "email_verified",
+     "ALTER TABLE users ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT 0"),
+    ("users", "refresh_token_hash",
+     "ALTER TABLE users ADD COLUMN refresh_token_hash VARCHAR(64)"),
+    # M-20260902-b：certificates 补证书×许可分流等级列（P0-1）
+    ("certificates", "license_grade",
+     "ALTER TABLE certificates ADD COLUMN license_grade VARCHAR(16) NOT NULL DEFAULT ''"),
 ]
 
 
@@ -38,11 +50,14 @@ def run(engine: Engine) -> list[str]:
     """执行全部未应用的迁移，返回应用清单（供启动日志与冒烟观测）。"""
     applied: list[str] = []
     with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(llm_settings)"))}
-        for name, ddl in _ADD_COLUMNS:
-            if name not in cols:
+        table_cols: dict[str, set[str]] = {}
+        for table, column, ddl in _ADD_COLUMNS:
+            if table not in table_cols:
+                table_cols[table] = {row[1] for row in
+                                     conn.execute(text(f"PRAGMA table_info({table})"))}
+            if column not in table_cols[table]:
                 conn.execute(text(ddl))
-                applied.append(f"llm_settings.{name}")
+                applied.append(f"{table}.{column}")
 
         # M-20260831-b：candidates.quality_score NOT NULL → 可空（外部模型候选无 AI 质量分，
         # 不再造分——见 ADR-012）。SQLite 中 NULL 可通过 CHECK 约束，无需改约束本身。
@@ -59,6 +74,22 @@ def run(engine: Engine) -> list[str]:
         if ddl and "'model_load'" not in ddl:
             _rebuild_table(conn, "tasks", "tasks__v14")
             applied.append("tasks.stage_key 增加 model_* 枚举")
+
+        # M-20260902-c：v0.7.0 商业化批——credit_transactions.reason 补 topup（Stripe 充值）
+        ddl = conn.execute(
+            text("SELECT sql FROM sqlite_master WHERE type='table' AND name='credit_transactions'")
+        ).scalar_one_or_none()
+        if ddl and "'topup'" not in ddl:
+            _rebuild_table(conn, "credit_transactions", "credit_transactions__v07")
+            applied.append("credit_transactions.reason 增加 topup 枚举")
+
+        # M-20260902-d：subscriptions.source 补 stripe（webhook 激活订阅）
+        ddl = conn.execute(
+            text("SELECT sql FROM sqlite_master WHERE type='table' AND name='subscriptions'")
+        ).scalar_one_or_none()
+        if ddl and "'stripe'" not in ddl:
+            _rebuild_table(conn, "subscriptions", "subscriptions__v07")
+            applied.append("subscriptions.source 增加 stripe 枚举")
     if applied:
         logger.info(f"sqlite migrations applied: {', '.join(applied)}")
     return applied
@@ -68,10 +99,14 @@ def _rebuild_table(conn, table_name: str, tmp_name: str) -> None:
     """标准表重建：建临时表→拷贝→删旧表→改名→补建索引（CHECK 约束/列约束变更走此路径）。"""
     from sqlalchemy.schema import CreateIndex, CreateTable
 
+    from app.models.plan import Subscription
     from app.models.task import Task
+    from app.models.user import CreditTransaction
     from app.models.work import Candidate
 
-    tables = {"candidates": Candidate.__table__, "tasks": Task.__table__}
+    tables = {"candidates": Candidate.__table__, "tasks": Task.__table__,
+              "credit_transactions": CreditTransaction.__table__,
+              "subscriptions": Subscription.__table__}
     table = tables[table_name]
 
     conn.execute(text("PRAGMA foreign_keys=OFF"))

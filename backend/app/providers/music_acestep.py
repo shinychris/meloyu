@@ -23,7 +23,6 @@ from pathlib import Path
 from app.config import ACESTEP_TASK_TIMEOUT_SEC, BACKEND_DIR, settings
 from app.core.i18n import tr
 from app.core.logging import logger
-from app.core.seed import candidate_seed
 from app.providers.base import (
     CancelCheck,
     CandidateArtifact,
@@ -186,7 +185,7 @@ class _StderrTail:
         return "".join(self.lines).strip()[-600:]
 
 
-def _stream_events(proc: subprocess.Popen, lines: "queue.Queue[str]") -> None:
+def _stream_events(proc: subprocess.Popen, lines: queue.Queue[str]) -> None:
     try:
         for line in proc.stdout or []:
             lines.put(line)
@@ -202,7 +201,7 @@ def _run_runner(args: list[str], on_event, *, timeout_sec: int,
     cancel 秒级响应（读 stdout 是阻塞的，不能直接在 readline 里查标志）。
     """
     proc = _spawn(args)
-    lines: "queue.Queue[str]" = queue.Queue()
+    lines: queue.Queue[str] = queue.Queue()
     threading.Thread(target=_stream_events, args=(proc, lines), daemon=True).start()
     stderr_tail = _StderrTail()
     stderr_tail.start(proc)
@@ -225,7 +224,7 @@ def _run_runner(args: list[str], on_event, *, timeout_sec: int,
             except queue.Empty:
                 if should_cancel and should_cancel():
                     _kill()
-                    raise SynthCancelled()
+                    raise SynthCancelled() from None
                 continue
             if line == "":  # EOF
                 break

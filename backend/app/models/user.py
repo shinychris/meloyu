@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, String
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import BaseModel, ISOTimestamp
@@ -21,6 +21,12 @@ class User(BaseModel):
     email: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String(60), nullable=False)  # bcrypt cost=12
     nickname: Mapped[str] = mapped_column(String(24), nullable=False)
+    # P1-2：模型中心写操作需管理员（settings.admin_emails 注册自动授予；demo 种子同）
+    is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # P0-6：注册邮箱验证（email_verification_enabled 开启时必须先验证）
+    email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # P1-3：刷新令牌（随机串的 sha256；轮换即覆写=单设备会话，登出/改密/注销置空）
+    refresh_token_hash: Mapped[str | None] = mapped_column(String(64))
     plan: Mapped[str] = mapped_column(
         String(10), ForeignKey("plans.code", ondelete="RESTRICT"),
         nullable=False, default="free",

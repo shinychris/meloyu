@@ -30,6 +30,8 @@ class Certificate(BaseModel):
     seed: Mapped[int] = mapped_column(Integer, nullable=False)
     generated_at: Mapped[str] = mapped_column(ISOTimestamp(), nullable=False)
     license_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    # P0-1 分流判定等级（allowed/nc/conditional/tos/unverified/free_plan），审计留痕
+    license_grade: Mapped[str] = mapped_column(String(16), nullable=False, default="")
     plan_at_issuance: Mapped[str] = mapped_column(String(10), nullable=False)
     license_valid: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     edit_events_count: Mapped[int] = mapped_column(Integer, nullable=False)

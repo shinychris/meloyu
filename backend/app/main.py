@@ -18,8 +18,27 @@ from app.models import Base
 
 setup_logging()
 
-app = FastAPI(title="Meloyu API", version=APP_VERSION, docs_url="/api/docs",
-              openapi_url="/api/openapi.json")
+# P0-5：生产环境关闭交互式 API 文档（信息收敛）；dev 保持可用
+_is_production = settings.env.strip().lower() == "production"
+
+app = FastAPI(title="Meloyu API", version=APP_VERSION,
+              docs_url=None if _is_production else "/api/docs",
+              openapi_url=None if _is_production else "/api/openapi.json")
+
+
+def _assert_production() -> None:
+    """P0-5 生产启动断言：弱密钥/危险 CORS 直接拒启（fail-fast 而非静默生效）。"""
+    problems: list[str] = []
+    if settings.jwt_secret in ("meloyu-dev-secret-do-not-use-in-production", ""):
+        problems.append("JWT_SECRET 仍为开发默认值/为空——生产必须配置强随机密钥")
+    if settings.server_nonce == "meloyu-local-nonce-v1":
+        problems.append("SERVER_NONCE 仍为开发默认值——生产必须配置强随机值")
+    origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+    if "*" in origins:
+        problems.append("CORS_ORIGINS 含 * 且 allow_credentials=True——禁止，请列明来源域名")
+    if problems:
+        raise RuntimeError("production startup assertions failed:\n- " + "\n- ".join(problems))
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,6 +49,20 @@ app.add_middleware(
 )
 # locale 中间件（纯 ASGI，最后注册=最外层）：contextvar 先于一切下游设置
 app.add_middleware(LocaleMiddleware)
+
+# P0-6：接口限流（IP+路径滑动窗口；生产/开发一致启用，豁免见表）
+from app.core.ratelimit import rate_limit_middleware  # noqa: E402
+
+app.middleware("http")(rate_limit_middleware)
+
+# P1-7：Sentry 接缝（可选依赖：pip install sentry-sdk 并配 SENTRY_DSN 后生效）
+if settings.sentry_dsn:
+    try:
+        import sentry_sdk
+        sentry_sdk.init(dsn=settings.sentry_dsn, release=f"meloyu@{APP_VERSION}")
+        logger.info("sentry initialized")
+    except ImportError:
+        logger.warning("SENTRY_DSN configured but sentry-sdk not installed; skipping")
 
 
 @app.middleware("http")
@@ -119,6 +152,8 @@ app.include_router(api_router, prefix=API_PREFIX)
 
 
 def _startup() -> None:
+    if _is_production:
+        _assert_production()
     # import 顺序保证全部模型注册到同一 Base.metadata
     from app import models  # noqa: F401
     from app.core.tasks import recover_zombie_tasks
@@ -138,8 +173,12 @@ def _startup() -> None:
     if recovered:
         logger.info(f"startup: recovered {recovered} zombie tasks")
     # 首次启动（无 demo 账号）时后台线程灌种子（渲染音频耗时数分钟，不阻塞启动）
+    # P0-5/D-6：生产环境禁用演示账号自动播种（固定密码账号=后门）
     from app.seed_data import ensure_seeded_in_background
-    ensure_seeded_in_background()
+    if _is_production:
+        logger.warning("production env: demo seeding skipped (fixed-password accounts disabled)")
+    else:
+        ensure_seeded_in_background()
 
 
 @app.on_event("startup")

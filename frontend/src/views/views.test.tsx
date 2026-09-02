@@ -10,6 +10,8 @@ import ComingSoonView from './ComingSoonView'
 import WorkDetailView from './WorkDetailView'
 import LoginView from './LoginView'
 import ModelCenterView from './ModelCenterView'
+import BillingReturnView from './BillingReturnView'
+import ResetPasswordView from './ResetPasswordView'
 import CandidateCard from '../components/studio/CandidateCard'
 import DerivePanel from '../components/studio/DerivePanel'
 import type { Candidate } from '../types/api'
@@ -18,12 +20,17 @@ function render(ui: React.ReactElement): string {
   return renderToString(<MemoryRouter>{ui}</MemoryRouter>)
 }
 
+function renderAt(path: string, ui: React.ReactElement): string {
+  return renderToString(<MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>)
+}
+
 /** 渲染冒烟：保证每个视图 mount 时不会抛错（useEffect 在 SSR 不执行，不触发请求）；默认 locale=en 断言英文文案 */
 describe('views render smoke', () => {
-  it('LoginView 渲染登录表单与演示账号', () => {
+  it('LoginView 渲染登录表单、演示账号与忘记密码入口（v0.7.0）', () => {
     const html = render(<LoginView />)
     expect(html).toContain('Sign in to Studio')
     expect(html).toContain('demo@meloyu.local')
+    expect(html).toContain('Forgot password?')
   })
 
   it('StudioView 渲染四步引导与空状态', () => {
@@ -56,23 +63,65 @@ describe('views render smoke', () => {
     expect(html).toContain('Loading')
   })
 
-  it('RightsView 渲染证书区与全局开关', () => {
+  it('RightsView 渲染证书区与授权说明（v0.7.0 摆设开关下架）', () => {
     const html = render(<RightsView />)
     expect(html).toContain('Every song comes with clean provenance')
-    expect(html).toContain('Embed AI disclosure on export')
+    expect(html).toContain('Licensing notes')
+    expect(html).toContain('Commercial rights follow the model license')
   })
 
-  it('RightsView 合规检查文案不做失实断言（审查 P2-13）', () => {
+  it('RightsView checklist 为真实数据驱动（P0-2 去虚还实）', () => {
     const html = render(<RightsView />)
-    expect(html).toContain('export target spec (streaming preset), not measured per track')
-    expect(html).toContain('SHA-256 fingerprint registration')
-    expect(html).not.toContain('watermark is embedded in exported files')
+    // AI 披露 = 真（证书真实能力）
+    expect(html).toContain('AI generation disclosure written into every license certificate')
+    // 内容指纹 = 真
+    expect(html).toContain('SHA-256 fingerprint registered for every work')
+    // 响度 = 灰色信息项（目标规格，非实测）
+    expect(html).toContain('−14 LUFS is the export target spec, not measured per track')
+    // 内容安全 = 黄点（基础敏感词过滤，如实）
+    expect(html).toContain('Built-in basic sensitive-word filtering')
+    // 三个摆设开关不再出现（任何语言）
+    expect(html).not.toContain('Voice-clone dual verification')
+    expect(html).not.toContain('人声克隆')
+    expect(html).not.toContain('Inaudible watermark')
+    expect(html).not.toContain('不可听水印')
   })
 
-  it('PricingView 渲染档位加载态与流水表', () => {
+  it('PricingView 渲染档位加载态、充值包与流水表（v0.7.0 支付流）', () => {
     const html = render(<PricingView />)
     expect(html).toContain('Pay for your craft, not your anxiety')
     expect(html).toContain('Credit transactions')
+    expect(html).toContain('Credit top-up pack')
+    expect(html).toContain('$9.99')
+    expect(html).toContain('Buy 1,000 credits')
+    expect(html).toContain('Manage subscription')
+  })
+
+  it('BillingReturnView success 态渲染支付处理中说明与刷新按钮', () => {
+    const html = renderAt(
+      '/billing/return?status=success&session_id=cs_test_123',
+      <BillingReturnView />,
+    )
+    expect(html).toContain('Payment received')
+    expect(html).toContain('activated asynchronously by the payment webhook')
+    expect(html).toContain('Refresh status')
+    expect(html).toContain('cs_test_123')
+    expect(html).toContain('Back to pricing')
+  })
+
+  it('BillingReturnView cancel 态渲染已取消提示', () => {
+    const html = renderAt('/billing/return?status=cancel', <BillingReturnView />)
+    expect(html).toContain('Checkout canceled')
+    expect(html).toContain('You were not charged')
+  })
+
+  it('ResetPasswordView 无 token 时提示链接无效；有 token 时渲染表单', () => {
+    expect(renderAt('/reset-password', <ResetPasswordView />)).toContain(
+      'This reset link is invalid or missing',
+    )
+    const form = renderAt('/reset-password?token=abc123', <ResetPasswordView />)
+    expect(form).toContain('Set a new password')
+    expect(form).toContain('Reset password')
   })
 
   it('ComingSoonView 三个占位页都渲染', () => {

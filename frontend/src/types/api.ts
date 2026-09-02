@@ -68,11 +68,14 @@ export interface User {
   created_at: string
 }
 
-/** POST /auth/register 与 POST /auth/login 的 data */
+/** POST /auth/register 与 POST /auth/login 的 data（v0.7.0 起附带轮换式 refresh token；
+ *  旧后端/旧缓存可能缺失，故可选，调用处存在性判断） */
 export interface AuthData extends User {
   access_token: string
   token_type: 'Bearer'
   expires_in: number
+  refresh_token?: string
+  refresh_expires_in?: number
 }
 
 export interface FileRef {
@@ -260,6 +263,73 @@ export interface RegisterRequest {
 export interface LoginRequest {
   email: string
   password: string
+}
+
+/* ============ v0.7.0 账号安全 / 数据自主 ============ */
+
+/** POST /auth/forgot-password {email} —— 无论账号存在与否都返回 ok（防枚举） */
+export interface ForgotPasswordRequest {
+  email: string
+}
+
+/** POST /auth/reset-password {token, new_password}（token 来自邮件链接） */
+export interface ResetPasswordRequest {
+  token: string
+  new_password: string
+}
+
+/** POST /auth/change-password（需 Bearer） */
+export interface ChangePasswordRequest {
+  old_password: string
+  new_password: string
+}
+
+/** POST /auth/delete-account（需 Bearer；成功后前端清 token 跳落地页） */
+export interface DeleteAccountRequest {
+  password: string
+}
+
+export interface OkResult {
+  ok: boolean
+}
+
+/* ============ v0.7.0 billing（Stripe） ============ */
+
+export type BillingKind = 'subscription' | 'topup'
+export type BillingInterval = 'monthly' | 'yearly'
+
+/** POST /billing/checkout —— 订阅或充值，返回 Stripe 跳转链接 */
+export interface BillingCheckoutRequest {
+  kind: BillingKind
+  plan?: 'pro' | 'studio'
+  interval?: BillingInterval
+}
+
+export interface BillingCheckoutResult {
+  url: string
+  order_id: string
+}
+
+/** GET /billing/orders 的订单行 */
+export interface BillingOrder {
+  id: string
+  kind: BillingKind
+  plan: 'pro' | 'studio' | null
+  interval: BillingInterval | null
+  credits: number
+  amount_usd: number
+  status: string
+  created_at: string
+  paid_at: string | null
+}
+
+export interface BillingOrdersResult {
+  orders: BillingOrder[]
+}
+
+/** POST /billing/portal —— Stripe 客户门户（无支付记录时后端返 40901） */
+export interface BillingPortalResult {
+  url: string
 }
 
 /* ============ generations / tasks ============ */

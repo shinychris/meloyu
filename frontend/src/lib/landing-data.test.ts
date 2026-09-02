@@ -16,6 +16,7 @@ import {
 } from './landing-data'
 import { landingEn } from '../i18n/en/landing'
 import { landingZh } from '../i18n/zh/landing'
+import pkg from '../../package.json'
 
 /** 落地页数据完整性：对外口径的事实以 backend 为准，此处防止手改失真。
  *  文案字段已 key 化（landing.data.*），断言分两层：key 结构 + en 字典译文。 */
@@ -25,6 +26,12 @@ const zhMap = landingZh as Record<string, string>
 const en = (k: string) => enMap[k]
 
 describe('landing-data 落地页数据完整性', () => {
+  it('LANDING_VERSION 与 package.json version 严格同步（v + version，防再脱节）', () => {
+    expect(LANDING_VERSION).toBe(`v${pkg.version}`)
+    // 里程碑末项即当前版本（既有断言的加强版）
+    expect(MILESTONES[MILESTONES.length - 1].ver).toBe(`v${pkg.version}`)
+  })
+
   it('七通道齐备且字段完整（对齐 backend/app/providers/）', () => {
     expect(CHANNELS).toHaveLength(7)
     const ids = CHANNELS.map((c) => c.id)

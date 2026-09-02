@@ -1,6 +1,7 @@
 import { rightsEn } from '../en/rights'
 
-/** rights 命名空间：中文与原文一致 */
+/** rights 命名空间：zh 与 en key 严格一一对应（编译期校验，漏 key 报 type error）。
+ *  v0.7.0「去虚还实」：checklist 只陈述真实能力，摆设开关整段下架。 */
 export const rightsZh: Record<keyof typeof rightsEn, string> = {
   // 页头
   'rights.label': 'Rights / 合规与权利中心',
@@ -32,22 +33,18 @@ export const rightsZh: Record<keyof typeof rightsEn, string> = {
   'rights.trail.count': '共 {n} 条',
   // 空状态
   'rights.empty': '暂无在库作品，去创作工作台生成第一首歌后再来签发证书。',
-  // 发行合规检查
+  // 发行合规检查（v0.7.0：真实数据驱动，只陈述实际存在的能力）
   'rights.check.title': '发行合规检查',
-  'rights.check.disclosure': 'AI 参与声明已写入 metadata（流媒体披露就绪）',
-  'rights.check.watermarkFree':
-    '免费档导出嵌入水印（当前以 SHA-256 指纹登记实现）· 升级付费档导出无水印',
-  'rights.check.watermarkPaid': '不可听水印导出时嵌入 —— 本地引擎当前以 SHA-256 指纹登记实现，可溯源',
-  'rights.check.loudness': '响度 −14 LUFS · 真峰值 −1.0 dBTP —— 导出目标规格（流媒体预设），非逐条实测',
-  'rights.check.safety': '敏感词生成时校验 · 未检测到名人仿声 / 受保护采样',
-  // 全局设置
-  'rights.settings': '全局设置',
-  'rights.setting.disclosure': '导出嵌入 AI 披露',
-  'rights.setting.disclosureDesc': '自动在 metadata 声明 AI 参与度',
-  'rights.setting.watermark': '不可听水印',
-  'rights.setting.watermarkDesc': '导出时登记 SHA-256 内容指纹，可溯源（频域水印 V1.1）',
-  'rights.setting.voiceVerify': '人声克隆双重验证',
-  'rights.setting.voiceVerifyDesc': '仅本人 · 随机短语活体朗读',
+  'rights.check.disclosure': 'AI 生成披露已写入每份授权证书',
+  'rights.check.fingerprint': '作品母带/预览 SHA-256 指纹登记',
+  'rights.check.loudness': '−14 LUFS 为导出目标规格，非逐项实测',
+  'rights.check.safety': '内置基础敏感词过滤（可扩展运营词库）',
+  // 授权说明（替代原三个摆设开关；商用权利跟随通道模型许可）
+  'rights.licenseNotes.title': '授权说明',
+  'rights.licenseNotes.intro': '商用权利跟随生成通道的模型许可：',
+  'rights.licenseNotes.commercial': '可商用通道：本地合成引擎 · ACE-Step（MIT）· Apache-2.0 系模型',
+  'rights.licenseNotes.nonCommercial': '非商用：MusicGen（CC-BY-NC 权重）· SongGeneration（腾讯学术许可）',
+  'rights.licenseNotes.conditional': '有条件商用：MiniMax / Stable Audio —— 需满足其社区许可的收入门槛',
   'rights.settingsNote':
     '证书由系统按契约 §8.4 签发：AI 披露、人类参与留痕与 SHA-256 指纹随作品版本固化。PDF 版证书将在 V1.1 提供。',
 }

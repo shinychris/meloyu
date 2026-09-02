@@ -49,7 +49,7 @@ MUSIC_CATALOG: list[dict] = [
         "id": "minimax-music-3",
         "name": "MiniMax Music 3",
         "vendor": "MiniMax",
-        "license": "开源权重（MiniMax 社区许可，2026.8.13 开放，商用条款见 LICENSE）",
+        "license": "MiniMax 社区许可（年营收≤$20M 可商用，附署名/防护措施/内容披露义务）",
         "params": "8B 全局 LLM + 0.6B 局部 LLM + 2.4B Flow Matching",
         "capabilities": {"vocals": True, "lyrics_input": True, "max_duration_sec": 300,
                          "languages": "中/英等多语"},
@@ -75,7 +75,7 @@ MUSIC_CATALOG: list[dict] = [
         "id": "songgeneration-2",
         "name": "SongGeneration 2（LeVo 2）",
         "vendor": "腾讯 AI Lab × 清华大学",
-        "license": "开源（官方权重仓 gated 需申请，社区镜像公开）",
+        "license": "腾讯学术许可（仅学术/研究/教育，禁止商用；商用需洽谈）",
         "params": "4B（LLM+Diffusion 混合，分层表征）",
         "capabilities": {"vocals": True, "lyrics_input": True, "max_duration_sec": 270,
                          "languages": "中/英等多语"},
@@ -101,7 +101,7 @@ MUSIC_CATALOG: list[dict] = [
         "id": "yue",
         "name": "YuE",
         "vendor": "HKUST / 昆仑万维等联合开源",
-        "license": "Apache-2.0 代码（权重见模型卡）",
+        "license": "Apache-2.0（代码+权重）",
         "params": "LLaMA2 7B/13B 双编解码",
         "capabilities": {"vocals": True, "lyrics_input": True, "max_duration_sec": 240,
                          "languages": "中/英等多语"},
@@ -124,7 +124,7 @@ MUSIC_CATALOG: list[dict] = [
         "id": "khala",
         "name": "Khala",
         "vendor": "中央音乐学院 × 清华大学",
-        "license": "开源（见模型卡）",
+        "license": "已更名 Shao；权重 CC-BY-NC 4.0（2026-04 开源）",
         "params": "64 层残差声学 Token（RVQ）",
         "capabilities": {"vocals": True, "lyrics_input": True, "max_duration_sec": 240,
                          "languages": "中/英"},
@@ -138,8 +138,8 @@ MUSIC_CATALOG: list[dict] = [
         "local_runnable": False,
         "local_hf_id": None,
         "local_size_mb": 0,
-        "local_note": "暂无可核实的公开代码/权重仓库（2026-09 核查），本机通道待其"
-                      "开源后接入；走 Replicate 托管（slug 需自查填写）",
+        "local_note": "项目已开源并更名 Shao（2026-04 起；HF 权重 CC-BY-NC 4.0，仅"
+                      "非商用）；本机通道待评估接入；走 Replicate 托管（slug 需自查填写）",
         "replicate_slug": "",
         "recommended": False,
         "recommend_reason": "",
@@ -318,8 +318,8 @@ MUSIC_CATALOG_EN: dict[str, dict] = {
     },
     "minimax-music-3": {
         "vendor": "MiniMax",
-        "license": "Open weights (MiniMax Community License, opened 2026-08-13; see "
-                   "LICENSE for commercial terms)",
+        "license": "MiniMax Community License (commercial use allowed up to "
+                   "$20M annual revenue; attribution/protection/disclosure duties apply)",
         "params": "8B global LLM + 0.6B local LLM + 2.4B Flow Matching",
         "capabilities": {"languages": "Multilingual (Chinese, English, etc.)"},
         "benchmark": {
@@ -339,7 +339,7 @@ MUSIC_CATALOG_EN: dict[str, dict] = {
     "songgeneration-2": {
         "name": "SongGeneration 2 (LeVo 2)",
         "vendor": "Tencent AI Lab × Tsinghua University",
-        "license": "Open source (official weight repo is gated; community mirrors are public)",
+        "license": "Tencent academic license (academic/research/education only; no commercial use)",
         "params": "4B (hybrid LLM + diffusion, hierarchical representation)",
         "capabilities": {"languages": "Multilingual (Chinese, English, etc.)"},
         "benchmark": {
@@ -359,7 +359,7 @@ MUSIC_CATALOG_EN: dict[str, dict] = {
     },
     "yue": {
         "vendor": "HKUST / Kunlun Tech and others, joint open-source release",
-        "license": "Apache-2.0 code (weights per model card)",
+        "license": "Apache-2.0 (code + weights)",
         "params": "LLaMA2 7B/13B dual-track codecs",
         "capabilities": {"languages": "Multilingual (Chinese, English, etc.)"},
         "benchmark": {
@@ -374,7 +374,7 @@ MUSIC_CATALOG_EN: dict[str, dict] = {
     },
     "khala": {
         "vendor": "Central Conservatory of Music × Tsinghua University",
-        "license": "Open source (see model card)",
+        "license": "Renamed Shao; weights CC-BY-NC 4.0 (opened 2026-04)",
         "params": "64-layer residual acoustic tokens (RVQ)",
         "capabilities": {"languages": "Chinese / English"},
         "benchmark": {
@@ -384,13 +384,14 @@ MUSIC_CATALOG_EN: dict[str, dict] = {
                      "models for vocal clarity, instrument separation, and lyric-rhythm "
                      "alignment - well suited as a research base.",
         },
-        "local_note": "No verifiable public code or weight repository as of the 2026-09 "
-                      "review; the local channel will be added once it opens up. Use "
-                      "Replicate hosting (look up and fill in the slug yourself).",
+        "local_note": "The project has been open-sourced and renamed Shao (since "
+                      "2026-04; HF weights CC-BY-NC 4.0, non-commercial only); local "
+                      "channel integration is pending evaluation. Use Replicate hosting "
+                      "(look up and fill in the slug yourself).",
     },
     "diffrhythm": {
         "vendor": "ASLP-lab (Northwestern Polytechnical University) et al.",
-        "license": "Open source (see model card)",
+        "license": "Apache-2.0 (code + weights)",
         "params": "Latent full-song diffusion",
         "capabilities": {"languages": "Chinese / English"},
         "benchmark": {

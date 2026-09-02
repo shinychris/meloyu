@@ -3,6 +3,7 @@ from app.models.base import Base, BaseModel, ISOTimestamp, new_uuid, utc_now_iso
 from app.models.certificate import Certificate
 from app.models.llm_setting import SETTING_ID, LLMSetting, ModelOp
 from app.models.lyrics import LyricsProject
+from app.models.order import Order
 from app.models.plan import Plan, SequenceCounter, Subscription
 from app.models.task import File, Task
 from app.models.user import CreditTransaction, User
@@ -15,5 +16,5 @@ __all__ = [
     "Work", "Version", "Candidate", "EditEvent",
     "Task", "File",
     "Certificate", "LyricsProject",
-    "LLMSetting", "ModelOp", "SETTING_ID",
+    "LLMSetting", "ModelOp", "SETTING_ID", "Order",
 ]

@@ -1,9 +1,10 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useSessionStore } from '../../stores/session'
 import { useUiStore } from '../../stores/ui'
-import { planLabel, formatNum } from '../../lib/format'
+import { formatNum } from '../../lib/format'
 import { useT } from '../../i18n'
 import LangSwitch from '../common/LangSwitch'
+import AccountMenu from './AccountMenu'
 import type { TranslationKey } from '../../i18n'
 
 const NAV_GROUPS: Array<{
@@ -41,13 +42,12 @@ const NAV_GROUPS: Array<{
   },
 ]
 
-/** 212px 侧边栏（对齐原型：logo / 导航分组 / 新手引导 / 积分余额条） */
+/** 212px 侧边栏（对齐原型：logo / 导航分组 / 新手引导 / 积分余额条 / 账号菜单） */
 export default function Sidebar() {
   const navigate = useNavigate()
   const location = useLocation()
   const t = useT()
   const user = useSessionStore((s) => s.user)
-  const logout = useSessionStore((s) => s.logout)
   const startOnboarding = useUiStore((s) => s.startOnboarding)
 
   const balance = user?.credits.balance ?? 0
@@ -56,17 +56,17 @@ export default function Sidebar() {
 
   return (
     <aside
-      className="w-[212px] flex-none border-r flex flex-col"
+      className="sidebar w-[212px] flex-none border-r flex flex-col"
       style={{ borderColor: 'var(--line)', background: 'var(--bg)' }}
     >
-      <div className="px-[18px] pt-6 pb-5">
+      <div className="sidebar-head px-[18px] pt-6 pb-5">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/studio')}>
           <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
             <rect x="1" y="1" width="20" height="20" stroke="#00ff2c" strokeWidth="2" />
             <rect x="6" y="9" width="3" height="7" fill="#fff" />
             <rect x="11" y="5" width="3" height="11" fill="#00ff2c" />
           </svg>
-          <div>
+          <div className="sidebar-head-text">
             <div className="text-[15px] font-extrabold tracking-tight leading-none">MELOYU</div>
             <div className="text-[10px] mt-1" style={{ color: 'var(--dim)' }}>
               {t('app.sidebar.tagline')}
@@ -98,8 +98,8 @@ export default function Sidebar() {
           </div>
         ))}
       </nav>
-      {/* pb 预留底部固定播放器(68px)的遮挡带，保证积分区与退出按钮可点击 */}
-      <div className="rule-t px-[18px] pt-[18px] pb-[84px]">
+      {/* pb 预留底部固定播放器(68px)的遮挡带，保证积分区与账号菜单可点击 */}
+      <div className="sidebar-bottom rule-t px-[18px] pt-[18px] pb-[84px]">
         <button className="btn btn-ghost w-full !py-1.5 text-[11px] mb-3" onClick={startOnboarding}>
           {t('app.sidebar.onboarding')}
         </button>
@@ -112,23 +112,9 @@ export default function Sidebar() {
         <div className="h-[3px] mt-2" style={{ background: 'var(--bg3)' }}>
           <div className="h-full" style={{ width: `${barPct}%`, background: 'var(--acc)' }}></div>
         </div>
-        <div className="text-[10px] mt-2 flex items-center justify-between" style={{ color: 'var(--dim)' }}>
-          <span>
-            {user ? planLabel(user.plan) : t('app.sidebar.notLoggedIn')} · {t('app.sidebar.transferable')}
-          </span>
-          <button
-            className="font-bold"
-            style={{ color: 'var(--dim)' }}
-            title={t('app.sidebar.logoutTitle')}
-            onClick={() => {
-              logout()
-              navigate('/login')
-            }}
-          >
-            {t('app.sidebar.logout')}
-          </button>
-        </div>
-        <div className="mt-3 flex">
+        {/* 账号管理区：档位行 + 弹出菜单（改密/导出/登出全部/删号/登出） */}
+        <AccountMenu />
+        <div className="mt-3 flex sidebar-lang">
           <LangSwitch />
         </div>
       </div>

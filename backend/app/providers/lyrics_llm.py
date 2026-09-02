@@ -11,10 +11,10 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 
+from app.core.i18n import tr
 from app.providers.llm.base import LLMError, extract_json
 from app.providers.lyrics_local import LocalLyricsProvider, check_sensitive
 from app.synth.structure import parse_lyrics
-from app.core.i18n import tr
 
 ChatFn = Callable[[str, str], str]
 

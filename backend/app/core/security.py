@@ -1,10 +1,15 @@
-"""JWT 签发/校验、bcrypt、get_current_user 依赖（架构 ADR-007：PyJWT + bcrypt）。"""
+"""JWT 签发/校验、bcrypt、get_current_user 依赖（架构 ADR-007：PyJWT + bcrypt）。
+
+P1-3（v0.7.0）：access 24h + refresh 30d 轮换（单设备会话语义：新 refresh 覆写
+users.refresh_token_hash，旧 refresh 自动失效；登出/改密/重置/注销清空即吊销全部）。
+"""
 from __future__ import annotations
 
 import base64
 import hashlib
 import hmac
 import json
+import secrets
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
@@ -19,8 +24,11 @@ from app.database import get_db
 from app.models import User
 
 JWT_ALGORITHM = "HS256"
-TOKEN_TTL_SEC = 7 * 24 * 3600  # 7 天（契约 §1.2）
+ACCESS_TOKEN_TTL_SEC = 24 * 3600          # access 24 小时（契约 §1.2，v0.7.0 由 7 天收紧）
+REFRESH_TOKEN_TTL_SEC = 30 * 24 * 3600    # refresh 30 天，轮换式
+TOKEN_TTL_SEC = ACCESS_TOKEN_TTL_SEC      # 兼容旧引用（expires_in 等展示口径）
 BCRYPT_ROUNDS = 12
+RESET_TOKEN_TTL_SEC = 30 * 60             # 找回密码重置令牌 30 分钟
 
 
 def hash_password(plain: str) -> str:
@@ -39,20 +47,80 @@ def create_access_token(user: User) -> str:
     payload = {
         "sub": user.id,
         "plan": user.plan,
+        "typ": "access",
         "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(seconds=TOKEN_TTL_SEC)).timestamp()),
+        "exp": int((now + timedelta(seconds=ACCESS_TOKEN_TTL_SEC)).timestamp()),
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=JWT_ALGORITHM)
 
 
-def decode_access_token(token: str) -> dict:
-    """解码并校验 JWT；过期抛 40102，其余无效抛 40101。"""
+def create_reset_token(user: User) -> str:
+    """找回密码重置令牌（短效 JWT，typ=reset；仅用于重置流程，不作 API 凭证）。"""
+    now = datetime.now(UTC)
+    payload = {
+        "sub": user.id,
+        "typ": "reset",
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(seconds=RESET_TOKEN_TTL_SEC)).timestamp()),
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm=JWT_ALGORITHM)
+
+
+def decode_reset_token(token: str) -> str | None:
+    """校验重置令牌；有效返回 user_id，无效/过期/类型不符返回 None。"""
     try:
-        return jwt.decode(token, settings.jwt_secret, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[JWT_ALGORITHM])
+    except jwt.InvalidTokenError:
+        return None
+    if payload.get("typ") != "reset":
+        return None
+    return payload.get("sub")
+
+
+# ---- 刷新令牌（随机串 + sha256 复合存储 "<expiry_iso>|<sha256>"，轮换即覆写）----
+
+
+def _refresh_record(token: str, expires: datetime) -> str:
+    digest = hashlib.sha256(token.encode("ascii")).hexdigest()
+    return f"{expires.strftime('%Y-%m-%dT%H:%M:%SZ')}|{digest}"
+
+
+def issue_refresh_token(user: User) -> tuple[str, int]:
+    """生成并挂载刷新令牌（不落库，由调用方 commit）；返回 (明文, ttl 秒)。"""
+    token = secrets.token_urlsafe(48)
+    expires = datetime.now(UTC) + timedelta(seconds=REFRESH_TOKEN_TTL_SEC)
+    user.refresh_token_hash = _refresh_record(token, expires)
+    return token, REFRESH_TOKEN_TTL_SEC
+
+
+def verify_refresh_token(user: User, token: str) -> bool:
+    record = user.refresh_token_hash or ""
+    try:
+        expires_iso, digest = record.split("|", 1)
+    except ValueError:
+        return False
+    if expires_iso <= datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"):
+        return False
+    return hmac.compare_digest(digest,
+                               hashlib.sha256(token.encode("ascii")).hexdigest())
+
+
+def revoke_refresh_token(user: User) -> None:
+    user.refresh_token_hash = None
+
+
+def decode_access_token(token: str) -> dict:
+    """解码并校验 JWT；过期抛 40102，其余无效（含 typ 非 access）抛 40101。"""
+    try:
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[JWT_ALGORITHM])
     except jwt.ExpiredSignatureError:
         raise err_token_expired() from None
     except jwt.InvalidTokenError:
         raise err_unauthenticated() from None
+    # typ 缺省视为 access（升级前签发的旧 7 天 token 兼容）；reset 等专用令牌禁作凭证
+    if payload.get("typ") not in ("access", None):
+        raise err_unauthenticated()
+    return payload
 
 
 def _extract_bearer(request: Request) -> str | None:

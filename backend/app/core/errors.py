@@ -26,8 +26,8 @@ def err_token_expired() -> BizError:
     return BizError(40102, tr("令牌已过期", "Token expired"), 401)
 
 
-def err_bad_credentials() -> BizError:
-    return BizError(40103, tr("邮箱或密码错误", "Incorrect email or password"), 401)
+def err_bad_credentials(msg: str | None = None) -> BizError:
+    return BizError(40103, msg or tr("邮箱或密码错误", "Incorrect email or password"), 401)
 
 
 def err_payment_required(msg: str) -> BizError:

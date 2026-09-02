@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.crypto import decrypt_secret, encrypt_secret
 from app.core.errors import err_conflict, err_not_found, err_validation
 from app.core.i18n import current_locale, run_with_locale, tr
 from app.core.logging import logger
@@ -27,13 +28,21 @@ from app.providers.music_acestep import (
     ACEStepLocalProvider,
     acestep_deps_installed,
     acestep_install_hint,
+)
+from app.providers.music_acestep import (
     delete_local as acestep_delete_local,
+)
+from app.providers.music_acestep import (
     local_downloaded_ids as acestep_downloaded_ids,
+)
+from app.providers.music_acestep import (
     pull_local as acestep_pull_local,
 )
 from app.providers.music_api import APIMusicProvider, MusicAPIError, SunoCompatClient
 from app.providers.music_catalog import (
     ACESTEP_RUNNABLE_IDS as _ACESTEP_IDS,
+)
+from app.providers.music_catalog import (
     CATALOG_BY_ID,
     LOCAL_RUNNABLE_IDS,
     catalog_disclaimer,
@@ -52,10 +61,8 @@ from app.providers.music_musicgen import (
 from app.providers.music_replicate import ReplicateClient, ReplicateError, ReplicateMusicProvider
 from app.providers.music_selfhosted import (
     MiniMaxSelfHostedProvider,
-    SelfHostedError,
     SongGenSelfHostedProvider,
     probe_service,
-    service_host,
 )
 
 _op_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="meloyu-model-op")
@@ -248,12 +255,14 @@ def update_settings(db: Session, patch: dict) -> dict:
             if len(v) > 300:
                 raise err_validation(tr(f"{field} 过长", f"{field} is too long"))
             setattr(s, field, v)
+    # P1-2：key/token 落库一律 Fernet 加密（KEY_ENCRYPTION_SECRET 未配置时明文直通）
     if patch.get("external_api_key"):  # 空串=保持不变（脱敏读回无法回显）
-        s.external_api_key = str(patch["external_api_key"]).strip()
+        s.external_api_key = encrypt_secret(str(patch["external_api_key"]).strip())
     if patch.get("music_api_key"):
-        s.music_api_key = str(patch["music_api_key"]).strip()
+        s.music_api_key = encrypt_secret(str(patch["music_api_key"]).strip())
     if "replicate_api_token" in patch:  # V1.4：显式空串=清除（前端仅在输入时携带该字段）
-        s.replicate_api_token = str(patch.get("replicate_api_token") or "").strip()
+        s.replicate_api_token = encrypt_secret(
+            str(patch.get("replicate_api_token") or "").strip())
     if isinstance(patch.get("replicate_slugs"), dict):
         slugs = {}
         for mid, slug in patch["replicate_slugs"].items():
@@ -338,7 +347,8 @@ def song_engine_label(db: Session) -> str:
     s = _setting_row(db)
     if s.music_backend == "api" and s.music_api_base_url:
         try:
-            provider = APIMusicProvider(s.music_api_base_url, s.music_api_key,
+            provider = APIMusicProvider(s.music_api_base_url,
+                                    decrypt_secret(s.music_api_key),
                                         s.music_api_model)
             return provider.display_name
         except Exception as e:  # noqa: BLE001 —— 展示用标签，构造失败不阻断
@@ -554,7 +564,8 @@ def get_lyrics_provider(db: Session):
         if s.lyrics_backend == "openai_compat":
             if not (s.external_base_url and s.external_model):
                 return LocalLyricsProvider()
-            client = OpenAICompatClient(s.external_base_url, s.external_api_key,
+            client = OpenAICompatClient(s.external_base_url,
+                                       decrypt_secret(s.external_api_key),
                                         s.external_model)
             return LLMLyricsProvider(
                 chat=lambda sys, p: client.chat(sys, p),
@@ -602,12 +613,14 @@ def get_music_provider(db: Session):
         entry = CATALOG_BY_ID.get(s.music_model) if s.music_model else None
         try:
             if s.music_backend == "api" and s.music_api_base_url:
-                return APIMusicProvider(s.music_api_base_url, s.music_api_key,
+                return APIMusicProvider(s.music_api_base_url,
+                                         decrypt_secret(s.music_api_key),
                                         s.music_api_model)
             if s.music_backend == "replicate" and s.replicate_api_token and entry:
                 slug = (s.replicate_slugs or {}).get(s.music_model) \
                     or entry.get("replicate_slug") or ""
-                return ReplicateMusicProvider(s.replicate_api_token, s.music_model, slug)
+                return ReplicateMusicProvider(decrypt_secret(s.replicate_api_token),
+                                               s.music_model, slug)
             if s.music_backend == "musicgen_local" and entry:
                 return MusicGenLocalProvider(s.music_model)
             if s.music_backend == "acestep_local" and entry:

@@ -215,7 +215,7 @@ export default function LibraryView() {
           ))}
         </div>
       </header>
-      <div className="rule-t flex-1 overflow-y-auto">
+      <div className="rule-t flex-1 overflow-y-auto list-scroll">
         {filter !== 'trash' && (
           <div className="row !cursor-default" style={{ color: 'var(--dim)' }}>
             <span className="label">{t('library.col.no')}</span>

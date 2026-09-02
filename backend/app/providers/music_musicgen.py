@@ -69,6 +69,30 @@ def _apply_hf_endpoint() -> None:
 # （重启服务后自动恢复尝试 GPU）
 _CUDA_POISONED = {"flag": False}
 
+# P1-9 模型常驻缓存：同一模型在进程生命周期内只 from_pretrained 一次
+# （原实现每次生成都冷加载权重，small 也要分钟级）。GPU 采样全程持锁串行
+# （transformers generate 非线程安全，且单卡显存本就只能串行）。
+_MODEL_CACHE: dict[str, tuple] = {}
+_GEN_LOCK = __import__("threading").Lock()
+
+
+def _load_or_get(hf_id: str, device: str):
+    """加载或复用常驻模型；返回 (model, processor, sampling_rate)。"""
+    if f"{hf_id}@{device}" not in _MODEL_CACHE:
+        from transformers import AutoProcessor, MusicgenForConditionalGeneration
+        model = MusicgenForConditionalGeneration.from_pretrained(
+            hf_id, cache_dir=str(hf_cache_dir())).to(device)
+        processor = AutoProcessor.from_pretrained(hf_id, cache_dir=str(hf_cache_dir()))
+        _MODEL_CACHE[f"{hf_id}@{device}"] = (model, processor,
+                                             model.config.audio_encoder.sampling_rate)
+    return _MODEL_CACHE[f"{hf_id}@{device}"]
+
+
+def _evict_model_cache(hf_id: str | None = None) -> None:
+    """清缓存（模型删除后/毒化降级时调用，防引用已删权重）。"""
+    for k in [k for k in _MODEL_CACHE if hf_id is None or k.startswith(f"{hf_id}@")]:
+        _MODEL_CACHE.pop(k, None)
+
 
 class MusicGenLocalError(Exception):
     """MusicGen 本地通道错误。kind ∈ deps|download|runtime。"""
@@ -105,6 +129,7 @@ def local_downloaded_ids() -> list[str]:
 
 
 def delete_local(model_id: str) -> None:
+    _evict_model_cache()  # 删除权重后弃用常驻实例（防引用已删文件）
     entry = CATALOG_BY_ID.get(model_id)
     if not entry or not entry.get("local_hf_id"):
         raise MusicGenLocalError(
@@ -204,23 +229,26 @@ class MusicGenLocalProvider:
                    f"Model weights not downloaded: {self.hf_id} (download them in the "
                    f"model center first)"))
 
-        import torch
-        from transformers import AutoProcessor, MusicgenForConditionalGeneration
 
         _apply_hf_endpoint()
+        with _GEN_LOCK:  # GPU 采样串行（generate 非线程安全 + 单卡显存互斥）
+            return self._generate_locked(request, progress, should_cancel, dest_dir)
+
+    def _generate_locked(self, request, progress, should_cancel, dest_dir: str
+                         ) -> GenerationOutput:
+        import torch
 
         # GPU 优先；进程内曾触发 CUDA 设备断言后禁用（断言会毒化上下文并拖死进程）
         device = "cpu" if _CUDA_POISONED["flag"] else (
             "cuda" if torch.cuda.is_available() else "cpu")
         duration = min(request.duration_sec, self.max_duration)
+        first_load = f"{self.hf_id}@{device}" not in _MODEL_CACHE
         _stage(progress, should_cancel, "model_load", 4,
-               tr(f"加载本地模型 {self.hf_id}（{device.upper()}，首次加载较慢）",
-                  f"Loading local model {self.hf_id} ({device.upper()}; first load is "
-                  f"slow)"))
-        model = MusicgenForConditionalGeneration.from_pretrained(
-            self.hf_id, cache_dir=str(hf_cache_dir())).to(device)
-        processor = AutoProcessor.from_pretrained(self.hf_id, cache_dir=str(hf_cache_dir()))
-        sr = model.config.audio_encoder.sampling_rate
+               tr(f"加载本地模型 {self.hf_id}（{device.upper()}，"
+                  + ("首次加载较慢" if first_load else "常驻已就绪") + "）",
+                  f"Loading local model {self.hf_id} ({device.upper()}; "
+                  + ("first load is slow" if first_load else "resident ready") + ")"))
+        model, processor, sr = _load_or_get(self.hf_id, device)
 
         desc = (f"{request.style_prompt or 'instrumental music'}. "
                 f"{request.bpm} BPM, {request.mode} key, instrumental.")
@@ -268,7 +296,7 @@ class MusicGenLocalProvider:
             # CUDA 设备断言：上下文已毒化——本进程后续禁用 CUDA，换 CPU 重载重试
             _CUDA_POISONED["flag"] = True
             logger.warning(f"musicgen CUDA 采样失败（设备断言类），本进程降级 CPU 重试: {e}")
-            del model
+            _evict_model_cache(self.hf_id)  # 弃用已加载实例（含毒化的 GPU 实例）
             try:
                 torch.cuda.empty_cache()
             except RuntimeError:  # noqa: BLE001 —— 清理失败不影响 CPU 重试
@@ -278,8 +306,7 @@ class MusicGenLocalProvider:
                       "GPU sampling error; retrying on CPU (GPU disabled for this "
                       "process)"))
             device = "cpu"
-            model = MusicgenForConditionalGeneration.from_pretrained(
-                self.hf_id, cache_dir=str(hf_cache_dir()))
+            model, processor, sr = _load_or_get(self.hf_id, device)
             inputs = processor(text=[desc, desc], padding=True, return_tensors="pt")
             audio = _sample(inputs, model, device)
         _stage(progress, should_cancel, "model_export", 88, tr("导出音频…", "Exporting audio…"))

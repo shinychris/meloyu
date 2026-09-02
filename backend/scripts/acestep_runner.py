@@ -131,8 +131,8 @@ def run_generate(request_path: str, outdir: str) -> None:
     dest = Path(outdir)
 
     from acestep.handler import AceStepHandler
-    from acestep.llm_inference import LLMHandler
     from acestep.inference import GenerationConfig, GenerationParams, generate_music
+    from acestep.llm_inference import LLMHandler
     from acestep.model_downloader import get_checkpoints_dir
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
