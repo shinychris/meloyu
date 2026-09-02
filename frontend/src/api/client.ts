@@ -9,6 +9,7 @@
 import axios, { AxiosError, type AxiosRequestConfig } from 'axios'
 import { getToken, clearToken } from '../lib/token'
 import { useToastStore } from '../stores/toast'
+import { t, getLocale } from '../i18n'
 
 export class ApiError extends Error {
   code: number
@@ -32,6 +33,8 @@ export const http = instance
 instance.interceptors.request.use((config) => {
   const token = getToken()
   if (token) config.headers.Authorization = `Bearer ${token}`
+  // 后端按此 header 返回本地化的 message / 目录文案
+  config.headers['Accept-Language'] = getLocale()
   return config
 })
 
@@ -58,7 +61,7 @@ instance.interceptors.response.use(
     const body = res.data as EnvelopeLike
     if (body && typeof body === 'object' && typeof body.code === 'number') {
       if (body.code !== 0) {
-        const err = new ApiError(body.code, body.message ?? '请求失败', res.config.url ?? '')
+        const err = new ApiError(body.code, body.message ?? t('api.requestFailed'), res.config.url ?? '')
         if (isAuthExpired(err.code)) {
           redirectToLogin()
         } else {
@@ -73,15 +76,15 @@ instance.interceptors.response.use(
   (error: AxiosError) => {
     const status = error.response?.status
     let code = 50001
-    let message = '服务暂不可用，请稍后重试'
+    let message = t('api.serverUnavailable')
     const body = error.response?.data as EnvelopeLike | undefined
     if (body && typeof body === 'object' && typeof body.code === 'number') {
       code = body.code
       message = body.message ?? message
     } else if (status != null) {
-      message = status >= 500 ? '服务内部错误，请稍后重试' : `请求失败（HTTP ${status}）`
+      message = status >= 500 ? t('api.internalError') : t('api.httpError', { status })
     } else if (error.code === 'ECONNABORTED') {
-      message = '请求超时，请检查网络'
+      message = t('api.timeout')
     }
     const err = new ApiError(code, message, error.config?.url ?? '')
     if (isAuthExpired(code)) {

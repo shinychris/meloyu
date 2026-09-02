@@ -1,12 +1,18 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import {
   formatDuration,
   formatDateTime,
   formatNum,
   formatBytes,
   keyLabel,
-  PLAN_LABEL,
+  planLabel,
 } from './format'
+import { useI18nStore } from '../i18n'
+
+afterEach(() => {
+  // 测试默认语言为 en；显式切过语言的用例恢复
+  useI18nStore.setState({ locale: 'en' })
+})
 
 describe('formatDuration', () => {
   it('秒数转 mm:ss', () => {
@@ -48,13 +54,18 @@ describe('formatNum / formatBytes / keyLabel', () => {
     expect(formatBytes(2048)).toBe('2.0 KB')
     expect(formatBytes(5 * 1024 * 1024)).toBe('5.0 MB')
   })
-  it('调性显示', () => {
+  it('调性显示（默认 en）', () => {
+    expect(keyLabel({ tonic: 'A', mode: 'minor' })).toBe('A Minor')
+    expect(keyLabel({ tonic: 'C', mode: 'major' })).toBe('C Major')
+  })
+  it('调性显示（zh）', () => {
+    useI18nStore.setState({ locale: 'zh' })
     expect(keyLabel({ tonic: 'A', mode: 'minor' })).toBe('A 小调')
     expect(keyLabel({ tonic: 'C', mode: 'major' })).toBe('C 大调')
   })
-  it('档位名称齐全', () => {
+  it('档位名称齐全（en）', () => {
     for (const code of ['free', 'pro', 'studio', 'team'] as const) {
-      expect(PLAN_LABEL[code].length).toBeGreaterThan(0)
+      expect(planLabel(code).length).toBeGreaterThan(0)
     }
   })
 })

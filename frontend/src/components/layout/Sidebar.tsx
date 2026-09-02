@@ -1,36 +1,42 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useSessionStore } from '../../stores/session'
 import { useUiStore } from '../../stores/ui'
-import { PLAN_LABEL, formatNum } from '../../lib/format'
+import { planLabel, formatNum } from '../../lib/format'
+import { useT } from '../../i18n'
+import LangSwitch from '../common/LangSwitch'
+import type { TranslationKey } from '../../i18n'
 
-const NAV_GROUPS: Array<{ label: string; items: Array<{ to: string; label: string; kbd: string }> }> = [
+const NAV_GROUPS: Array<{
+  labelKey: TranslationKey
+  items: Array<{ to: string; labelKey: TranslationKey; kbd: string }>
+}> = [
   {
-    label: '创作',
+    labelKey: 'app.sidebar.group.create',
     items: [
-      { to: '/studio', label: '创作工作台', kbd: '1' },
-      { to: '/lyrics', label: '歌词助手', kbd: '2' },
+      { to: '/studio', labelKey: 'app.sidebar.nav.studio', kbd: '1' },
+      { to: '/lyrics', labelKey: 'app.sidebar.nav.lyrics', kbd: '2' },
     ],
   },
   {
-    label: '制作',
+    labelKey: 'app.sidebar.group.produce',
     items: [
-      { to: '/arrange', label: '编曲', kbd: '3' },
-      { to: '/edit', label: '音频剪辑', kbd: '4' },
-      { to: '/pitch', label: '修调', kbd: '5' },
+      { to: '/arrange', labelKey: 'app.sidebar.nav.arrange', kbd: '3' },
+      { to: '/edit', labelKey: 'app.sidebar.nav.edit', kbd: '4' },
+      { to: '/pitch', labelKey: 'app.sidebar.nav.pitch', kbd: '5' },
     ],
   },
   {
-    label: '资产与权利',
+    labelKey: 'app.sidebar.group.assets',
     items: [
-      { to: '/library', label: '作品库', kbd: '6' },
-      { to: '/rights', label: '合规与权利中心', kbd: '7' },
+      { to: '/library', labelKey: 'app.sidebar.nav.library', kbd: '6' },
+      { to: '/rights', labelKey: 'app.sidebar.nav.rights', kbd: '7' },
     ],
   },
   {
-    label: '账户',
+    labelKey: 'app.sidebar.group.account',
     items: [
-      { to: '/pricing', label: '定价与积分', kbd: '8' },
-      { to: '/models', label: '模型中心', kbd: '9' },
+      { to: '/pricing', labelKey: 'app.sidebar.nav.pricing', kbd: '8' },
+      { to: '/models', labelKey: 'app.sidebar.nav.models', kbd: '9' },
     ],
   },
 ]
@@ -39,6 +45,7 @@ const NAV_GROUPS: Array<{ label: string; items: Array<{ to: string; label: strin
 export default function Sidebar() {
   const navigate = useNavigate()
   const location = useLocation()
+  const t = useT()
   const user = useSessionStore((s) => s.user)
   const logout = useSessionStore((s) => s.logout)
   const startOnboarding = useUiStore((s) => s.startOnboarding)
@@ -62,15 +69,15 @@ export default function Sidebar() {
           <div>
             <div className="text-[15px] font-extrabold tracking-tight leading-none">MELOYU</div>
             <div className="text-[10px] mt-1" style={{ color: 'var(--dim)' }}>
-              旋律屿 · 专业 AI 音乐制作
+              {t('app.sidebar.tagline')}
             </div>
           </div>
         </div>
       </div>
       <nav className="rule-t pt-3 flex-1 overflow-y-auto">
         {NAV_GROUPS.map((group) => (
-          <div key={group.label}>
-            <div className="label px-[18px] pt-5 pb-2">{group.label}</div>
+          <div key={group.labelKey}>
+            <div className="label px-[18px] pt-5 pb-2">{t(group.labelKey)}</div>
             {group.items.map((item) => {
               const on =
                 item.to === '/library'
@@ -83,7 +90,7 @@ export default function Sidebar() {
                   onClick={() => navigate(item.to)}
                 >
                   <span className="dot"></span>
-                  {item.label}
+                  {t(item.labelKey)}
                   <span className="kbd">{item.kbd}</span>
                 </div>
               )
@@ -94,10 +101,10 @@ export default function Sidebar() {
       {/* pb 预留底部固定播放器(68px)的遮挡带，保证积分区与退出按钮可点击 */}
       <div className="rule-t px-[18px] pt-[18px] pb-[84px]">
         <button className="btn btn-ghost w-full !py-1.5 text-[11px] mb-3" onClick={startOnboarding}>
-          新手引导
+          {t('app.sidebar.onboarding')}
         </button>
         <div className="flex items-center justify-between">
-          <span className="label">积分余额</span>
+          <span className="label">{t('app.sidebar.credits')}</span>
           <span className="text-[11px] font-bold num" style={{ color: 'var(--acc)' }}>
             {formatNum(balance)}
           </span>
@@ -106,18 +113,23 @@ export default function Sidebar() {
           <div className="h-full" style={{ width: `${barPct}%`, background: 'var(--acc)' }}></div>
         </div>
         <div className="text-[10px] mt-2 flex items-center justify-between" style={{ color: 'var(--dim)' }}>
-          <span>{user ? PLAN_LABEL[user.plan] : '未登录'} · 积分可结转</span>
+          <span>
+            {user ? planLabel(user.plan) : t('app.sidebar.notLoggedIn')} · {t('app.sidebar.transferable')}
+          </span>
           <button
             className="font-bold"
             style={{ color: 'var(--dim)' }}
-            title="退出登录"
+            title={t('app.sidebar.logoutTitle')}
             onClick={() => {
               logout()
               navigate('/login')
             }}
           >
-            退出
+            {t('app.sidebar.logout')}
           </button>
+        </div>
+        <div className="mt-3 flex">
+          <LangSwitch />
         </div>
       </div>
     </aside>

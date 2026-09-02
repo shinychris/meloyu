@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.errors import err_validation
+from app.core.i18n import tr
 from app.core.responses import ok
 from app.core.security import get_current_user
 from app.database import get_db
@@ -25,9 +26,9 @@ def list_tasks(type: str | None = Query(default=None),
                user: User = Depends(get_current_user),
                db: Session = Depends(get_db)):
     if type is not None and type not in TASK_TYPES:
-        raise err_validation("type 必须为 generation/export")
+        raise err_validation(tr("type 必须为 generation/export", "type must be generation/export"))
     if status is not None and status not in TASK_STATUSES:
-        raise err_validation("status 取值非法")
+        raise err_validation(tr("status 取值非法", "Invalid status value"))
     return ok(gen_svc.list_tasks(db, user, type_=type, status=status, work_id=work_id,
                                  page=page, page_size=min(page_size, 100)))
 

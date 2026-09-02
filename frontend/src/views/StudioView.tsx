@@ -5,6 +5,7 @@ import { useMetaStore } from '../stores/meta'
 import { toast } from '../stores/toast'
 import { countStructureTags } from '../lib/structure'
 import { getModelsRuntime } from '../api/models'
+import { useT, useI18nStore, type TranslationKey } from '../i18n'
 import StepBar from '../components/studio/StepBar'
 import InspireBox from '../components/studio/InspireBox'
 import ParamPanel from '../components/studio/ParamPanel'
@@ -12,16 +13,17 @@ import GenProgress from '../components/studio/GenProgress'
 import CandidateCard from '../components/studio/CandidateCard'
 import VersionTree from '../components/studio/VersionTree'
 
-const MODE_HINTS: Record<string, string> = {
-  simple: '一句话模式：用自然语言描述整首歌',
-  custom: '自定义模式：风格 + 结构标签歌词 + 参数',
-  ref: '参考音频：V1.1 上线（上传音频作风格参考）',
-  hum: '哼唱成歌：V1.1 上线（录一段哼唱，AI 补全）',
+const MODE_HINTS: Record<string, TranslationKey> = {
+  simple: 'studio.modeHint.simple',
+  custom: 'studio.modeHint.custom',
+  ref: 'studio.modeHint.ref',
+  hum: 'studio.modeHint.hum',
 }
 
 /** 创作工作台（原型核心视图：左控制 / 中结果 / 右版本树） */
 export default function StudioView() {
   const navigate = useNavigate()
+  const t = useT()
   const [songEngine, setSongEngine] = useState('')
   const form = useStudioStore((s) => s.form)
   const { patchForm, markStep, submitGeneration } = useStudioStore()
@@ -38,21 +40,23 @@ export default function StudioView() {
   const generating =
     submitting || (task != null && (task.status === 'queued' || task.status === 'running'))
 
-  // V1.3：显示当前歌曲引擎（模型中心可切换：本地合成 / 外部歌曲 API）
+  // V1.3：显示当前歌曲引擎（模型中心可切换：本地合成 / 外部歌曲 API）；
+  // 依赖 locale——后端按 Accept-Language 返回本地化引擎名，切语言后重拉
+  const locale = useI18nStore((s) => s.locale)
   useEffect(() => {
     getModelsRuntime()
       .then((rt) => setSongEngine(rt.song_engine))
       .catch(() => {})
-  }, [])
+  }, [locale])
 
   const onMode = (mode: string) => {
     if (mode === 'ref' || mode === 'hum') {
-      toast(MODE_HINTS[mode], 'warn')
+      toast(t(MODE_HINTS[mode]), 'warn')
       return
     }
     patchForm({ mode: mode as typeof form.mode })
     markStep(1)
-    toast(MODE_HINTS[mode])
+    toast(t(MODE_HINTS[mode]))
   }
 
   const insertTag = (tag: string) => {
@@ -74,7 +78,9 @@ export default function StudioView() {
     useStudioStore.getState().applyInspireToPrompt(next)
     markStep(1)
     useStudioStore.getState().logOp(
-      `灵感指引：${[next.genre, next.mood, next.inst, next.scene].filter(Boolean).join(' / ')}`,
+      t('studio.log.inspire', {
+        detail: [next.genre, next.mood, next.inst, next.scene].filter(Boolean).join(' / '),
+      }),
     )
   }
 
@@ -83,22 +89,22 @@ export default function StudioView() {
       <header className="px-8 pt-6 pb-4">
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
-            <div className="label">Studio / 创作工作台</div>
-            <h1 className="text-[28px] font-extrabold tracking-tight mt-1">从一句描述，到可发行的歌</h1>
+            <div className="label">{t('studio.view.label')}</div>
+            <h1 className="text-[28px] font-extrabold tracking-tight mt-1">{t('studio.view.headline')}</h1>
           </div>
           <div className="flex items-center gap-3 text-[11px]" style={{ color: 'var(--muted)' }}>
             <span className="flex items-center gap-2">
               <span className="dot" style={{ background: 'var(--acc)' }}></span>
-              {modelLabel} · 中文人声优化
+              {modelLabel} · {t('studio.view.vocalOptimized')}
             </span>
             {songEngine && (
               <span
                 className="text-[10px] font-bold px-2 py-1 cursor-pointer"
                 style={{ background: 'var(--bg2)', border: '1px solid var(--line)', color: 'var(--dim)' }}
-                title="在模型中心切换歌曲引擎（本地合成 / 外部歌曲生成 API）；歌词引擎也在此配置"
+                title={t('studio.view.songEngineTitle')}
                 onClick={() => navigate('/models')}
               >
-                歌曲引擎：{songEngine} ⇄
+                {t('studio.view.songEngine', { name: songEngine })}
               </span>
             )}
           </div>
@@ -109,40 +115,40 @@ export default function StudioView() {
       <div className="grid grid-cols-[360px_1fr_200px] rule-t flex-1 min-h-0">
         {/* 左：控制列 */}
         <div className="border-r px-6 py-5 overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
-          <div className="label">模式</div>
+          <div className="label">{t('studio.mode')}</div>
           <div className="flex gap-1.5 mt-2 flex-wrap">
             <span className={`chip ${form.mode === 'simple' ? 'on' : ''}`} onClick={() => onMode('simple')}>
-              一句话
+              {t('studio.mode.simple')}
             </span>
             <span className={`chip ${form.mode === 'custom' ? 'on' : ''}`} onClick={() => onMode('custom')}>
-              自定义
+              {t('studio.mode.custom')}
             </span>
             <span
               className="chip disabled"
-              title="V1.1 上线"
+              title={t('studio.mode.comingSoon')}
               style={{ opacity: 0.35, cursor: 'not-allowed' }}
               onClick={() => onMode('ref')}
             >
-              参考音频
+              {t('studio.mode.ref')}
             </span>
             <span
               className="chip disabled"
-              title="V1.1 上线"
+              title={t('studio.mode.comingSoon')}
               style={{ opacity: 0.35, cursor: 'not-allowed' }}
               onClick={() => onMode('hum')}
             >
-              哼唱成歌
+              {t('studio.mode.hum')}
             </span>
           </div>
 
           {form.mode === 'simple' ? (
             <>
-              <div className="label mt-4">一句话描述</div>
+              <div className="label mt-4">{t('studio.simple.label')}</div>
               <textarea
                 rows={3}
                 className="mt-2"
                 maxLength={200}
-                placeholder="例：写一首雨夜便利店的华语流行，钢琴伴奏，女声"
+                placeholder={t('studio.simple.placeholder')}
                 value={form.simplePrompt}
                 onChange={(e) => {
                   patchForm({ simplePrompt: e.target.value })
@@ -150,7 +156,7 @@ export default function StudioView() {
                 }}
               />
               <div className="text-[10px] mt-1.5 leading-relaxed" style={{ color: 'var(--dim)' }}>
-                歌词与结构将按描述自动生成；也可切到「歌词助手」先写词。
+                {t('studio.simple.hint')}
               </div>
             </>
           ) : (
@@ -159,7 +165,7 @@ export default function StudioView() {
 
           {form.mode === 'custom' && (
             <>
-              <div className="label mt-4">风格描述</div>
+              <div className="label mt-4">{t('studio.style.label')}</div>
               <textarea
                 rows={3}
                 className="mt-2"
@@ -176,7 +182,7 @@ export default function StudioView() {
           {form.mode === 'custom' && (
             <>
               <div className="label mt-4">
-                歌词 <span className="normal-case tracking-normal" style={{ color: 'var(--dim)' }}>（已识别 {tagCount} 段结构标签）</span>
+                {t('studio.lyrics.label')} <span className="normal-case tracking-normal" style={{ color: 'var(--dim)' }}>{t('studio.lyrics.tagCount', { n: tagCount })}</span>
               </div>
               <div className="flex flex-wrap gap-1.5 mt-2 mb-2">
                 {meta.structure_tags.map((t) => (
@@ -196,15 +202,15 @@ export default function StudioView() {
                 className="btn btn-ghost w-full !py-1.5 text-[11px] mt-2"
                 onClick={() => {
                   navigate('/lyrics')
-                  toast('已切换到歌词助手')
+                  toast(t('studio.toast.switchedToLyrics'))
                 }}
               >
-                在歌词助手中完善 →
+                {t('studio.lyrics.openAssistant')}
               </button>
             </>
           )}
 
-          <div className="label mt-4">参数与模型</div>
+          <div className="label mt-4">{t('studio.param.label')}</div>
           <ParamPanel />
 
           <button
@@ -213,19 +219,19 @@ export default function StudioView() {
             disabled={generating}
             onClick={() => void submitGeneration()}
           >
-            {generating ? '生成中…' : `生成 2 个候选 · ${creditCost} 积分`}
+            {generating ? t('studio.generate.generating') : t('studio.generate.button', { n: creditCost })}
           </button>
           <div className="text-[10px] mt-2.5 leading-relaxed" style={{ color: 'var(--dim)' }}>
-            付费方案生成内容含商用授权；全程留痕，可在「合规与权利中心」下载授权证书。
+            {t('studio.generate.complianceNote')}
           </div>
         </div>
 
         {/* 中：结果列 */}
         <div className="px-6 py-5 min-h-[560px] overflow-y-auto">
           <div className="flex items-center justify-between">
-            <div className="label">候选 / Candidates</div>
+            <div className="label">{t('studio.candidates.title')}</div>
             <div className="text-[11px]" style={{ color: 'var(--dim)' }}>
-              试听为低码流预览 · 导出 48kHz / 24bit
+              {t('studio.candidates.previewNote')}
             </div>
           </div>
 
@@ -236,7 +242,7 @@ export default function StudioView() {
               <div className="flex items-center gap-3">
                 <span className="dot" style={{ background: 'var(--bad)' }}></span>
                 <span className="text-[13px] font-semibold" style={{ color: 'var(--bad)' }}>
-                  生成失败
+                  {t('studio.failure.title')}
                 </span>
               </div>
               <div className="text-[12px] mt-3 leading-relaxed" style={{ color: 'var(--muted)' }}>
@@ -247,17 +253,17 @@ export default function StudioView() {
                   className="btn btn-acc !py-1.5 !px-3 text-[11px] font-bold"
                   onClick={() => void submitGeneration({ simplified: true })}
                 >
-                  重试（精简提示词）
+                  {t('studio.failure.retrySimplified')}
                 </button>
                 <button
                   className="btn btn-ghost !py-1.5 !px-3 text-[11px]"
                   onClick={() => void submitGeneration()}
                 >
-                  原参数重试
+                  {t('studio.failure.retryOriginal')}
                 </button>
               </div>
               <div className="text-[10px] mt-3" style={{ color: 'var(--dim)' }}>
-                失败任务积分已自动退还；精简重试将把风格描述关键词减半。
+                {t('studio.failure.note')}
               </div>
             </div>
           ) : candidates.length > 0 ? (
@@ -267,7 +273,7 @@ export default function StudioView() {
                   key={c.id}
                   candidate={c}
                   index={i}
-                  workTitle={workTitle ?? '未命名作品'}
+                  workTitle={workTitle ?? t('studio.untitled')}
                   modelLabel={modelLabel}
                 />
               ))}
@@ -284,21 +290,21 @@ export default function StudioView() {
                 <rect x="28" y="12" width="4" height="20" fill="#2c2c2c" />
               </svg>
               <div className="text-[13px] mt-4 font-semibold" style={{ color: 'var(--muted)' }}>
-                三步出第一版
+                {t('studio.empty.title')}
               </div>
               <div className="text-[11px] mt-2 leading-relaxed" style={{ color: 'var(--dim)' }}>
-                ① 在左侧「灵感指引」点选场景 / 情绪 / 风格
+                {t('studio.empty.step1')}
                 <br />
-                ② 粘贴歌词或点结构标签 → ③ 点「生成 2 个候选」
+                {t('studio.empty.step2')}
               </div>
               <button
                 className="btn btn-ghost text-[11px] mt-4"
                 onClick={() => {
                   randomInspire()
-                  toast('已随机填入一组灵感')
+                  toast(t('studio.toast.randomInspired'))
                 }}
               >
-                先来一组随机灵感
+                {t('studio.empty.random')}
               </button>
             </div>
           )}

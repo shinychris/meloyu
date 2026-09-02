@@ -5,18 +5,21 @@ import { getTask } from '../../api/generation'
 import { downloadFileRef } from '../../api/files'
 import { downloadCertificate } from '../../api/works'
 import { toast } from '../../stores/toast'
+import { useT, type TranslationKey } from '../../i18n'
 
-const FORMATS: Array<{ code: ExportFormat; label: string; note: string }> = [
-  { code: 'wav', label: 'WAV', note: '48kHz / 24bit 母带' },
-  { code: 'mp3', label: 'MP3', note: '320k CBR' },
-  { code: 'midi', label: 'MIDI', note: 'melody/chords/bass/drums ×4' },
-  { code: 'stems', label: 'Stems', note: 'vocals/drums/bass/other ZIP' },
+// 格式说明文案走 i18n（work.export.note.*）；WAV/MP3 等为专有名词保留原文
+const FORMATS: Array<{ code: ExportFormat; label: string; noteKey: TranslationKey }> = [
+  { code: 'wav', label: 'WAV', noteKey: 'work.export.note.wav' },
+  { code: 'mp3', label: 'MP3', noteKey: 'work.export.note.mp3' },
+  { code: 'midi', label: 'MIDI', noteKey: 'work.export.note.midi' },
+  { code: 'stems', label: 'Stems', noteKey: 'work.export.note.stems' },
 ]
 
 type BusyMap = Partial<Record<ExportFormat, number>>
 
 /** 导出面板：WAV / MP3 / MIDI / Stems + 授权证书（导出任务轮询完成后自动下载） */
 export default function ExportPanel({ versionId }: { versionId: string }) {
+  const t = useT()
   const [busy, setBusy] = useState<BusyMap>({})
   const [certBusy, setCertBusy] = useState(false)
   const timers = useRef<number[]>([])
@@ -26,7 +29,7 @@ export default function ExportPanel({ versionId }: { versionId: string }) {
     mounted.current = true
     return () => {
       mounted.current = false
-      timers.current.forEach((t) => window.clearTimeout(t))
+      timers.current.forEach((tm) => window.clearTimeout(tm))
     }
   }, [])
 
@@ -41,13 +44,13 @@ export default function ExportPanel({ versionId }: { versionId: string }) {
             for (const f of task.result.files) {
               await downloadFileRef(f, `${format}_${f.file_id}`)
             }
-            toast(`导出完成：${format.toUpperCase()} 已开始下载（${task.result.files.length} 个文件）`)
+            toast(t('work.export.toast.done', { format: format.toUpperCase(), n: task.result.files.length }))
           } else {
-            toast('导出完成，但未返回文件列表')
+            toast(t('work.export.toast.noFiles'))
           }
         } else if (task.status === 'failed' || task.status === 'canceled') {
           setBusy((b) => ({ ...b, [format]: undefined }))
-          toast(task.error?.message ?? '导出失败', 'bad')
+          toast(task.error?.message ?? t('work.export.failed'), 'bad')
         } else {
           setBusy((b) => ({ ...b, [format]: task.progress }))
           schedule(taskId, format, 0)
@@ -56,7 +59,7 @@ export default function ExportPanel({ versionId }: { versionId: string }) {
         if (!mounted.current) return
         if (fails >= 4) {
           setBusy((b) => ({ ...b, [format]: undefined }))
-          toast('导出任务查询中断', 'bad')
+          toast(t('work.export.toast.pollBroken'), 'bad')
         } else {
           schedule(taskId, format, fails + 1)
         }
@@ -82,7 +85,7 @@ export default function ExportPanel({ versionId }: { versionId: string }) {
     setCertBusy(true)
     try {
       await downloadCertificate(versionId, `${versionId}_certificate.json`)
-      toast('授权证书 JSON 已开始下载')
+      toast(t('work.export.toast.certStarted'))
     } catch {
       /* 拦截器已 toast */
     } finally {
@@ -92,7 +95,7 @@ export default function ExportPanel({ versionId }: { versionId: string }) {
 
   return (
     <div className="card p-4">
-      <div className="label mb-3">导出与证书</div>
+      <div className="label mb-3">{t('work.export.title')}</div>
       <div className="grid grid-cols-2 gap-2">
         {FORMATS.map((f) => {
           const pct = busy[f.code]
@@ -103,19 +106,19 @@ export default function ExportPanel({ versionId }: { versionId: string }) {
               disabled={pct !== undefined}
               onClick={() => void runExport(f.code)}
             >
-              <span className="font-bold">导出 {f.label}</span>
+              <span className="font-bold">{t('work.export.run', { format: f.label })}</span>
               <span className="block text-[9px] font-normal mt-0.5" style={{ color: 'var(--dim)' }}>
-                {pct !== undefined ? `处理中 ${pct}%…` : f.note}
+                {pct !== undefined ? t('work.export.processing', { n: pct }) : t(f.noteKey)}
               </span>
             </button>
           )
         })}
       </div>
       <button className="btn btn-acc w-full mt-2 !py-2 text-[11px] font-bold" disabled={certBusy} onClick={() => void onCert()}>
-        {certBusy ? '生成中…' : '下载授权证书 JSON'}
+        {certBusy ? t('work.export.generating') : t('work.export.certificate')}
       </button>
       <div className="text-[9px] mt-2 leading-relaxed" style={{ color: 'var(--dim)' }}>
-        导出不扣积分；需先在候选列表「采用定稿」。证书含人类创作留痕与 SHA-256 内容指纹。
+        {t('work.export.footnote')}
       </div>
     </div>
   )

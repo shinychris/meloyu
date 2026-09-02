@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { debounce, sanitizeQuery } from '../../lib/debounce'
+import { useT } from '../../i18n'
 
 interface SearchInputProps {
   /** 防抖后的查询词（仅用于 API 查询参数，绝不回写输入框） */
@@ -21,6 +22,7 @@ interface SearchInputProps {
  * 立即同步本地 state 并即时通知（跳过防抖），保证一键清空生效。
  */
 function SearchInputImpl({ onQueryChange, delayMs = 400, maxLength = 50, placeholder }: SearchInputProps) {
+  const t = useT()
   const [value, setValue] = useState('')
   const cbRef = useRef(onQueryChange)
   cbRef.current = onQueryChange
@@ -48,8 +50,8 @@ function SearchInputImpl({ onQueryChange, delayMs = 400, maxLength = 50, placeho
         type="text"
         value={value}
         maxLength={maxLength}
-        placeholder={placeholder ?? '搜索…'}
-        aria-label="搜索"
+        placeholder={placeholder ?? t('layout.search.placeholder')}
+        aria-label={t('common.search')}
         onChange={onChange}
         className="!w-[220px] !text-[12px] !pr-7"
         style={{ padding: '6px 10px' }}
@@ -57,8 +59,8 @@ function SearchInputImpl({ onQueryChange, delayMs = 400, maxLength = 50, placeho
       {value !== '' && (
         <button
           type="button"
-          aria-label="清空搜索"
-          title="清空搜索"
+          aria-label={t('layout.search.clear')}
+          title={t('layout.search.clear')}
           onClick={onClear}
           className="absolute right-1.5 w-5 h-5 flex items-center justify-center text-[11px] leading-none"
           style={{ color: 'var(--dim)' }}

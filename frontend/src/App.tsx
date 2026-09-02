@@ -6,6 +6,7 @@ import Onboarding from './components/layout/Onboarding'
 import ToastHost from './components/common/ToastHost'
 import ConfirmDialog from './components/common/ConfirmDialog'
 import LoginView from './views/LoginView'
+import LandingView from './views/LandingView'
 import StudioView from './views/StudioView'
 import LyricsView from './views/LyricsView'
 import LibraryView from './views/LibraryView'
@@ -19,6 +20,7 @@ import { useMetaStore } from './stores/meta'
 import { useUiStore, hasOnboarded } from './stores/ui'
 import { usePlayerStore } from './stores/player'
 import { getToken } from './lib/token'
+import { useT, useI18nStore } from './i18n'
 
 /** 快捷键：1-8 切换视图；空格 播放/暂停（输入控件内不触发，复刻原型行为） */
 const SHORTCUT_ROUTES: Record<string, string> = {
@@ -35,8 +37,10 @@ const SHORTCUT_ROUTES: Record<string, string> = {
 
 function AppLayout() {
   const location = useLocation()
+  const t = useT()
   const { user, ready, bootstrap } = useSessionStore()
   const loadMeta = useMetaStore((s) => s.load)
+  const reloadMeta = useMetaStore((s) => s.reloadForLocale)
   const startOnboarding = useUiStore((s) => s.startOnboarding)
 
   const bootedRef = useRef(false)
@@ -46,6 +50,17 @@ function AppLayout() {
     void bootstrap()
     void loadMeta()
   }, [bootstrap, loadMeta])
+
+  // 语言切换后重拉系统元数据（后端按 Accept-Language 返回本地化 label/灵感词条）
+  const locale = useI18nStore((s) => s.locale)
+  const localeBootedRef = useRef(false)
+  useEffect(() => {
+    if (!localeBootedRef.current) {
+      localeBootedRef.current = true
+      return
+    }
+    void reloadMeta()
+  }, [locale, reloadMeta])
 
   // 首次登录后自动开启新手引导（600ms，复刻原型）
   useEffect(() => {
@@ -59,7 +74,7 @@ function AppLayout() {
   if (!user && !ready) {
     return (
       <div className="h-full flex items-center justify-center" style={{ background: 'var(--bg)' }}>
-        <span className="label">MELOYU · 载入中…</span>
+        <span className="label">{t('app.loading')}</span>
       </div>
     )
   }
@@ -128,6 +143,9 @@ function RootRoutes() {
   const hasToken = useSessionStore((s) => s.user !== null) || Boolean(getToken())
   return (
     <Routes>
+      {/* 产品落地页：对外展示入口。未登录访问 / 直接落地；已登录直达工作台。 /landing 恒定可访问（演示/分享）。 */}
+      <Route path="/landing" element={<LandingView />} />
+      <Route path="/" element={hasToken ? <Navigate to="/studio" replace /> : <LandingView />} />
       <Route path="/login" element={<LoginGuard />} />
       {hasToken ? (
         <Route element={<AppLayout />}>
@@ -144,7 +162,7 @@ function RootRoutes() {
           <Route path="*" element={<Navigate to="/studio" replace />} />
         </Route>
       ) : (
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       )}
     </Routes>
   )

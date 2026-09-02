@@ -1,4 +1,5 @@
 import type { CreditReason, EventAction, PlanCode, Section, VocalType } from '../types/api'
+import { t, type TranslationKey } from '../i18n'
 
 /** 90 → "1:30" */
 export function formatDuration(sec: number | null | undefined): string {
@@ -12,7 +13,7 @@ export function formatClock(sec: number | null | undefined): string {
   return formatDuration(sec)
 }
 
-/** ISO → "2026-08-29 14:22:08"（本地时区） */
+/** ISO → "2026-08-29 14:22:08"（本地时区；数字格式对 en/zh 通用，无需按 locale 变化） */
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return '—'
   const d = new Date(iso)
@@ -21,7 +22,7 @@ export function formatDateTime(iso: string | null | undefined): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
 }
 
-/** 2468 → "2,468" */
+/** 2468 → "2,468"（en-US 与 zh-CN 千分位规则一致） */
 export function formatNum(n: number | null | undefined): string {
   if (n == null) return '—'
   return n.toLocaleString('en-US')
@@ -34,79 +35,103 @@ export function formatBytes(bytes: number | null | undefined): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-export const PLAN_LABEL: Record<PlanCode, string> = {
-  free: '免费',
-  pro: '个人 Pro',
-  studio: '创作人 Studio',
-  team: '团队 / 企业',
+/**
+ * 以下标签函数按当前 locale 返回文案（app.format.* 命名空间）。
+ * 原 PLAN_LABEL / SECTION_LABEL / VOCAL_LABEL 等常量表已改为函数，
+ * 调用点由 `LABEL[x]` 改为 `xxxLabel(x)`。
+ */
+function label(keys: Record<string, TranslationKey>, value: string): string {
+  return t(keys[value] ?? value)
 }
 
-export const SECTION_LABEL: Record<Section, string> = {
-  intro: 'Intro',
-  verse: 'Verse',
-  pre_chorus: 'Pre',
-  chorus: 'Chorus',
-  bridge: 'Bridge',
-  outro: 'Outro',
+const PLAN_KEYS: Record<PlanCode, TranslationKey> = {
+  free: 'app.format.plan.free',
+  pro: 'app.format.plan.pro',
+  studio: 'app.format.plan.studio',
+  team: 'app.format.plan.team',
 }
 
-export const SECTION_ZH: Record<Section, string> = {
-  intro: '前奏',
-  verse: '主歌',
-  pre_chorus: '导歌',
-  chorus: '副歌',
-  bridge: '桥段',
-  outro: '尾奏',
+export function planLabel(plan: PlanCode): string {
+  return label(PLAN_KEYS, plan)
 }
 
-export const VOCAL_LABEL: Record<VocalType, string> = {
-  female_air: '女声 · 气声',
-  female_bright: '女声 · 清亮',
-  female_deep: '女声 · 浑厚',
-  male_magnetic: '男声 · 磁性',
-  male_clear: '男声 · 清朗',
-  choir: '合唱',
-  instrumental: '纯器乐',
+const SECTION_KEYS: Record<Section, TranslationKey> = {
+  intro: 'app.format.section.intro',
+  verse: 'app.format.section.verse',
+  pre_chorus: 'app.format.section.pre_chorus',
+  chorus: 'app.format.section.chorus',
+  bridge: 'app.format.section.bridge',
+  outro: 'app.format.section.outro',
 }
 
-export const CREDIT_REASON_LABEL: Record<CreditReason, string> = {
-  signup_bonus: '注册赠送',
-  generation: '生成消耗',
-  refund: '失败退款',
-  plan_grant: '档位发放',
-  plan_switch: '档位切换',
+export function sectionLabel(section: Section): string {
+  return label(SECTION_KEYS, section)
 }
 
-export const EVENT_ACTION_LABEL: Record<EventAction, string> = {
-  generate: '生成',
-  adopt: '采用候选',
-  update: '编辑作品',
-  export: '导出',
-  trash: '移入回收站',
-  restore: '从回收站恢复',
-  certificate: '下载证书',
-  plan_switch: '切换档位',
+const VOCAL_KEYS: Record<VocalType, TranslationKey> = {
+  female_air: 'app.format.vocal.female_air',
+  female_bright: 'app.format.vocal.female_bright',
+  female_deep: 'app.format.vocal.female_deep',
+  male_magnetic: 'app.format.vocal.male_magnetic',
+  male_clear: 'app.format.vocal.male_clear',
+  choir: 'app.format.vocal.choir',
+  instrumental: 'app.format.vocal.instrumental',
 }
 
-export const EVENT_ACTOR_LABEL: Record<string, string> = {
-  human: '人工',
-  ai: 'AI',
-  system: '系统',
+export function vocalLabel(vocal: VocalType): string {
+  return label(VOCAL_KEYS, vocal)
 }
 
-/** 版本来源中文标签（契约 §1.6 source 枚举：generate/extend/variant/regen_section）；未知值原样显示 */
-export const VERSION_SOURCE_LABEL: Record<string, string> = {
-  generate: '初始生成',
-  extend: '延长',
-  variant: '变体',
-  regen_section: '段落重生成',
+const CREDIT_KEYS: Record<CreditReason, TranslationKey> = {
+  signup_bonus: 'app.format.credit.signup_bonus',
+  generation: 'app.format.credit.generation',
+  refund: 'app.format.credit.refund',
+  plan_grant: 'app.format.credit.plan_grant',
+  plan_switch: 'app.format.credit.plan_switch',
+}
+
+export function creditReasonLabel(reason: CreditReason): string {
+  return label(CREDIT_KEYS, reason)
+}
+
+const EVENT_KEYS: Record<EventAction, TranslationKey> = {
+  generate: 'app.format.event.generate',
+  adopt: 'app.format.event.adopt',
+  update: 'app.format.event.update',
+  export: 'app.format.event.export',
+  trash: 'app.format.event.trash',
+  restore: 'app.format.event.restore',
+  certificate: 'app.format.event.certificate',
+  plan_switch: 'app.format.event.plan_switch',
+}
+
+export function eventActionLabel(action: EventAction): string {
+  return label(EVENT_KEYS, action)
+}
+
+const ACTOR_KEYS: Record<string, TranslationKey> = {
+  human: 'app.format.actor.human',
+  ai: 'app.format.actor.ai',
+  system: 'app.format.actor.system',
+}
+
+export function eventActorLabel(actor: string): string {
+  return label(ACTOR_KEYS, actor)
+}
+
+/** 版本来源标签（契约 §1.6 source 枚举：generate/extend/variant/regen_section）；未知值原样显示 */
+const SOURCE_KEYS: Record<string, TranslationKey> = {
+  generate: 'app.format.source.generate',
+  extend: 'app.format.source.extend',
+  variant: 'app.format.source.variant',
+  regen_section: 'app.format.source.regen_section',
 }
 
 export function versionSourceLabel(source: string): string {
-  return VERSION_SOURCE_LABEL[source] ?? source
+  return label(SOURCE_KEYS, source)
 }
 
-/** 调性显示：{tonic:'A',mode:'minor'} → "A 小调" */
+/** 调性显示：{tonic:'A',mode:'minor'} → "A Minor" / "A 小调" */
 export function keyLabel(key: { tonic: string; mode: string }): string {
-  return `${key.tonic} ${key.mode === 'major' ? '大调' : '小调'}`
+  return `${key.tonic} ${t(key.mode === 'major' ? 'app.format.major' : 'app.format.minor')}`
 }

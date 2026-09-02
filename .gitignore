@@ -9,6 +9,13 @@ dist/
 # Local runtime data
 backend/data/
 *.db
+# Logs（运行日志不入库，归档至 backend/data/logs/）
+*.log
+# Test/CI caches
+.pytest_cache/
+.ruff_cache/
+coverage/
+.eslintcache
 # IDE/OS
 .vscode/
 .idea/

@@ -1,7 +1,9 @@
 import { useConfirmStore } from '../../stores/confirm'
+import { useT } from '../../i18n'
 
 /** 敏感操作确认对话框（永久删除等） */
 export default function ConfirmDialog() {
+  const t = useT()
   const { visible, options, resolve } = useConfirmStore()
   if (!visible || !options) return null
   return (
@@ -15,14 +17,14 @@ export default function ConfirmDialog() {
         )}
         <div className="flex gap-2 mt-6 justify-end">
           <button className="btn btn-ghost !py-1.5 !px-4 text-[12px]" onClick={() => resolve(false)}>
-            取消
+            {t('common.cancel')}
           </button>
           <button
             className={`btn !py-1.5 !px-4 text-[12px] ${options.danger ? '' : 'btn-acc'}`}
             style={options.danger ? { borderColor: 'var(--bad)', color: 'var(--bad)' } : undefined}
             onClick={() => resolve(true)}
           >
-            {options.confirmText ?? '确认'}
+            {options.confirmText ?? t('common.confirm')}
           </button>
         </div>
       </div>

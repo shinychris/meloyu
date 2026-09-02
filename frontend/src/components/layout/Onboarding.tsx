@@ -2,11 +2,15 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUiStore } from '../../stores/ui'
 import { toast } from '../../stores/toast'
+import { useT } from '../../i18n'
+import type { TranslationKey } from '../../i18n'
 
 interface ObStep {
   sel: string | null
-  title: string
-  desc: string
+  /** 步骤标题词条 */
+  titleKey: TranslationKey
+  /** 步骤描述词条 */
+  descKey: TranslationKey
   /** 需要导航到的路由（引导目标所在视图） */
   view?: string
 }
@@ -15,26 +19,26 @@ const OB_STEPS: ObStep[] = [
   {
     sel: '#inspireBox',
     view: '/studio',
-    title: '描述你的灵感',
-    desc: '点选场景、情绪、风格与主奏乐器，系统自动组装专业提示词；也可以直接改写下方描述。',
+    titleKey: 'layout.ob.step1.title',
+    descKey: 'layout.ob.step1.desc',
   },
   {
     sel: '#lyricBox',
     view: '/studio',
-    title: '歌词与结构',
-    desc: '粘贴歌词，用 [Verse]/[Chorus] 等标签告诉 AI 歌曲结构；没有歌词可在「歌词助手」里让 AI 起草。',
+    titleKey: 'layout.ob.step2.title',
+    descKey: 'layout.ob.step2.desc',
   },
   {
     sel: '#btnGenerate',
     view: '/studio',
-    title: '生成与挑选',
-    desc: '每次产出 2 个候选并给出 AI 质量分；不满意可整首重生成，或只对某段落局部重生成（V1.1）。',
+    titleKey: 'layout.ob.step3.title',
+    descKey: 'layout.ob.step3.desc',
   },
   {
     sel: null,
     view: '/arrange',
-    title: '进入专业制作',
-    desc: '满意的候选可「送往编曲」：多轨时间线编排、音频剪辑、修调将在 V2 上线；现在即可在作品库导出可商用的成品与授权证书。',
+    titleKey: 'layout.ob.step4.title',
+    descKey: 'layout.ob.step4.desc',
   },
 ]
 
@@ -47,6 +51,7 @@ interface SpotRect {
 
 /** 新手引导 spotlight（复刻原型 obSteps：四步高亮 + 提示卡） */
 export default function Onboarding() {
+  const t = useT()
   const { onboardingOpen, onboardingStep, setStep, endOnboarding } = useUiStore()
   const navigate = useNavigate()
   const [spot, setSpot] = useState<SpotRect | null>(null)
@@ -106,15 +111,15 @@ export default function Onboarding() {
       >
         <div className="flex items-center justify-between">
           <span className="label" style={{ color: 'var(--acc)' }}>
-            第 {onboardingStep + 1} / {OB_STEPS.length} 步
+            {t('layout.ob.progress', { current: onboardingStep + 1, total: OB_STEPS.length })}
           </span>
           <button className="text-[10px]" style={{ color: 'var(--dim)' }} onClick={endOnboarding}>
-            跳过
+            {t('layout.ob.skip')}
           </button>
         </div>
-        <div className="text-[14px] font-bold mt-2">{step.title}</div>
+        <div className="text-[14px] font-bold mt-2">{t(step.titleKey)}</div>
         <div className="text-[12px] mt-2 leading-relaxed" style={{ color: 'var(--muted)' }}>
-          {step.desc}
+          {t(step.descKey)}
         </div>
         <div className="flex justify-between items-center mt-4">
           <div className="flex gap-1">
@@ -131,13 +136,13 @@ export default function Onboarding() {
             onClick={() => {
               if (isLast) {
                 endOnboarding()
-                toast('引导结束 · 随时可在左下角重新打开')
+                toast(t('layout.ob.finished'))
               } else {
                 setStep(onboardingStep + 1)
               }
             }}
           >
-            {isLast ? '完成' : '下一步'}
+            {isLast ? t('common.done') : t('common.next')}
           </button>
         </div>
       </div>

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.errors import err_conflict, err_not_found
+from app.core.i18n import tr
 from app.core.logging import logger
 from app.database import SessionLocal
 from app.models import Candidate, File, Task, User, Version, Work
@@ -23,10 +24,10 @@ from app.synth.mp3_io import encode_mp3
 def create_export(db: Session, user: User, version_id: str, fmt: str) -> dict:
     version = works_svc.get_version_owned(db, version_id, user)
     if not version.active_candidate_id:
-        raise err_conflict("该版本尚未采用候选")
+        raise err_conflict(tr("该版本尚未采用候选", "No candidate adopted for this version yet"))
     now = utc_now_iso()
     task = Task(user_id=user.id, type="export", status="queued", progress=0,
-                stage_key="queued", stage_label="排队中",
+                stage_key="queued", stage_label=tr("排队中", "Queued"),
                 work_id=version.work_id, version_id=version.id,
                 format=fmt, cost_credits=0,
                 request_payload={"version_id": version_id, "format": fmt},
@@ -48,7 +49,7 @@ def execute_export(task_id: str) -> None:
         task.started_at = utc_now_iso()
         task.updated_at = utc_now_iso()
         task.stage_key = "serialize"
-        task.stage_label = "文件导出"
+        task.stage_label = tr("文件导出", "Exporting files")
         task.progress = 30
         db.commit()
         fmt = task.format
@@ -65,7 +66,7 @@ def execute_export(task_id: str) -> None:
             task_row.status = "succeeded"
             task_row.progress = 100
             task_row.stage_key = "done"
-            task_row.stage_label = "完成"
+            task_row.stage_label = tr("完成", "Done")
             task_row.result = {"files": files}
             task_row.finished_at = now
             task_row.updated_at = now
@@ -82,7 +83,7 @@ def execute_export(task_id: str) -> None:
             if t and t.status not in ("succeeded", "canceled"):
                 t.status = "failed"
                 t.error_code = 50002
-                t.error_message = f"导出失败：{e}"
+                t.error_message = tr("导出失败：", "Export failed: ") + str(e)
                 t.finished_at = utc_now_iso()
                 t.updated_at = utc_now_iso()
                 db.commit()
@@ -96,7 +97,7 @@ def _candidate_file(db: Session, candidate_id: str, kind: str,
         q = q.where(File.stem_name == stem_name)
     f = db.execute(q).scalars().first()
     if not f:
-        raise err_not_found(f"候选文件缺失：{kind}")
+        raise err_not_found(tr(f"候选文件缺失：{kind}", f"Candidate file missing: {kind}"))
     return f
 
 
@@ -159,9 +160,15 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
     ).first() is not None
     mp3_master = (master.mime or "").startswith("audio/mpeg")
     if fmt in ("midi", "stems") and not has_stems:
-        raise err_conflict("该候选为模型整曲产物（无分轨/MIDI）；分轨与 MIDI 为本地引擎产物")
+        raise err_conflict(
+            tr("该候选为模型整曲产物（无分轨/MIDI）；分轨与 MIDI 为本地引擎产物",
+               "This candidate is a whole-song model output (no stems/MIDI); "
+               "stems and MIDI come from the local engine only"))
     if fmt == "wav" and mp3_master:
-        raise err_conflict("该候选母带为 mp3（外部歌曲 API 通道），仅支持 MP3 导出")
+        raise err_conflict(
+            tr("该候选母带为 mp3（外部歌曲 API 通道），仅支持 MP3 导出",
+               "This candidate's master is mp3 (external song API channel); "
+               "only MP3 export is supported"))
 
     if fmt == "mp3":
         src_rate: int | None = None
@@ -206,7 +213,7 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
         for stem in ("melody", "chords", "bass", "drums"):
             src = cand_midi_dir / f"{stem}.mid"
             if not src.exists():
-                raise err_not_found(f"MIDI 文件缺失：{stem}")
+                raise err_not_found(tr(f"MIDI 文件缺失：{stem}", f"MIDI file missing: {stem}"))
             p = exports_dir / f"midi_{stem}.mid"
             p.write_bytes(src.read_bytes())
             row = _register(db, work, version, kind="export_midi",
@@ -239,7 +246,7 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
                              name=f"{work.display_code}_{version.version_no}_stem_{stem}.wav")
             out.append(file_ref(srow))
     else:
-        raise err_not_found(f"未知导出格式：{fmt}")
+        raise err_not_found(tr(f"未知导出格式：{fmt}", f"Unknown export format: {fmt}"))
     return out
 
 

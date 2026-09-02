@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import { composeStylePrompt, countStructureTags, detectSectionAtCaret, parseSectionTag } from './structure'
+import { useI18nStore } from '../i18n'
+
+afterEach(() => {
+  // 测试默认语言为 en；显式切过语言的用例恢复
+  useI18nStore.setState({ locale: 'en' })
+})
 
 describe('parseSectionTag', () => {
   it('英文标签（大小写不敏感）', () => {
@@ -50,12 +56,22 @@ describe('detectSectionAtCaret', () => {
 })
 
 describe('composeStylePrompt（灵感指引组装）', () => {
-  it('全选：风格，情绪，乐器主导，适合场景', () => {
+  it('en 全选：genre, mood, X-led, great for scene', () => {
+    expect(
+      composeStylePrompt({ scene: 'Solo single', mood: 'Melancholy', genre: 'Mandopop', inst: 'Piano' }),
+    ).toBe('Mandopop, Melancholy, Piano-led, great for Solo single')
+  })
+  it('en 部分选：跳过空项', () => {
+    expect(composeStylePrompt({ scene: '', mood: 'Energetic', genre: 'EDM', inst: '' })).toBe('EDM, Energetic')
+  })
+  it('zh 全选：风格，情绪，乐器主导，适合场景', () => {
+    useI18nStore.setState({ locale: 'zh' })
     expect(
       composeStylePrompt({ scene: '个人单曲', mood: '忧郁', genre: '华语流行', inst: '钢琴' }),
     ).toBe('华语流行，忧郁，钢琴主导，适合个人单曲')
   })
-  it('部分选：跳过空项', () => {
+  it('zh 部分选：跳过空项', () => {
+    useI18nStore.setState({ locale: 'zh' })
     expect(composeStylePrompt({ scene: '', mood: '热血', genre: 'EDM', inst: '' })).toBe('EDM，热血')
   })
   it('全空返回空串', () => {

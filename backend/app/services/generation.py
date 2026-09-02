@@ -19,17 +19,19 @@ from app.core.errors import (
     err_payment_required,
     err_sensitive,
 )
+from app.core.i18n import tr
 from app.core.logging import logger
 from app.core.seed import cover_color_for_seed, derive_seed
 from app.database import SessionLocal
 from app.models import Candidate, File, Task, User, Version, Work
 from app.models.base import utc_now_iso
-from app.providers.base import STAGE_LABELS, SynthCancelled
+from app.providers.base import SynthCancelled, stage_label
 from app.providers.lyrics_local import check_sensitive
 from app.services import model_center
 from app.services import works as works_svc
 from app.services.serializers import candidate_to_dict, task_to_dict
 from app.synth.ir import SongRequest
+from app.core.i18n import current_locale
 
 
 # ---------- 提交 ----------
@@ -37,6 +39,8 @@ from app.synth.ir import SongRequest
 def expand_simple_prompt(simple_prompt: str) -> str:
     """simple 模式：一句话扩写为 style_prompt（规则引擎，LLM 不可用时的兜底）。"""
     base = (simple_prompt or "").strip().rstrip("。，,.")
+    if current_locale() != "zh":
+        return f"{base}, pop arrangement, piano with string pads, clear lead vocal, natural emotional flow"
     return f"{base}，流行编曲，钢琴与弦乐铺底，人声旋律清晰，情绪自然流动"
 
 
@@ -125,7 +129,8 @@ def check_free_daily_limit(db: Session, user: User) -> None:
             Task.created_at >= day_start_utc)
     ).scalar_one()
     if count >= 5:
-        raise err_payment_required("今日免费生成次数已用完")
+        raise err_payment_required(
+            tr("今日免费生成次数已用完", "Today's free generations are used up"))
 
 
 def submit_generation(db: Session, user: User, payload: dict) -> dict:
@@ -161,7 +166,7 @@ def submit_generation(db: Session, user: User, payload: dict) -> dict:
     if parent_version_id:
         parent = db.get(Version, parent_version_id)
         if not parent or parent.work_id != work.id:
-            raise err_not_found("父版本不存在")
+            raise err_not_found(tr("父版本不存在", "Parent version not found"))
     else:
         latest = db.execute(select(Version).where(Version.work_id == work.id)
                             .order_by(Version.created_at.desc(), Version.id.desc())
@@ -187,7 +192,7 @@ def submit_generation(db: Session, user: User, payload: dict) -> dict:
         "_resolved": resolved,
     }
     task = Task(user_id=user.id, type="generation", status="queued", progress=0,
-                stage_key="queued", stage_label="排队中", work_id=work.id,
+                stage_key="queued", stage_label=tr("排队中", "Queued"), work_id=work.id,
                 version_id=version.id,
                 provider=model_center.current_music_backend(db), seed=resolved["seed"],
                 cost_credits=cost, request_payload=request_snapshot,
@@ -218,7 +223,7 @@ def _derive_title(payload: dict, params: dict) -> str:
         return payload["simple_prompt"][:12]
     if params.get("style_prompt"):
         return params["style_prompt"][:12]
-    return "未命名作品"
+    return tr("未命名作品", "Untitled work")
 
 
 # ---------- 执行（线程池内）----------
@@ -232,7 +237,8 @@ def _prepare_generation_inputs(db, task_id: str, payload_row: dict, resolved: di
     params = resolved["params"]
     changed = False
     if payload_row.get("mode") == "simple" and payload_row.get("simple_prompt"):
-        _write_progress(task_id, "writing", 2, "AI 扩写风格描述…")
+        _write_progress(task_id, "writing", 2,
+                        tr("AI 扩写风格描述…", "Expanding style description with AI…"))
         simple = str(payload_row["simple_prompt"]).strip()
         style = expand_simple_prompt(simple)
         chat = model_center.get_lyrics_chat(db)
@@ -243,7 +249,8 @@ def _prepare_generation_inputs(db, task_id: str, payload_row: dict, resolved: di
         resolved["style_expanded"] = True
         changed = True
     if resolved.get("auto_lyrics") and not resolved.get("lyrics"):
-        _write_progress(task_id, "writing", 4, "AI 创作歌词…")
+        _write_progress(task_id, "writing", 4,
+                        tr("AI 创作歌词…", "Writing lyrics with AI…"))
         theme = payload_row.get("simple_prompt") or (params.get("style_prompt") or "")[:60]
         gen = model_center.get_lyrics_provider(db).generate(
             theme=theme, style_hint=(params.get("style_prompt") or "")[:80],
@@ -308,7 +315,8 @@ def execute_generation(task_id: str) -> None:
 
         def progress(stage_key: str, pct: int, label: str) -> None:
             if time.monotonic() - t_start > timeout_sec:
-                raise TimeoutError(f"超过 {timeout_sec}s 熔断")
+                raise TimeoutError(
+                    tr(f"超过 {timeout_sec}s 熔断", f"exceeded {timeout_sec}s circuit limit"))
             _write_progress(task_id, stage_key, pct, label)
 
         def should_cancel() -> bool:
@@ -335,14 +343,17 @@ def execute_generation(task_id: str) -> None:
             db.commit()
     except TimeoutError as e:
         with SessionLocal() as db:
-            _finish_task(db, task_id, "failed", 50002, f"生成失败：渲染超时 {e}")
+            _finish_task(db, task_id, "failed", 50002,
+                         tr("生成失败：渲染超时 ", "Generation failed: render timeout ") + str(e))
             _refund(db, task_id)
             rollback_empty_current_version(db, task_id)
             db.commit()
     except Exception as e:  # noqa: BLE001 —— 任务级兜底，退款 + 50002
         logger.exception(f"generation {task_id} failed: {e}")
         with SessionLocal() as db:
-            _finish_task(db, task_id, "failed", 50002, f"生成失败：{type(e).__name__} {e}")
+            _finish_task(db, task_id, "failed", 50002,
+                         tr("生成失败：", "Generation failed: ")
+                         + f"{type(e).__name__} {e}")
             _refund(db, task_id)
             rollback_empty_current_version(db, task_id)
             db.commit()
@@ -450,7 +461,7 @@ def _persist_success(db: Session, task_id: str, user_id: str, output, provider) 
     task.status = "succeeded"
     task.progress = 100
     task.stage_key = "done"
-    task.stage_label = STAGE_LABELS["done"][0]
+    task.stage_label = stage_label("done")
     task.result = {"candidates": result_candidates}
     task.finished_at = now
     task.updated_at = now
@@ -535,7 +546,7 @@ def rollback_empty_current_version(db: Session, task_id: str) -> None:
 def get_task_owned(db: Session, task_id: str, user: User) -> Task:
     task = db.get(Task, task_id)
     if not task:
-        raise err_not_found("任务不存在")
+        raise err_not_found(tr("任务不存在", "Task not found"))
     if task.user_id != user.id:
         raise err_forbidden()
     return task
@@ -561,9 +572,9 @@ def list_tasks(db: Session, user: User, *, type_: str | None, status: str | None
 def cancel_task(db: Session, user: User, task_id: str) -> dict:
     task = get_task_owned(db, task_id, user)
     if task.status in ("succeeded", "failed", "canceled"):
-        raise err_conflict("任务已结束，无法取消")
+        raise err_conflict(tr("任务已结束，无法取消", "Task already finished; cannot cancel"))
     if task.type == "export":
-        raise err_conflict("导出任务不支持取消")
+        raise err_conflict(tr("导出任务不支持取消", "Export tasks cannot be canceled"))
     if task.status == "queued":
         task.status = "canceled"
         task.finished_at = utc_now_iso()
@@ -575,7 +586,7 @@ def cancel_task(db: Session, user: User, task_id: str) -> dict:
         return task_to_dict(task)
     # running：置取消标志，渲染循环在阶段边界到达
     task.cancel_requested = True
-    task.stage_label = "正在取消…"
+    task.stage_label = tr("正在取消…", "Canceling…")
     task.updated_at = utc_now_iso()
     db.commit()
     db.refresh(task)
@@ -595,7 +606,7 @@ def list_candidates(db: Session, version_id: str, user: User) -> dict:
 def get_candidate_owned(db: Session, candidate_id: str, user: User) -> Candidate:
     cand = db.get(Candidate, candidate_id)
     if not cand:
-        raise err_not_found("候选不存在")
+        raise err_not_found(tr("候选不存在", "Candidate not found"))
     works_svc.get_version_owned(db, cand.version_id, user)  # 归属校验
     return cand
 
@@ -605,7 +616,7 @@ def adopt_candidate(db: Session, candidate_id: str, user: User) -> dict:
     cand = get_candidate_owned(db, candidate_id, user)
     version = db.get(Version, cand.version_id)
     if version.active_candidate_id == cand.id:
-        raise err_conflict("该候选已是活跃候选")
+        raise err_conflict(tr("该候选已是活跃候选", "This candidate is already active"))
     # 同版本其他候选置 false
     others = db.execute(select(Candidate).where(Candidate.version_id == version.id)).scalars()
     for c in others:

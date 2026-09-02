@@ -2,12 +2,14 @@ import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePlayerStore } from '../../stores/player'
 import { formatDuration } from '../../lib/format'
+import { useT } from '../../i18n'
 
 /**
  * 68px 底部全局播放器：原生 <audio> 播放后端文件流（stream-token URL），
  * 进度条可点可拖、时间码、上一首/下一首、标题滚动 marquee。
  */
 export default function TransportBar() {
+  const t = useT()
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const navigate = useNavigate()
   const {
@@ -79,7 +81,7 @@ export default function TransportBar() {
     >
       <audio ref={audioRef} preload="metadata" />
       <div className="flex items-center gap-2">
-        <button className="iconbtn" title="上一首" onClick={() => void prev()}>
+        <button className="iconbtn" title={t('layout.player.prev')} onClick={() => void prev()}>
           <svg viewBox="0 0 16 16" fill="currentColor">
             <path d="M3 3h2v10H3zM13 3v10L6 8z" />
           </svg>
@@ -88,7 +90,7 @@ export default function TransportBar() {
           className={`iconbtn !w-10 !h-10 ${current ? 'on' : ''}`}
           style={{ borderColor: 'var(--acc)', color: 'var(--acc)' }}
           onClick={toggle}
-          title={playing ? '暂停' : '播放'}
+          title={playing ? t('layout.player.pause') : t('layout.player.play')}
         >
           {playing ? (
             <svg viewBox="0 0 16 16" fill="currentColor">
@@ -100,7 +102,7 @@ export default function TransportBar() {
             </svg>
           )}
         </button>
-        <button className="iconbtn" title="下一首" onClick={() => void next()}>
+        <button className="iconbtn" title={t('layout.player.next')} onClick={() => void next()}>
           <svg viewBox="0 0 16 16" fill="currentColor">
             <path d="M11 3h2v10h-2zM3 3v10l7-5z" />
           </svg>
@@ -135,9 +137,9 @@ export default function TransportBar() {
       <div
         className="flex items-center gap-2 text-[10px]"
         style={{ color: 'var(--dim)' }}
-        title="导出目标规格（流媒体预设），非实时测量值"
+        title={t('layout.player.lufsTitle')}
       >
-        <span>目标</span>
+        <span>{t('layout.player.target')}</span>
         <span className="num" style={{ color: 'var(--acc)' }}>
           −14 LUFS
         </span>
@@ -146,10 +148,10 @@ export default function TransportBar() {
       </div>
       <button
         className="btn btn-ghost !py-1.5 !px-3 text-[11px]"
-        title="在作品详情页导出 WAV / MP3 / MIDI / Stems 与证书"
+        title={t('layout.player.exportTitle')}
         onClick={() => navigate('/library')}
       >
-        导出
+        {t('layout.player.export')}
       </button>
     </footer>
   )

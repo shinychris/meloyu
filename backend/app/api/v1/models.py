@@ -128,7 +128,7 @@ def music_delete(body: CatalogModelRequest, db: Session = Depends(get_db),
 
 @router.get("/presets")
 def presets(user: User = Depends(get_current_user)):
-    """外部 API 厂商预设 + 推荐 pull 清单。"""
-    return ok({"external_presets": svc.EXTERNAL_PRESETS,
-               "music_api_presets": svc.MUSIC_API_PRESETS,
-               "recommended_models": svc.RECOMMENDED_MODELS})
+    """外部 API 厂商预设 + 推荐 pull 清单（文案按请求 locale 输出）。"""
+    return ok({"external_presets": svc.external_presets(),
+               "music_api_presets": svc.music_api_presets(),
+               "recommended_models": svc.recommended_models()})

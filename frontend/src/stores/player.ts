@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { getStreamToken } from '../api/files'
+import { t } from '../i18n'
 import { toast } from './toast'
 
 export interface PlayerTrack {
@@ -38,7 +39,7 @@ interface PlayerState {
 
 function startPlayback(el: HTMLAudioElement) {
   el.play().catch(() => {
-    toast('浏览器阻止了自动播放，请再点一次播放', 'warn')
+    toast(t('layout.player.autoplayBlocked'), 'warn')
   })
 }
 
@@ -95,7 +96,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   toggle() {
     const { audio, current } = get()
     if (!audio || !current) {
-      toast('还没有可播放的音频，先在作品库或工作台试听', 'warn')
+      toast(t('layout.player.nothingToPlay'), 'warn')
       return
     }
     if (audio.paused) startPlayback(audio)
@@ -115,7 +116,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   async next() {
     const { queue, queueIndex } = get()
     if (queue.length === 0) {
-      toast('没有下一首', 'warn')
+      toast(t('layout.player.noNext'), 'warn')
       return
     }
     const idx = (queueIndex + 1) % queue.length
@@ -125,7 +126,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   async prev() {
     const { queue, queueIndex } = get()
     if (queue.length === 0) {
-      toast('没有上一首', 'warn')
+      toast(t('layout.player.noPrev'), 'warn')
       return
     }
     const idx = (queueIndex - 1 + queue.length) % queue.length

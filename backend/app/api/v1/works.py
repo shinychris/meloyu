@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.errors import err_validation
+from app.core.i18n import tr
 from app.core.responses import ok
 from app.core.security import get_current_user
 from app.database import get_db
@@ -27,11 +28,12 @@ def list_works(q: str | None = Query(default=None, max_length=50),
                user: User = Depends(get_current_user),
                db: Session = Depends(get_db)):
     if status not in ("active", "trash", "all"):
-        raise err_validation("status 必须为 active/trash/all")
+        raise err_validation(tr("status 必须为 active/trash/all", "status must be active/trash/all"))
     if sort not in ("updated_at", "created_at", "title"):
-        raise err_validation("sort 必须为 updated_at/created_at/title")
+        raise err_validation(
+            tr("sort 必须为 updated_at/created_at/title", "sort must be updated_at/created_at/title"))
     if order not in ("desc", "asc"):
-        raise err_validation("order 必须为 desc/asc")
+        raise err_validation(tr("order 必须为 desc/asc", "order must be desc/asc"))
     return ok(works_svc.list_works(db, user, q=q, tag=tag, favorite=favorite,
                                    status=status, sort=sort, order=order,
                                    page=page, page_size=min(page_size, 100)))

@@ -24,6 +24,7 @@ from urllib.parse import urlparse
 import httpx
 
 from app.config import MUSIC_API_TASK_TIMEOUT_SEC
+from app.core.i18n import tr
 from app.core.logging import logger
 from app.core.seed import candidate_seed
 from app.providers.base import (
@@ -58,7 +59,7 @@ class MusicAPIError(Exception):
 def _norm_base(base_url: str) -> str:
     base = (base_url or "").strip().rstrip("/")
     if not base:
-        raise MusicAPIError("unavailable", "base_url 未配置")
+        raise MusicAPIError("unavailable", tr("base_url 未配置", "base_url is not configured"))
     if not base.startswith(("http://", "https://")):
         base = f"https://{base}"
     if not base.endswith("/api/v1"):
@@ -106,21 +107,35 @@ class SunoCompatClient:
             return httpx.request(method, url, params=params, json=json_body,
                                  headers=self._headers(), timeout=timeout)
         except httpx.TimeoutException as e:
-            raise MusicAPIError("timeout", f"外部歌曲 API 超时（{url}）") from e
+            raise MusicAPIError(
+                "timeout", tr(f"外部歌曲 API 超时（{url}）",
+                              f"External song API timed out ({url})")) from e
         except httpx.HTTPError as e:
             raise MusicAPIError("unavailable",
-                                f"外部歌曲 API 不可达（{url}）：{e.__class__.__name__}") from e
+                                tr(f"外部歌曲 API 不可达（{url}）：{e.__class__.__name__}",
+                                   f"External song API unreachable ({url}): "
+                                   f"{e.__class__.__name__}")) from e
 
     @staticmethod
     def _raise_status(r: httpx.Response, url: str) -> None:
         if r.status_code in (401, 403):
-            raise MusicAPIError("auth", "鉴权失败：api_key 无效或无权限")
+            raise MusicAPIError(
+                "auth", tr("鉴权失败：api_key 无效或无权限",
+                           "Authentication failed: api_key invalid or unauthorized"))
         if r.status_code == 404:
-            raise MusicAPIError("protocol", f"端点不存在（{url}）：请确认 base_url 与协议")
+            raise MusicAPIError(
+                "protocol",
+                tr(f"端点不存在（{url}）：请确认 base_url 与协议",
+                   f"Endpoint not found ({url}): check base_url and the protocol"))
         if r.status_code == 429:
-            raise MusicAPIError("unavailable", "触发限流（429），请稍后重试")
+            raise MusicAPIError(
+                "unavailable", tr("触发限流（429），请稍后重试",
+                                  "Rate limited (429); please retry later"))
         if r.status_code != 200:
-            raise MusicAPIError("protocol", f"外部歌曲 API HTTP {r.status_code}：{r.text[:200]}")
+            raise MusicAPIError(
+                "protocol",
+                tr(f"外部歌曲 API HTTP {r.status_code}：{r.text[:200]}",
+                   f"External song API HTTP {r.status_code}: {r.text[:200]}"))
 
     def submit(self, prompt: str, tags: str, instrumental: bool) -> list[str]:
         """提交生成，返回 clip id 列表（通常 2 个，对应 A/B 候选）。"""
@@ -134,10 +149,14 @@ class SunoCompatClient:
         try:
             data = r.json()
         except ValueError as e:
-            raise MusicAPIError("protocol", f"响应不是 JSON：{r.text[:200]}") from e
+            raise MusicAPIError(
+                "protocol", tr(f"响应不是 JSON：{r.text[:200]}",
+                               f"Response is not JSON: {r.text[:200]}")) from e
         ids = [str(c["id"]) for c in self._clips_of(data) if c.get("id")]
         if not ids:
-            raise MusicAPIError("protocol", f"响应中无 clip id：{str(data)[:200]}")
+            raise MusicAPIError(
+                "protocol", tr(f"响应中无 clip id：{str(data)[:200]}",
+                               f"No clip id in response: {str(data)[:200]}"))
         return ids
 
     def fetch(self, ids: list[str]) -> list[dict]:
@@ -151,7 +170,9 @@ class SunoCompatClient:
         try:
             return self._clips_of(r.json())
         except ValueError as e:
-            raise MusicAPIError("protocol", f"响应不是 JSON：{r.text[:200]}") from e
+            raise MusicAPIError(
+                "protocol", tr(f"响应不是 JSON：{r.text[:200]}",
+                               f"Response is not JSON: {r.text[:200]}")) from e
 
     def test(self) -> str:
         """探活：get 一个不存在的 clip id —— 端点与鉴权通过即返回 200（空结果）。"""
@@ -159,7 +180,8 @@ class SunoCompatClient:
         r = self._request("GET", "/get", params={"ids": "__meloyu_probe__"},
                           timeout=_POLL_TIMEOUT)
         self._raise_status(r, url)
-        return f"端点可达（{self.base}），鉴权通过"
+        return tr(f"端点可达（{self.base}），鉴权通过",
+                  f"Endpoint reachable ({self.base}), authentication passed")
 
 
 def _stage(progress: ProgressCallback, should_cancel: CancelCheck, key: str, pct: int,
@@ -189,7 +211,7 @@ class APIMusicProvider:
     def __init__(self, base_url: str, api_key: str = "", model: str = ""):
         self.client = SunoCompatClient(base_url, api_key, model)
         model_part = model or _host_of(base_url)
-        self.display_name = f"外部歌曲API · {model_part}"
+        self.display_name = tr("外部歌曲API · ", "External song API · ") + model_part
 
     def generate(
         self,
@@ -199,7 +221,8 @@ class APIMusicProvider:
         dest_dir: str,
     ) -> GenerationOutput:
         dest = Path(dest_dir)
-        _stage(progress, should_cancel, "api_submit", 5, "提交外部模型生成")
+        _stage(progress, should_cancel, "api_submit", 5,
+               tr("提交外部模型生成", "Submitting to external model"))
         lyrics = (request.lyrics or "").strip()
         instrumental = request.vocal == "instrumental"
         # custom 模式：有人声走歌词（段落标签 [Verse]/[Chorus] 为协议原生支持），
@@ -209,7 +232,8 @@ class APIMusicProvider:
         ids = self.client.submit(prompt=prompt, tags=tags, instrumental=instrumental)
         logger.info(f"music api submitted: clips={ids} base={self.client.base}")
         _stage(progress, should_cancel, "api_queue", 12,
-               f"外部模型已受理（{len(ids)} 个候选），排队中")
+               tr(f"外部模型已受理（{len(ids)} 个候选），排队中",
+                  f"Accepted by external model ({len(ids)} candidates), queued"))
 
         clips = self._poll(ids, progress, should_cancel)
 
@@ -217,7 +241,7 @@ class APIMusicProvider:
         for idx, clip in enumerate(clips[:2]):
             label = chr(ord("A") + idx)
             _stage(progress, should_cancel, "api_download", 82 + idx * 5,
-                   f"下载候选 {label} 音频")
+                   tr(f"下载候选 {label} 音频", f"Downloading candidate {label} audio"))
             candidates.append(self._download_candidate(clip, request, label, dest))
         return GenerationOutput(candidates, [], False)
 
@@ -234,28 +258,41 @@ class APIMusicProvider:
                 if s in ("error", "failed"):
                     raise MusicAPIError(
                         "bad_output",
-                        f"外部模型生成失败：{str(c.get('error') or c.get('error_message') or s)[:200]}")
+                        tr(f"外部模型生成失败：{str(c.get('error') or c.get('error_message') or s)[:200]}",
+                           f"External model generation failed: "
+                           f"{str(c.get('error') or c.get('error_message') or s)[:200]}"))
             pct = min(75, max(_STATUS_PCT.get(s, 20) for s in statuses)) if statuses else 15
-            progress("api_render", pct, "外部模型生成中（整曲约 1~5 分钟）")
+            progress("api_render", pct,
+                     tr("外部模型生成中（整曲约 1~5 分钟）",
+                        "Generating on external model (whole song, ~1-5 minutes)"))
             time.sleep(_POLL_INTERVAL_SEC)
 
     def _download_candidate(self, clip: dict, request: SongRequest, label: str,
                             dest: Path) -> CandidateArtifact:
         url = str(clip.get("audio_url") or clip.get("audio_url_cdn") or "")
         if not url:
-            raise MusicAPIError("bad_output", f"clip {clip.get('id')} 缺少 audio_url")
+            raise MusicAPIError(
+                "bad_output",
+                tr(f"clip {clip.get('id')} 缺少 audio_url",
+                   f"clip {clip.get('id')} has no audio_url"))
         cand_dir = dest / "candidates" / label
         cand_dir.mkdir(parents=True, exist_ok=True)
         path = cand_dir / "preview.mp3"
         try:
             with httpx.stream("GET", url, timeout=_DOWNLOAD_TIMEOUT, follow_redirects=True) as r:
                 if r.status_code != 200:
-                    raise MusicAPIError("protocol", f"音频下载失败 HTTP {r.status_code}")
+                    raise MusicAPIError(
+                        "protocol",
+                        tr(f"音频下载失败 HTTP {r.status_code}",
+                           f"Audio download failed with HTTP {r.status_code}"))
                 with open(path, "wb") as f:
                     for chunk in r.iter_bytes(1 << 20):
                         f.write(chunk)
         except httpx.HTTPError as e:
-            raise MusicAPIError("unavailable", f"音频下载失败：{e.__class__.__name__}") from e
+            raise MusicAPIError(
+                "unavailable",
+                tr(f"音频下载失败：{e.__class__.__name__}",
+                   f"Audio download failed: {e.__class__.__name__}")) from e
 
         meta = clip.get("metadata") if isinstance(clip.get("metadata"), dict) else {}
         duration = float(meta.get("duration") or clip.get("duration") or request.duration_sec)

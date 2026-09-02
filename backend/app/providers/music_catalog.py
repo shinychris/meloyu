@@ -262,6 +262,18 @@ CATALOG_DISCLAIMER = (
     "目录按外部测评参考分排序；分数综合自各模型公开论文/技术报告/社区横评（来源见"
     "每项 benchmark.source），仅作选型参考，非本系统实测结果。"
 )
+CATALOG_DISCLAIMER_EN = (
+    "The catalog is ranked by reference scores from external evaluations; scores are "
+    "compiled from each model's public papers, technical reports, and community "
+    "benchmarks (see benchmark.source on each entry). They are provided for model "
+    "selection reference only and were not measured by this system."
+)
+
+
+def catalog_disclaimer() -> str:
+    """目录免责声明（按当前 locale）。"""
+    from app.core.i18n import tr
+    return tr(CATALOG_DISCLAIMER, CATALOG_DISCLAIMER_EN)
 
 # 本机可下载运行的模型（按通道分组：V1.4 musicgen_local / V1.5 acestep_local）
 LOCAL_RUNNABLE_IDS = [m["id"] for m in MUSIC_CATALOG if "musicgen_local" in m["channels"]]
@@ -274,3 +286,202 @@ def catalog_sorted() -> list[dict]:
     """按外部测评参考分降序（同分按能力完整度：人声>纯器乐）。"""
     return sorted(MUSIC_CATALOG,
                   key=lambda m: (-m["benchmark"]["score"], not m["capabilities"]["vocals"]))
+
+
+# ---------- 目录英文文案（面向海外用户的选型信息；技术名词保持原样） ----------
+
+# 与 MUSIC_CATALOG 中文条目平行的英文覆盖：仅覆盖展示性文本字段
+# （name/vendor/license/params/capabilities.languages/benchmark.source|notes/
+# local_note/recommend_reason）；slug、HF id、GB/显存数字、arXiv 编号等不动。
+MUSIC_CATALOG_EN: dict[str, dict] = {
+    "ace-step": {
+        "name": "ACE-Step v1.5",
+        "vendor": "ACE Studio × StepFun",
+        "license": "MIT (code + weights)",
+        "params": "2B DiT (turbo) + 0.6B-4B 5Hz LM",
+        "capabilities": {"languages": "50+ languages (Chinese, English, Japanese, Korean, etc.)"},
+        "benchmark": {
+            "source": "ACE-Step 1.5 technical report (arXiv:2602.00744) and community "
+                      "benchmarks (2026)",
+            "notes": "New open-source benchmark for lyrics-to-song: hybrid LM + DiT "
+                     "architecture, with reported audio quality between Suno v4.5 and v5. "
+                     "The 2B turbo tier renders a full song in under 2s on an A100 or "
+                     "under 10s on an RTX 3090, and runs locally on 6-8GB VRAM "
+                     "(0.6B LM + CPU offload).",
+        },
+        "local_note": "Recommended local tier: runs on 8GB VRAM (isolated venv deployment, "
+                      "~11GB weights) - the only open-source lyrics-to-vocals SOTA that "
+                      "runs locally.",
+        "recommend_reason": "Best external scores and runs locally on 8GB VRAM: download "
+                            "the weights, then generate complete sung songs offline with "
+                            "lyric alignment.",
+    },
+    "minimax-music-3": {
+        "vendor": "MiniMax",
+        "license": "Open weights (MiniMax Community License, opened 2026-08-13; see "
+                   "LICENSE for commercial terms)",
+        "params": "8B global LLM + 0.6B local LLM + 2.4B Flow Matching",
+        "capabilities": {"languages": "Multilingual (Chinese, English, etc.)"},
+        "benchmark": {
+            "source": "MiniMax official blog (2026-08-13) and early community reviews",
+            "notes": "Generates up to 5 minutes of a complete song in a single forward "
+                     "pass (no stitching), with strong long-range structure, emotional "
+                     "progression, and realistic instrument timbres; newly released, so "
+                     "few independent samples exist yet; 32kHz output.",
+        },
+        "local_note": "Two local channel forms (auto-selected by priority): (1) local "
+                      "audio.cpp (llama.cpp audio branch, GGUF Q4/Q8/Q4; runs on Windows "
+                      "CUDA, 8GB VRAM is borderline - measured ~16 min per 10s song on a "
+                      "4060 Ti; slow but zero external dependencies); (2) SGLang-Omni "
+                      "self-hosted service (the official path; Linux + dual GPUs, fast). "
+                      "See the model center status hints for weight deployment.",
+    },
+    "songgeneration-2": {
+        "name": "SongGeneration 2 (LeVo 2)",
+        "vendor": "Tencent AI Lab × Tsinghua University",
+        "license": "Open source (official weight repo is gated; community mirrors are public)",
+        "params": "4B (hybrid LLM + diffusion, hierarchical representation)",
+        "capabilities": {"languages": "Multilingual (Chinese, English, etc.)"},
+        "benchmark": {
+            "source": "LeVo 2 paper and community benchmarks (2026)",
+            "notes": "Top open-source tier for audio quality: phoneme error rate as low "
+                     "as 8.55%, with precise control via separate vocal/accompaniment "
+                     "track representations; the community reports results on par with "
+                     "high-tier Suno versions.",
+        },
+        "local_note": "Local channel = SongGeneration-Studio self-hosted service (a "
+                      "low-VRAM package that runs on Windows; v1 weights base/full ≈ 11GB "
+                      "and large ≈ 21GB, rated 10-22GB VRAM - lower VRAM trades off "
+                      "against time via offload; v2 / LeVo 2 weights require a self-built "
+                      "Linux + ComfyUI setup). Start the Studio service, then configure "
+                      "its endpoint in the model center; weights download through Studio "
+                      "(the official repo is gated; community mirrors are used).",
+    },
+    "yue": {
+        "vendor": "HKUST / Kunlun Tech and others, joint open-source release",
+        "license": "Apache-2.0 code (weights per model card)",
+        "params": "LLaMA2 7B/13B dual-track codecs",
+        "capabilities": {"languages": "Multilingual (Chinese, English, etc.)"},
+        "benchmark": {
+            "source": "YuE technical report (2025), subjective evaluation",
+            "notes": "First open-source foundation model for full-length songs: strong "
+                     "musicality and natural vocals with fine-grained style control; "
+                     "slow inference and high VRAM requirements, and long-range structure "
+                     "consistency trails ACE-Step.",
+        },
+        "local_note": "Local deployment needs 24GB+ VRAM; use Replicate hosting instead "
+                      "(look up and fill in the slug yourself).",
+    },
+    "khala": {
+        "vendor": "Central Conservatory of Music × Tsinghua University",
+        "license": "Open source (see model card)",
+        "params": "64-layer residual acoustic tokens (RVQ)",
+        "capabilities": {"languages": "Chinese / English"},
+        "benchmark": {
+            "source": "Khala technical report and community benchmarks (2026)",
+            "notes": "High-fidelity academic benchmark: a unified 64-layer acoustic space "
+                     "modeling both structure and detail; first-tier among open-source "
+                     "models for vocal clarity, instrument separation, and lyric-rhythm "
+                     "alignment - well suited as a research base.",
+        },
+        "local_note": "No verifiable public code or weight repository as of the 2026-09 "
+                      "review; the local channel will be added once it opens up. Use "
+                      "Replicate hosting (look up and fill in the slug yourself).",
+    },
+    "diffrhythm": {
+        "vendor": "ASLP-lab (Northwestern Polytechnical University) et al.",
+        "license": "Open source (see model card)",
+        "params": "Latent full-song diffusion",
+        "capabilities": {"languages": "Chinese / English"},
+        "benchmark": {
+            "source": "DiffRhythm technical report (2025) and community benchmarks",
+            "notes": "Full song generated in one shot, extremely fast (seconds to tens of "
+                     "seconds), above-average quality; fine detail and enunciation trail "
+                     "ACE-Step.",
+        },
+        "local_note": "Use Replicate hosting (look up and fill in the slug yourself).",
+    },
+    "musicgen-large": {
+        "vendor": "Meta (AudioCraft)",
+        "license": "CC-BY-NC 4.0 (weights) + MIT (code)",
+        "params": "3.3B",
+        "capabilities": {"languages": "Instrumental (no lyrics/vocals)"},
+        "benchmark": {
+            "source": "MusicGen paper (Meta, arXiv:2306.05284) FAD/FD benchmarks",
+            "notes": "Strongest text-to-music instrumental benchmark tier; no vocals or "
+                     "lyric input; long audio is costly.",
+        },
+        "local_note": "3.3B weights are ~6GB; impractical on local CPU - use Replicate "
+                      "hosting.",
+    },
+    "musicgen-medium": {
+        "vendor": "Meta (AudioCraft)",
+        "license": "CC-BY-NC 4.0 (weights) + MIT (code)",
+        "params": "1.5B",
+        "capabilities": {"languages": "Instrumental (no lyrics/vocals)"},
+        "benchmark": {
+            "source": "MusicGen paper (Meta, arXiv:2306.05284) FAD/FD benchmarks",
+            "notes": "Balanced instrumental quality/speed tier; runs on local CPU (about "
+                     "5-15 minutes for 30s).",
+        },
+        "local_note": "Works on local CPU but slow; for long audio, prefer Replicate "
+                      "hosting.",
+    },
+    "musicgen-small": {
+        "vendor": "Meta (AudioCraft)",
+        "license": "CC-BY-NC 4.0 (weights) + MIT (code)",
+        "params": "300M",
+        "capabilities": {"languages": "Instrumental (no lyrics/vocals)"},
+        "benchmark": {
+            "source": "MusicGen paper (Meta, arXiv:2306.05284) FAD/FD benchmarks",
+            "notes": "Lightweight validation tier: ~2.2GB weights, about 2-6 minutes for "
+                     "30s on CPU; the go-to for offline / key-free use, though quality "
+                     "trails the medium and large tiers.",
+        },
+        "local_note": "Recommended offline tier: no API key needed; generates "
+                      "instrumentals locally after a real download.",
+        "recommend_reason": "Recommended for offline / key-free use: download locally and "
+                            "generate for real (instrumental).",
+    },
+    "stable-audio-open": {
+        "vendor": "Stability AI",
+        "license": "Stability Community License (free for non-commercial use)",
+        "params": "~1.1B",
+        "capabilities": {"languages": "Sound effects / short instrumentals"},
+        "benchmark": {
+            "source": "Stable Audio Open model card (Stability AI, 2024)",
+            "notes": "Good short-audio and sound-effect quality, but not song-structured "
+                     "(47s cap); mostly used for source material.",
+        },
+        "local_note": "Use Replicate hosting (look up and fill in the slug yourself).",
+    },
+}
+
+# 允许英文覆盖的展示字段（其余字段原样保留）
+_EN_DISPLAY_FIELDS = ("name", "vendor", "license", "params", "local_note",
+                      "recommend_reason")
+
+
+def localized_entry(entry: dict, locale: str | None = None) -> dict:
+    """按 locale 返回目录条目的展示副本：zh 原样；en 覆盖英文文案字段。
+
+    深度仅两级（capabilities/benchmark 内的 languages/source/notes 做合并覆盖），
+    技术/状态字段（channels、local_hf_id、local_status 等）不受影响。
+    """
+    from app.core.i18n import current_locale
+    loc = locale or current_locale()
+    if loc != "en":
+        return entry
+    override = MUSIC_CATALOG_EN.get(entry.get("id") or "")
+    if not override:
+        return entry
+    out = dict(entry)
+    for field in _EN_DISPLAY_FIELDS:
+        if field in override:
+            out[field] = override[field]
+    for sub in ("capabilities", "benchmark"):
+        if sub in override:
+            merged = dict(out.get(sub) or {})
+            merged.update(override[sub])
+            out[sub] = merged
+    return out

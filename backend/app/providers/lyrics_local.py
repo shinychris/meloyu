@@ -13,6 +13,7 @@ from pathlib import Path
 from pypinyin import Style, pinyin
 
 from app.synth.structure import SECTION_ALIASES, TAG_RE, parse_lyrics
+from app.core.i18n import tr
 
 BANKS_DIR = Path(__file__).parent / "lyrics" / "banks"
 
@@ -268,21 +269,26 @@ class LocalLyricsProvider:
                     off_count += 1
                     suggestions.append({
                         "line_no": ln["line_no"], "type": "rhyme",
-                        "message": f"尾字「{ln['tail_char']}」属 "
+                        "message": tr(f"尾字「{ln['tail_char']}」属 "
                                    f"{rhyme_group_of(ln['rhyme_group']) or '未知'} 辙，与主韵 "
-                                   f"{main_group} 不一致，建议换 {main_group} 辙词"})
+                                   f"{main_group} 不一致，建议换 {main_group} 辙词",
+                                   f'Tail char "{ln["tail_char"]}" belongs to rhyme '
+                                   f"{rhyme_group_of(ln['rhyme_group']) or 'unknown'}, not the main "
+                                   f"rhyme {main_group}; consider a {main_group}-rhyming word")})
                 # 重音：每段末行的句尾双字词建议落长音
                 text = ln["text"]
                 if idx == len(sec["lines"]) - 1 and re.search(r"[\u4e00-\u9fff]{2}$", text):
                     last2 = text[-2:]
                     suggestions.append({
                         "line_no": ln["line_no"], "type": "stress",
-                        "message": f"「{last2}」为句尾双字词，建议落长音"})
+                        "message": tr(f"「{last2}」为句尾双字词，建议落长音",
+                                   f'"{last2}" ends the line with a two-char word; let it land on a long note')})
         counts = [c for _, c in sec_line_counts if c > 0]
         if counts and max(counts) - min(counts) >= 3:
             suggestions.append({
                 "line_no": 1, "type": "structure",
-                "message": "段落行数不均衡（相差 ≥3 行），建议各段行数对齐"})
+                "message": tr("段落行数不均衡（相差 ≥3 行），建议各段行数对齐",
+                            "Sections have unbalanced line counts (diff >= 3); align them")})
         return {"sections": sections_out, "main_rhyme_group": main_final,
                 "off_rhyme_count": off_count, "suggestions": suggestions}
 

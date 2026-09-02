@@ -30,6 +30,7 @@ import type { LocalModelsResult, ModelsPresets } from '../types/api'
 import { useConfirmStore } from '../stores/confirm'
 import { toast } from '../stores/toast'
 import { formatDateTime } from '../lib/format'
+import { t, useT, type TranslationKey } from '../i18n'
 
 function fmtSize(bytes: number): string {
   if (!bytes) return '-'
@@ -38,20 +39,20 @@ function fmtSize(bytes: number): string {
   return `${Math.round(bytes / 1024 ** 2)} MB`
 }
 
-const BACKENDS: { value: LyricsBackend; title: string; desc: string }[] = [
-  { value: 'localsynth', title: '本地规则引擎', desc: '离线可用 · 秒级出稿 · 演示级文采（默认）' },
-  { value: 'ollama', title: '本地开源模型（Ollama）', desc: '真实大模型 · 数据不出本机 · 速度视模型与硬件' },
-  { value: 'openai_compat', title: '外部 API（OpenAI 兼容）', desc: '智谱 / DeepSeek / OpenAI 等云端模型 · 需 API Key' },
+const BACKENDS: { value: LyricsBackend; title: TranslationKey; desc: TranslationKey }[] = [
+  { value: 'localsynth', title: 'models.backend.localsynth.title', desc: 'models.backend.localsynth.desc' },
+  { value: 'ollama', title: 'models.backend.ollama.title', desc: 'models.backend.ollama.desc' },
+  { value: 'openai_compat', title: 'models.backend.openai_compat.title', desc: 'models.backend.openai_compat.desc' },
 ]
 
-const MUSIC_BACKENDS: { value: MusicBackend; title: string; desc: string }[] = [
-  { value: 'localsynth', title: '本地合成引擎', desc: '离线可用 · 算法作曲实时渲染 · 含分轨/MIDI（默认）' },
-  { value: 'acestep_local', title: '本机 ACE-Step v1.5（开源·人声成曲）', desc: '歌词→真人声演唱完整歌曲 · 独立 venv 部署 · 8GB 显存档 · GPU 约 1~3 分钟/首' },
-  { value: 'mmax_local', title: 'MiniMax Music 3 · 自托管服务', desc: '官方推理路径 SGLang-Omni（需 Linux+双卡环境）· 端点可配 · 5 分钟长歌 · 32kHz' },
-  { value: 'songgen_local', title: 'SongGeneration · 自托管服务', desc: 'SongGeneration-Studio 服务（Windows 可跑，v1 权重 11~21GB，低显存可 offload）· 端点可配' },
-  { value: 'replicate', title: 'Replicate 开源模型托管', desc: '多类开源歌曲模型（ACE-Step/YuE/MusicGen…）· 一个 Token 全可用' },
-  { value: 'api', title: '外部歌曲 API（Suno 兼容）', desc: '商业整曲模型（人声演唱）· 需网关与 Key · 约 1~5 分钟/首' },
-  { value: 'musicgen_local', title: '本机 MusicGen（开源）', desc: '本地真实下载与推理（器乐）· 免 API Key · CPU 可跑' },
+const MUSIC_BACKENDS: { value: MusicBackend; title: TranslationKey; desc: TranslationKey }[] = [
+  { value: 'localsynth', title: 'models.mbackend.localsynth.title', desc: 'models.mbackend.localsynth.desc' },
+  { value: 'acestep_local', title: 'models.mbackend.acestep_local.title', desc: 'models.mbackend.acestep_local.desc' },
+  { value: 'mmax_local', title: 'models.mbackend.mmax_local.title', desc: 'models.mbackend.mmax_local.desc' },
+  { value: 'songgen_local', title: 'models.mbackend.songgen_local.title', desc: 'models.mbackend.songgen_local.desc' },
+  { value: 'replicate', title: 'models.mbackend.replicate.title', desc: 'models.mbackend.replicate.desc' },
+  { value: 'api', title: 'models.mbackend.api.title', desc: 'models.mbackend.api.desc' },
+  { value: 'musicgen_local', title: 'models.mbackend.musicgen_local.title', desc: 'models.mbackend.musicgen_local.desc' },
 ]
 
 /** 支持本机/自托管运行的通道（目录按钮/状态按此泛化渲染） */
@@ -61,22 +62,23 @@ const DOWNLOAD_CHANNELS: MusicBackend[] = ['acestep_local', 'musicgen_local']
 const localChannelOf = (m: MusicCatalogModel): MusicBackend | undefined =>
   m.channels.find((c) => LOCAL_CHANNELS.includes(c))
 
-const OP_TYPE_LABEL: Record<ModelOpInfo['op_type'], string> = {
-  pull: '下载', delete: '删除', music_pull: '下载', music_delete: '删除',
+const OP_TYPE_LABEL: Record<ModelOpInfo['op_type'], TranslationKey> = {
+  pull: 'common.download', delete: 'common.delete', music_pull: 'common.download', music_delete: 'common.delete',
 }
 
-/** 目录模型的本机状态文案 */
+/** 目录模型的本机状态文案（t 为模块级翻译函数；本组件经 useT 订阅语言变化后重渲染） */
 function localStatusText(m: MusicCatalogModel): { text: string; color: string } {
-  if (m.local_status === 'ready') return { text: '本机已就绪', color: 'var(--acc)' }
-  if (m.local_status === 'deps_missing') return { text: '依赖未安装', color: 'var(--bad)' }
-  if (m.local_status === 'not_downloaded') return { text: '未下载', color: 'var(--dim)' }
-  if (m.local_status === 'not_running') return { text: '服务未运行', color: 'var(--bad)' }
-  return { text: '仅托管', color: 'var(--dim)' }
+  if (m.local_status === 'ready') return { text: t('models.status.ready'), color: 'var(--acc)' }
+  if (m.local_status === 'deps_missing') return { text: t('models.status.depsMissing'), color: 'var(--bad)' }
+  if (m.local_status === 'not_downloaded') return { text: t('models.status.notDownloaded'), color: 'var(--dim)' }
+  if (m.local_status === 'not_running') return { text: t('models.status.notRunning'), color: 'var(--bad)' }
+  return { text: t('models.status.hostedOnly'), color: 'var(--dim)' }
 }
 
 /** 模型中心：歌词引擎通道切换 + 本地开源模型下载管理 + 外部 API 配置（契约 §5.8） */
 export default function ModelCenterView() {
   const confirm = useConfirmStore((s) => s.confirm)
+  const t = useT()
   const [runtime, setRuntime] = useState<ModelsRuntime | null>(null)
   const [local, setLocal] = useState<LocalModelsResult | null>(null)
   const [settings, setSettings] = useState<LLMSettings | null>(null)
@@ -168,11 +170,11 @@ export default function ModelCenterView() {
 
   const saveBackend = async (target: LyricsBackend, extra: Record<string, string> = {}) => {
     if (target === 'ollama' && !pickedModel && !extra.ollama_model) {
-      toast('请先在下方选择（或下载）一个本地模型')
+      toast(t('models.lyrics.needModel'))
       return
     }
     if (target === 'openai_compat' && !(extBase || extra.external_base_url)) {
-      toast('请先在下方完成外部 API 配置')
+      toast(t('models.lyrics.needExternal'))
       return
     }
     setSaving(true)
@@ -189,7 +191,7 @@ export default function ModelCenterView() {
       setBackend(st.lyrics_backend)
       const rt = await getModelsRuntime()
       setRuntime(rt)
-      toast(`歌词引擎已切换：${rt.engine}`)
+      toast(t('models.lyrics.switched', { engine: rt.engine }))
     } catch {
       /* 拦截器已 toast */
     } finally {
@@ -200,7 +202,7 @@ export default function ModelCenterView() {
   const startPull = async (tag: string) => {
     const model = tag.trim()
     if (!model) {
-      toast('请输入或选择要下载的模型 tag')
+      toast(t('models.pull.needTag'))
       return
     }
     setPulling(true)
@@ -208,7 +210,7 @@ export default function ModelCenterView() {
       const op = await pullModel(model)
       setActiveOp(op)
       setPullTag('')
-      toast(`开始下载 ${model}`)
+      toast(t('models.pull.started', { model }))
     } catch {
       /* 拦截器已 toast（重复下载 / 格式错误等） */
     } finally {
@@ -218,16 +220,16 @@ export default function ModelCenterView() {
 
   const removeModel = async (name: string) => {
     const ok = await confirm({
-      title: `删除模型 ${name}？`,
-      description: '将删除本机模型文件以释放磁盘空间；若是当前引擎所用模型，引擎将自动回退到本地规则。',
-      confirmText: '删除',
+      title: t('models.del.title', { name }),
+      description: t('models.del.desc'),
+      confirmText: t('common.delete'),
       danger: true,
     })
     if (!ok) return
     try {
       const op = await deleteModel(name)
-      if (op.status === 'succeeded') toast(`已删除 ${name}`)
-      else toast(op.error_message || '删除失败', 'warn')
+      if (op.status === 'succeeded') toast(t('models.del.done', { name }))
+      else toast(op.error_message || t('models.del.failed'), 'warn')
       await refreshAll()
     } catch {
       /* 拦截器已 toast */
@@ -236,7 +238,7 @@ export default function ModelCenterView() {
 
   const runTest = async () => {
     if (!extBase.trim() || !extModel.trim()) {
-      toast('base_url 与 model 必填')
+      toast(t('models.ext.baseUrlRequired'))
       return
     }
     setTesting(true)
@@ -266,7 +268,7 @@ export default function ModelCenterView() {
       setExtKey('')
       const rt = await getModelsRuntime()
       setRuntime(rt)
-      toast(`歌词引擎已切换：${rt.engine}`)
+      toast(t('models.lyrics.switched', { engine: rt.engine }))
     } catch {
       /* 拦截器已 toast */
     } finally {
@@ -276,7 +278,7 @@ export default function ModelCenterView() {
 
   const runMusicTest = async () => {
     if (!musicBase.trim()) {
-      toast('base_url 必填')
+      toast(t('models.music.baseUrlRequired'))
       return
     }
     setMusicTesting(true)
@@ -294,18 +296,18 @@ export default function ModelCenterView() {
 
   const saveMusic = async (target: MusicBackend, extra: Record<string, string> = {}) => {
     if (target === 'api' && !(musicBase || extra.music_api_base_url)) {
-      toast('请先在下方完成外部歌曲 API 配置')
+      toast(t('models.music.needApi'))
       return
     }
     if (target === 'replicate'
         && !(settings?.replicate_api_token.has_key || replicateKey.trim())) {
-      toast('Replicate 通道需先保存 API Token（见下方开源模型目录）')
+      toast(t('models.music.needReplicateToken'))
       return
     }
     if ((target === 'replicate' || target === 'musicgen_local' || target === 'acestep_local'
         || target === 'mmax_local' || target === 'songgen_local')
         && !settings?.music_model) {
-      toast('请先在下方目录中选择一个开源模型')
+      toast(t('models.music.needModel'))
       return
     }
     setMusicSaving(true)
@@ -326,7 +328,7 @@ export default function ModelCenterView() {
       setMusicKey('')
       const rt = await getModelsRuntime()
       setRuntime(rt)
-      toast(`歌曲引擎已切换：${rt.song_engine}`)
+      toast(t('models.music.switched', { engine: rt.song_engine }))
     } catch {
       /* 拦截器已 toast */
     } finally {
@@ -336,7 +338,7 @@ export default function ModelCenterView() {
 
   const runReplicateTest = async () => {
     if (!replicateKey.trim()) {
-      toast('请先输入 Replicate API Token（r8_ 开头）')
+      toast(t('models.replicate.needToken'))
       return
     }
     setReplicateTesting(true)
@@ -352,7 +354,7 @@ export default function ModelCenterView() {
 
   const saveReplicate = async () => {
     if (!replicateKey.trim() && !settings?.replicate_api_token.has_key) {
-      toast('请先输入 Replicate API Token')
+      toast(t('models.replicate.needTokenSave'))
       return
     }
     setReplicateSaving(true)
@@ -364,7 +366,7 @@ export default function ModelCenterView() {
       setReplicateKey('')
       const rt = await getModelsRuntime()
       setRuntime(rt)
-      toast(st.replicate_api_token.has_key ? 'Replicate Token 已保存' : 'Replicate Token 已清除')
+      toast(st.replicate_api_token.has_key ? t('models.replicate.tokenSaved') : t('models.replicate.tokenCleared'))
     } catch {
       /* 拦截器已 toast */
     } finally {
@@ -377,7 +379,7 @@ export default function ModelCenterView() {
     const hasLocal = m.channels.some((c) => LOCAL_CHANNELS.includes(c))
     if (channel === 'replicate' || (!channel && !hasLocal)) {
       if (!settings?.replicate_api_token.has_key && !replicateKey.trim()) {
-        toast('该模型走 Replicate 托管，请先在下方保存 API Token')
+        toast(t('models.music.replicateHostedNeedToken'))
         return
       }
     }
@@ -395,7 +397,7 @@ export default function ModelCenterView() {
       const [rt, cat] = await Promise.all([getModelsRuntime(), getMusicCatalog()])
       setRuntime(rt)
       setCatalog(cat)
-      toast(`歌曲引擎已切换：${rt.song_engine}`)
+      toast(t('models.music.switched', { engine: rt.song_engine }))
     } catch {
       /* 拦截器已 toast（缺 Token / 通道不匹配等） */
     } finally {
@@ -408,7 +410,7 @@ export default function ModelCenterView() {
     try {
       const op = await pullMusicModel(m.id)
       setActiveOp(op)
-      toast(`开始下载 ${m.name}（约 ${m.local_size_mb} MB）`)
+      toast(t('models.music.pullStarted', { name: m.name, size: m.local_size_mb }))
     } catch {
       /* 拦截器已 toast */
     } finally {
@@ -418,16 +420,16 @@ export default function ModelCenterView() {
 
   const removeMusicModel = async (m: MusicCatalogModel) => {
     const ok = await confirm({
-      title: `删除本机模型 ${m.name}？`,
-      description: '将删除 HuggingFace 缓存中的模型权重以释放磁盘空间；若是当前引擎所用模型，引擎将自动回退到本地合成。',
-      confirmText: '删除',
+      title: t('models.musicDel.title', { name: m.name }),
+      description: t('models.musicDel.desc'),
+      confirmText: t('common.delete'),
       danger: true,
     })
     if (!ok) return
     try {
       const op = await deleteMusicModel(m.id)
-      if (op.status === 'succeeded') toast(`已删除 ${m.name}`)
-      else toast(op.error_message || '删除失败', 'warn')
+      if (op.status === 'succeeded') toast(t('models.del.done', { name: m.name }))
+      else toast(op.error_message || t('models.del.failed'), 'warn')
       await refreshAll()
     } catch {
       /* 拦截器已 toast */
@@ -441,7 +443,7 @@ export default function ModelCenterView() {
       setSettings(st)
       const cat = await getMusicCatalog()
       setCatalog(cat)
-      toast('slug 覆盖已保存')
+      toast(t('models.catalog.slugsSaved'))
     } catch {
       /* 拦截器已 toast */
     } finally {
@@ -460,7 +462,7 @@ export default function ModelCenterView() {
       const cat = await getMusicCatalog()
       setCatalog(cat)
       const svc = cat.machine.services?.[channel]
-      toast(svc?.running ? `端点已保存，服务在线：${svc.detail}` : '端点已保存（服务未运行）')
+      toast(svc?.running ? t('models.catalog.hostSavedOnline', { detail: svc.detail }) : t('models.catalog.hostSavedOffline'))
     } catch {
       /* 拦截器已 toast */
     } finally {
@@ -473,12 +475,10 @@ export default function ModelCenterView() {
   return (
     <div className="view h-full overflow-y-auto">
       <div className="max-w-[1080px] mx-auto px-10 py-8">
-        <div className="label">模型中心 · MODEL HUB</div>
-        <h1 className="text-[22px] font-extrabold tracking-tight mt-2">AI 引擎与模型管理</h1>
+        <div className="label">{t('models.label')}</div>
+        <h1 className="text-[22px] font-extrabold tracking-tight mt-2">{t('models.title')}</h1>
         <p className="text-[12px] mt-2" style={{ color: 'var(--dim)' }}>
-          歌词引擎：本地规则（离线兜底）/ 本地开源模型（Ollama）/ 外部 API（OpenAI 兼容）；
-          歌曲引擎：本机 ACE-Step v1.5（开源人声成曲）/ 本地合成（离线兜底）/ Replicate
-          开源模型托管 / 外部歌曲 API / 本机 MusicGen——开源模型按外部测评参考分排序并给出推荐（见下方目录）。引擎失败时自动回退本地引擎，创作不中断。
+          {t('models.intro')}
         </p>
 
         {/* 运行时状态 */}
@@ -492,16 +492,16 @@ export default function ModelCenterView() {
           />
           <div className="flex-1 min-w-0">
             <div className="text-[13px] font-bold">
-              Ollama {ollama?.running ? `运行中 · v${ollama.version || '?'}` : '未运行'}
+              Ollama {ollama?.running ? t('models.runtime.running', { version: ollama.version || '?' }) : t('models.runtime.stopped')}
               {ollama?.running && (
                 <span className="ml-2 text-[11px] font-normal" style={{ color: 'var(--dim)' }}>
-                  {ollama.host} · {ollama.models_count} 个本地模型
+                  {ollama.host} · {t('models.runtime.localModels', { n: ollama.models_count })}
                 </span>
               )}
             </div>
             <div className="text-[11px] mt-1" style={{ color: 'var(--dim)' }}>
               {ollama?.running
-                ? local?.error || '本地开源模型运行时就绪，可在下方下载 / 选用模型'
+                ? local?.error || t('models.runtime.ready')
                 : ollama?.error || '—'}
             </div>
           </div>
@@ -511,11 +511,11 @@ export default function ModelCenterView() {
             </div>
           )}
           <div className="text-right flex-none">
-            <div className="label">歌词引擎</div>
+            <div className="label">{t('models.runtime.lyricsEngine')}</div>
             <div className="text-[12px] font-bold mt-1" style={{ color: 'var(--acc)' }}>
               {runtime?.engine || '…'}
             </div>
-            <div className="label mt-2">歌曲引擎</div>
+            <div className="label mt-2">{t('models.runtime.songEngine')}</div>
             <div className="text-[12px] font-bold mt-1" style={{ color: 'var(--acc)' }}>
               {runtime?.song_engine || '…'}
             </div>
@@ -524,7 +524,7 @@ export default function ModelCenterView() {
 
         {/* 歌曲生成引擎通道（V1.3/V1.4） */}
         <div className="mt-8">
-          <div className="label mb-3">歌曲生成引擎通道</div>
+          <div className="label mb-3">{t('models.music.title')}</div>
           <div className="grid grid-cols-2 gap-3">
             {MUSIC_BACKENDS.map((b) => {
               const on = musicBackend === b.value
@@ -535,25 +535,25 @@ export default function ModelCenterView() {
                   style={on ? { borderColor: 'var(--acc)' } : undefined}
                   onClick={() => {
                     if (b.value === 'api' && !musicBase && settings?.music_backend !== 'api') {
-                      toast('请先在下方完成外部歌曲 API 配置')
+                      toast(t('models.music.needApi'))
                       return
                     }
                     if (b.value === 'replicate' && settings?.music_backend !== 'replicate'
                         && !settings?.replicate_api_token.has_key) {
-                      toast('请先在下方目录区保存 Replicate API Token')
+                      toast(t('models.music.needCatalogToken'))
                       return
                     }
                     if ((b.value === 'musicgen_local' || b.value === 'acestep_local'
                         || b.value === 'mmax_local' || b.value === 'songgen_local')
                         && !settings?.music_model) {
-                      toast('请先在下方目录选择支持本机运行的模型')
+                      toast(t('models.music.needCatalogModel'))
                       return
                     }
                     setMusicBackend(b.value)
                   }}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-bold">{b.title}</span>
+                    <span className="text-[13px] font-bold">{t(b.title)}</span>
                     <span
                       className="text-[10px] font-bold px-1.5 py-0.5"
                       style={{
@@ -561,10 +561,10 @@ export default function ModelCenterView() {
                         color: on ? '#000' : 'var(--dim)',
                       }}
                     >
-                      {on ? '使用中' : '选择'}
+                      {on ? t('models.chan.inUse') : t('models.chan.select')}
                     </span>
                   </div>
-                  <div className="text-[11px] mt-2" style={{ color: 'var(--dim)' }}>{b.desc}</div>
+                  <div className="text-[11px] mt-2" style={{ color: 'var(--dim)' }}>{t(b.desc)}</div>
                 </div>
               )
             })}
@@ -572,10 +572,10 @@ export default function ModelCenterView() {
           {musicBackend !== settings?.music_backend && (
             <div className="mt-3 flex items-center gap-3">
               <button className="btn btn-acc" disabled={musicSaving} onClick={() => void saveMusic(musicBackend)}>
-                {musicSaving ? '切换中…' : '应用切换'}
+                {musicSaving ? t('models.chan.switching') : t('models.chan.apply')}
               </button>
               <span className="text-[11px]" style={{ color: 'var(--dim)' }}>
-                切换立即生效，影响工作台的整曲生成（歌词助手不受影响）
+                {t('models.chan.musicEffect')}
               </span>
             </div>
           )}
@@ -596,14 +596,14 @@ export default function ModelCenterView() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
-                <div className="label mb-1">BASE URL（Suno 兼容网关根，自动补 /api/v1）</div>
+                <div className="label mb-1">{t('models.musicApi.baseUrl')}</div>
                 <input
                   className="w-full px-3 py-2 text-[12px]"
                   style={{
                     background: 'var(--bg)', border: '1px solid var(--line)',
                     color: 'var(--txt)', outline: 'none',
                   }}
-                  placeholder="https://api.goapi.ai/suno 或 http://localhost:3000"
+                  placeholder={t('models.musicApi.baseUrlPh')}
                   value={musicBase}
                   onChange={(e) => setMusicBase(e.target.value)}
                 />
@@ -613,7 +613,7 @@ export default function ModelCenterView() {
                   API KEY{' '}
                   {settings?.music_api_key.has_key && (
                     <span style={{ color: 'var(--dim)' }}>
-                      （已保存 ····{settings.music_api_key.key_tail}，留空即沿用）
+                      {t('models.keySavedHint', { tail: settings.music_api_key.key_tail })}
                     </span>
                   )}
                 </div>
@@ -624,20 +624,20 @@ export default function ModelCenterView() {
                     background: 'var(--bg)', border: '1px solid var(--line)',
                     color: 'var(--txt)', outline: 'none',
                   }}
-                  placeholder={settings?.music_api_key.has_key ? '••••••••（不变）' : 'sk-…'}
+                  placeholder={settings?.music_api_key.has_key ? t('models.keyKeepPh') : 'sk-…'}
                   value={musicKey}
                   onChange={(e) => setMusicKey(e.target.value)}
                 />
               </div>
               <div>
-                <div className="label mb-1">MODEL（可选，网关区分模型时填写）</div>
+                <div className="label mb-1">{t('models.musicApi.model')}</div>
                 <input
                   className="w-full px-3 py-2 text-[12px]"
                   style={{
                     background: 'var(--bg)', border: '1px solid var(--line)',
                     color: 'var(--txt)', outline: 'none',
                   }}
-                  placeholder="如 V3 / V4 / V4_5，留空用网关默认"
+                  placeholder={t('models.musicApi.modelPh')}
                   value={musicModel}
                   onChange={(e) => setMusicModel(e.target.value)}
                 />
@@ -645,10 +645,10 @@ export default function ModelCenterView() {
             </div>
             <div className="flex items-center gap-3 mt-4">
               <button className="btn" disabled={musicTesting} onClick={() => void runMusicTest()}>
-                {musicTesting ? '测试中…' : '测试连接'}
+                {musicTesting ? t('models.testing') : t('models.test')}
               </button>
               <button className="btn btn-acc" disabled={musicSaving} onClick={() => void saveMusic('api')}>
-                {musicSaving ? '保存中…' : '保存并启用'}
+                {musicSaving ? t('models.saving') : t('models.save')}
               </button>
               {musicTestResult && (
                 <span
@@ -660,16 +660,14 @@ export default function ModelCenterView() {
               )}
             </div>
             <div className="text-[10px] mt-3 leading-relaxed" style={{ color: 'var(--dim)' }}>
-              采用社区通行的 Suno 兼容协议（POST /api/v1/generate + GET /api/v1/get），
-              GoAPI / suno-api 自建网关及各类中转站均可直连。外部候选为整曲 mp3（含人声演唱），
-              不含分轨/MIDI；派生编辑与 WAV/分轨/MIDI 导出仅支持本地引擎候选，MP3 导出可用。
+              {t('models.musicApi.note')}
             </div>
           </div>
         </div>
 
         {/* 开源歌曲模型目录（V1.4：按外部测评排序 + 推荐） */}
         <div className="mt-8">
-          <div className="label mb-3">开源歌曲模型目录（按外部测评排序）</div>
+          <div className="label mb-3">{t('models.catalog.title')}</div>
 
           {/* Replicate Token 配置 */}
           <div className="card p-5">
@@ -679,7 +677,7 @@ export default function ModelCenterView() {
                   REPLICATE API TOKEN{' '}
                   {settings?.replicate_api_token.has_key && (
                     <span style={{ color: 'var(--dim)' }}>
-                      （已保存 ····{settings.replicate_api_token.key_tail}，留空即沿用）
+                      {t('models.keySavedHint', { tail: settings.replicate_api_token.key_tail })}
                     </span>
                   )}
                 </div>
@@ -690,17 +688,17 @@ export default function ModelCenterView() {
                     background: 'var(--bg)', border: '1px solid var(--line)',
                     color: 'var(--txt)', outline: 'none',
                   }}
-                  placeholder={settings?.replicate_api_token.has_key ? '••••••••（不变）' : 'r8_…（replicate.com 账户获取）'}
+                  placeholder={settings?.replicate_api_token.has_key ? t('models.keyKeepPh') : t('models.replicate.tokenPh')}
                   value={replicateKey}
                   onChange={(e) => setReplicateKey(e.target.value)}
                 />
               </div>
               <div className="flex items-center gap-2">
                 <button className="btn" disabled={replicateTesting} onClick={() => void runReplicateTest()}>
-                  {replicateTesting ? '测试中…' : '测试 Token'}
+                  {replicateTesting ? t('models.testing') : t('models.testToken')}
                 </button>
                 <button className="btn btn-acc" disabled={replicateSaving} onClick={() => void saveReplicate()}>
-                  {replicateSaving ? '保存中…' : '保存 Token'}
+                  {replicateSaving ? t('models.saving') : t('models.saveToken')}
                 </button>
                 {replicateTestResult && (
                   <span
@@ -714,12 +712,12 @@ export default function ModelCenterView() {
             </div>
             {catalog && !catalog.machine.musicgen_deps_installed && (
               <div className="text-[11px] mt-3 leading-relaxed" style={{ color: 'var(--dim)' }}>
-                MusicGen：{catalog.machine.install_hint}
+                {t('models.catalog.musicgenDeps', { hint: catalog.machine.install_hint })}
               </div>
             )}
             {catalog && !catalog.machine.acestep_deps_installed && (
               <div className="text-[11px] mt-2 leading-relaxed" style={{ color: 'var(--dim)' }}>
-                ACE-Step：{catalog.machine.acestep_install_hint}
+                {t('models.catalog.acestepDeps', { hint: catalog.machine.acestep_install_hint })}
               </div>
             )}
           </div>
@@ -736,7 +734,7 @@ export default function ModelCenterView() {
                     <span
                       className="text-[10px] font-bold px-1.5 py-1 num flex-none"
                       style={{ background: 'var(--bg3)', color: 'var(--muted)' }}
-                      title="外部测评参考分排名"
+                      title={t('models.catalog.rankTitle')}
                     >
                       #{m.rank}
                     </span>
@@ -746,9 +744,9 @@ export default function ModelCenterView() {
                         <span
                           className="text-[9px] font-bold px-1.5 py-0.5 num"
                           style={{ background: 'var(--acc-dim)', color: 'var(--acc)' }}
-                          title={`来源：${m.benchmark.source}\n${m.benchmark.notes}`}
+                          title={t('models.catalog.sourceTitle', { source: m.benchmark.source, notes: m.benchmark.notes })}
                         >
-                          测评 {m.benchmark.score.toFixed(1)}
+                          {t('models.catalog.score', { score: m.benchmark.score.toFixed(1) })}
                         </span>
                         {m.recommended && (
                           <span
@@ -756,12 +754,12 @@ export default function ModelCenterView() {
                             style={{ background: 'var(--acc)', color: '#000' }}
                             title={m.recommend_reason}
                           >
-                            推荐
+                            {t('models.catalog.recommended')}
                           </span>
                         )}
                         {m.selected && (
                           <span className="text-[9px] font-bold px-1.5 py-0.5" style={{ background: 'var(--acc)', color: '#000' }}>
-                            使用中
+                            {t('models.chan.inUse')}
                           </span>
                         )}
                         <span className="text-[10px]" style={{ color: st.color }}>{st.text}</span>
@@ -771,7 +769,7 @@ export default function ModelCenterView() {
                       </div>
                       <div className="flex gap-1.5 mt-2 flex-wrap">
                         <span className="text-[10px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>
-                          {m.capabilities.vocals ? '人声+歌词成曲' : '纯器乐'}
+                          {m.capabilities.vocals ? t('models.catalog.capVocals') : t('models.catalog.capInstrumental')}
                         </span>
                         <span className="text-[10px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>
                           ≤{m.capabilities.max_duration_sec}s
@@ -780,7 +778,7 @@ export default function ModelCenterView() {
                           {m.capabilities.languages}
                         </span>
                         <span className="text-[10px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>
-                          {localChannel ? '本机/托管' : 'Replicate 托管'}
+                          {localChannel ? t('models.catalog.chanLocal') : t('models.catalog.chanReplicate')}
                         </span>
                       </div>
                       <div className="text-[10px] mt-1.5 leading-relaxed" style={{ color: 'var(--dim)' }}>
@@ -794,7 +792,7 @@ export default function ModelCenterView() {
                           disabled={catalogBusy || m.selected}
                           onClick={() => void useCatalogModel(m, 'replicate')}
                         >
-                          云端使用
+                          {t('models.catalog.useCloud')}
                         </button>
                       )}
                       {localChannel && !isService && (
@@ -804,7 +802,7 @@ export default function ModelCenterView() {
                             disabled={catalogBusy || m.selected}
                             onClick={() => void useCatalogModel(m, localChannel)}
                           >
-                            本机使用
+                            {t('models.catalog.useLocal')}
                           </button>
                           {m.local_status !== 'ready' ? (
                             <button
@@ -812,7 +810,7 @@ export default function ModelCenterView() {
                               disabled={catalogBusy || !!activeOp}
                               onClick={() => void downloadMusicModel(m)}
                             >
-                              下载 ≈{m.local_size_mb}MB
+                              {t('models.catalog.downloadSize', { size: m.local_size_mb })}
                             </button>
                           ) : (
                             <button
@@ -821,7 +819,7 @@ export default function ModelCenterView() {
                               disabled={catalogBusy}
                               onClick={() => void removeMusicModel(m)}
                             >
-                              删除
+                              {t('common.delete')}
                             </button>
                           )}
                         </>
@@ -832,13 +830,13 @@ export default function ModelCenterView() {
                           disabled={catalogBusy || m.selected}
                           onClick={() => void useCatalogModel(m, localChannel)}
                         >
-                          自托管使用
+                          {t('models.catalog.useSelfHosted')}
                         </button>
                       )}
                     </div>
                   </div>
                       {m.channels.includes('replicate') && (
-                        <div className="flex items-center gap-2 mt-3" title="Replicate 模型 slug（社区托管变动时可覆盖）">
+                        <div className="flex items-center gap-2 mt-3" title={t('models.catalog.slugTitle')}>
                           <span className="text-[10px] flex-none" style={{ color: 'var(--dim)' }}>slug</span>
                           <input
                             className="flex-1 px-2 py-1 text-[11px]"
@@ -846,19 +844,19 @@ export default function ModelCenterView() {
                               background: 'var(--bg)', border: '1px solid var(--line)',
                               color: 'var(--txt)', outline: 'none',
                             }}
-                            placeholder={m.replicate_slug_default || 'owner/name（replicate.com 查询后填写）'}
+                            placeholder={m.replicate_slug_default || t('models.catalog.slugPh')}
                             value={slugEdits[m.id] ?? ''}
                             onChange={(e) => setSlugEdits((p) => ({ ...p, [m.id]: e.target.value }))}
                           />
                           {m.replicate_slug_overridden && (
-                            <span className="text-[10px] flex-none" style={{ color: 'var(--dim)' }}>已覆盖</span>
+                            <span className="text-[10px] flex-none" style={{ color: 'var(--dim)' }}>{t('models.catalog.overridden')}</span>
                           )}
                         </div>
                       )}
                       {isService && localChannel && (
-                        <div className="mt-3" title="自托管推理服务端点（模型装在你自己的环境，此处只配地址）">
+                        <div className="mt-3" title={t('models.catalog.hostTitle')}>
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] flex-none" style={{ color: 'var(--dim)' }}>端点</span>
+                            <span className="text-[10px] flex-none" style={{ color: 'var(--dim)' }}>{t('models.catalog.endpoint')}</span>
                             <input
                               className="flex-1 px-2 py-1 text-[11px]"
                               style={{
@@ -874,13 +872,13 @@ export default function ModelCenterView() {
                               disabled={catalogBusy}
                               onClick={() => void saveHost(localChannel)}
                             >
-                              保存端点
+                              {t('models.catalog.saveEndpoint')}
                             </button>
                           </div>
                           <div className="text-[10px] mt-1" style={{ color: m.local_status === 'ready' ? 'var(--acc)' : 'var(--dim)' }}>
                             {m.service_detail || catalog?.machine.services?.[localChannel]?.detail}
                             {m.local_status !== 'ready' && catalog?.machine.services?.[localChannel]?.hint
-                              ? ` —— ${catalog.machine.services[localChannel].hint}` : ''}
+                              ? t('models.catalog.hintSuffix', { hint: catalog.machine.services[localChannel].hint }) : ''}
                           </div>
                         </div>
                       )}
@@ -890,7 +888,7 @@ export default function ModelCenterView() {
           </div>
           <div className="flex items-center gap-3 mt-3">
             <button className="btn" disabled={catalogBusy} onClick={() => void saveSlugs()}>
-              保存 slug 覆盖
+              {t('models.catalog.saveSlugs')}
             </button>
             <span className="text-[10px] flex-1" style={{ color: 'var(--dim)' }}>
               {catalog?.disclaimer}
@@ -900,7 +898,7 @@ export default function ModelCenterView() {
 
         {/* 通道选择 */}
         <div className="mt-8">
-          <div className="label mb-3">歌词引擎通道</div>
+          <div className="label mb-3">{t('models.lyrics.title')}</div>
           <div className="grid grid-cols-3 gap-3">
             {BACKENDS.map((b) => {
               const on = backend === b.value
@@ -911,14 +909,14 @@ export default function ModelCenterView() {
                   style={on ? { borderColor: 'var(--acc)' } : undefined}
                   onClick={() => {
                     if (b.value === 'ollama' && !local?.models.length) {
-                      toast('本机还没有本地模型，请先在下方下载')
+                      toast(t('models.lyrics.noLocal'))
                       return
                     }
                     setBackend(b.value)
                   }}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-bold">{b.title}</span>
+                    <span className="text-[13px] font-bold">{t(b.title)}</span>
                     <span
                       className="text-[10px] font-bold px-1.5 py-0.5"
                       style={{
@@ -926,10 +924,10 @@ export default function ModelCenterView() {
                         color: on ? '#000' : 'var(--dim)',
                       }}
                     >
-                      {on ? '使用中' : '选择'}
+                      {on ? t('models.chan.inUse') : t('models.chan.select')}
                     </span>
                   </div>
-                  <div className="text-[11px] mt-2" style={{ color: 'var(--dim)' }}>{b.desc}</div>
+                  <div className="text-[11px] mt-2" style={{ color: 'var(--dim)' }}>{t(b.desc)}</div>
                   {b.value === 'ollama' && local && local.models.length > 0 && (
                     <select
                       className="w-full mt-3 text-[12px] px-2 py-1.5"
@@ -946,7 +944,7 @@ export default function ModelCenterView() {
                     >
                       {local.models.map((m) => (
                         <option key={m.name} value={m.name}>
-                          {m.name}（{m.parameter_size || '?'} · {fmtSize(m.size_bytes)}）
+                          {t('models.local.modelOption', { name: m.name, params: m.parameter_size || '?', size: fmtSize(m.size_bytes) })}
                         </option>
                       ))}
                     </select>
@@ -958,10 +956,10 @@ export default function ModelCenterView() {
           {backend !== settings?.lyrics_backend && (
             <div className="mt-3 flex items-center gap-3">
               <button className="btn btn-acc" disabled={saving} onClick={() => void saveBackend(backend)}>
-                {saving ? '切换中…' : '应用切换'}
+                {saving ? t('models.chan.switching') : t('models.chan.apply')}
               </button>
               <span className="text-[11px]" style={{ color: 'var(--dim)' }}>
-                切换立即生效，影响歌词助手的生成 / 润色
+                {t('models.chan.lyricsEffect')}
               </span>
             </div>
           )}
@@ -969,16 +967,16 @@ export default function ModelCenterView() {
 
         {/* 本地开源模型 */}
         <div className="mt-8">
-          <div className="label mb-3">本地开源模型（Ollama）</div>
+          <div className="label mb-3">{t('models.local.title')}</div>
           <div className="card">
             {local && local.models.length > 0 ? (
               <table className="w-full text-[12px]">
                 <thead>
                   <tr className="label" style={{ color: 'var(--dim)' }}>
-                    <th className="text-left px-4 py-2 font-normal">模型</th>
-                    <th className="text-left px-4 py-2 font-normal">参数 / 量化</th>
-                    <th className="text-left px-4 py-2 font-normal">大小</th>
-                    <th className="text-right px-4 py-2 font-normal">操作</th>
+                    <th className="text-left px-4 py-2 font-normal">{t('models.local.col.model')}</th>
+                    <th className="text-left px-4 py-2 font-normal">{t('models.local.col.params')}</th>
+                    <th className="text-left px-4 py-2 font-normal">{t('models.local.col.size')}</th>
+                    <th className="text-right px-4 py-2 font-normal">{t('models.local.col.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -991,7 +989,7 @@ export default function ModelCenterView() {
                             className="ml-2 text-[9px] font-bold px-1.5 py-0.5"
                             style={{ background: 'var(--acc)', color: '#000' }}
                           >
-                            引擎使用中
+                            {t('models.local.engineInUse')}
                           </span>
                         )}
                       </td>
@@ -1010,14 +1008,14 @@ export default function ModelCenterView() {
                             void saveBackend('ollama', { ollama_model: m.name })
                           }}
                         >
-                          设为引擎
+                          {t('models.local.setEngine')}
                         </button>
                         <button
                           className="btn !py-1 !px-2.5 text-[11px]"
                           style={{ color: 'var(--bad)' }}
                           onClick={() => void removeModel(m.name)}
                         >
-                          删除
+                          {t('common.delete')}
                         </button>
                       </td>
                     </tr>
@@ -1026,20 +1024,20 @@ export default function ModelCenterView() {
               </table>
             ) : (
               <div className="px-4 py-6 text-[12px]" style={{ color: 'var(--dim)' }}>
-                {local?.error || '暂无本地模型，从下方推荐清单下载一个开始使用'}
+                {local?.error || t('models.local.empty')}
               </div>
             )}
           </div>
 
           {/* 下载区 */}
           <div className="card mt-3 p-4">
-            <div className="label mb-2">下载新模型</div>
+            <div className="label mb-2">{t('models.pull.title')}</div>
             <div className="flex flex-wrap gap-2 mb-3">
               {(local?.recommended || presets?.recommended_models || []).map((r) => (
                 <span
                   key={r.tag}
                   className="chip"
-                  title={`${r.note} · 约 ${r.size_mb}MB`}
+                  title={`${r.note} · ${t('models.pull.aboutSize', { size: r.size_mb })}`}
                   onClick={() => setPullTag(r.tag)}
                 >
                   {r.tag} · ≈{r.size_mb}MB
@@ -1053,7 +1051,7 @@ export default function ModelCenterView() {
                   background: 'var(--bg)', border: '1px solid var(--line)',
                   color: 'var(--txt)', outline: 'none',
                 }}
-                placeholder="或输入自定义 tag，如 qwen3.5:1.7b"
+                placeholder={t('models.pull.tagPh')}
                 value={pullTag}
                 onChange={(e) => setPullTag(e.target.value)}
                 onKeyDown={(e) => {
@@ -1061,11 +1059,11 @@ export default function ModelCenterView() {
                 }}
               />
               <button className="btn btn-acc" disabled={pulling || !!activeOp} onClick={() => void startPull(pullTag)}>
-                {pulling || activeOp ? '下载中…' : '下载'}
+                {pulling || activeOp ? t('models.pull.downloading') : t('common.download')}
               </button>
             </div>
             <div className="text-[10px] mt-2" style={{ color: 'var(--dim)' }}>
-              从 Ollama 公共仓库拉取（ollama.com/library）；下载进度实时显示，可离开本页
+              {t('models.pull.note')}
             </div>
             {activeOp && (
               <div className="mt-3">
@@ -1088,13 +1086,13 @@ export default function ModelCenterView() {
           {/* 操作记录 */}
           {ops.length > 0 && (
             <div className="card mt-3 p-4">
-              <div className="label mb-2">最近操作</div>
+              <div className="label mb-2">{t('models.ops.title')}</div>
               {ops.map((op) => (
                 <div key={op.id} className="flex items-center gap-3 text-[11px] py-1">
                   <span style={{ color: 'var(--dim)' }} className="num">
                     {formatDateTime(op.created_at)}
                   </span>
-                  <span className="font-bold">{OP_TYPE_LABEL[op.op_type] ?? op.op_type}</span>
+                  <span className="font-bold">{t(OP_TYPE_LABEL[op.op_type])}</span>
                   <span>{op.target}</span>
                   <span
                     className="flex-1"
@@ -1104,8 +1102,8 @@ export default function ModelCenterView() {
                         : op.status === 'failed' ? 'var(--bad)' : 'var(--dim)',
                     }}
                   >
-                    {op.status === 'succeeded' ? '成功' : op.status === 'failed'
-                      ? `失败：${op.error_message || '未知错误'}` : `${op.progress}% ${op.message}`}
+                    {op.status === 'succeeded' ? t('models.ops.succeeded') : op.status === 'failed'
+                      ? t('models.ops.failed', { msg: op.error_message || t('models.ops.unknownError') }) : `${op.progress}% ${op.message}`}
                   </span>
                 </div>
               ))}
@@ -1115,14 +1113,14 @@ export default function ModelCenterView() {
 
         {/* 外部 API */}
         <div className="mt-8 mb-10">
-          <div className="label mb-3">外部 API（OpenAI 兼容）</div>
+          <div className="label mb-3">{t('models.ext.title')}</div>
           <div className="card p-5">
             <div className="flex flex-wrap gap-2 mb-4">
               {(presets?.external_presets || []).map((p) => (
                 <span
                   key={p.vendor}
                   className="chip"
-                  title={`${p.base_url} · 推荐 ${p.model_hint}`}
+                  title={`${p.base_url} · ${t('models.ext.recommended', { hint: p.model_hint })}`}
                   onClick={() => {
                     setExtBase(p.base_url)
                     if (!extModel) setExtModel(p.model_hint.split('（')[0])
@@ -1151,7 +1149,7 @@ export default function ModelCenterView() {
                   API KEY{' '}
                   {settings?.external_api_key.has_key && (
                     <span style={{ color: 'var(--dim)' }}>
-                      （已保存 ····{settings.external_api_key.key_tail}，留空即沿用）
+                      {t('models.keySavedHint', { tail: settings.external_api_key.key_tail })}
                     </span>
                   )}
                 </div>
@@ -1162,7 +1160,7 @@ export default function ModelCenterView() {
                     background: 'var(--bg)', border: '1px solid var(--line)',
                     color: 'var(--txt)', outline: 'none',
                   }}
-                  placeholder={settings?.external_api_key.has_key ? '••••••••（不变）' : 'sk-…'}
+                  placeholder={settings?.external_api_key.has_key ? t('models.keyKeepPh') : 'sk-…'}
                   value={extKey}
                   onChange={(e) => setExtKey(e.target.value)}
                 />
@@ -1183,21 +1181,20 @@ export default function ModelCenterView() {
             </div>
             <div className="flex items-center gap-3 mt-4">
               <button className="btn" disabled={testing} onClick={() => void runTest()}>
-                {testing ? '测试中…' : '测试连接'}
+                {testing ? t('models.testing') : t('models.test')}
               </button>
               <button className="btn btn-acc" disabled={saving} onClick={() => void saveExternal()}>
-                {saving ? '保存中…' : '保存并启用'}
+                {saving ? t('models.saving') : t('models.save')}
               </button>
               {testResult && (
                 <span className="text-[11px]" style={{ color: testResult.ok ? 'var(--acc)' : 'var(--bad)' }}>
                   {testResult.ok ? '✓' : '✕'} {testResult.message}
-                  {testResult.sample ? `（回声：${testResult.sample}）` : ''}
+                  {testResult.sample ? t('models.testEcho', { sample: testResult.sample }) : ''}
                 </span>
               )}
             </div>
             <div className="text-[10px] mt-3" style={{ color: 'var(--dim)' }}>
-              标准 chat/completions 协议：智谱 GLM、DeepSeek、OpenAI、Moonshot、通义等均可直连；
-              也兼容本地网关（如 Ollama 的 http://localhost:11434/v1，Key 可任意填）。
+              {t('models.ext.note')}
             </div>
           </div>
         </div>

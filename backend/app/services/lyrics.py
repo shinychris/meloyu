@@ -14,6 +14,7 @@ from app.models import LyricsProject, User
 from app.models.base import utc_now_iso
 from app.providers.lyrics_local import check_sensitive
 from app.services.model_center import get_lyrics_provider
+from app.core.i18n import tr
 
 
 def _guard(text: str) -> None:
@@ -80,7 +81,7 @@ def save_draft(db: Session, user: User, text: str) -> dict:
     row = _draft_row(db, user)
     now = utc_now_iso()
     if row is None:
-        row = LyricsProject(user_id=user.id, title="歌词草稿", draft_text=text,
+        row = LyricsProject(user_id=user.id, title=tr("歌词草稿", "Lyrics draft"), draft_text=text,
                             created_at=now, updated_at=now)
         db.add(row)
     else:

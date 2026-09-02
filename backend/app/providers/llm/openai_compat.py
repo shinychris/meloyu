@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import httpx
 
+from app.core.i18n import tr
 from app.providers.llm.base import LLMError, strip_think
 
 _PROBE_TIMEOUT = httpx.Timeout(20.0)
@@ -15,7 +16,7 @@ _PROBE_TIMEOUT = httpx.Timeout(20.0)
 def _norm_base(base_url: str) -> str:
     base = (base_url or "").strip().rstrip("/")
     if not base:
-        raise LLMError("unavailable", "base_url 未配置")
+        raise LLMError("unavailable", tr("base_url 未配置", "base_url is not configured"))
     if not base.startswith(("http://", "https://")):
         base = f"https://{base}"
     return base
@@ -44,7 +45,7 @@ class OpenAICompatClient:
         url = f"{_norm_base(base_url) if base_url else self.base}/chat/completions"
         m = (model or self.model).strip()
         if not m:
-            raise LLMError("unavailable", "model 未配置")
+            raise LLMError("unavailable", tr("model 未配置", "model is not configured"))
 
         def once(token_budget: int) -> tuple[str, str]:
             payload = {
@@ -58,25 +59,44 @@ class OpenAICompatClient:
                 r = httpx.post(url, json=payload, headers=self._headers(api_key),
                                timeout=httpx.Timeout(timeout))
             except httpx.TimeoutException as e:
-                raise LLMError("timeout", f"外部 API 超时（{timeout:.0f}s）") from e
+                raise LLMError(
+                    "timeout",
+                    tr(f"外部 API 超时（{timeout:.0f}s）",
+                       f"External API timed out ({timeout:.0f}s)")) from e
             except httpx.HTTPError as e:
                 raise LLMError("unavailable",
-                               f"外部 API 不可达（{url}）：{e.__class__.__name__}") from e
+                               tr(f"外部 API 不可达（{url}）：{e.__class__.__name__}",
+                                  f"External API unreachable ({url}): "
+                                  f"{e.__class__.__name__}")) from e
             if r.status_code in (401, 403):
-                raise LLMError("unavailable", "鉴权失败：api_key 无效或无权限")
+                raise LLMError(
+                    "unavailable",
+                    tr("鉴权失败：api_key 无效或无权限",
+                       "Authentication failed: api_key invalid or unauthorized"))
             if r.status_code == 404:
-                raise LLMError("protocol", f"端点或模型不存在（{url}，model={m}）")
+                raise LLMError(
+                    "protocol",
+                    tr(f"端点或模型不存在（{url}，model={m}）",
+                       f"Endpoint or model not found ({url}, model={m})"))
             if r.status_code == 429:
-                raise LLMError("unavailable", "触发限流（429），请稍后重试")
+                raise LLMError(
+                    "unavailable", tr("触发限流（429），请稍后重试",
+                                      "Rate limited (429); please retry later"))
             if r.status_code != 200:
-                raise LLMError("protocol", f"外部 API HTTP {r.status_code}：{r.text[:200]}")
+                raise LLMError(
+                    "protocol",
+                    tr(f"外部 API HTTP {r.status_code}：{r.text[:200]}",
+                       f"External API HTTP {r.status_code}: {r.text[:200]}"))
             try:
                 message = r.json()["choices"][0]["message"]
                 # 思考链字段：OpenAI/deepseek 为 reasoning_content，Ollama /v1 为 reasoning
                 reasoning = message.get("reasoning_content") or message.get("reasoning") or ""
                 return message.get("content") or "", reasoning
             except (ValueError, KeyError, IndexError, TypeError) as e:
-                raise LLMError("protocol", f"响应结构不符合 OpenAI 协议：{e}") from e
+                raise LLMError(
+                    "protocol",
+                    tr(f"响应结构不符合 OpenAI 协议：{e}",
+                       f"Response structure does not follow the OpenAI protocol: {e}")) from e
 
         content, reasoning = once(max_tokens)
         if not content.strip() and reasoning.strip() and max_tokens < 8000:
@@ -85,9 +105,13 @@ class OpenAICompatClient:
         if not text:
             if reasoning.strip():
                 raise LLMError("bad_output",
-                               f"模型 {m} 思考链过长超出输出预算/上下文（若端点为 Ollama"
-                               f" /v1，建议改用原生 Ollama 通道或非思考型模型）")
-            raise LLMError("bad_output", "外部 API 返回空内容")
+                               tr(f"模型 {m} 思考链过长超出输出预算/上下文（若端点为 Ollama"
+                                  f" /v1，建议改用原生 Ollama 通道或非思考型模型）",
+                                  f"Model {m}: thinking chain exceeded the output "
+                                  f"budget/context (if the endpoint is Ollama /v1, use "
+                                  f"the native Ollama channel or a non-thinking model)"))
+            raise LLMError("bad_output", tr("外部 API 返回空内容",
+                                            "External API returned empty content"))
         return text
 
     def test(self, base_url: str | None = None, api_key: str | None = None,
@@ -102,5 +126,5 @@ class OpenAICompatClient:
                 model=model, base_url=base_url, api_key=api_key)
         except LLMError as e:
             if e.kind == "bad_output":
-                return f"（已连通）{e.message}"
+                return tr(f"（已连通）{e.message}", f"(Connected) {e.message}")
             raise

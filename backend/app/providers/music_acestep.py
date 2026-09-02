@@ -21,6 +21,7 @@ import threading
 from pathlib import Path
 
 from app.config import ACESTEP_TASK_TIMEOUT_SEC, BACKEND_DIR, settings
+from app.core.i18n import tr
 from app.core.logging import logger
 from app.core.seed import candidate_seed
 from app.providers.base import (
@@ -35,9 +36,12 @@ from app.synth.ir import SongRequest
 from app.synth.mp3_io import encode_mp3
 from app.synth.wav_io import read_wav
 
-_INSTALL_HINT = ("ACE-Step 未部署：在 backend/ 下执行 "
-                 "python scripts/setup_acestep.py（自动下载代码并 uv sync 独立 venv，"
-                 "约 4GB 依赖；需已安装 uv 与 Python 3.11/3.12）")
+_INSTALL_HINT_ZH = ("ACE-Step 未部署：在 backend/ 下执行 "
+                    "python scripts/setup_acestep.py（自动下载代码并 uv sync 独立 venv，"
+                    "约 4GB 依赖；需已安装 uv 与 Python 3.11/3.12）")
+_INSTALL_HINT_EN = ("ACE-Step is not deployed: from backend/ run "
+                    "python scripts/setup_acestep.py (downloads the code and uv-syncs an "
+                    "isolated venv, ~4GB of dependencies; requires uv and Python 3.11/3.12)")
 
 # 主模型 4 组件 + 8GB 档 LM（checkpoints 目录下的子目录名，与 acestep 包一致）
 _COMPONENTS = ("acestep-v15-turbo", "vae", "Qwen3-Embedding-0.6B",
@@ -85,7 +89,7 @@ def checkpoints_dir() -> Path:
 
 
 def acestep_install_hint() -> str:
-    return _INSTALL_HINT
+    return tr(_INSTALL_HINT_ZH, _INSTALL_HINT_EN)
 
 
 def acestep_deps_installed() -> bool:
@@ -120,7 +124,9 @@ def local_downloaded_ids() -> list[str]:
 
 def delete_local(model_id: str) -> None:
     if not _is_acestep_model(model_id):
-        raise ACEStepLocalError("download", f"模型不支持本地删除：{model_id}")
+        raise ACEStepLocalError(
+            "download", tr(f"模型不支持本地删除：{model_id}",
+                           f"Model does not support local deletion: {model_id}"))
     ck = checkpoints_dir()
     if ck.exists():
         import shutil
@@ -233,20 +239,28 @@ def _run_runner(args: list[str], on_event, *, timeout_sec: int,
                 continue
             if event.get("event") == "error":
                 _kill()
-                raise ACEStepLocalError("runtime", str(event.get("message") or "未知错误"))
+                raise ACEStepLocalError(
+                    "runtime",
+                    str(event.get("message") or tr("未知错误", "Unknown error")))
             if event.get("event") == "done":
                 return event
             if event.get("event") == "progress" and on_event:
                 on_event(int(event.get("pct") or 0), str(event.get("message") or ""))
         proc.wait(timeout=30)
         if killed["timeout"]:
-            raise TimeoutError(f"ACE-Step 推理超过 {timeout_sec}s 熔断")
+            raise TimeoutError(
+                tr(f"ACE-Step 推理超过 {timeout_sec}s 熔断",
+                   f"ACE-Step inference exceeded {timeout_sec}s circuit limit"))
         rc = proc.returncode
         if rc == 0:
             # 正常退出但没发 done（不应发生）
-            raise ACEStepLocalError("runtime", "runner 未返回结果即退出")
+            raise ACEStepLocalError(
+                "runtime", tr("runner 未返回结果即退出",
+                              "runner exited without returning a result"))
         raise ACEStepLocalError(
-            "runtime", f"runner 异常退出（码 {rc}）：{stderr_tail.tail()[-300:]}")
+            "runtime",
+            tr(f"runner 异常退出（码 {rc}）：{stderr_tail.tail()[-300:]}",
+               f"runner crashed (exit code {rc}): {stderr_tail.tail()[-300:]}"))
     finally:
         watchdog.cancel()
         _kill()
@@ -261,9 +275,11 @@ def _run_runner(args: list[str], on_event, *, timeout_sec: int,
 def pull_local(model_id: str, on_progress) -> None:
     """下载模型权重（主模型 4 组件 + 0.6B LM，约 11GB），进度经 on_progress 上报。"""
     if not _is_acestep_model(model_id):
-        raise ACEStepLocalError("download", f"模型不支持本地下载：{model_id}")
+        raise ACEStepLocalError(
+            "download", tr(f"模型不支持本地下载：{model_id}",
+                           f"Model does not support local download: {model_id}"))
     if not acestep_deps_installed():
-        raise ACEStepLocalError("deps", _INSTALL_HINT)
+        raise ACEStepLocalError("deps", tr(_INSTALL_HINT_ZH, _INSTALL_HINT_EN))
     checkpoints_dir().mkdir(parents=True, exist_ok=True)
 
     def on_event(pct: int, message: str) -> None:
@@ -284,7 +300,7 @@ class ACEStepLocalProvider:
     """MusicProvider 协议实现：本机 ACE-Step v1.5 推理（人声+器乐）。"""
 
     name = "acestep_local"
-    base_display = "本机 ACE-Step v1.5（开源）"
+    base_display = "Local ACE-Step v1.5 (open source)"
     supports_vocals = True
     timeout_sec = ACESTEP_TASK_TIMEOUT_SEC
     vocals_downgraded = False
@@ -292,9 +308,12 @@ class ACEStepLocalProvider:
     def __init__(self, model_id: str):
         if not _is_acestep_model(model_id):
             raise ACEStepLocalError(
-                "download", f"模型不支持本机 ACE-Step 通道：{model_id}")
+                "download",
+                tr(f"模型不支持本机 ACE-Step 通道：{model_id}",
+                   f"Model does not support the local ACE-Step channel: {model_id}"))
         self.model_id = model_id
-        self.display_name = f"ACE-Step 本地 · {CATALOG_BY_ID[model_id]['name']}"
+        self.display_name = (tr("ACE-Step 本地 · ", "ACE-Step Local · ")
+                             + CATALOG_BY_ID[model_id]['name'])
 
     def generate(
         self,
@@ -304,10 +323,13 @@ class ACEStepLocalProvider:
         dest_dir: str,
     ) -> GenerationOutput:
         if not acestep_deps_installed():
-            raise ACEStepLocalError("deps", _INSTALL_HINT)
+            raise ACEStepLocalError("deps", tr(_INSTALL_HINT_ZH, _INSTALL_HINT_EN))
         if not is_downloaded(self.model_id):
             raise ACEStepLocalError(
-                "download", "模型权重未下载（请先在模型中心下载，约 11GB）")
+                "download",
+                tr("模型权重未下载（请先在模型中心下载，约 11GB）",
+                   "Model weights not downloaded (download them in the model center "
+                   "first, ~11GB)"))
 
         dest = Path(dest_dir)
         dest.mkdir(parents=True, exist_ok=True)
@@ -335,7 +357,8 @@ class ACEStepLocalProvider:
             # 阶段边界查取消（采样中由队列轮询秒级响应）
             if should_cancel():
                 raise SynthCancelled()
-            progress(_stage_key(pct), max(1, min(99, pct)), message or "ACE-Step 生成中")
+            progress(_stage_key(pct), max(1, min(99, pct)),
+                     message or tr("ACE-Step 生成中", "Generating with ACE-Step"))
 
         try:
             done = _run_runner(
@@ -350,7 +373,10 @@ class ACEStepLocalProvider:
             master_rel = str(meta.get("relpath"))
             master = dest / master_rel
             if not master.exists():
-                raise ACEStepLocalError("runtime", f"候选 {label} 母带缺失：{master_rel}")
+                raise ACEStepLocalError(
+                    "runtime",
+                    tr(f"候选 {label} 母带缺失：{master_rel}",
+                       f"Candidate {label} master missing: {master_rel}"))
             sr = int(meta.get("sample_rate") or 48000)
             total_sec = float(meta.get("duration_sec") or 0)
             channels = read_wav(master)

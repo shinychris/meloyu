@@ -18,96 +18,96 @@ function render(ui: React.ReactElement): string {
   return renderToString(<MemoryRouter>{ui}</MemoryRouter>)
 }
 
-/** 渲染冒烟：保证每个视图 mount 时不会抛错（useEffect 在 SSR 不执行，不触发请求） */
+/** 渲染冒烟：保证每个视图 mount 时不会抛错（useEffect 在 SSR 不执行，不触发请求）；默认 locale=en 断言英文文案 */
 describe('views render smoke', () => {
   it('LoginView 渲染登录表单与演示账号', () => {
     const html = render(<LoginView />)
-    expect(html).toContain('登录工作台')
+    expect(html).toContain('Sign in to Studio')
     expect(html).toContain('demo@meloyu.local')
   })
 
   it('StudioView 渲染四步引导与空状态', () => {
     const html = render(<StudioView />)
-    expect(html).toContain('从一句描述，到可发行的歌')
-    expect(html).toContain('描述灵感')
-    expect(html).toContain('生成 2 个候选')
+    expect(html).toContain('From one line to a release-ready song')
+    expect(html).toContain('Describe ideas')
+    expect(html).toContain('Generate 2 candidates')
   })
 
   it('LyricsView 渲染编辑器与按钮', () => {
     const html = render(<LyricsView />)
-    expect(html).toContain('写词，并与旋律对齐')
-    expect(html).toContain('AI 生成歌词')
+    expect(html).toContain('Write lyrics that lock to the melody')
+    expect(html).toContain('Generate with AI')
   })
 
   it('LibraryView 渲染表头与筛选 chips', () => {
     const html = render(<LibraryView />)
-    expect(html).toContain('全部作品')
-    expect(html).toContain('回收站')
+    expect(html).toContain('All works')
+    expect(html).toContain('Trash')
   })
 
   it('LibraryView 搜索框为独立组件渲染（发现 #1：防抖不回写输入框）', () => {
     const html = render(<LibraryView />)
-    expect(html).toContain('搜索标题 / 歌词…')
-    expect(html).not.toContain('清空搜索') // 初始为空：清空按钮不渲染（有内容时才出现）
+    expect(html).toContain('Search titles / lyrics…')
+    expect(html).not.toContain('Clear search') // 初始为空：清空按钮不渲染（有内容时才出现）
   })
 
   it('WorkDetailView 渲染加载态（无参数时不崩溃）', () => {
     const html = render(<WorkDetailView />)
-    expect(html).toContain('加载中')
+    expect(html).toContain('Loading')
   })
 
   it('RightsView 渲染证书区与全局开关', () => {
     const html = render(<RightsView />)
-    expect(html).toContain('每一首，都有清白凭证')
-    expect(html).toContain('导出嵌入 AI 披露')
+    expect(html).toContain('Every song comes with clean provenance')
+    expect(html).toContain('Embed AI disclosure on export')
   })
 
   it('RightsView 合规检查文案不做失实断言（审查 P2-13）', () => {
     const html = render(<RightsView />)
-    expect(html).toContain('导出目标规格（流媒体预设），非逐条实测')
-    expect(html).toContain('SHA-256 指纹登记实现')
-    expect(html).not.toContain('不可听水印已嵌入导出文件')
+    expect(html).toContain('export target spec (streaming preset), not measured per track')
+    expect(html).toContain('SHA-256 fingerprint registration')
+    expect(html).not.toContain('watermark is embedded in exported files')
   })
 
   it('PricingView 渲染档位加载态与流水表', () => {
     const html = render(<PricingView />)
-    expect(html).toContain('为创作付费，不为焦虑付费')
-    expect(html).toContain('积分流水')
+    expect(html).toContain('Pay for your craft, not your anxiety')
+    expect(html).toContain('Credit transactions')
   })
 
   it('ComingSoonView 三个占位页都渲染', () => {
-    expect(render(<ComingSoonView kind="arrange" />)).toContain('多轨时间线编曲')
-    expect(render(<ComingSoonView kind="edit" />)).toContain('非破坏性音频剪辑')
-    expect(render(<ComingSoonView kind="pitch" />)).toContain('旋律修调工坊')
+    expect(render(<ComingSoonView kind="arrange" />)).toContain('Multitrack timeline arranging')
+    expect(render(<ComingSoonView kind="edit" />)).toContain('Non-destructive audio editing')
+    expect(render(<ComingSoonView kind="pitch" />)).toContain('Melody tuning workshop')
   })
 
   it('ModelCenterView 渲染双引擎通道区（V1.3 歌曲生成引擎）', () => {
     const html = render(<ModelCenterView />)
-    expect(html).toContain('歌词引擎通道')
-    expect(html).toContain('歌曲生成引擎通道')
-    expect(html).toContain('外部歌曲 API（Suno 兼容）')
-    expect(html).toContain('BASE URL（Suno 兼容网关根，自动补 /api/v1）')
-    expect(html).toContain('测试连接')
+    expect(html).toContain('Lyrics engine channels')
+    expect(html).toContain('Song generation engine channels')
+    expect(html).toContain('External song API (Suno-compatible)')
+    expect(html).toContain('BASE URL (Suno-compatible gateway root; /api/v1 is appended automatically)')
+    expect(html).toContain('Test connection')
   })
 
   it('ModelCenterView 渲染开源歌曲模型目录区（V1.4 外部测评排序）', () => {
     const html = render(<ModelCenterView />)
-    expect(html).toContain('开源歌曲模型目录（按外部测评排序）')
+    expect(html).toContain('Open-source song model catalog (ranked by third-party benchmarks)')
     expect(html).toContain('REPLICATE API TOKEN')
-    expect(html).toContain('Replicate 开源模型托管')
-    expect(html).toContain('本机 MusicGen（开源）')
+    expect(html).toContain('Replicate open-source model hosting')
+    expect(html).toContain('On-device MusicGen (open source)')
   })
 
   it('ModelCenterView 渲染本机 ACE-Step 通道卡（V1.5 人声成曲）', () => {
     const html = render(<ModelCenterView />)
-    expect(html).toContain('本机 ACE-Step v1.5（开源·人声成曲）')
-    expect(html).toContain('歌词→真人声演唱完整歌曲')
+    expect(html).toContain('On-device ACE-Step v1.5 (open-source · vocal songs)')
+    expect(html).toContain('Lyrics → full songs sung by realistic vocals')
   })
 
   it('ModelCenterView 渲染自托管服务通道卡（V1.5.1 MiniMax/SongGeneration）', () => {
     const html = render(<ModelCenterView />)
-    expect(html).toContain('MiniMax Music 3 · 自托管服务')
-    expect(html).toContain('SongGeneration · 自托管服务')
+    expect(html).toContain('MiniMax Music 3 · self-hosted service')
+    expect(html).toContain('SongGeneration · self-hosted service')
   })
 })
 
@@ -142,9 +142,9 @@ describe('CandidateCard V1.1 派生操作', () => {
     const html = render(
       <CandidateCard candidate={candidateFixture} index={0} workTitle="测试作品" modelLabel="V1 Pro" />,
     )
-    expect(html).toContain('延长')
-    expect(html).toContain('变体')
-    expect(html).toContain('段落重生成')
+    expect(html).toContain('Extend')
+    expect(html).toContain('Variant')
+    expect(html).toContain('Regen section')
     expect(html).not.toContain('V1.1')
   })
 
@@ -153,10 +153,10 @@ describe('CandidateCard V1.1 派生操作', () => {
     const html = render(
       <CandidateCard candidate={external} index={0} workTitle="测试作品" modelLabel="V1 Pro" />,
     )
-    expect(html).toContain('外部模型')
+    expect(html).toContain('External model')
     // 徽标本体不得出现数字分（tooltip 文案允许提及「AI 质量」）
-    expect(html).not.toMatch(/AI 质量 \d/)
-    expect(html).not.toContain('AI 质量 null')
+    expect(html).not.toMatch(/AI quality \d/)
+    expect(html).not.toContain('AI quality null')
   })
 })
 
@@ -176,13 +176,13 @@ describe('DerivePanel 派生面板', () => {
     expect(html).toContain('+15s')
     expect(html).toContain('+30s')
     expect(html).toContain('+60s')
-    expect(html).toContain('延长 30 秒') // 默认选中 30
+    expect(html).toContain('Extend 30s') // 默认选中 30
   })
 
   it('variant 面板渲染风格输入（可留空）', () => {
     const html = renderToString(<DerivePanel {...base} kind="variant" />)
-    expect(html).toContain('可留空 = 自动换风格')
-    expect(html).toContain('生成变体')
+    expect(html).toContain('leave blank = auto restyle')
+    expect(html).toContain('Create variant')
   })
 
   it('regen 面板按 structure 列出段落，同名段落标注次序与起止秒', () => {
@@ -200,6 +200,6 @@ describe('DerivePanel 派生面板', () => {
     const html = renderToString(
       <DerivePanel {...base} kind="regen" candidate={{ ...candidateFixture, structure: [] }} />,
     )
-    expect(html).toContain('该候选无结构信息，无法定位段落')
+    expect(html).toContain('No structure info for this candidate')
   })
 })

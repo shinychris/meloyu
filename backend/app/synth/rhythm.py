@@ -4,6 +4,7 @@ from __future__ import annotations
 import numpy as np
 
 from app.synth.ir import BAR_QUARTER_UNITS, DrumHit, Note, SongIR
+from app.core.i18n import tr
 
 # 16 分网格位置（4/4 用 16 格；3/4 与 6/8 用 12 格）
 PATTERNS: dict[str, dict[str, list[int]]] = {
@@ -35,11 +36,11 @@ def build_rhythm(ir: SongIR, rng: np.random.Generator) -> None:
     no_bass = _neg_hit(req.negative_prompt, ["不要贝斯", "无贝斯", "不要低音", "no bass",
                                              "不要808", "不要 808"])
     if no_drums:
-        ir.applied_negative.append("不要鼓机/鼓组")
+        ir.applied_negative.append(tr("不要鼓机/鼓组", "no drums/percussion"))
     if no_bass:
-        ir.applied_negative.append("不要贝斯/808")
+        ir.applied_negative.append(tr("不要贝斯/808", "no bass/808"))
     if "电音人声" in (req.negative_prompt or ""):
-        ir.applied_negative.append("不要电音人声")
+        ir.applied_negative.append(tr("不要电音人声", "no synth-tuned vocals"))
 
     pat = PATTERNS[family]
     drums: list[DrumHit] = []

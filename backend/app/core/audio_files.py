@@ -11,6 +11,7 @@ from app.config import settings
 from app.core.errors import err_forbidden, err_not_found, err_unauthenticated
 from app.core.security import verify_stream_token
 from app.models import File, User, Work
+from app.core.i18n import tr
 
 MIME_WHITELIST = {"audio/mpeg", "audio/wav", "audio/midi", "application/zip",
                   "application/json"}
@@ -20,9 +21,9 @@ CHUNK = 1 << 20
 def resolve_file(db: Session, file_id: str) -> File:
     f = db.get(File, file_id)
     if not f:
-        raise err_not_found("文件不存在")
+        raise err_not_found(tr("文件不存在", "File not found"))
     if f.mime not in MIME_WHITELIST:
-        raise err_forbidden("文件类型不允许访问")
+        raise err_forbidden(tr("文件类型不允许访问", "File type not allowed for access"))
     return f
 
 
@@ -31,9 +32,9 @@ def abs_path(f: File) -> Path:
     p = (settings.audio_path / f.path).resolve()
     root = settings.audio_path.resolve()
     if not str(p).startswith(str(root)):
-        raise err_forbidden("非法文件路径")
+        raise err_forbidden(tr("非法文件路径", "Illegal file path"))
     if not p.is_file():
-        raise err_not_found("文件不存在")
+        raise err_not_found(tr("文件不存在", "File not found"))
     return p
 
 
@@ -53,7 +54,7 @@ def user_from_request_or_token(db: Session, request: Request,
         raise err_unauthenticated()
     payload = verify_stream_token(st)
     if not payload:
-        raise err_unauthenticated("流地址签名无效或已过期")
+        raise err_unauthenticated(tr("流地址签名无效或已过期", "Stream URL signature invalid or expired"))
     user = db.get(User, payload.get("u"))
     if user is None:
         raise err_unauthenticated()

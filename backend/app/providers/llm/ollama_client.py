@@ -8,6 +8,7 @@ from collections.abc import Callable
 
 import httpx
 
+from app.core.i18n import tr
 from app.providers.llm.base import LLMError, strip_think
 
 # pull 阶段单层 blob 下载可能数分钟无完整响应，只限制连接建立
@@ -35,19 +36,27 @@ class OllamaClient:
         try:
             r = httpx.get(f"{self.base}/api/version", timeout=_PROBE_TIMEOUT)
             if r.status_code != 200:
-                raise LLMError("unavailable", f"Ollama 响应异常 HTTP {r.status_code}")
+                raise LLMError("unavailable",
+                tr(f"Ollama 响应异常 HTTP {r.status_code}",
+                   f"Ollama abnormal response HTTP {r.status_code}"))
             return str(r.json().get("version") or "")
         except LLMError:
             raise
         except httpx.HTTPError as e:
-            raise LLMError("unavailable", f"Ollama 服务不可达（{self.base}）：{e.__class__.__name__}") from e
+            raise LLMError("unavailable",
+                    tr(f"Ollama 服务不可达（{self.base}）：{e.__class__.__name__}",
+                       f"Ollama service unreachable ({self.base}): "
+                       f"{e.__class__.__name__}")) from e
 
     def list_models(self) -> list[dict]:
         try:
             r = httpx.get(f"{self.base}/api/tags", timeout=_PROBE_TIMEOUT)
             r.raise_for_status()
         except httpx.HTTPError as e:
-            raise LLMError("unavailable", f"Ollama 服务不可达（{self.base}）：{e.__class__.__name__}") from e
+            raise LLMError("unavailable",
+                    tr(f"Ollama 服务不可达（{self.base}）：{e.__class__.__name__}",
+                       f"Ollama service unreachable ({self.base}): "
+                       f"{e.__class__.__name__}")) from e
         out = []
         for m in r.json().get("models", []):
             details = m.get("details") or {}
@@ -72,10 +81,14 @@ class OllamaClient:
                                    json={"model": model, "stream": True}) as resp:
                     if resp.status_code == 404:
                         resp.read()
-                        raise LLMError("protocol", f"模型不存在：{model}（仓库无此 tag）")
+                        raise LLMError("protocol",
+                            tr(f"模型不存在：{model}（仓库无此 tag）",
+                               f"Model not found: {model} (no such tag in the repo)"))
                     if resp.status_code != 200:
                         resp.read()
-                        raise LLMError("protocol", f"pull 失败 HTTP {resp.status_code}")
+                        raise LLMError("protocol",
+                            tr(f"pull 失败 HTTP {resp.status_code}",
+                               f"pull failed with HTTP {resp.status_code}"))
                     for line in resp.iter_lines():
                         if not line:
                             continue
@@ -85,32 +98,40 @@ class OllamaClient:
                         except ValueError:
                             continue
                         if ev.get("error"):
-                            raise LLMError("protocol", f"pull 失败：{ev['error']}")
+                            raise LLMError("protocol",
+                                tr(f"pull 失败：{ev['error']}",
+                                   f"pull failed: {ev['error']}"))
                         status = str(ev.get("status") or "")
                         total, completed = ev.get("total"), ev.get("completed")
                         if total and completed is not None and total > 0:
                             pct = min(99, int(completed * 100 / total))
-                            on_progress(f"下载中 {pct}%", pct)
+                            on_progress(tr(f"下载中 {pct}%", f"Downloading {pct}%"), pct)
                         elif status:
                             on_progress(status, 0)
         except LLMError:
             raise
         except httpx.HTTPError as e:
-            raise LLMError("unavailable", f"pull 连接中断：{e.__class__.__name__}") from e
-        on_progress("完成", 100)
+            raise LLMError("unavailable",
+                    tr(f"pull 连接中断：{e.__class__.__name__}",
+                       f"pull connection interrupted: {e.__class__.__name__}")) from e
+        on_progress(tr("完成", "Done"), 100)
 
     def delete(self, model: str) -> None:
         try:
             r = httpx.request("DELETE", f"{self.base}/api/delete",
                               json={"model": model}, timeout=_PROBE_TIMEOUT)
             if r.status_code == 404:
-                raise LLMError("protocol", f"模型不存在：{model}")
+                raise LLMError("protocol", tr(f"模型不存在：{model}", f"Model not found: {model}"))
             if r.status_code != 200:
-                raise LLMError("protocol", f"删除失败 HTTP {r.status_code}")
+                raise LLMError("protocol",
+                            tr(f"删除失败 HTTP {r.status_code}",
+                               f"delete failed with HTTP {r.status_code}"))
         except LLMError:
             raise
         except httpx.HTTPError as e:
-            raise LLMError("unavailable", f"Ollama 服务不可达：{e.__class__.__name__}") from e
+            raise LLMError("unavailable",
+                            tr(f"Ollama 服务不可达：{e.__class__.__name__}",
+                               f"Ollama service unreachable: {e.__class__.__name__}")) from e
 
     # ---- 推理 ----
     def chat(self, model: str, system: str, prompt: str, timeout: float = 300.0,
@@ -134,9 +155,12 @@ class OllamaClient:
                 r = httpx.post(f"{self.base}/api/chat", json=payload,
                                timeout=httpx.Timeout(timeout))
             if r.status_code == 404:
-                raise LLMError("protocol", f"模型未安装：{model}")
+                raise LLMError("protocol", tr(f"模型未安装：{model}", f"Model not installed: {model}"))
             if r.status_code != 200:
-                raise LLMError("protocol", f"Ollama chat HTTP {r.status_code}：{r.text[:200]}")
+                raise LLMError(
+                    "protocol",
+                    tr(f"Ollama chat HTTP {r.status_code}：{r.text[:200]}",
+                       f"Ollama chat HTTP {r.status_code}: {r.text[:200]}"))
             body = r.json()
             message = body.get("message") or {}
             content = message.get("content") or ""
@@ -145,22 +169,34 @@ class OllamaClient:
                 if thinking and body.get("done_reason") == "length":
                     raise LLMError(
                         "bad_output",
-                        f"模型 {model} 思考链过长被截断（可调大 max_tokens 或改用"
-                        f"支持关闭思考的模型，如 qwen3.5 系列）")
+                        tr(f"模型 {model} 思考链过长被截断（可调大 max_tokens 或改用"
+                           f"支持关闭思考的模型，如 qwen3.5 系列）",
+                           f"Model {model}: thinking chain truncated (raise max_tokens "
+                           f"or switch to a model with toggleable thinking, e.g. the "
+                           f"qwen3.5 series)"))
                 if thinking:
                     raise LLMError(
                         "bad_output",
-                        f"模型 {model} 只输出了思考链没有正文，建议改用 qwen3.5 "
-                        f"等可控思考的模型")
+                        tr(f"模型 {model} 只输出了思考链没有正文，建议改用 qwen3.5 "
+                           f"等可控思考的模型",
+                           f"Model {model} returned only a thinking chain with no "
+                           f"content; prefer a controllable-thinking model such as "
+                           f"qwen3.5"))
         except LLMError:
             raise
         except httpx.TimeoutException as e:
-            raise LLMError("timeout", f"模型推理超时（{timeout:.0f}s），可换更小模型重试") from e
+            raise LLMError("timeout",
+                    tr(f"模型推理超时（{timeout:.0f}s），可换更小模型重试",
+                       f"Model inference timed out ({timeout:.0f}s); try a smaller "
+                       f"model")) from e
         except httpx.HTTPError as e:
-            raise LLMError("unavailable", f"Ollama 服务不可达：{e.__class__.__name__}") from e
+            raise LLMError(
+                "unavailable",
+                tr(f"Ollama 服务不可达：{e.__class__.__name__}",
+                   f"Ollama service unreachable: {e.__class__.__name__}")) from e
         except ValueError as e:
-            raise LLMError("protocol", f"响应非 JSON：{e}") from e
+            raise LLMError("protocol", tr(f"响应非 JSON：{e}", f"Response is not JSON: {e}")) from e
         text = strip_think(content).strip()
         if not text:
-            raise LLMError("bad_output", "模型返回空内容")
+            raise LLMError("bad_output", tr("模型返回空内容", "Model returned empty content"))
         return text

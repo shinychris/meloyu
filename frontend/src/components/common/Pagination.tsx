@@ -1,3 +1,5 @@
+import { useT } from '../../i18n'
+
 interface PaginationProps {
   page: number
   totalPages: number
@@ -6,6 +8,7 @@ interface PaginationProps {
 
 /** 分页器：上一页/页码窗口/下一页（对齐整体直角风格） */
 export default function Pagination({ page, totalPages, onChange }: PaginationProps) {
+  const t = useT()
   if (totalPages <= 1) return null
   const windowSize = 5
   let start = Math.max(1, page - Math.floor(windowSize / 2))
@@ -17,10 +20,10 @@ export default function Pagination({ page, totalPages, onChange }: PaginationPro
   return (
     <div className="pager">
       <span className="text-[10px] num mr-2" style={{ color: 'var(--dim)' }}>
-        {page} / {totalPages} 页
+        {t('layout.pagination.status', { page, total: totalPages })}
       </span>
       <button className="pnum-btn" disabled={page <= 1} onClick={() => onChange(page - 1)}>
-        上一页
+        {t('layout.pagination.prev')}
       </button>
       {pages.map((p) => (
         <button key={p} className={`pnum-btn ${p === page ? 'on' : ''}`} onClick={() => onChange(p)}>
@@ -28,7 +31,7 @@ export default function Pagination({ page, totalPages, onChange }: PaginationPro
         </button>
       ))}
       <button className="pnum-btn" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
-        下一页
+        {t('layout.pagination.next')}
       </button>
     </div>
   )

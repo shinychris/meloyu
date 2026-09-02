@@ -8,7 +8,8 @@ function defaultKeys(): SystemMeta['keys'] {
   const list: SystemMeta['keys'] = []
   for (const mode of ['major', 'minor'] as const) {
     for (const tonic of TONICS) {
-      list.push({ tonic, mode, label: `${tonic} ${mode === 'major' ? '大调' : '小调'}` })
+      // 兜底数据为默认语言 en；后端可达时由 /system/meta 按 Accept-Language 返回本地化 label
+      list.push({ tonic, mode, label: `${tonic} ${mode === 'major' ? 'Major' : 'Minor'}` })
     }
   }
   // 原型默认展示顺序：A 小调 / C 大调 / G 大调 / F 大调 提前
@@ -27,13 +28,13 @@ function defaultMeta(): SystemMeta {
     models: [
       {
         value: 'v1_pro',
-        label: 'V1 Pro · 高质',
+        label: 'V1 Pro · High quality',
         credit_cost: 12,
         capabilities: { vocals: true, midi: true, stems: 4 },
       },
       {
         value: 'v1_fast',
-        label: 'V1 · 快速草稿',
+        label: 'V1 · Fast draft',
         credit_cost: 6,
         capabilities: { vocals: true, midi: true, stems: 4 },
       },
@@ -41,19 +42,19 @@ function defaultMeta(): SystemMeta {
     keys: defaultKeys(),
     time_signatures: ['4/4', '3/4', '6/8'],
     vocal_types: [
-      { value: 'female_air', label: '女声 · 气声' },
-      { value: 'female_bright', label: '女声 · 清亮' },
-      { value: 'female_deep', label: '女声 · 浑厚' },
-      { value: 'male_magnetic', label: '男声 · 磁性' },
-      { value: 'male_clear', label: '男声 · 清朗' },
-      { value: 'choir', label: '合唱' },
-      { value: 'instrumental', label: '纯器乐' },
+      { value: 'female_air', label: 'Female · breathy' },
+      { value: 'female_bright', label: 'Female · bright' },
+      { value: 'female_deep', label: 'Female · deep' },
+      { value: 'male_magnetic', label: 'Male · magnetic' },
+      { value: 'male_clear', label: 'Male · clear' },
+      { value: 'choir', label: 'Choir' },
+      { value: 'instrumental', label: 'Instrumental' },
     ],
     languages: [
-      { value: 'zh', label: '中文（普通话）' },
-      { value: 'yue', label: '粤语' },
-      { value: 'en', label: '英语' },
-      { value: 'ja', label: '日语' },
+      { value: 'zh', label: 'Chinese (Mandarin)' },
+      { value: 'yue', label: 'Cantonese' },
+      { value: 'en', label: 'English' },
+      { value: 'ja', label: 'Japanese' },
     ],
     structure_tags: [
       { tag: '[Intro]', section: 'intro', label: 'Intro' },
@@ -73,10 +74,10 @@ function defaultMeta(): SystemMeta {
       max_negative_prompt: 100,
     },
     inspiration: {
-      scenes: ['短视频 BGM', '广告片', '游戏配乐', '个人单曲'],
-      moods: ['治愈', '忧郁', '热血', '浪漫', '紧张'],
-      genres: ['华语流行', '国风', '嘻哈', 'EDM', 'Lo-fi', '摇滚', '民谣', 'R&B'],
-      instruments: ['钢琴', '吉他', '弦乐', '古筝', '合成器', '808'],
+      scenes: ['Short-video BGM', 'Ad film', 'Game score', 'Solo single'],
+      moods: ['Healing', 'Melancholy', 'Energetic', 'Romantic', 'Tense'],
+      genres: ['Mandopop', 'Chinese traditional', 'Hip-hop', 'EDM', 'Lo-fi', 'Rock', 'Folk', 'R&B'],
+      instruments: ['Piano', 'Guitar', 'Strings', 'Guzheng', 'Synth', '808'],
     },
   }
 }
@@ -85,6 +86,8 @@ interface MetaState {
   meta: SystemMeta
   loaded: boolean
   load: () => Promise<void>
+  /** 语言切换后重拉：后端按 Accept-Language 返回本地化 label/灵感词条 */
+  reloadForLocale: () => Promise<void>
 }
 
 export const useMetaStore = create<MetaState>((set, get) => ({
@@ -98,6 +101,14 @@ export const useMetaStore = create<MetaState>((set, get) => ({
     } catch {
       // 后端未启动时静默使用兜底枚举（值与契约一致，不算编造数据）
       set({ loaded: true })
+    }
+  },
+  async reloadForLocale() {
+    try {
+      const meta = await getSystemMeta()
+      set({ meta })
+    } catch {
+      /* 保留现有兜底 */
     }
   },
 }))

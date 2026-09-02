@@ -3,7 +3,8 @@ import type {
   LyricsGenerateResult,
   RhymeCheckResult,
 } from '../../types/api'
-import { SECTION_ZH } from '../../lib/format'
+import { useT, getLocale } from '../../i18n'
+import { sectionLabel } from '../../lib/format'
 
 interface AnalysisPanelProps {
   gen: LyricsGenerateResult | null
@@ -15,6 +16,7 @@ interface AnalysisPanelProps {
 
 /** 歌词助手右侧面板：结构建议 / 润色记录 / 重音对齐 / 韵脚（数据来自接口响应） */
 export default function AnalysisPanel({ gen, rhyme, tagInfo, changes, onBackStudio }: AnalysisPanelProps) {
+  const t = useT()
   const stressIssues = rhyme?.suggestions.filter((s) => s.type === 'stress') ?? []
   const otherIssues = rhyme?.suggestions.filter((s) => s.type !== 'stress') ?? []
   const rhymeChips: string[] = []
@@ -28,21 +30,25 @@ export default function AnalysisPanel({ gen, rhyme, tagInfo, changes, onBackStud
 
   return (
     <div className="px-6 py-5 overflow-y-auto">
-      <div className="label">结构建议</div>
+      <div className="label">{t('lyrics.panel.structure')}</div>
       <div className="text-[12px] leading-relaxed mt-2" style={{ color: 'var(--muted)' }}>
         {gen && gen.structure.length > 0
-          ? gen.structure.map((s) => `${SECTION_ZH[s.section]} ${s.line_count} 行`).join(' · ')
-          : '副歌核心句建议重复 2–3 次；桥段可降半音营造对比，末副歌回升。'}
+          ? gen.structure
+              .map((s) => t('lyrics.panel.sectionCount', { section: sectionLabel(s.section), n: s.line_count }))
+              .join(' · ')
+          : t('lyrics.panel.structureDefault')}
         {tagInfo && (
           <div className="mt-2" style={{ color: 'var(--dim)' }}>
-            标签检测：{tagInfo.detected.map((d) => SECTION_ZH[d.section]).join(' / ') || '无'}
+            {t('lyrics.panel.tagDetect', {
+              tags: tagInfo.detected.map((d) => sectionLabel(d.section)).join(' / ') || t('lyrics.panel.none'),
+            })}
           </div>
         )}
       </div>
 
       {changes.length > 0 && (
         <>
-          <div className="label mt-6">润色记录</div>
+          <div className="label mt-6">{t('lyrics.panel.polishLog')}</div>
           <div className="mt-2 space-y-2 text-[11px] leading-relaxed" style={{ color: 'var(--muted)' }}>
             {changes.slice(0, 8).map((c) => (
               <div key={c.line_no}>
@@ -56,13 +62,13 @@ export default function AnalysisPanel({ gen, rhyme, tagInfo, changes, onBackStud
         </>
       )}
 
-      <div className="label mt-6">重音对齐</div>
+      <div className="label mt-6">{t('lyrics.panel.stress')}</div>
       <div className="mt-2 space-y-2 text-[12px]">
         {stressIssues.length === 0 && otherIssues.length === 0 ? (
           <div className="flex items-center gap-2">
             <span className="dot" style={{ background: rhyme ? 'var(--acc)' : 'var(--dim)' }}></span>
             <span style={{ color: 'var(--muted)' }}>
-              {rhyme ? '重音落拍正常' : '运行「押韵 / 重音检查」后显示'}
+              {rhyme ? t('lyrics.panel.stressOk') : t('lyrics.panel.stressPending')}
             </span>
           </div>
         ) : (
@@ -83,17 +89,23 @@ export default function AnalysisPanel({ gen, rhyme, tagInfo, changes, onBackStud
         )}
       </div>
 
-      <div className="label mt-6">韵脚{rhyme ? ` · 主韵 ${rhyme.main_rhyme_group}` : ''}</div>
+      <div className="label mt-6">
+        {t('lyrics.panel.rhyme')}
+        {rhyme ? t('lyrics.panel.rhymeMain', { group: rhyme.main_rhyme_group }) : ''}
+      </div>
       <div className="flex flex-wrap gap-1.5 mt-2">
         {rhymeChips.length === 0
-          ? ['台 ai', '白 ai', '待 ai', '轻 in', '心 in', '音 in'].map((t) => (
-              <span key={t} className="chip" style={{ opacity: 0.5 }}>{t}</span>
+          ? (getLocale() === 'zh'
+              ? ['台 ai', '白 ai', '待 ai', '轻 in', '心 in', '音 in']
+              : ['ai', 'in', 'ing', 'an', 'ou', 'ei']
+          ).map((c) => (
+              <span key={c} className="chip" style={{ opacity: 0.5 }}>{c}</span>
             ))
-          : rhymeChips.map((t, i) => <span key={i} className="chip">{t}</span>)}
+          : rhymeChips.map((c, i) => <span key={i} className="chip">{c}</span>)}
       </div>
       <div className="mt-6">
         <button className="btn btn-ghost text-[11px] w-full" onClick={onBackStudio}>
-          返回工作台 →
+          {t('lyrics.panel.backStudio')}
         </button>
       </div>
     </div>

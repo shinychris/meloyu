@@ -5,33 +5,26 @@ import { getModelsRuntime } from '../api/models'
 import type { CompleteTagsResult, LyricsGenerateResult, RhymeCheckResult } from '../types/api'
 import { useStudioStore } from '../stores/studio'
 import { toast } from '../stores/toast'
+import { useT, t as tt, useI18nStore } from '../i18n'
 import { detectSectionAtCaret } from '../lib/structure'
-import { SECTION_ZH } from '../lib/format'
+import { sectionLabel } from '../lib/format'
 import AnalysisPanel from '../components/lyrics/AnalysisPanel'
 
 const DRAFT_KEY = 'meloyu:lyric-draft:v1' // 契约 §14 R2：草稿由前端 localStorage 承载
 
-const DEFAULT_LYRICS = `[Verse]
-雨停在凌晨三点的窗台
-霓虹把影子拉得好白
-便利店的灯还亮着
-像没说完的对白
+/** 本地规则引擎判定（后端 engine 字段按 Accept-Language 本地化，中英都要匹配） */
+const LOCAL_RULE_RE = /本地规则|local rule/i
 
-[Pre-Chorus]
-我数着屋檐滴落的节拍
-一下一下都是等待
-
-[Chorus]
-我们把未来说得太轻
-像风穿过无人的街心
-承诺若只剩回音
-至少今夜还有雨声`
+/** 编辑器初始示例歌词（按当前 locale；用户草稿优先） */
+function defaultLyrics(): string {
+  return tt('lyrics.defaultLyrics')
+}
 
 function loadDraft(): string {
   try {
-    return localStorage.getItem(DRAFT_KEY) ?? DEFAULT_LYRICS
+    return localStorage.getItem(DRAFT_KEY) ?? defaultLyrics()
   } catch {
-    return DEFAULT_LYRICS
+    return defaultLyrics()
   }
 }
 
@@ -43,6 +36,7 @@ interface ChangeEntry {
 
 /** 歌词助手：AI 生成 / 润色选中段 / 押韵重音检查 / 标签补全（契约 §6 四接口全接） */
 export default function LyricsView() {
+  const t = useT()
   const [text, setText] = useState<string>(loadDraft)
   const [theme, setTheme] = useState('')
   const [mood, setMood] = useState('')
@@ -64,12 +58,13 @@ export default function LyricsView() {
     }
   }, [text])
 
-  // V1.2：显示当前歌词引擎（模型中心可切换）
+  // V1.2：显示当前歌词引擎（模型中心可切换）；依赖 locale——后端按 Accept-Language 本地化
+  const locale = useI18nStore((s) => s.locale)
   useEffect(() => {
     getModelsRuntime()
       .then((rt) => setEngine(rt.engine))
       .catch(() => {})
-  }, [])
+  }, [locale])
 
   const run = async (key: string, fn: () => Promise<void>) => {
     if (busy) return
@@ -86,7 +81,7 @@ export default function LyricsView() {
   const onGenerate = () =>
     run('gen', async () => {
       if (!theme.trim()) {
-        toast('先填一个主题或一句话（1~100 字）', 'warn')
+        toast(t('lyrics.toast.themeRequired'), 'warn')
         return
       }
       const res = await generateLyrics({ theme: theme.trim(), mood: mood.trim() || null, language: 'zh' })
@@ -95,17 +90,17 @@ export default function LyricsView() {
       setChanges([])
       setText(res.lyrics)
       if (res.fallback && res.fallback_reason) {
-        toast(`引擎不可用已回退本地规则：${res.fallback_reason}`, 'warn')
+        toast(t('lyrics.toast.fallback', { reason: res.fallback_reason }), 'warn')
       } else {
-        toast(`AI 已生成歌词草稿（${res.engine || engine}），可继续润色`)
+        toast(t('lyrics.toast.generated', { engine: res.engine || engine }))
       }
-      useStudioStore.getState().logOp('歌词助手：AI 生成草稿')
+      useStudioStore.getState().logOp(t('lyrics.log.generated'))
     })
 
   const onPolish = () =>
     run('polish', async () => {
       if (!text.trim()) {
-        toast('歌词为空', 'warn')
+        toast(t('lyrics.toast.empty'), 'warn')
         return
       }
       const caret = editorRef.current?.selectionStart ?? text.length
@@ -114,12 +109,12 @@ export default function LyricsView() {
       setChanges(res.changes)
       setText(res.lyrics)
       if (res.fallback && res.fallback_reason) {
-        toast(`引擎不可用已回退本地规则：${res.fallback_reason}`, 'warn')
+        toast(t('lyrics.toast.fallback', { reason: res.fallback_reason }), 'warn')
       } else {
         toast(
           section
-            ? `已润色${SECTION_ZH[section]}（${res.changes.length} 处修改）`
-            : `已润色全文（${res.changes.length} 处修改）`,
+            ? t('lyrics.toast.polishedSection', { section: sectionLabel(section), n: res.changes.length })
+            : t('lyrics.toast.polishedAll', { n: res.changes.length }),
         )
       }
     })
@@ -127,44 +122,44 @@ export default function LyricsView() {
   const onRhyme = () =>
     run('rhyme', async () => {
       if (!text.trim()) {
-        toast('歌词为空', 'warn')
+        toast(t('lyrics.toast.empty'), 'warn')
         return
       }
       const res = await rhymeCheck(text)
       setRhyme(res)
       toast(
         res.off_rhyme_count > 0
-          ? `检查完成：${res.off_rhyme_count} 处出韵，主韵 ${res.main_rhyme_group}`
-          : `检查完成：全部押韵（主韵 ${res.main_rhyme_group}）`,
+          ? t('lyrics.toast.rhymeOff', { n: res.off_rhyme_count, group: res.main_rhyme_group })
+          : t('lyrics.toast.rhymeAll', { group: res.main_rhyme_group }),
       )
     })
 
   const onTags = () =>
     run('tags', async () => {
       if (!text.trim()) {
-        toast('歌词为空', 'warn')
+        toast(t('lyrics.toast.empty'), 'warn')
         return
       }
       const res = await completeTags(text)
       setTagInfo(res)
       setText(res.lyrics)
-      toast(res.inferred ? '原歌词无标签，已按模板补全结构' : '已识别并规范化结构标签')
+      toast(res.inferred ? t('lyrics.toast.tagsInferred') : t('lyrics.toast.tagsNormalized'))
     })
 
   return (
     <section className="view flex flex-col h-full">
       <header className="px-8 pt-6 pb-4">
-        <div className="label">Lyrics / 歌词助手</div>
+        <div className="label">{t('lyrics.header.label')}</div>
         <div className="flex items-end justify-between">
-          <h1 className="text-[28px] font-extrabold tracking-tight mt-1">写词，并与旋律对齐</h1>
+          <h1 className="text-[28px] font-extrabold tracking-tight mt-1">{t('lyrics.header.headline')}</h1>
           {engine && (
             <span
               className="text-[10px] font-bold px-2 py-1 cursor-pointer"
               style={{ background: 'var(--bg2)', border: '1px solid var(--line)', color: 'var(--dim)' }}
-              title="在模型中心切换 AI 引擎（本地规则 / 本地开源模型 / 外部 API）"
+              title={t('lyrics.engine.title')}
               onClick={() => navigate('/models')}
             >
-              引擎：{engine} ⇄
+              {t('lyrics.engine.badge', { engine })}
             </span>
           )}
         </div>
@@ -173,21 +168,21 @@ export default function LyricsView() {
         <div className="px-8 py-5 border-r overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
           <div className="grid grid-cols-2 gap-2.5 mb-3">
             <div>
-              <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>主题 / 一句话（生成用，必填）</div>
+              <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>{t('lyrics.theme.label')}</div>
               <input
                 type="text"
                 maxLength={100}
-                placeholder="例：雨夜便利店等待"
+                placeholder={t('lyrics.theme.placeholder')}
                 value={theme}
                 onChange={(e) => setTheme(e.target.value)}
               />
             </div>
             <div>
-              <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>情绪（可选，如：忧郁 / 热血）</div>
+              <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>{t('lyrics.mood.label')}</div>
               <input
                 type="text"
                 maxLength={20}
-                placeholder="命中意象库"
+                placeholder={t('lyrics.mood.placeholder')}
                 value={mood}
                 onChange={(e) => setMood(e.target.value)}
               />
@@ -195,32 +190,32 @@ export default function LyricsView() {
           </div>
           <div className="flex gap-2 mb-3 flex-wrap">
             <button className="btn btn-ghost text-[11px]" disabled={busy !== null} onClick={onGenerate}
-              title={engine && !engine.includes('本地规则') ? 'LLM 引擎生成中，视模型 10s~3min' : undefined}>
+              title={engine && !LOCAL_RULE_RE.test(engine) ? t('lyrics.action.generateTitle') : undefined}>
               {busy === 'gen'
-                ? engine && !engine.includes('本地规则') ? 'AI 生成中（最长约 3 分钟）…' : '生成中…'
-                : 'AI 生成歌词'}
+                ? engine && !LOCAL_RULE_RE.test(engine) ? t('lyrics.action.generatingLLM') : t('lyrics.action.generating')
+                : t('lyrics.action.generate')}
             </button>
             <button className="btn btn-ghost text-[11px]" disabled={busy !== null} onClick={onPolish}>
-              {busy === 'polish' ? '润色中…' : '润色选中段'}
+              {busy === 'polish' ? t('lyrics.action.polishing') : t('lyrics.action.polish')}
             </button>
             <button className="btn btn-ghost text-[11px]" disabled={busy !== null} onClick={onRhyme}>
-              {busy === 'rhyme' ? '检查中…' : '押韵 / 重音检查'}
+              {busy === 'rhyme' ? t('lyrics.action.checking') : t('lyrics.action.rhyme')}
             </button>
             <button className="btn btn-ghost text-[11px]" disabled={busy !== null} onClick={onTags}>
-              补全结构标签
+              {t('lyrics.action.tags')}
             </button>
-            <button className="btn btn-ghost text-[11px]" onClick={() => toast('续写桥段将在 V1.1 上线', 'warn')}>
-              续写桥段
+            <button className="btn btn-ghost text-[11px]" onClick={() => toast(t('lyrics.action.bridgeSoon'), 'warn')}>
+              {t('lyrics.action.bridge')}
             </button>
             <button
               className="btn btn-ghost text-[11px]"
               style={{ color: 'var(--acc)', borderColor: 'var(--acc)' }}
               onClick={() => {
                 setLyricsFromAssistant(text)
-                toast('已应用到创作工作台的歌词框')
+                toast(t('lyrics.toast.applied'))
               }}
             >
-              应用到工作台 →
+              {t('lyrics.action.apply')}
             </button>
           </div>
           <textarea
@@ -232,7 +227,7 @@ export default function LyricsView() {
           />
           {gen && gen.alternatives.length > 0 && (
             <div className="mt-3">
-              <div className="label mb-2">备选版本</div>
+              <div className="label mb-2">{t('lyrics.alternatives')}</div>
               <div className="flex gap-1.5 flex-wrap">
                 {gen.alternatives.map((alt, i) => (
                   <span
@@ -240,10 +235,10 @@ export default function LyricsView() {
                     className="chip"
                     onClick={() => {
                       setText(alt.lyrics)
-                      toast(`已载入备选 ${i + 1}`)
+                      toast(t('lyrics.toast.altLoaded', { n: i + 1 }))
                     }}
                   >
-                    备选 {i + 1}
+                    {t('lyrics.alternative', { n: i + 1 })}
                   </span>
                 ))}
               </div>
@@ -258,7 +253,7 @@ export default function LyricsView() {
           changes={changes}
           onBackStudio={() => {
             navigate('/studio')
-            toast('已回到创作工作台')
+            toast(t('lyrics.toast.backStudio'))
           }}
         />
       </div>

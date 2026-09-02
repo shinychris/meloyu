@@ -1,4 +1,5 @@
 import type { Section } from '../types/api'
+import { getLocale } from '../i18n'
 
 /** 结构标签（中英别名均可，与后端 synth/structure 解析规则保持一致的子集） */
 const TAG_PATTERNS: Array<{ re: RegExp; section: Section }> = [
@@ -43,13 +44,21 @@ export function detectSectionAtCaret(lyrics: string, caretIndex: number): Sectio
   return null
 }
 
-/** 灵感指引组合 → 风格描述（复刻原型 composePrompt） */
+/** 灵感指引组合 → 风格描述（复刻原型 composePrompt）；按当前 locale 组合拼接词 */
 export function composeStylePrompt(inspire: {
   scene: string
   mood: string
   genre: string
   inst: string
 }): string {
+  if (getLocale() === 'en') {
+    return [
+      inspire.genre,
+      inspire.mood,
+      inspire.inst ? `${inspire.inst}-led` : '',
+      inspire.scene ? `great for ${inspire.scene}` : '',
+    ].filter(Boolean).join(', ')
+  }
   const parts = [
     inspire.genre,
     inspire.mood,

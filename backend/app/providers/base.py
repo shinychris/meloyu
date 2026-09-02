@@ -4,13 +4,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Protocol, runtime_checkable
 
+from app.core.i18n import tr
 from app.synth.ir import SongRequest
 
-ProgressCallback = Callable[[str, int, str], None]   # (stage_key, pct 0-100, label_zh)
+ProgressCallback = Callable[[str, int, str], None]   # (stage_key, pct 0-100, label)
 CancelCheck = Callable[[], bool]
 
 STAGE_LABELS: dict[str, tuple[str, int, int]] = {
-    # stage_key: (label, 进度区间)
+    # stage_key: (label, 进度区间)——中文主表；英文见 _STAGE_LABELS_EN
     "writing": ("AI 写词", 2, 8),
     "structure": ("结构规划", 5, 10),
     "harmony": ("和声进行", 10, 20),
@@ -21,6 +22,23 @@ STAGE_LABELS: dict[str, tuple[str, int, int]] = {
     "serialize": ("文件导出", 85, 95),
     "done": ("完成", 100, 100),
 }
+
+_STAGE_LABELS_EN: dict[str, str] = {
+    "writing": "Writing lyrics",
+    "structure": "Planning structure",
+    "harmony": "Chord progression",
+    "melody": "Composing melody",
+    "arrange": "Arranging & drums",
+    "vocal": "Synthesizing vocals",
+    "mixdown": "Mixing & rendering",
+    "serialize": "Exporting files",
+    "done": "Done",
+}
+
+
+def stage_label(key: str) -> str:
+    """按当前 locale 返回阶段标签（写入 task.stage_label，轮询返回给前端）。"""
+    return tr(STAGE_LABELS[key][0], _STAGE_LABELS_EN.get(key, STAGE_LABELS[key][0]))
 
 
 class SynthCancelled(Exception):

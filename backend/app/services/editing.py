@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.config import EDIT_OPERATION_CREDIT_COST, settings
 from app.core.errors import err_conflict, err_validation
+from app.core.i18n import tr
 from app.models import Candidate, File, Task, User, Version, Work
 from app.models.base import utc_now_iso
 from app.services import generation as gen_svc
@@ -34,13 +35,18 @@ def _source_context(db: Session, user: User, candidate_id: str,
         ("stem", s) for s in ("vocals", "drums", "bass", "other")}
     if not required.issubset(have):
         if not any(kind == "stem" for kind, _ in have):
-            raise err_conflict("外部模型候选不含分轨文件，暂不支持延长/变体/段落重生成")
-        raise err_conflict("源候选产物不完整，无法衍生")
+            raise err_conflict(
+                tr("外部模型候选不含分轨文件，暂不支持延长/变体/段落重生成",
+                  "External-model candidates have no stems; extend/variant/section-regen "
+                  "are not supported yet"))
+        raise err_conflict(tr("源候选产物不完整，无法衍生",
+                             "Source candidate artifacts incomplete; cannot derive"))
     base_dir = settings.audio_path / work.id / version.id / "candidates" / cand.label
     for rel in ("master.wav", "preview.mp3",
                 "stems/vocals.wav", "stems/drums.wav", "stems/bass.wav", "stems/other.wav"):
         if not (base_dir / rel).exists():
-            raise err_conflict("源候选音频文件缺失，无法衍生")
+            raise err_conflict(tr("源候选音频文件缺失，无法衍生",
+                                 "Source candidate audio files missing; cannot derive"))
     return cand, version, work
 
 
@@ -69,7 +75,7 @@ def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
                    section: str | None = None, occurrence: int = 1) -> dict:
     """提交派生生成：建子版本 + 任务 + 扣积分，返回 POST /generations 同构响应。"""
     if op not in DERIVED_OPS:
-        raise err_validation(f"未知派生操作：{op}")
+        raise err_validation(tr(f"未知派生操作：{op}", f"Unknown derived operation: {op}"))
     cand, version, work = _source_context(db, user, candidate_id)
     params = _base_params(version, cand)
     extra = ""
@@ -78,7 +84,9 @@ def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
         total = cand.duration_sec + int(seconds or 0)
         if total > MAX_TOTAL_DURATION_SEC:
             raise err_validation(
-                f"续写后总时长 {total}s 超过 {MAX_TOTAL_DURATION_SEC}s 上限")
+                tr(f"续写后总时长 {total}s 超过 {MAX_TOTAL_DURATION_SEC}s 上限",
+                   f"Total duration after extend is {total}s, exceeding the "
+                   f"{MAX_TOTAL_DURATION_SEC}s limit"))
         params["duration_sec"] = total
         extra = str(int(seconds or 0))
     elif op == "variant":
@@ -94,13 +102,17 @@ def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
         seg_sections = {str(seg.get("section")) for seg in (cand.structure or [])}
         if section not in seg_sections:
             raise err_validation(
-                f"候选结构中不存在该段落：{section}（可用：{sorted(seg_sections)}）")
+                tr(f"候选结构中不存在该段落：{section}（可用：{sorted(seg_sections)}）",
+                   f"Section not found in candidate structure: {section} "
+                   f"(available: {sorted(seg_sections)})"))
         n_occ = sum(1 for seg in (cand.structure or [])
                     if str(seg.get("section")) == section)
         if not 1 <= occurrence <= n_occ:
             raise err_validation(
-                f"occurrence 越界：段落 {section} 共出现 {n_occ} 次，合法范围 1~{n_occ}",
-                details=[{"field": "occurrence", "message": f"1~{n_occ}"}])
+                tr(f"occurrence 越界：段落 {section} 共出现 {n_occ} 次，合法范围 1~{n_occ}",
+                   f"occurrence out of range: section {section} occurs {n_occ} time(s), "
+                   f"valid range 1-{n_occ}"),
+                details=[{"field": "occurrence", "message": f"1-{n_occ}"}])
         extra = f"{section}:{occurrence}"
 
     gen_svc.check_free_daily_limit(db, user)  # 派生同样计入免费档每日生成限额
@@ -136,7 +148,7 @@ def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
 
     cost = EDIT_OPERATION_CREDIT_COST.get(op, 6)
     task = Task(user_id=user.id, type="generation", status="queued", progress=0,
-                stage_key="queued", stage_label="排队中", work_id=work.id,
+                stage_key="queued", stage_label=tr("排队中", "Queued"), work_id=work.id,
                 version_id=child.id, provider="localsynth", seed=seed,
                 cost_credits=cost,
                 request_payload={

@@ -25,6 +25,7 @@ from pathlib import Path
 
 import httpx
 
+from app.core.i18n import tr
 from app.config import SELFHOSTED_DEFAULT_HOSTS, SELFHOSTED_PROBE_TIMEOUT_SEC
 from app.config import SELFHOSTED_TASK_TIMEOUT_SEC as _TIMEOUT
 from app.core.logging import logger
@@ -62,17 +63,45 @@ class SelfHostedError(Exception):
         self.message = message
 
 
-MMAX_HINT = ("MiniMax Music 3 推理服务未运行：官方路径为 SGLang-Omni（需 Linux + 双 CUDA "
-             "GPU），在服务机执行 `sgl-omni serve --model-path MiniMaxAI/MiniMax-Music3 "
-             "--port 8300` 后，在模型中心把端点配置到本通道（默认 http://127.0.0.1:8300）")
-SONGGEN_HINT = ("SongGeneration 推理服务未运行：在装有 SongGeneration-Studio 的环境启动其 "
-                "model server（端口默认 42100，Windows 可跑），或在模型中心把端点改为服务机"
-                "地址；权重经 Studio 界面下载（HF lglg666/SongGeneration-*）")
-MMAX_LOCAL_HINT = ("MiniMax Music 3 本机推理未就绪：部署 audio.cpp（llama.cpp 音频分支，"
-                   "Windows CUDA 预编译）与 GGUF 权重——backend/data/audiocpp/ 下放置 "
-                   "audiocpp_cli.exe（GitHub 0xShug0/audio.cpp releases 的 windows-x64-"
-                   "cuda12.4 包 + cudart 包解压）与 MiniMax-Music3-GGUF/（HF audio-cpp/"
-                   "MiniMax-Music3-GGUF 默认 Q4/Q8/Q4 组件，约 8.4GB）")
+_MMAX_HINT_ZH = ("MiniMax Music 3 推理服务未运行：官方路径为 SGLang-Omni（需 Linux + 双 CUDA "
+                 "GPU），在服务机执行 `sgl-omni serve --model-path MiniMaxAI/MiniMax-Music3 "
+                 "--port 8300` 后，在模型中心把端点配置到本通道（默认 http://127.0.0.1:8300）")
+_MMAX_HINT_EN = ("MiniMax Music 3 inference service is not running: the official path is "
+                 "SGLang-Omni (Linux + dual CUDA GPUs). On the service machine run "
+                 "`sgl-omni serve --model-path MiniMaxAI/MiniMax-Music3 --port 8300`, then "
+                 "configure the endpoint for this channel in the model center (default "
+                 "http://127.0.0.1:8300)")
+_SONGGEN_HINT_ZH = ("SongGeneration 推理服务未运行：在装有 SongGeneration-Studio 的环境启动其 "
+                    "model server（端口默认 42100，Windows 可跑），或在模型中心把端点改为服务机"
+                    "地址；权重经 Studio 界面下载（HF lglg666/SongGeneration-*）")
+_SONGGEN_HINT_EN = ("SongGeneration inference service is not running: start its model server "
+                    "in an environment with SongGeneration-Studio installed (default port "
+                    "42100, runs on Windows), or point this channel's endpoint at the "
+                    "service machine in the model center; weights download via the Studio "
+                    "UI (HF lglg666/SongGeneration-*)")
+_MMAX_LOCAL_HINT_ZH = ("MiniMax Music 3 本机推理未就绪：部署 audio.cpp（llama.cpp 音频分支，"
+                       "Windows CUDA 预编译）与 GGUF 权重——backend/data/audiocpp/ 下放置 "
+                       "audiocpp_cli.exe（GitHub 0xShug0/audio.cpp releases 的 windows-x64-"
+                       "cuda12.4 包 + cudart 包解压）与 MiniMax-Music3-GGUF/（HF audio-cpp/"
+                       "MiniMax-Music3-GGUF 默认 Q4/Q8/Q4 组件，约 8.4GB）")
+_MMAX_LOCAL_HINT_EN = ("MiniMax Music 3 local inference is not ready: deploy audio.cpp (the "
+                       "llama.cpp audio branch, Windows CUDA prebuilt) and the GGUF "
+                       "weights - place audiocpp_cli.exe (from the windows-x64-cuda12.4 "
+                       "plus cudart packages on GitHub 0xShug0/audio.cpp releases) and "
+                       "MiniMax-Music3-GGUF/ (HF audio-cpp/MiniMax-Music3-GGUF, default "
+                       "Q4/Q8/Q4 components, ~8.4GB) under backend/data/audiocpp/")
+
+
+def mmax_hint() -> str:
+    return tr(_MMAX_HINT_ZH, _MMAX_HINT_EN)
+
+
+def songgen_hint() -> str:
+    return tr(_SONGGEN_HINT_ZH, _SONGGEN_HINT_EN)
+
+
+def mmax_local_hint() -> str:
+    return tr(_MMAX_LOCAL_HINT_ZH, _MMAX_LOCAL_HINT_EN)
 
 
 def _audiocpp_home() -> Path:
@@ -109,22 +138,28 @@ def probe_service(channel: str, hosts: dict | None) -> dict:
     if channel == "mmax_local":
         if audiocpp_ready():
             return {"running": True,
-                    "detail": "本机 audio.cpp · MiniMax-Music3 GGUF Q4/Q8/Q4（已部署）",
-                    "hint": MMAX_LOCAL_HINT, "host": "local"}
-        hint = MMAX_HINT
+                    "detail": tr("本机 audio.cpp · MiniMax-Music3 GGUF Q4/Q8/Q4（已部署）",
+                                 "Local audio.cpp · MiniMax-Music3 GGUF Q4/Q8/Q4 (deployed)"),
+                    "hint": mmax_local_hint(), "host": "local"}
+        hint = mmax_hint()
         try:
             with httpx.Client(timeout=SELFHOSTED_PROBE_TIMEOUT_SEC, trust_env=False) as c:
                 r = c.get(f"{host}/v1/models")
             ok = r.status_code == 200
-            return {"running": ok, "detail": f"{host} · SGLang-Omni {'在线' if ok else '异常'}"
-                                             f"（本机 audio.cpp 未部署）",
+            return {"running": ok,
+                    "detail": (f"{host} · SGLang-Omni "
+                               + tr("在线" if ok else "异常", "online" if ok else "error")
+                               + tr("（本机 audio.cpp 未部署）",
+                                    " (local audio.cpp not deployed)")),
                     "hint": hint, "host": host}
         except Exception as e:  # noqa: BLE001 —— 探活失败=服务不在
             return {"running": False,
-                    "detail": f"{host} · {type(e).__name__}；本机 audio.cpp 未部署",
+                    "detail": f"{host} · {type(e).__name__}"
+                              + tr("；本机 audio.cpp 未部署",
+                                   "; local audio.cpp not deployed"),
                     "hint": hint, "host": host}
     if channel == "songgen_local":
-        hint = SONGGEN_HINT
+        hint = songgen_hint()
         try:
             with httpx.Client(timeout=SELFHOSTED_PROBE_TIMEOUT_SEC) as c:
                 h = c.get(f"{host}/health")
@@ -133,13 +168,18 @@ def probe_service(channel: str, hosts: dict | None) -> dict:
             loaded = bool(s.get("loaded"))
             model = s.get("model_id") or ""
             return {"running": ok,
-                    "detail": f"{host} · Studio{'在线' if ok else '离线'}"
-                              f"{'（已载入 ' + model + '）' if loaded else '（未载入模型）'}",
+                    "detail": (f"{host} · Studio "
+                               + tr("在线" if ok else "离线", "online" if ok else "offline")
+                               + (tr(f"（已载入 {model}）", f" (loaded {model})")
+                                  if loaded else tr("（未载入模型）",
+                                                    " (no model loaded)"))),
                     "hint": hint, "host": host}
         except Exception as e:  # noqa: BLE001
             return {"running": False, "detail": f"{host} · {type(e).__name__}", "hint": hint,
                     "host": host}
-    return {"running": False, "detail": f"未知通道：{channel}", "hint": "", "host": host}
+    return {"running": False,
+            "detail": tr(f"未知通道：{channel}", f"Unknown channel: {channel}"),
+            "hint": "", "host": host}
 
 
 def _stage(progress: ProgressCallback, should_cancel: CancelCheck, key: str, pct: int,
@@ -215,7 +255,10 @@ def _artifact(request, label: str, meta: dict, seed: int) -> CandidateArtifact:
 
 def _check_channel(model_id: str, channel: str) -> None:
     if channel not in CATALOG_BY_ID.get(model_id, {}).get("channels", []):
-        raise SelfHostedError("service", f"模型不支持 {channel} 通道：{model_id}")
+        raise SelfHostedError(
+            "service",
+            tr(f"模型不支持 {channel} 通道：{model_id}",
+               f"Model does not support the {channel} channel: {model_id}"))
 
 
 class MiniMaxSelfHostedProvider:
@@ -223,14 +266,15 @@ class MiniMaxSelfHostedProvider:
     SGLang-Omni 服务（OpenAI 兼容 speech API，官方路径）。"""
 
     name = "mmax_local"
-    base_display = "MiniMax Music 3 · 自托管服务"
+    base_display = "MiniMax Music 3 · Self-hosted service"
     supports_vocals = True
     timeout_sec = _TIMEOUT
     vocals_downgraded = False
 
     def __init__(self, model_id: str, hosts: dict | None = None):
         _check_channel(model_id, self.name)
-        self.display_name = f"MiniMax Music 3 · {CATALOG_BY_ID[model_id]['name']}（自托管）"
+        self.display_name = ("MiniMax Music 3 · " + CATALOG_BY_ID[model_id]['name']
+                             + tr("（自托管）", " (self-hosted)"))
         self.host = service_host(self.name, hosts)
 
     # ---------- 本地 audio.cpp 形态 ----------
@@ -254,9 +298,12 @@ class MiniMaxSelfHostedProvider:
         # 目录 note 已标注速度，用户自行权衡时长
         for i in range(2):
             label = chr(ord("A") + i)
+            est = duration * 94 // 60 + 1
             _stage(progress, should_cancel, "model_sample", 15 + i * 35,
-                   f"MiniMax Music 3（本机 audio.cpp Q4/Q8/Q4）生成候选 {label}"
-                   f"（约 {duration * 94 // 60 + 1} 分钟/候选）…")
+                   tr(f"MiniMax Music 3（本机 audio.cpp Q4/Q8/Q4）生成候选 {label}"
+                      f"（约 {est} 分钟/候选）…",
+                      f"MiniMax Music 3 (local audio.cpp Q4/Q8/Q4) generating candidate "
+                      f"{label} (~{est} min per candidate)…"))
             out_wav = dest / f"_mmax_{label}.wav"
             cmd = [str(home / "audiocpp_cli.exe"), "--task", "gen",
                    "--family", "minimax_music3", "--model", "MiniMax-Music3-GGUF",
@@ -311,11 +358,15 @@ class MiniMaxSelfHostedProvider:
                     raise SynthCancelled()
                 if proc.returncode != 0 or not out_wav.exists():
                     raise SelfHostedError(
-                        "runtime", f"audio.cpp 生成失败（码 {proc.returncode}）：{tail[-300:]}")
+                        "runtime",
+                        tr(f"audio.cpp 生成失败（码 {proc.returncode}）：{tail[-300:]}",
+                           f"audio.cpp generation failed (code {proc.returncode}): "
+                           f"{tail[-300:]}"))
             finally:
                 watchdog.cancel()
                 _kill()
-            _stage(progress, should_cancel, "model_export", 80 + i * 8, "导出音频…")
+            _stage(progress, should_cancel, "model_export", 80 + i * 8,
+                       tr("导出音频…", "Exporting audio…"))
             meta = _finalize_audio(out_wav, dest, label, sr_expected=44100)
             out_wav.unlink(missing_ok=True)
             candidates.append(
@@ -345,7 +396,9 @@ class MiniMaxSelfHostedProvider:
             for i, seed in enumerate(seeds):
                 label = chr(ord("A") + i)
                 _stage(progress, should_cancel, "model_sample", 20 + i * 35,
-                       f"MiniMax Music 3 生成候选 {label}（SGLang 服务，约 1~5 分钟）…")
+                       tr(f"MiniMax Music 3 生成候选 {label}（SGLang 服务，约 1~5 分钟）…",
+                          f"MiniMax Music 3 generating candidate {label} (SGLang service, "
+                          f"~1-5 minutes)…"))
                 r = client.post(f"{self.host}/v1/audio/speech", json={
                     "model": "minimax_ttm", "input": lyrics, "instructions": instructions,
                     "response_format": "wav", "seed": int(seed),
@@ -353,8 +406,11 @@ class MiniMaxSelfHostedProvider:
                 })
                 if r.status_code != 200:
                     raise SelfHostedError(
-                        "runtime", f"SGLang 服务返回 {r.status_code}：{r.text[:200]}")
-                _stage(progress, should_cancel, "model_export", 80 + i * 8, "导出音频…")
+                        "runtime",
+                        tr(f"SGLang 服务返回 {r.status_code}：{r.text[:200]}",
+                           f"SGLang service returned {r.status_code}: {r.text[:200]}"))
+                _stage(progress, should_cancel, "model_export", 80 + i * 8,
+                       tr("导出音频…", "Exporting audio…"))
                 meta = _finalize_audio(r.content, dest, label, sr_expected=32000)
                 candidates.append(_artifact(request, label, meta, seed))
         self.vocals_downgraded = False
@@ -365,14 +421,15 @@ class SongGenSelfHostedProvider:
     """MusicProvider：SongGeneration（LeVo）经 SongGeneration-Studio model server。"""
 
     name = "songgen_local"
-    base_display = "SongGeneration · 自托管服务"
+    base_display = "SongGeneration · Self-hosted service"
     supports_vocals = True
     timeout_sec = _TIMEOUT
     vocals_downgraded = False
 
     def __init__(self, model_id: str, hosts: dict | None = None):
         _check_channel(model_id, self.name)
-        self.display_name = f"SongGeneration · {CATALOG_BY_ID[model_id]['name']}（自托管）"
+        self.display_name = ("SongGeneration · " + CATALOG_BY_ID[model_id]['name']
+                             + tr("（自托管）", " (self-hosted)"))
         self.host = service_host(self.name, hosts)
 
     def _ensure_model(self, client: httpx.Client) -> str:
@@ -386,10 +443,16 @@ class SongGenSelfHostedProvider:
                 return mid
             err = str(r.get("error") or "")
             if "not found" not in err.lower():
-                raise SelfHostedError("runtime", f"加载模型失败：{err[:200]}")
+                raise SelfHostedError(
+                    "runtime", tr(f"加载模型失败：{err[:200]}",
+                                  f"Failed to load model: {err[:200]}"))
         raise SelfHostedError(
-            "service", "Studio 已运行但未找到已下载的模型权重：请在 Studio 界面下载"
-            "（HF lglg666/SongGeneration-*，约 11~21GB）后重试，或在其界面手动加载模型")
+            "service",
+            tr("Studio 已运行但未找到已下载的模型权重：请在 Studio 界面下载"
+               "（HF lglg666/SongGeneration-*，约 11~21GB）后重试，或在其界面手动加载模型",
+               "Studio is running but no downloaded model weights were found: download "
+               "them in the Studio UI (HF lglg666/SongGeneration-*, ~11-21GB) and retry, "
+               "or load a model manually in its UI"))
 
     def generate(self, request, progress: ProgressCallback, should_cancel: CancelCheck,
                  dest_dir: str) -> GenerationOutput:
@@ -408,13 +471,17 @@ class SongGenSelfHostedProvider:
         work.mkdir(parents=True, exist_ok=True)
         try:
             with httpx.Client(timeout=self.timeout_sec, trust_env=False) as client:
-                _stage(progress, should_cancel, "model_load", 8, "检查 Studio 模型载入…")
+                _stage(progress, should_cancel, "model_load", 8,
+                       tr("检查 Studio 模型载入…", "Checking Studio model load…"))
                 loaded = self._ensure_model(client)
                 for i in range(2):
                     label = chr(ord("A") + i)
                     _stage(progress, should_cancel, "model_sample", 20 + i * 35,
-                           f"SongGeneration（{loaded}）生成候选 {label}（自回归+扩散，"
-                           "视显存 2~20 分钟）…")
+                           tr(f"SongGeneration（{loaded}）生成候选 {label}（自回归+扩散，"
+                              f"视显存 2~20 分钟）…",
+                              f"SongGeneration ({loaded}) generating candidate {label} "
+                              f"(autoregressive + diffusion, 2-20 minutes depending on "
+                              f"VRAM)…"))
                     input_path = work / f"input_{label}.jsonl"
                     input_path.write_text(json.dumps({
                         "gt_lyric": (request.lyrics or "").strip() or "[Instrumental]",
@@ -429,11 +496,18 @@ class SongGenSelfHostedProvider:
                     if r.get("status") == "cancelled":
                         raise SynthCancelled()
                     if r.get("error"):
-                        raise SelfHostedError("runtime", f"Studio 生成失败：{str(r['error'])[:200]}")
+                        raise SelfHostedError(
+                            "runtime",
+                            tr(f"Studio 生成失败：{str(r['error'])[:200]}",
+                               f"Studio generation failed: {str(r['error'])[:200]}"))
                     out = r.get("output_file")
                     if not out or not Path(out).exists():
-                        raise SelfHostedError("runtime", f"Studio 未返回音频：{str(r)[:200]}")
-                    _stage(progress, should_cancel, "model_export", 80 + i * 8, "导出音频…")
+                        raise SelfHostedError(
+                            "runtime",
+                            tr(f"Studio 未返回音频：{str(r)[:200]}",
+                               f"Studio returned no audio: {str(r)[:200]}"))
+                    _stage(progress, should_cancel, "model_export", 80 + i * 8,
+                       tr("导出音频…", "Exporting audio…"))
                     meta = _finalize_audio(Path(out), dest, label, sr_expected=None)
                     candidates.append(
                         _artifact(request, label, meta, candidate_seed(request.seed, label)))

@@ -1,16 +1,18 @@
 import { useMetaStore } from '../../stores/meta'
 import { useStudioStore } from '../../stores/studio'
 import { toast } from '../../stores/toast'
+import { useT, type TranslationKey } from '../../i18n'
 
-const GROUPS: Array<{ key: 'scene' | 'mood' | 'genre' | 'inst'; label: string; source: 'scenes' | 'moods' | 'genres' | 'instruments' }> = [
-  { key: 'scene', label: '场景', source: 'scenes' },
-  { key: 'mood', label: '情绪', source: 'moods' },
-  { key: 'genre', label: '风格', source: 'genres' },
-  { key: 'inst', label: '主奏乐器', source: 'instruments' },
+const GROUPS: Array<{ key: 'scene' | 'mood' | 'genre' | 'inst'; label: TranslationKey; source: 'scenes' | 'moods' | 'genres' | 'instruments' }> = [
+  { key: 'scene', label: 'studio.inspire.scene', source: 'scenes' },
+  { key: 'mood', label: 'studio.inspire.mood', source: 'moods' },
+  { key: 'genre', label: 'studio.inspire.genre', source: 'genres' },
+  { key: 'inst', label: 'studio.inspire.inst', source: 'instruments' },
 ]
 
 /** 灵感指引卡：点选组合自动组装风格描述（数据来自 /system/meta inspiration） */
 export default function InspireBox() {
+  const t = useT()
   const inspiration = useMetaStore((s) => s.meta.inspiration)
   const inspire = useStudioStore((s) => s.inspire)
   const { setInspire, applyInspireToPrompt, markStep, logOp } = useStudioStore()
@@ -33,27 +35,31 @@ export default function InspireBox() {
     useStudioStore.setState({ inspire: next })
     applyInspireToPrompt(next)
     markStep(1)
-    logOp(`灵感指引：${[next.genre, next.mood, next.inst, next.scene].filter(Boolean).join(' / ')}`)
-    toast('已随机生成一组灵感组合')
+    logOp(
+      t('studio.log.inspire', {
+        detail: [next.genre, next.mood, next.inst, next.scene].filter(Boolean).join(' / '),
+      }),
+    )
+    toast(t('studio.toast.inspireRandom'))
   }
 
   return (
     <div className="card mt-4 p-3.5" id="inspireBox">
       <div className="flex items-center justify-between">
         <div className="label" style={{ color: 'var(--acc)' }}>
-          灵感指引
+          {t('studio.inspire.title')}
         </div>
         <button className="text-[10px] font-bold" style={{ color: 'var(--acc)' }} onClick={random}>
-          随机一组 ↻
+          {t('studio.inspire.random')}
         </button>
       </div>
       <div className="text-[10px] mt-1.5 mb-2" style={{ color: 'var(--dim)' }}>
-        点选组合，自动填入风格描述
+        {t('studio.inspire.hint')}
       </div>
       {GROUPS.map((g) => (
         <div key={g.key}>
           <div className={`text-[10px] ${g.key === 'scene' ? '' : 'mt-2.5'} mb-1`} style={{ color: 'var(--dim)' }}>
-            {g.label}
+            {t(g.label)}
           </div>
           <div className="flex flex-wrap gap-1.5">
             {inspiration[g.source].map((item) => (

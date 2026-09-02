@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from sqlalchemy import select
 
+from app.core.i18n import current_locale, run_with_locale, tr
 from app.core.logging import logger
 from app.database import SessionLocal
 from app.models import Task
@@ -22,12 +23,16 @@ def get_executor() -> ThreadPoolExecutor:
 
 def schedule_generation(task_id: str) -> None:
     from app.services.generation import execute_generation
-    get_executor().submit(_safe_run, execute_generation, task_id)
+    # ThreadPoolExecutor 不复制 contextvar：捕获提交时 locale，worker 内恢复，
+    # 保证任务进度/错误文案按提交请求语言生成（持久化语义，可接受）
+    locale = current_locale()
+    get_executor().submit(run_with_locale, locale, _safe_run, execute_generation, task_id)
 
 
 def schedule_export(task_id: str) -> None:
     from app.services.export import execute_export
-    get_executor().submit(_safe_run, execute_export, task_id)
+    locale = current_locale()
+    get_executor().submit(run_with_locale, locale, _safe_run, execute_export, task_id)
 
 
 def _safe_run(fn, task_id: str) -> None:
@@ -52,7 +57,8 @@ def recover_zombie_tasks() -> int:
         for t in rows:
             t.status = "failed"
             t.error_code = 50003
-            t.error_message = "任务被系统中断（服务重启），积分已退还"
+            t.error_message = tr("任务被系统中断（服务重启），积分已退还",
+                                 "Task interrupted by a system restart; credits refunded")
             t.finished_at = now
             t.updated_at = now
             recovered += 1

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.core.i18n import tr
 from app.providers.lyrics_llm import valid_model_tag
 
 
@@ -15,7 +16,8 @@ class ModelPullRequest(BaseModel):
     def _tag(cls, v: str) -> str:
         v = v.strip()
         if not valid_model_tag(v):
-            raise ValueError("模型 tag 格式不合法（允许字母数字与 . _ : @ / + -）")
+            raise ValueError(tr("模型 tag 格式不合法（允许字母数字与 . _ : @ / + -）",
+                          "invalid model tag (allowed: alphanumerics and . _ : @ / + -)"))
         return v
 
 
@@ -52,7 +54,7 @@ class LLMSettingsRequest(BaseModel):
     @classmethod
     def _backend(cls, v: str | None) -> str | None:
         if v is not None and v not in ("localsynth", "ollama", "openai_compat"):
-            raise ValueError("lyrics_backend 必须为 localsynth/ollama/openai_compat")
+            raise ValueError(tr("lyrics_backend 必须为 localsynth/ollama/openai_compat", "lyrics_backend must be localsynth/ollama/openai_compat"))
         return v
 
     @field_validator("music_backend")
@@ -61,8 +63,10 @@ class LLMSettingsRequest(BaseModel):
         if v is not None and v not in (
                 "localsynth", "api", "replicate", "musicgen_local", "acestep_local",
                 "mmax_local", "songgen_local"):
-            raise ValueError("music_backend 必须为 localsynth/api/replicate/"
-                             "musicgen_local/acestep_local/mmax_local/songgen_local")
+            raise ValueError(tr("music_backend 必须为 localsynth/api/replicate/"
+                             "musicgen_local/acestep_local/mmax_local/songgen_local",
+                             "music_backend must be localsynth/api/replicate/"
+                             "musicgen_local/acestep_local/mmax_local/songgen_local"))
         return v
 
 

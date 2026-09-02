@@ -7,6 +7,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.core.errors import err_payment_required
+from app.core.i18n import tr
 from app.models import CreditTransaction, Plan, User
 from app.models.base import utc_now_iso
 
@@ -29,7 +30,9 @@ def atomic_deduct(db: Session, user_id: str, amount: int, reason: str,
     )
     if result.rowcount == 0:
         balance = _get_balance(db, user_id)
-        raise err_payment_required(f"积分不足：需 {amount}，余额 {balance}")
+        raise err_payment_required(
+            tr(f"积分不足：需 {amount}，余额 {balance}",
+               f"Not enough credits: {amount} needed, balance {balance}"))
     new_balance = _get_balance(db, user_id)
     _add_transaction(db, user_id, -amount, reason, ref_task_id, new_balance)
     return new_balance

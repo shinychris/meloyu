@@ -26,6 +26,7 @@ from pathlib import Path
 import httpx
 
 from app.config import REPLICATE_API_BASE
+from app.core.i18n import tr
 from app.core.logging import logger
 from app.core.seed import candidate_seed
 from app.providers.base import (
@@ -126,7 +127,8 @@ def build_replicate_input(req: SongRequest, model_id: str) -> dict:
 class ReplicateClient:
     def __init__(self, api_token: str, base: str = REPLICATE_API_BASE):
         if not (api_token or "").strip():
-            raise ReplicateError("auth", "Replicate API Token 未配置")
+            raise ReplicateError(
+                "auth", tr("Replicate API Token 未配置", "Replicate API token not configured"))
         self.token = api_token.strip()
         self.base = (base or REPLICATE_API_BASE).strip().rstrip("/")
 
@@ -138,24 +140,38 @@ class ReplicateClient:
             return httpx.request(method, url, json=json_body, headers=headers,
                                  timeout=_TIMEOUTS)
         except httpx.TimeoutException as e:
-            raise ReplicateError("timeout", f"Replicate API 超时（{url}）") from e
+            raise ReplicateError(
+                "timeout",
+                tr(f"Replicate API 超时（{url}）", f"Replicate API timed out ({url})")) from e
         except httpx.HTTPError as e:
             raise ReplicateError("unavailable",
-                                 f"Replicate API 不可达（{url}）：{e.__class__.__name__}") from e
+                                 tr(f"Replicate API 不可达（{url}）：{e.__class__.__name__}",
+                                    f"Replicate API unreachable ({url}): "
+                                    f"{e.__class__.__name__}")) from e
 
     @staticmethod
     def _raise_status(r: httpx.Response, url: str) -> None:
         if r.status_code in (401, 403):
-            raise ReplicateError("auth", "鉴权失败：API Token 无效或无权限")
+            raise ReplicateError(
+                "auth", tr("鉴权失败：API Token 无效或无权限",
+                           "Authentication failed: API token invalid or unauthorized"))
         if r.status_code == 404:
             raise ReplicateError("protocol",
-                                 f"模型不存在（{url}）：请在模型中心核对/更新该模型的 slug")
+                                 tr(f"模型不存在（{url}）：请在模型中心核对/更新该模型的 slug",
+                                    f"Model not found ({url}): verify or update its slug "
+                                    f"in the model center"))
         if r.status_code == 422:
             raise ReplicateError("protocol",
-                                 f"模型 input 参数不合法（{r.text[:200]}）——平台版本与适配器"
-                                 "漂移时请在目录中调整该模型 slug 或反馈适配器修正")
+                                 tr(f"模型 input 参数不合法（{r.text[:200]}）——平台版本与适配器"
+                                    "漂移时请在目录中调整该模型 slug 或反馈适配器修正",
+                                    f"Invalid model input ({r.text[:200]}) - if the platform "
+                                    "version drifted from the adapter, adjust the model slug "
+                                    "in the catalog or report the adapter for a fix"))
         if r.status_code != 200:
-            raise ReplicateError("protocol", f"Replicate HTTP {r.status_code}：{r.text[:200]}")
+            raise ReplicateError(
+                "protocol",
+                tr(f"Replicate HTTP {r.status_code}：{r.text[:200]}",
+                   f"Replicate HTTP {r.status_code}: {r.text[:200]}"))
 
     def account(self) -> dict:
         r = self._request("GET", "/v1/account")
@@ -173,7 +189,10 @@ class ReplicateClient:
         self._raise_status(r, f"{self.base}/v1/models/{slug}/predictions")
         pred_id = (r.json() or {}).get("id")
         if not pred_id:
-            raise ReplicateError("protocol", f"响应中无 prediction id：{r.text[:200]}")
+            raise ReplicateError(
+                "protocol",
+                tr(f"响应中无 prediction id：{r.text[:200]}",
+                   f"No prediction id in response: {r.text[:200]}"))
         return str(pred_id)
 
     def fetch(self, prediction_id: str) -> dict:
@@ -199,7 +218,10 @@ def _audio_url(output) -> str:
                 return str(item["url"])
     if isinstance(output, dict) and str(output.get("url") or "").startswith("http"):
         return str(output["url"])
-    raise ReplicateError("bad_output", f"模型输出中无音频 URL：{str(output)[:200]}")
+    raise ReplicateError(
+        "bad_output",
+        tr(f"模型输出中无音频 URL：{str(output)[:200]}",
+           f"No audio URL in model output: {str(output)[:200]}"))
 
 
 def _stage(progress: ProgressCallback, should_cancel: CancelCheck, key: str, pct: int,
@@ -231,12 +253,16 @@ class ReplicateMusicProvider:
     def __init__(self, api_token: str, model_id: str, slug: str):
         entry = CATALOG_BY_ID.get(model_id)
         if entry is None:
-            raise ReplicateError("bad_output", f"目录中不存在模型：{model_id}")
+            raise ReplicateError(
+                "bad_output", tr(f"目录中不存在模型：{model_id}",
+                                 f"Model not in catalog: {model_id}"))
         slug = (slug or entry.get("replicate_slug") or "").strip()
         if not slug:
             raise ReplicateError("protocol",
-                                 f"模型 {model_id} 未配置 Replicate slug（社区托管 slug "
-                                 "请在模型中心填写）")
+                                 tr(f"模型 {model_id} 未配置 Replicate slug（社区托管 slug "
+                                    "请在模型中心填写）",
+                                    f"Model {model_id} has no Replicate slug configured "
+                                    "(fill in community-hosted slugs in the model center)"))
         self.client = ReplicateClient(api_token)
         self.model_id = model_id
         self.slug = slug
@@ -253,7 +279,8 @@ class ReplicateMusicProvider:
         dest = Path(dest_dir)
         input = build_replicate_input(request, self.model_id)
         _stage(progress, should_cancel, "api_submit", 5,
-               f"提交 Replicate 生成（{self.slug}，2 个候选并行）")
+               tr(f"提交 Replicate 生成（{self.slug}，2 个候选并行）",
+                  f"Submitting to Replicate ({self.slug}, 2 candidates in parallel)"))
         ids = [self.client.create(self.slug, input) for _ in range(2)]
         logger.info(f"replicate submitted: model={self.slug} predictions={ids}")
 
@@ -263,7 +290,7 @@ class ReplicateMusicProvider:
         for idx, url in enumerate(outputs[:2]):
             label = chr(ord("A") + idx)
             _stage(progress, should_cancel, "api_download", 82 + idx * 5,
-                   f"下载候选 {label} 音频")
+                   tr(f"下载候选 {label} 音频", f"Downloading candidate {label} audio"))
             candidates.append(self._materialize(url, request, label, dest))
         return GenerationOutput(candidates, [], False)
 
@@ -283,10 +310,13 @@ class ReplicateMusicProvider:
                 elif status in ("failed", "canceled"):
                     raise ReplicateError(
                         "bad_output",
-                        f"模型推理失败：{str(data.get('error') or status)[:200]}")
+                        tr(f"模型推理失败：{str(data.get('error') or status)[:200]}",
+                           f"Model inference failed: {str(data.get('error') or status)[:200]}"))
             if pending:
                 pct = 55 if done else 20
-                progress("api_render", pct, "Replicate 推理中（云端开源模型）")
+                progress("api_render", pct,
+                         tr("Replicate 推理中（云端开源模型）",
+                            "Running on Replicate (hosted open-source model)"))
                 time.sleep(_POLL_INTERVAL_SEC)
         return [done[pid] for pid in ids if pid in done]
 
@@ -299,12 +329,18 @@ class ReplicateMusicProvider:
         try:
             with httpx.stream("GET", url, timeout=300.0, follow_redirects=True) as r:
                 if r.status_code != 200:
-                    raise ReplicateError("protocol", f"音频下载失败 HTTP {r.status_code}")
+                    raise ReplicateError(
+                        "protocol",
+                        tr(f"音频下载失败 HTTP {r.status_code}",
+                           f"Audio download failed with HTTP {r.status_code}"))
                 with open(raw, "wb") as f:
                     for chunk in r.iter_bytes(1 << 20):
                         f.write(chunk)
         except httpx.HTTPError as e:
-            raise ReplicateError("unavailable", f"音频下载失败：{e.__class__.__name__}") from e
+            raise ReplicateError(
+                "unavailable",
+                tr(f"音频下载失败：{e.__class__.__name__}",
+                   f"Audio download failed: {e.__class__.__name__}")) from e
 
         digest = hashlib.sha256(raw.read_bytes()).hexdigest()
         size = raw.stat().st_size

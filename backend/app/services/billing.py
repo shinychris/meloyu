@@ -7,11 +7,34 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import err_validation
+from app.core.i18n import current_locale, tr
 from app.models import Plan, Subscription, User
 from app.models.base import utc_now_iso
 from app.services import credits as credits_svc
 from app.services import works as works_svc
 from app.services.serializers import user_to_dict
+
+# 档位卖点文案（seed 写库为中文，API 层按 locale 展开英文；未收录条目原样返回）
+_FEATURE_EN = {
+    "每日 5 次生成": "5 generations per day",
+    "仅 MP3 导出": "MP3 export only",
+    "非商用 · 含水印": "Non-commercial · watermarked",
+    "商用授权 + 证书": "Commercial license + certificate",
+    "WAV 48k/24bit · MIDI · 4 Stems": "WAV 48k/24bit · MIDI · 4 stems",
+    "每月 2,500 积分可结转": "2,500 credits per month, rollable",
+    "全部 Pro 权益 + 12 Stems（V1.1）": "All Pro benefits + 12 stems (V1.1)",
+    "专业修调/AI 编曲建议（V2）": "Pro tuning / AI arrangement advice (V2)",
+    "每月 10,000 积分 · 优先队列": "10,000 credits per month · priority queue",
+    "团队空间与协作（V1.1）": "Team workspace & collaboration (V1.1)",
+    "API 按量计费": "Usage-based API billing",
+    "专属合规支持": "Dedicated compliance support",
+}
+
+
+def _feature_label(feature: str) -> str:
+    if current_locale() == "zh":
+        return feature
+    return _FEATURE_EN.get(feature, feature)
 
 
 def list_plans(db: Session, user: User) -> dict:
@@ -21,16 +44,17 @@ def list_plans(db: Session, user: User) -> dict:
         "price_yearly": p.price_yearly, "daily_generations": p.daily_generations,
         "monthly_credits": p.monthly_credits, "max_export": p.max_export,
         "commercial_license": p.commercial_license, "watermark": p.watermark,
-        "current": p.code == user.plan, "features": p.features or [],
+        "current": p.code == user.plan,
+        "features": [_feature_label(f) for f in (p.features or [])],
     } for p in rows]
     return {"plans": plans}
 
 
 def switch_plan(db: Session, user: User, plan_code: str) -> dict:
     if plan_code == "team":
-        raise err_validation("团队版请联系销售")
+        raise err_validation(tr("团队版请联系销售", "Please contact sales for the Team plan"))
     if plan_code not in ("free", "pro", "studio"):
-        raise err_validation("plan 必须为 free/pro/studio")
+        raise err_validation(tr("plan 必须为 free/pro/studio", "plan must be free/pro/studio"))
     if plan_code == user.plan:
         # 幂等：同档切换仅记录事件
         works_svc.add_event(db, user_id=user.id, action="plan_switch", actor="human",

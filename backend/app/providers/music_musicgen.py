@@ -21,6 +21,7 @@ import shutil
 from pathlib import Path
 
 from app.config import MUSICGEN_TASK_TIMEOUT_SEC, settings
+from app.core.i18n import tr
 from app.core.logging import logger
 from app.core.seed import candidate_seed
 from app.providers.base import (
@@ -35,13 +36,21 @@ from app.synth.ir import SongRequest
 from app.synth.mp3_io import encode_mp3
 from app.synth.wav_io import write_wav
 
-_INSTALL_HINT = ("本机 MusicGen 依赖未安装（torch/transformers 较大，未随主依赖安装）："
-                 "backend/ 下执行 ./.venv/Scripts/python -m pip install -r "
-                 "requirements-musicgen.txt 后重启服务")
+_INSTALL_HINT_ZH = ("本机 MusicGen 依赖未安装（torch/transformers 较大，未随主依赖安装）："
+                    "backend/ 下执行 ./.venv/Scripts/python -m pip install -r "
+                    "requirements-musicgen.txt 后重启服务")
+_INSTALL_HINT_EN = ("Local MusicGen dependencies are not installed (torch/transformers are "
+                    "large and not in the main requirements): from backend/ run ./.venv/"
+                    "Scripts/python -m pip install -r requirements-musicgen.txt, then "
+                    "restart the server")
+
+
+def _install_hint() -> str:
+    return tr(_INSTALL_HINT_ZH, _INSTALL_HINT_EN)
 
 
 def musicgen_install_hint() -> str:
-    return _INSTALL_HINT
+    return _install_hint()
 
 
 def _apply_hf_endpoint() -> None:
@@ -98,7 +107,9 @@ def local_downloaded_ids() -> list[str]:
 def delete_local(model_id: str) -> None:
     entry = CATALOG_BY_ID.get(model_id)
     if not entry or not entry.get("local_hf_id"):
-        raise MusicGenLocalError("download", f"模型不支持本地删除：{model_id}")
+        raise MusicGenLocalError(
+            "download", tr(f"模型不支持本地删除：{model_id}",
+                           f"Model does not support local deletion: {model_id}"))
     target = hf_cache_dir() / f"models--{_snapshot_prefix(entry['local_hf_id'])}"
     if target.exists():
         shutil.rmtree(target)
@@ -108,9 +119,11 @@ def pull_local(model_id: str, on_progress) -> None:
     """真实下载模型权重（huggingface_hub），进度经 on_progress(pct, message) 上报。"""
     entry = CATALOG_BY_ID.get(model_id)
     if not entry or "musicgen_local" not in entry.get("channels", []):
-        raise MusicGenLocalError("download", f"模型不支持本地下载：{model_id}")
+        raise MusicGenLocalError(
+            "download", tr(f"模型不支持本地下载：{model_id}",
+                           f"Model does not support local download: {model_id}"))
     if not musicgen_deps_installed():
-        raise MusicGenLocalError("deps", _INSTALL_HINT)
+        raise MusicGenLocalError("deps", _install_hint())
     from huggingface_hub import snapshot_download
     from tqdm import tqdm
 
@@ -124,14 +137,15 @@ def pull_local(model_id: str, on_progress) -> None:
             try:
                 if self.total:
                     pct = max(1, min(99, int(self.n * 100 / self.total)))
-                    on_progress(pct, f"{self.desc or '下载'} {pct}%")
+                    on_progress(pct, tr(f"{self.desc or '下载'} {pct}%",
+                                        f"{self.desc or 'Downloading'} {pct}%"))
             except Exception:  # noqa: BLE001 —— 进度回调不允许影响下载
                 pass
 
-    on_progress(1, "连接 Hugging Face…")
+    on_progress(1, tr("连接 Hugging Face…", "Connecting to Hugging Face…"))
     snapshot_download(entry["local_hf_id"], cache_dir=str(hf_cache_dir()),
                       tqdm_class=_OpTqdm)
-    on_progress(100, f"已下载 {entry['name']}")
+    on_progress(100, tr(f"已下载 {entry['name']}", f"Downloaded {entry['name']}"))
 
 
 def _stage(progress: ProgressCallback, should_cancel: CancelCheck, key: str, pct: int,
@@ -157,7 +171,7 @@ class MusicGenLocalProvider:
     """MusicProvider 协议实现：本机 MusicGen 推理（器乐）。"""
 
     name = "musicgen_local"
-    base_display = "本机 MusicGen（开源）"
+    base_display = "Local MusicGen (open source)"
     supports_vocals = False
     timeout_sec = MUSICGEN_TASK_TIMEOUT_SEC
     vocals_downgraded = False
@@ -166,11 +180,13 @@ class MusicGenLocalProvider:
         entry = CATALOG_BY_ID.get(model_id)
         if entry is None or "musicgen_local" not in entry.get("channels", []):
             raise MusicGenLocalError("download",
-                                     f"模型不支持本机运行：{model_id}（需 GPU 档请走 Replicate）")
+                                     tr(f"模型不支持本机运行：{model_id}（需 GPU 档请走 Replicate）",
+                                        f"Model does not support local execution: {model_id} "
+                                        f"(GPU-only tiers should use Replicate)"))
         self.model_id = model_id
         self.hf_id = entry["local_hf_id"]
         self.max_duration = int(entry["capabilities"]["max_duration_sec"])
-        self.display_name = f"MusicGen 本地 · {entry['name']}"
+        self.display_name = tr("MusicGen 本地 · ", "MusicGen Local · ") + entry['name']
 
     def generate(
         self,
@@ -180,10 +196,13 @@ class MusicGenLocalProvider:
         dest_dir: str,
     ) -> GenerationOutput:
         if not musicgen_deps_installed():
-            raise MusicGenLocalError("deps", _INSTALL_HINT)
+            raise MusicGenLocalError("deps", _install_hint())
         if not is_downloaded(self.model_id):
             raise MusicGenLocalError(
-                "download", f"模型权重未下载：{self.hf_id}（请先在模型中心下载）")
+                "download",
+                tr(f"模型权重未下载：{self.hf_id}（请先在模型中心下载）",
+                   f"Model weights not downloaded: {self.hf_id} (download them in the "
+                   f"model center first)"))
 
         import torch
         from transformers import AutoProcessor, MusicgenForConditionalGeneration
@@ -195,7 +214,9 @@ class MusicGenLocalProvider:
             "cuda" if torch.cuda.is_available() else "cpu")
         duration = min(request.duration_sec, self.max_duration)
         _stage(progress, should_cancel, "model_load", 4,
-               f"加载本地模型 {self.hf_id}（{device.upper()}，首次加载较慢）")
+               tr(f"加载本地模型 {self.hf_id}（{device.upper()}，首次加载较慢）",
+                  f"Loading local model {self.hf_id} ({device.upper()}; first load is "
+                  f"slow)"))
         model = MusicgenForConditionalGeneration.from_pretrained(
             self.hf_id, cache_dir=str(hf_cache_dir())).to(device)
         processor = AutoProcessor.from_pretrained(self.hf_id, cache_dir=str(hf_cache_dir()))
@@ -207,12 +228,15 @@ class MusicGenLocalProvider:
 
         if device == "cuda":
             # 实测 RTX 4060 Ti：300M 自回归逐 token 生成，30s×2 约 2~3 分钟（kernel 开销为主）
-            est = f"GPU 约 {max(30, duration * 3)}~{duration * 6}s"
+            est = tr(f"GPU 约 {max(30, duration * 3)}~{duration * 6}s",
+                     f"GPU ~{max(30, duration * 3)}-{duration * 6}s")
         else:
             est_min = max(1, round(duration / 10))
-            est = f"CPU 约 {est_min}~{est_min * 3} 分钟"
+            est = tr(f"CPU 约 {est_min}~{est_min * 3} 分钟",
+                     f"CPU ~{est_min}-{est_min * 3} min")
         _stage(progress, should_cancel, "model_sample", 25,
-               f"模型采样中（{duration}s 器乐 ×2 候选，{est}）")
+               tr(f"模型采样中（{duration}s 器乐 ×2 候选，{est}）",
+                  f"Sampling ({duration}s instrumental x2 candidates, {est})"))
 
         # guidance_scale=1.0：关闭 classifier-free guidance 分支——该分支在 CUDA 上存在
         # flaky 设备端索引断言（srcIndex < srcSelectDimSize，真机中文风格+人声请求实测
@@ -250,13 +274,15 @@ class MusicGenLocalProvider:
             except RuntimeError:  # noqa: BLE001 —— 清理失败不影响 CPU 重试
                 pass
             _stage(progress, should_cancel, "model_sample", 30,
-                   "GPU 采样异常，已切换 CPU 重试（本进程内不再使用 GPU）")
+                   tr("GPU 采样异常，已切换 CPU 重试（本进程内不再使用 GPU）",
+                      "GPU sampling error; retrying on CPU (GPU disabled for this "
+                      "process)"))
             device = "cpu"
             model = MusicgenForConditionalGeneration.from_pretrained(
                 self.hf_id, cache_dir=str(hf_cache_dir()))
             inputs = processor(text=[desc, desc], padding=True, return_tensors="pt")
             audio = _sample(inputs, model, device)
-        _stage(progress, should_cancel, "model_export", 88, "导出音频…")
+        _stage(progress, should_cancel, "model_export", 88, tr("导出音频…", "Exporting audio…"))
 
         dest = Path(dest_dir)
         candidates: list[CandidateArtifact] = []

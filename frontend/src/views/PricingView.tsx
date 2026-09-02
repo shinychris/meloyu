@@ -3,8 +3,9 @@ import type { CreditTransaction, PlanInfo } from '../types/api'
 import { getCreditTransactions, getPlans, switchPlan } from '../api/account'
 import { useSessionStore } from '../stores/session'
 import { toast } from '../stores/toast'
-import { CREDIT_REASON_LABEL, formatDateTime, formatNum } from '../lib/format'
+import { creditReasonLabel, formatDateTime, formatNum, planLabel } from '../lib/format'
 import Pagination from '../components/common/Pagination'
+import { useT } from '../i18n'
 
 const PAGE_SIZE = 10
 
@@ -18,6 +19,7 @@ export default function PricingView() {
   const [txPage, setTxPage] = useState(1)
   const [txTotalPages, setTxTotalPages] = useState(1)
   const { user, refreshUser } = useSessionStore()
+  const t = useT()
 
   const loadPlans = useCallback(async () => {
     setLoading(true)
@@ -52,7 +54,7 @@ export default function PricingView() {
   const onSwitch = async (plan: PlanInfo) => {
     if (switching) return
     if (plan.code === 'team') {
-      toast('团队版请联系销售（MVP 演示）', 'warn')
+      toast(t('pricing.contactSalesToast'), 'warn')
       return
     }
     if (plan.current) return
@@ -62,7 +64,7 @@ export default function PricingView() {
       useSessionStore.setState({ user })
       await loadPlans()
       void refreshUser()
-      toast(`已切换至「${plan.name}」，积分已按月发放`)
+      toast(t('pricing.switched', { name: planLabel(plan.code) }))
     } catch {
       /* 拦截器已 toast（40001 团队版等） */
     } finally {
@@ -74,27 +76,27 @@ export default function PricingView() {
     <section className="view flex flex-col h-full">
       <header className="px-8 pt-6 pb-4 flex items-end justify-between flex-wrap gap-3">
         <div>
-          <div className="label">Pricing / 定价与积分</div>
-          <h1 className="text-[28px] font-extrabold tracking-tight mt-1">为创作付费，不为焦虑付费</h1>
+          <div className="label">{t('pricing.label')}</div>
+          <h1 className="text-[28px] font-extrabold tracking-tight mt-1">{t('pricing.title')}</h1>
         </div>
         <div className="flex items-center gap-3 text-[12px]" style={{ color: 'var(--muted)' }}>
-          按月
+          {t('pricing.monthly')}
           <button className={`toggle ${yearly ? 'on' : ''}`} onClick={() => setYearly((v) => !v)}></button>
-          按年
+          {t('pricing.yearly')}
           <span className="text-[11px] px-1.5 py-0.5 font-bold" style={{ background: 'var(--acc)', color: '#000' }}>
-            省 20%
+            {t('pricing.save20')}
           </span>
         </div>
       </header>
 
       {loading ? (
         <div className="rule-t py-16 text-center text-[12px]" style={{ color: 'var(--dim)' }}>
-          加载档位…
+          {t('pricing.loading')}
         </div>
       ) : plans.length === 0 ? (
         <div className="rule-t py-16 text-center">
-          <div className="text-[12px]" style={{ color: 'var(--dim)' }}>档位信息加载失败</div>
-          <button className="btn btn-ghost text-[11px] mt-4" onClick={() => void loadPlans()}>重试</button>
+          <div className="text-[12px]" style={{ color: 'var(--dim)' }}>{t('pricing.loadFailed')}</div>
+          <button className="btn btn-ghost text-[11px] mt-4" onClick={() => void loadPlans()}>{t('common.retry')}</button>
         </div>
       ) : (
         <div className="grid grid-cols-4 rule-t">
@@ -114,29 +116,29 @@ export default function PricingView() {
               >
                 {popular && (
                   <div className="absolute top-0 left-0 text-[10px] font-bold px-2 py-1" style={{ background: 'var(--acc)', color: '#000' }}>
-                    最受欢迎
+                    {t('pricing.popular')}
                   </div>
                 )}
-                <div className="label" style={popular ? { color: 'var(--acc)' } : undefined}>{p.name}</div>
+                <div className="label" style={popular ? { color: 'var(--acc)' } : undefined}>{planLabel(p.code)}</div>
                 <div className="price-num mt-4">
-                  {price == null ? (p.code === 'team' ? '定制' : '—') : `¥${price}`}
+                  {price == null ? (p.code === 'team' ? t('pricing.customPrice') : '—') : `¥${price}`}
                   {price != null && (
-                    <span className="text-[16px] font-bold" style={{ color: 'var(--muted)' }}> ¥/月</span>
+                    <span className="text-[16px] font-bold" style={{ color: 'var(--muted)' }}>{t('pricing.perMonth')}</span>
                   )}
                 </div>
                 <div className="text-[11px] mt-1" style={{ color: 'var(--dim)' }}>
-                  {p.code === 'free' && '先玩起来'}
-                  {p.code === 'pro' && (yearly ? '按年付 · 积分可结转' : `年付 ¥${p.price_yearly ?? ''}/月 更划算`)}
-                  {p.code === 'studio' && (yearly ? '按年付' : `年付 ¥${p.price_yearly ?? ''}/月 更划算`)}
-                  {p.code === 'team' && '席位 · API · 批量'}
+                  {p.code === 'free' && t('pricing.tag.free')}
+                  {p.code === 'pro' && (yearly ? t('pricing.tag.proYearly') : t('pricing.tag.yearlyBetter', { price: p.price_yearly ?? '' }))}
+                  {p.code === 'studio' && (yearly ? t('pricing.tag.yearlyOnly') : t('pricing.tag.yearlyBetter', { price: p.price_yearly ?? '' }))}
+                  {p.code === 'team' && t('pricing.tag.team')}
                 </div>
                 <ul className="mt-6 space-y-2.5 text-[12px]" style={{ color: 'var(--muted)' }}>
                   {p.features.map((f) => (
                     <li key={f}>· {f}</li>
                   ))}
-                  {p.monthly_credits != null && !p.features.some((f) => f.includes('积分')) && (
+                  {p.monthly_credits != null && !p.features.some((f) => f.includes('积分') || /credit/i.test(f)) && (
                     <li>
-                      · 每月 <span className="num">{formatNum(p.monthly_credits)}</span> 积分
+                      · {t('pricing.monthlyCredits.pre')} <span className="num">{formatNum(p.monthly_credits)}</span> {t('pricing.monthlyCredits.post')}
                     </li>
                   )}
                 </ul>
@@ -146,14 +148,14 @@ export default function PricingView() {
                   onClick={() => void onSwitch(p)}
                 >
                   {current
-                    ? '当前方案'
+                    ? t('pricing.current')
                     : switching === p.code
-                      ? '切换中…'
+                      ? t('pricing.switching')
                       : p.code === 'team'
-                        ? '联系销售'
+                        ? t('pricing.contactSales')
                         : p.code === 'free'
-                          ? '降级到免费'
-                          : `升级 ${p.name}`}
+                          ? t('pricing.downgrade')
+                          : t('pricing.upgrade', { name: planLabel(p.code) })}
                 </button>
               </div>
             )
@@ -162,32 +164,33 @@ export default function PricingView() {
       )}
 
       <div className="rule-t px-8 py-4 text-[11px]" style={{ color: 'var(--dim)' }}>
-        商用授权随有效订阅生效；订阅期内生成并导出的作品保留商用权利。积分按月发放、未用完可结转。当前余额
-        <span className="num font-bold mx-1" style={{ color: 'var(--acc)' }}>{formatNum(user?.credits.balance ?? 0)}</span>积分。
+        {t('pricing.footnote')}
+        <span className="num font-bold mx-1" style={{ color: 'var(--acc)' }}>{formatNum(user?.credits.balance ?? 0)}</span>
+        {t('pricing.creditsUnit')}
       </div>
 
       {/* 积分流水 */}
       <div className="rule-t px-8 py-4">
-        <div className="label mb-3">积分流水</div>
+        <div className="label mb-3">{t('pricing.tx.title')}</div>
         <div className="row !cursor-default" style={{ color: 'var(--dim)', gridTemplateColumns: '170px 90px 110px 100px 1fr' }}>
-          <span className="label">时间</span>
-          <span className="label">变动</span>
-          <span className="label">原因</span>
-          <span className="label">余额</span>
-          <span className="label">关联任务</span>
+          <span className="label">{t('pricing.tx.time')}</span>
+          <span className="label">{t('pricing.tx.change')}</span>
+          <span className="label">{t('pricing.tx.reason')}</span>
+          <span className="label">{t('pricing.tx.balance')}</span>
+          <span className="label">{t('pricing.tx.task')}</span>
         </div>
         {txs.length === 0 ? (
-          <div className="py-8 text-center text-[11px]" style={{ color: 'var(--dim)' }}>暂无流水记录</div>
+          <div className="py-8 text-center text-[11px]" style={{ color: 'var(--dim)' }}>{t('pricing.tx.empty')}</div>
         ) : (
-          txs.map((t) => (
-            <div key={t.id} className="row" style={{ cursor: 'default', gridTemplateColumns: '170px 90px 110px 100px 1fr' }}>
-              <span className="text-[11px] num" style={{ color: 'var(--muted)' }}>{formatDateTime(t.created_at)}</span>
-              <span className="text-[12px] num font-semibold" style={{ color: t.delta >= 0 ? 'var(--acc)' : 'var(--txt)' }}>
-                {t.delta >= 0 ? `+${t.delta}` : t.delta}
+          txs.map((tx) => (
+            <div key={tx.id} className="row" style={{ cursor: 'default', gridTemplateColumns: '170px 90px 110px 100px 1fr' }}>
+              <span className="text-[11px] num" style={{ color: 'var(--muted)' }}>{formatDateTime(tx.created_at)}</span>
+              <span className="text-[12px] num font-semibold" style={{ color: tx.delta >= 0 ? 'var(--acc)' : 'var(--txt)' }}>
+                {tx.delta >= 0 ? `+${tx.delta}` : tx.delta}
               </span>
-              <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{CREDIT_REASON_LABEL[t.reason] ?? t.reason}</span>
-              <span className="text-[11px] num" style={{ color: 'var(--muted)' }}>{formatNum(t.balance_after)}</span>
-              <span className="text-[10px] num truncate" style={{ color: 'var(--dim)' }}>{t.ref_task_id ?? '—'}</span>
+              <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{creditReasonLabel(tx.reason)}</span>
+              <span className="text-[11px] num" style={{ color: 'var(--muted)' }}>{formatNum(tx.balance_after)}</span>
+              <span className="text-[10px] num truncate" style={{ color: 'var(--dim)' }}>{tx.ref_task_id ?? '—'}</span>
             </div>
           ))
         )}

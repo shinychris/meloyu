@@ -48,6 +48,7 @@ src/
 ├── lib/                        # 纯函数（带单测）：format / structure(标签解析镜像) / wave(canvas 波形) / token
 ├── components/
 │   ├── layout/                 # Sidebar(212px) / TransportBar(68px 播放器) / Onboarding(spotlight 四步)
+│   ├── landing/                # 落地页 11 个区块组件（产品入口，见下）
 │   ├── studio/                 # StepBar / InspireBox / ParamPanel / GenProgress / CandidateCard / VersionTree
 │   ├── work/ExportPanel.tsx    # WAV/MP3/MIDI/Stems 导出轮询下载 + 证书 JSON
 │   ├── common/                 # ToastHost / ConfirmDialog / Pagination
@@ -58,7 +59,9 @@ src/
 
 | 路由 | 视图 | 要点 |
 |---|---|---|
-| `#/login` | 登录/注册 | 演示账号一键填入；JWT 存 localStorage |
+| `#/` | 产品落地页（公共） | 未登录即落地页（产品入口/全套展示信息）；已登录自动跳工作台 |
+| `#/landing` | 产品落地页（恒定） | 不受登录态影响，供演示与对外分享 |
+| `#/login` | 登录/注册 | 演示账号一键填入；JWT 存 localStorage；底部「返回产品主页」 |
 | `#/studio` | 创作工作台 | 四模式 chips（参考音频/哼唱=V1.1 置灰）、灵感指引组装 prompt、参数面板、四步引导条、生成→轮询→2 候选卡、版本树 + 操作日志 |
 | `#/lyrics` | 歌词助手 | 4 个歌词接口全接；草稿存 localStorage(`meloyu:lyric-draft:v1`) |
 | `#/arrange` `#/edit` `#/pitch` | V2 占位页 | 「即将上线」说明卡 + 返回工作台 |
@@ -66,6 +69,15 @@ src/
 | `#/works/:id` | 作品详情 | 版本树 + 候选（试听/采用定稿）+ 导出面板 + 证书 |
 | `#/rights` | 合规与权利中心 | 证书卡字段来自 /versions/{id}/certificate、合规检查清单、全局开关 |
 | `#/pricing` | 定价与积分 | 档位来自接口、月/年切换、升级调 /subscriptions/switch、积分流水表 |
+| `#/models` | 模型中心 | 七通道卡片 + 开源目录（10 模型）+ 下载管理 |
+
+### 落地页（产品入口）
+
+- 组件：`src/views/LandingView.tsx` + `src/components/landing/*`（Nav/Hero/WorkFlow/Capabilities/Channels/Models/Showcase/Audience/Pricing/Faq/Footer）。
+- 数据：`src/lib/landing-data.ts` 单一事实源（七通道/十模型目录/定价/FAQ/里程碑），**纯静态内嵌、不依赖后端**；有 `landing-data.test.ts` 完整性测试兜底（通道数量/排序/许可口径/定价与 seed_data 一致）。
+- 真机截图：`public/shots/`（来自 `reports/sim-sessions/shots` 已验收画面）。
+- 宣传口径：商用表述遵循商业化盘点 R-01——「商用权利跟随所选通道的模型许可」，NC 权重如实标注，不写绝对化承诺。
+- 锚点导航在 HashRouter 下不能用 `href="#id"`，统一走 `scrollToSection()`（`components/landing/LandingNav.tsx`）。
 
 ## 约定（给下游开发者/AI）
 

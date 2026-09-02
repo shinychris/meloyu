@@ -14,6 +14,7 @@ from collections.abc import Callable
 from app.providers.llm.base import LLMError, extract_json
 from app.providers.lyrics_local import LocalLyricsProvider, check_sensitive
 from app.synth.structure import parse_lyrics
+from app.core.i18n import tr
 
 ChatFn = Callable[[str, str], str]
 
@@ -63,7 +64,7 @@ class LLMLyricsProvider:
     def _ask_json(self, prompt: str) -> dict:
         data = extract_json(self._chat(_SYSTEM, prompt))
         if not isinstance(data, dict):
-            raise LLMError("bad_output", "模型输出不是 JSON 对象")
+            raise LLMError("bad_output", tr("模型输出不是 JSON 对象", "Model output is not a JSON object"))
         return data
 
     # ---- 生成 ----
@@ -87,9 +88,9 @@ class LLMLyricsProvider:
             data = self._ask_json(prompt)
             lyrics = str(data.get("lyrics") or "").strip()
             if len(_content_lines(lyrics)) < 4:
-                raise LLMError("bad_output", "生成歌词行数不足")
+                raise LLMError("bad_output", tr("生成歌词行数不足", "Generated lyrics have too few lines"))
             if check_sensitive(lyrics):
-                raise LLMError("bad_output", "生成内容命中敏感词")
+                raise LLMError("bad_output", tr("生成内容命中敏感词", "Generated content hit a sensitive word"))
             alts = data.get("alternatives") or []
             alternatives = []
             for a in alts[:2]:
@@ -109,7 +110,7 @@ class LLMLyricsProvider:
                       style_hint=style_hint, locked_lines=locked_lines)
         try:
             if check_sensitive(lyrics):
-                raise LLMError("bad_output", "输入内容命中敏感词")
+                raise LLMError("bad_output", tr("输入内容命中敏感词", "Input content hit a sensitive word"))
             lock = sorted(set(locked_lines or []))
             prompt = (
                 f"润色以下歌词：提升文学性与押韵一致性，保持段落标签与整体结构不变。\n"
@@ -125,9 +126,9 @@ class LLMLyricsProvider:
             new_lyrics = str(data.get("lyrics") or "").strip()
             old_lines, new_lines = _content_lines(lyrics), _content_lines(new_lyrics)
             if len(new_lines) < 2:
-                raise LLMError("bad_output", "润色结果行数不足")
+                raise LLMError("bad_output", tr("润色结果行数不足", "Polished lyrics have too few lines"))
             if check_sensitive(new_lyrics):
-                raise LLMError("bad_output", "润色内容命中敏感词")
+                raise LLMError("bad_output", tr("润色内容命中敏感词", "Polished content hit a sensitive word"))
             changes: list[dict] = []
             polished_sections: list[str] = []
             if len(old_lines) == len(new_lines):  # 行对齐才给出可信 diff

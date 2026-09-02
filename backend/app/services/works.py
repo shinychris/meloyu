@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import TRASH_RETENTION_DAYS, settings
 from app.core.errors import err_conflict, err_forbidden, err_not_found
+from app.core.i18n import tr
 from app.models import EditEvent, Task, User, Version, Work
 from app.models.base import utc_now_iso
 from app.repositories import counters
@@ -18,7 +19,7 @@ from app.services.serializers import event_to_dict, work_to_dict
 def _get_work_owned(db: Session, work_id: str, user: User) -> Work:
     work = db.get(Work, work_id)
     if not work:
-        raise err_not_found("作品不存在")
+        raise err_not_found(tr("作品不存在", "Work not found"))
     if work.user_id != user.id:
         raise err_forbidden()
     return work
@@ -114,7 +115,8 @@ def delete_work(db: Session, work_id: str, user: User, permanent: bool) -> dict:
     work = _get_work_owned(db, work_id, user)
     if permanent:
         if work.status != "trash":
-            raise err_conflict("作品不在回收站，无法直接物理删除（先移入回收站）")
+            raise err_conflict(tr("作品不在回收站，无法直接物理删除（先移入回收站）",
+                            "Work is not in the trash; move it to trash before permanent deletion"))
         _physical_delete(db, work)
         return {"deleted": True, "permanent": True}
     work.status = "trash"
@@ -129,7 +131,7 @@ def delete_work(db: Session, work_id: str, user: User, permanent: bool) -> dict:
 def restore_work(db: Session, work_id: str, user: User) -> dict:
     work = _get_work_owned(db, work_id, user)
     if work.status != "trash":
-        raise err_conflict("作品不在回收站")
+        raise err_conflict(tr("作品不在回收站", "Work is not in the trash"))
     work.status = "active"
     work.trashed_at = None
     work.updated_at = utc_now_iso()
@@ -199,7 +201,7 @@ def version_tree(db: Session, work_id: str, user: User) -> dict:
 def get_version_owned(db: Session, version_id: str, user: User) -> Version:
     version = db.get(Version, version_id)
     if not version:
-        raise err_not_found("版本不存在")
+        raise err_not_found(tr("版本不存在", "Version not found"))
     work = db.get(Work, version.work_id)
     if not work or work.user_id != user.id:
         raise err_forbidden()

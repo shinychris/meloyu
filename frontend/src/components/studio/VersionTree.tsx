@@ -1,4 +1,5 @@
 import { useStudioStore } from '../../stores/studio'
+import { useT } from '../../i18n'
 import type { VersionTreeNode } from '../../types/api'
 import { versionSourceLabel } from '../../lib/format'
 
@@ -17,6 +18,7 @@ function depthOf(nodes: VersionTreeNode[], node: VersionTreeNode): number {
 
 /** 版本树侧栏（GET /works/{id}/versions，前端构树）+ 最近操作日志 */
 export default function VersionTree() {
+  const t = useT()
   const versionTree = useStudioStore((s) => s.versionTree)
   const workId = useStudioStore((s) => s.workId)
   const opLog = useStudioStore((s) => s.opLog)
@@ -29,22 +31,22 @@ export default function VersionTree() {
   return (
     <div className="border-l px-5 py-5 overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
       <div className="flex items-center justify-between">
-        <div className="label">版本树</div>
+        <div className="label">{t('studio.tree.title')}</div>
         {workId && (
           <button
             className="text-[10px] font-bold"
             style={{ color: 'var(--acc)' }}
             onClick={() => resetForNewWork()}
-            title="清空当前上下文，下一次生成将新建作品"
+            title={t('studio.tree.newTitle')}
           >
-            + 新建作品
+            {t('studio.tree.new')}
           </button>
         )}
       </div>
       <div className="vtree mt-3">
         {nodes.length === 0 ? (
           <div className="text-[11px] py-2 leading-relaxed" style={{ color: 'var(--dim)' }}>
-            尚未生成 · 提交后在此展示版本树
+            {t('studio.tree.empty')}
           </div>
         ) : (
           nodes.map((n, i) => (
@@ -52,7 +54,11 @@ export default function VersionTree() {
               key={n.id}
               className={`vnode pop ${versionTree?.current_version_id === n.id ? 'cur' : ''}`}
               style={{ marginLeft: depthOf(nodes, n) * 14, animationDelay: `${i * 0.05}s` }}
-              title={`${n.version_no} · ${versionSourceLabel(n.source)} · 候选 ×${n.candidate_count}`}
+              title={t('studio.tree.node', {
+                no: n.version_no,
+                source: versionSourceLabel(n.source),
+                n: n.candidate_count,
+              })}
             >
               <span className="dot"></span>
               {n.version_no} · {versionSourceLabel(n.source)}
@@ -60,7 +66,7 @@ export default function VersionTree() {
           ))
         )}
       </div>
-      <div className="label mt-6">最近操作</div>
+      <div className="label mt-6">{t('studio.tree.recentOps')}</div>
       <div className="mt-2 space-y-2 text-[11px]" style={{ color: 'var(--dim)' }}>
         {opLog.map((op, i) => (
           <div key={`${op}-${i}`}>· {op}</div>

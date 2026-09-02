@@ -132,3 +132,17 @@ select {
 .pager .pnum-btn:hover:not([disabled]) { border-color: var(--txt); color: var(--txt) }
 .pager .pnum-btn.on { background: var(--acc); border-color: var(--acc); color: #000; font-weight: 700 }
 .pager .pnum-btn[disabled] { opacity: .35; cursor: default }
+
+/* ---------- 落地页（登录墙之外的产品入口） ---------- */
+.landing-hero-bg { background: radial-gradient(ellipse 90% 70% at 50% -10%, rgba(0, 255, 44, .08), transparent 60%), var(--bg) }
+.landing-grid {
+  background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, .6), transparent 72%);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, .6), transparent 72%);
+}
+details.faq > summary { list-style: none; cursor: pointer }
+details.faq > summary::-webkit-details-marker { display: none }
+details.faq[open] { border-color: var(--line2) }
+.faq-plus { transition: transform .2s ease }
+details.faq[open] .faq-plus { transform: rotate(45deg) }

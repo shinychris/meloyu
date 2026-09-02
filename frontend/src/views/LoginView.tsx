@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { login, register } from '../api/auth'
 import { useSessionStore } from '../stores/session'
+import { useT } from '../i18n'
+import LangSwitch from '../components/common/LangSwitch'
 import type { AuthData } from '../types/api'
 
 type Tab = 'login' | 'register'
@@ -12,6 +14,7 @@ function isEmail(v: string): boolean {
 
 /** 登录/注册页（原型未含，按同一设计令牌扩展的暗色极简页） */
 export default function LoginView() {
+  const t = useT()
   const [tab, setTab] = useState<Tab>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -25,12 +28,12 @@ export default function LoginView() {
   const from = (location.state as { from?: string } | null)?.from ?? '/studio'
 
   const validate = (): string | null => {
-    if (!isEmail(email)) return '请输入有效的邮箱地址'
-    if (!password) return '请输入密码'
+    if (!isEmail(email)) return t('login.error.emailInvalid')
+    if (!password) return t('login.error.passwordRequired')
     if (tab === 'register') {
-      if (password.length < 8 || password.length > 64) return '密码需为 8~64 位，且包含字母和数字'
-      if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) return '密码需同时包含字母和数字'
-      if (nickname.trim().length < 1 || nickname.trim().length > 24) return '昵称需为 1~24 字'
+      if (password.length < 8 || password.length > 64) return t('login.error.passwordLength')
+      if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) return t('login.error.passwordCharset')
+      if (nickname.trim().length < 1 || nickname.trim().length > 24) return t('login.error.nicknameLength')
     }
     return null
   }
@@ -55,7 +58,7 @@ export default function LoginView() {
       navigate(from, { replace: true })
     } catch {
       /* 拦截器已 toast（40103 邮箱或密码错误 / 40901 已注册等） */
-      setError('登录/注册失败，请检查输入')
+      setError(t('login.error.failed'))
     } finally {
       setLoading(false)
     }
@@ -70,6 +73,10 @@ export default function LoginView() {
 
   return (
     <div className="login-bg h-screen flex items-center justify-center overflow-hidden">
+      {/* 未登录也可切换语言：右上角固定入口 */}
+      <div className="absolute top-4 right-4 z-10">
+        <LangSwitch />
+      </div>
       <div className="w-[380px] pop">
         <div className="flex items-center gap-2 justify-center mb-8">
           <svg width="26" height="26" viewBox="0 0 22 22" fill="none">
@@ -80,7 +87,7 @@ export default function LoginView() {
           <div>
             <div className="text-[17px] font-extrabold tracking-tight leading-none">MELOYU</div>
             <div className="text-[10px] mt-1" style={{ color: 'var(--dim)' }}>
-              旋律屿 · 专业 AI 音乐制作
+              {t('login.tagline')}
             </div>
           </div>
         </div>
@@ -88,10 +95,10 @@ export default function LoginView() {
         <div className="card p-7">
           <div className="flex gap-1.5 mb-5">
             <span className={`chip ${tab === 'login' ? 'on' : ''}`} onClick={() => setTab('login')}>
-              登录
+              {t('login.tab.login')}
             </span>
             <span className={`chip ${tab === 'register' ? 'on' : ''}`} onClick={() => setTab('register')}>
-              注册
+              {t('login.tab.register')}
             </span>
           </div>
 
@@ -99,20 +106,20 @@ export default function LoginView() {
             {tab === 'register' && (
               <div>
                 <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>
-                  昵称
+                  {t('login.nickname.label')}
                 </div>
                 <input
                   type="text"
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value)}
-                  placeholder="作品署名用，如：岛民"
+                  placeholder={t('login.nickname.placeholder')}
                   maxLength={24}
                 />
               </div>
             )}
             <div>
               <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>
-                邮箱
+                {t('login.email.label')}
               </div>
               <input
                 type="email"
@@ -124,13 +131,13 @@ export default function LoginView() {
             </div>
             <div>
               <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>
-                密码
+                {t('login.password.label')}
               </div>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={tab === 'register' ? '8~64 位，含字母和数字' : '密码'}
+                placeholder={tab === 'register' ? t('login.password.placeholderRegister') : t('login.password.placeholder')}
                 autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
               />
             </div>
@@ -142,16 +149,26 @@ export default function LoginView() {
             )}
 
             <button type="submit" className="btn btn-acc w-full !py-3 text-[13px] font-bold" disabled={loading}>
-              {loading ? '请稍候…' : tab === 'login' ? '登录工作台' : '注册并赠送 200 积分'}
+              {loading ? t('login.submitting') : tab === 'login' ? t('login.submit.login') : t('login.submit.register')}
             </button>
           </form>
 
           <div className="mt-5 pt-4 rule-t text-[11px] leading-relaxed" style={{ color: 'var(--dim)' }}>
-            演示账号：<span className="num" style={{ color: 'var(--muted)' }}>demo@meloyu.local / Meloyu2026</span>
+            {t('login.demo.account')}
+            <span className="num" style={{ color: 'var(--muted)' }}>
+              demo@meloyu.local / Meloyu2026
+            </span>
             <button className="text-[11px] font-bold ml-2" style={{ color: 'var(--acc)' }} type="button" onClick={fillDemo}>
-              一键填入
+              {t('login.demo.fill')}
             </button>
-            <div className="mt-1">本地演示引擎 · 生成内容自动登记创作留痕</div>
+            <div className="mt-1">{t('login.demo.note')}</div>
+            <button
+              className="mt-3 flex items-center gap-1 transition-colors hover:text-white"
+              type="button"
+              onClick={() => navigate('/landing')}
+            >
+              {t('login.backToLanding')}
+            </button>
           </div>
         </div>
       </div>

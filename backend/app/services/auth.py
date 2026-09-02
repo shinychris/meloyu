@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.config import SIGNUP_BONUS_CREDITS
 from app.core.errors import err_bad_credentials, err_conflict
+from app.core.i18n import tr
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models import Subscription, User
 from app.models.base import utc_now_iso
@@ -15,7 +16,7 @@ from app.services.serializers import user_to_dict
 def register(db: Session, email: str, password: str, nickname: str) -> dict:
     existing = db.query(User).filter(User.email == email).first()
     if existing:
-        raise err_conflict("该邮箱已注册")
+        raise err_conflict(tr("该邮箱已注册", "This email is already registered"))
     now = utc_now_iso()
     user = User(email=email, password_hash=hash_password(password), nickname=nickname,
                 plan="free", created_at=now, updated_at=now)

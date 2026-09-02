@@ -18,6 +18,7 @@ import { getVersionTree } from '../api/works'
 import { useSessionStore } from './session'
 import { toast } from './toast'
 import { composeStylePrompt } from '../lib/structure'
+import { t, getLocale } from '../i18n'
 
 export interface StudioForm {
   mode: Mode
@@ -43,11 +44,21 @@ export interface InspireSelection {
   inst: string
 }
 
+/** 新会话默认风格描述（示例输入内容，按当前 locale 取文案；文件顶部已 import t，无初始化时序问题） */
+function initialStylePrompt(): string {
+  return t('studio.default.stylePrompt')
+}
+
+/** 新会话默认示例歌词（结构标签 [Verse]/[Chorus] 保留英文） */
+function initialLyrics(): string {
+  return t('studio.default.lyrics')
+}
+
 const DEFAULT_FORM: StudioForm = {
   mode: 'custom',
   simplePrompt: '',
-  stylePrompt: '华语流行抒情，钢琴主导，弦乐铺底，雨夜氛围，女声气声，副歌情绪推起',
-  lyrics: '[Verse]\n雨停在凌晨三点的窗台\n霓虹把影子拉得好白\n[Chorus]\n我们把未来说得太轻\n像风穿过无人的街心',
+  stylePrompt: initialStylePrompt(),
+  lyrics: initialLyrics(),
   negativePrompt: '',
   model: 'v1_pro',
   bpm: 90,
@@ -112,8 +123,8 @@ async function pollTick(getState: () => StudioState, taskId: string) {
       useStudioStore.getState().stopPolling()
       const msg =
         task.status === 'failed'
-          ? task.error?.message ?? '生成失败'
-          : '已取消生成，积分已退还'
+          ? task.error?.message ?? t('studio.fail.default')
+          : t('studio.fail.canceled')
       useStudioStore.setState({
         submitting: false,
         failureMessage: task.status === 'failed' ? msg : null,
@@ -126,8 +137,8 @@ async function pollTick(getState: () => StudioState, taskId: string) {
     pollErrors++
     if (pollErrors >= 5) {
       useStudioStore.getState().stopPolling()
-      useStudioStore.setState({ submitting: false, failureMessage: '任务状态查询中断，请稍后重试' })
-      toast('任务状态查询中断，请稍后重试', 'bad')
+      useStudioStore.setState({ submitting: false, failureMessage: t('studio.fail.pollLost') })
+      toast(t('studio.fail.pollLost'), 'bad')
     } else {
       schedulePoll(getState, taskId, 1500)
     }
@@ -143,11 +154,11 @@ async function onGenerationSucceeded(task: Task) {
         candidates: result.items,
         inferredStructure: result.inferred_structure,
       })
-      if (result.inferred_structure) toast('歌词无结构标签，已自动补全结构')
+      if (result.inferred_structure) toast(t('studio.toast.structureInferred'))
       // 候选数以接口为准（生成固定 2 个；延长/变体/段落重生成等派生操作可能不同）
       const n = result.items.length
-      s.logOp(n > 0 ? `生成 ${n} 个候选（任务已完成）` : '生成完成（任务已完成）')
-      toast(n > 0 ? `已生成 ${n} 个候选` : '生成完成')
+      s.logOp(n > 0 ? t('studio.log.generated', { n }) : t('studio.log.generatedEmpty'))
+      toast(n > 0 ? t('studio.toast.generated', { n }) : t('studio.toast.generatedEmpty'))
     } catch {
       /* 拦截器已 toast */
     }
@@ -169,7 +180,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   inferredStructure: false,
   submitting: false,
   failureMessage: null,
-  opLog: ['载入模板「华语流行抒情」'],
+  opLog: [t('studio.log.templateLoaded')],
 
   patchForm(patch) {
     set({ form: { ...get().form, ...patch } })
@@ -184,7 +195,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     const prompt = composeStylePrompt(inspire)
     if (prompt) {
       get().patchForm({ stylePrompt: prompt })
-      get().logOp(`灵感指引：${prompt.split('，').join(' / ')}`)
+      // composeStylePrompt 按 locale 用「，」/「, 」连接，日志统一转为「 / 」分隔
+      const detail = prompt.split(getLocale() === 'en' ? ', ' : '，').join(' / ')
+      get().logOp(t('studio.log.inspire', { detail }))
     }
   },
 
@@ -201,11 +214,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     if (s.submitting) return
     const { form } = s
     if (form.mode === 'simple' && !form.simplePrompt.trim()) {
-      toast('先用一句话描述你想写的歌', 'warn')
+      toast(t('studio.warn.simpleEmpty'), 'warn')
       return
     }
     if (form.mode === 'custom' && !form.stylePrompt.trim()) {
-      toast('风格描述不能为空', 'warn')
+      toast(t('studio.warn.styleEmpty'), 'warn')
       return
     }
     const req: GenerationSubmitRequest = {
@@ -237,7 +250,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       // 积分在提交时即被扣减：立刻同步侧栏余额，不等任务终态（真实业务测试发现 #5）
       void useSessionStore.getState().refreshCredits()
       get().logOp(
-        `提交生成（${result.cost_credits} 积分）${opts?.simplified ? ' · 精简重试' : ''}`,
+        opts?.simplified
+          ? t('studio.log.submitSimplified', { n: result.cost_credits })
+          : t('studio.log.submit', { n: result.cost_credits }),
       )
       get().startPolling(result.task.id)
     } catch {
@@ -251,7 +266,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     try {
       const updated = await cancelTask(task.id)
       set({ task: updated })
-      toast('已请求取消，正在停止…')
+      toast(t('studio.toast.cancelRequested'))
     } catch {
       /* 拦截器已 toast */
     }
@@ -271,7 +286,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       failureMessage: null,
       candidates: [],
     })
-    get().logOp(`${opLabel}（${result.cost_credits} 积分）→ ${result.work.display_code} 新子版本生成中`)
+    get().logOp(
+      t('studio.log.deriveStart', {
+        op: opLabel,
+        n: result.cost_credits,
+        code: result.work.display_code,
+      }),
+    )
     get().startPolling(result.task.id)
   },
 

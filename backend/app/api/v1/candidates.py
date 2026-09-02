@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core import audio_files as af
 from app.core.errors import err_not_found, err_validation
+from app.core.i18n import tr
 from app.core.responses import ok
 from app.core.security import get_current_user, get_current_user_optional
 from app.database import get_db
@@ -38,13 +39,13 @@ def candidate_audio(candidate_id: str, request: Request,
                     user: User | None = Depends(get_current_user_optional),
                     db: Session = Depends(get_db)):
     if quality not in ("preview", "master"):
-        raise err_validation("quality 必须为 preview/master")
+        raise err_validation(tr("quality 必须为 preview/master", "quality must be preview/master"))
     u = af.user_from_request_or_token(db, request, user)
     cand = gen_svc.get_candidate_owned(db, candidate_id, u)
     f = db.execute(select(File).where(
         File.candidate_id == cand.id, File.kind == quality)).scalars().first()
     if not f:
-        raise err_not_found("候选音频不存在")
+        raise err_not_found(tr("候选音频不存在", "Candidate audio not found"))
     af.check_owner(db, f, u)
     return af.file_stream_response(request, f)
 

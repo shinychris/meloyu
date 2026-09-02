@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.config import API_PREFIX
 from app.core.errors import err_conflict
+from app.core.i18n import current_locale, tr
 from app.models import Candidate, Certificate, EditEvent, File, Task, User, Version, Work
 from app.models.base import utc_now_iso
 from app.repositories import counters
@@ -18,6 +19,8 @@ from app.services import works as works_svc
 
 DISCLOSURE = ("本作品由 AI 辅助生成（{provider_display} {model}），"
               "人类创作参与记录见 human_participation。")
+DISCLOSURE_EN = ("This work was created with AI assistance ({provider_display} {model}); "
+                 "see human_participation for the record of human creative input.")
 
 CERT_FORMATS = ("json", "pdf")
 
@@ -30,18 +33,21 @@ def _version_provider(db: Session, version: Version) -> tuple[str, str]:
     ).scalars().first()
     from app.providers.music_api import APIMusicProvider
     from app.providers.music_local import LocalSynthProvider
-    display = {LocalSynthProvider.name: LocalSynthProvider.display_name,
-               APIMusicProvider.name: APIMusicProvider.base_display}
+    zh_map = {LocalSynthProvider.name: "Meloyu 本地引擎",
+              APIMusicProvider.name: APIMusicProvider.base_display}
+    en_map = {LocalSynthProvider.name: "Meloyu local engine",
+              APIMusicProvider.name: "External song API (Suno-compatible)"}
     provider = (task.provider if task and task.provider else LocalSynthProvider.name)
-    return provider, display.get(provider, provider)
+    display_map = en_map if current_locale() != "zh" else zh_map
+    return provider, display_map.get(provider, provider)
 
 _ACTION_LABELS = [
-    ("update", "歌词人工撰写/编辑"),
-    ("adopt", "采用候选"),
-    ("export", "导出"),
-    ("certificate", "证书下载"),
-    ("trash", "移入回收站"),
-    ("restore", "恢复作品"),
+    ("update", ("歌词人工撰写/编辑", "lyrics written/edited by human")),
+    ("adopt", ("采用候选", "candidate adopted")),
+    ("export", ("导出", "export")),
+    ("certificate", ("证书下载", "certificate downloaded")),
+    ("trash", ("移入回收站", "moved to trash")),
+    ("restore", ("恢复作品", "work restored")),
 ]
 
 
@@ -49,9 +55,10 @@ def issue_certificate(db: Session, user: User, version: Version, fmt: str = "jso
                       ) -> tuple[dict, str, bytes, str]:
     """签发证书：返回 (cert_dict, 下载文件名, 文件字节, mime)。每次下载 = 一次签发。"""
     if fmt not in CERT_FORMATS:
-        raise err_conflict(f"证书格式必须为 {CERT_FORMATS}")
+        raise err_conflict(
+            tr(f"证书格式必须为 {CERT_FORMATS}", f"Certificate format must be {CERT_FORMATS}"))
     if not version.active_candidate_id:
-        raise err_conflict("该版本尚未采用候选")
+        raise err_conflict(tr("该版本尚未采用候选", "No candidate adopted for this version yet"))
     work = db.get(Work, version.work_id)
     cand = db.get(Candidate, version.active_candidate_id)
     master = db.execute(select(File).where(File.candidate_id == cand.id,
@@ -89,8 +96,10 @@ def issue_certificate(db: Session, user: User, version: Version, fmt: str = "jso
             "master_wav_sha256": master.sha256 if master else "",
             "preview_mp3_sha256": preview.sha256 if preview else "",
         },
-        "disclosure": DISCLOSURE.format(
+        "disclosure": tr(DISCLOSURE.format(
             provider_display=provider_display, model=version.params.get("model", "v1_pro")),
+            DISCLOSURE_EN.format(
+                provider_display=provider_display, model=version.params.get("model", "v1_pro"))),
         "issued_at": now,
     }
 
@@ -152,8 +161,10 @@ _CJK_FONTS = [
     "/System/Library/Fonts/PingFang.ttc",
 ]
 
-_LICENSE_LABELS = {"commercial": "商用授权（Commercial License）",
-                   "non_commercial": "非商用授权（Non-Commercial License）"}
+_LICENSE_LABELS_ZH = {"commercial": "商用授权（Commercial License）",
+                     "non_commercial": "非商用授权（Non-Commercial License）"}
+_LICENSE_LABELS_EN = {"commercial": "Commercial License",
+                     "non_commercial": "Non-Commercial License"}
 
 
 def _find_cjk_font() -> Path | None:
@@ -181,7 +192,7 @@ def render_certificate_pdf(cert: dict) -> bytes:
             family = "cjk"
         except RuntimeError:  # 字体损坏等运行时异常 → 英文降级
             family = "helvetica"
-    zh_ok = family != "helvetica"
+    zh_ok = family != "helvetica" and current_locale() == "zh"
 
     def t(zh: str, en: str) -> str:
         return zh if zh_ok else en
@@ -205,7 +216,8 @@ def render_certificate_pdf(cert: dict) -> bytes:
         (t("种子", "Seed"), str(cert["model"]["seed"])),
         (t("生成时间", "Generated At"), str(cert.get("generated_at", ""))),
         (t("授权类型", "License"),
-         _LICENSE_LABELS.get(cert["license"]["type"], str(cert["license"]["type"]))),
+         tr(_LICENSE_LABELS_ZH.get(cert["license"]["type"], str(cert["license"]["type"])),
+            _LICENSE_LABELS_EN.get(cert["license"]["type"], str(cert["license"]["type"])))),
         (t("签发时间", "Issued At"), str(cert.get("issued_at", ""))),
     ]
     for label, value in rows:
@@ -251,8 +263,8 @@ def _human_summary(db: Session, work_id: str) -> list[str]:
                       .group_by(EditEvent.action, EditEvent.actor)).all()
     counts = {(a, actor): n for a, actor, n in rows}
     summary = []
-    for action, label in _ACTION_LABELS:
+    for action, pair in _ACTION_LABELS:
         n = counts.get((action, "human"), 0)
         if n:
-            summary.append(f"{label} {n} 次")
+            summary.append(tr(f"{pair[0]} {n} 次", f"{pair[1]} x{n}"))
     return summary

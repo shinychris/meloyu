@@ -17,14 +17,15 @@ from pathlib import Path
 import numpy as np
 
 from app.config import GENERATION_TASK_TIMEOUT_SEC
+from app.core.i18n import tr
 from app.core.seed import candidate_seed
 from app.providers.base import (
-    STAGE_LABELS,
     CancelCheck,
     CandidateArtifact,
     GenerationOutput,
     ProgressCallback,
     SynthCancelled,
+    stage_label,
 )
 from app.synth import editing as editing_mod
 from app.synth import harmony as harmony_mod
@@ -51,8 +52,7 @@ def _sha256_file(path: Path) -> str:
 def _stage(progress: ProgressCallback, should_cancel: CancelCheck, key: str, pct: int):
     if should_cancel():
         raise SynthCancelled()
-    label = STAGE_LABELS[key][0]
-    progress(key, pct, label)
+    progress(key, pct, stage_label(key))
 
 
 def _style_tags(style_prompt: str, family: str) -> list[str]:
@@ -116,7 +116,9 @@ def _write_candidate_files(dest: Path, label: str, master_l: np.ndarray,
 
 class LocalSynthProvider:
     name = "localsynth"
-    display_name = "Meloyu 本地引擎"
+    @property
+    def display_name(self) -> str:
+        return tr("Meloyu 本地引擎", "Meloyu local engine")
     supports_vocals = True
     timeout_sec = GENERATION_TASK_TIMEOUT_SEC
 
@@ -218,7 +220,7 @@ class LocalSynthProvider:
             art, inferred = self._derive_regen(request, spec, base_req, base_dir, dest,
                                                progress, should_cancel)
         else:
-            raise ValueError(f"未知派生操作：{op}")
+            raise ValueError(tr(f"未知派生操作：{op}", f"Unknown derived operation: {op}"))
         return GenerationOutput([art], list(art.applied_negative_ext), inferred)
 
     def _derive_extend(self, request: SongRequest, spec: dict, base_req: SongRequest,
@@ -228,7 +230,8 @@ class LocalSynthProvider:
         _stage(progress, should_cancel, "structure", 10)
         base_ir = editing_mod.rebuild_ir(base_req, base_req.seed)
         if not editing_mod.structure_matches(base_ir, spec.get("base_structure") or []):
-            raise ValueError("源候选结构重建与存库不一致，无法续写")
+            raise ValueError(tr("源候选结构重建与存库不一致，无法续写",
+                       "Rebuilt source structure does not match stored data; cannot extend"))
 
         _stage(progress, should_cancel, "harmony", 25)
         rng = editing_mod.make_rng(request.seed)
@@ -319,12 +322,14 @@ class LocalSynthProvider:
         base_ir = editing_mod.rebuild_ir(base_req, base_req.seed)
         structure = spec.get("base_structure") or []
         if not editing_mod.structure_matches(base_ir, structure):
-            raise ValueError("源候选结构重建与存库不一致，无法重生成段落")
+            raise ValueError(tr("源候选结构重建与存库不一致，无法重生成段落",
+                       "Rebuilt source structure does not match stored data; cannot regenerate section"))
         occurrence = int(spec.get("occurrence", 1))
         target_index = editing_mod.section_occurrence_index(structure, spec["section"],
                                                             occurrence)
         if target_index is None:
-            raise ValueError(f"occurrence 越界：段落 {spec['section']}")
+            raise ValueError(tr(f"occurrence 越界：段落 {spec['section']}",
+                       f"occurrence out of range: section {spec['section']}"))
 
         _stage(progress, should_cancel, "harmony", 25)
         rng = editing_mod.make_rng(request.seed)
@@ -342,7 +347,8 @@ class LocalSynthProvider:
         orig_stems = {s: read_wav(cand_dir / "stems" / f"{s}.wav")[0] for s in STEM_NAMES}
         n = len(orig_master[0])
         if len(result.master_l) != n:
-            raise ValueError(f"重渲染长度不一致：{len(result.master_l)} vs {n}")
+            raise ValueError(tr(f"重渲染长度不一致：{len(result.master_l)} vs {n}",
+                       f"Re-render length mismatch: {len(result.master_l)} vs {n}"))
         new_l = editing_mod.splice_regen(result.master_l, orig_master[0], structure,
                                          target_index)
         new_r = editing_mod.splice_regen(result.master_r, orig_master[1], structure,

@@ -5,6 +5,7 @@ import re
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.core.i18n import tr
 from app.models.enums import (
     KEY_MODES,
     LANGUAGES,
@@ -28,14 +29,15 @@ class RegisterRequest(BaseModel):
     @classmethod
     def _email(cls, v: str) -> str:
         if not EMAIL_RE.match(v):
-            raise ValueError("email 格式不正确")
+            raise ValueError(tr("email 格式不正确", "invalid email format"))
         return v.lower()
 
     @field_validator("password")
     @classmethod
     def _pwd(cls, v: str) -> str:
         if not re.search(r"[A-Za-z]", v) or not re.search(r"\d", v):
-            raise ValueError("密码须同时包含字母和数字")
+            raise ValueError(tr("密码须同时包含字母和数字",
+                             "password must contain both letters and numbers"))
         return v
 
 
@@ -47,7 +49,7 @@ class LoginRequest(BaseModel):
     @classmethod
     def _email(cls, v: str) -> str:
         if not EMAIL_RE.match(v):
-            raise ValueError("email 格式不正确")
+            raise ValueError(tr("email 格式不正确", "Invalid email address"))
         return v.lower()
 
 
@@ -60,14 +62,14 @@ class KeySchema(BaseModel):
     def _tonic(cls, v: str) -> str:
         v = v.upper()
         if v not in TONICS:
-            raise ValueError(f"tonic 必须为 {TONICS} 之一")
+            raise ValueError(tr(f"tonic 必须为 {TONICS} 之一", f"tonic must be one of {TONICS}"))
         return v
 
     @field_validator("mode")
     @classmethod
     def _mode(cls, v: str) -> str:
         if v not in KEY_MODES:
-            raise ValueError("mode 必须为 major/minor")
+            raise ValueError(tr("mode 必须为 major/minor", "mode must be major/minor"))
         return v
 
 
@@ -84,21 +86,22 @@ class GenerationParams(BaseModel):
     @classmethod
     def _ts(cls, v: str) -> str:
         if v not in TIME_SIGNATURES:
-            raise ValueError("time_signature 必须为 4/4、3/4、6/8")
+            raise ValueError(tr("time_signature 必须为 4/4、3/4、6/8",
+                            "time_signature must be 4/4, 3/4 or 6/8"))
         return v
 
     @field_validator("vocal")
     @classmethod
     def _vocal(cls, v: str) -> str:
         if v not in VOCALS:
-            raise ValueError(f"vocal 必须为 {VOCALS} 之一")
+            raise ValueError(tr(f"vocal 必须为 {VOCALS} 之一", f"vocal must be one of {VOCALS}"))
         return v
 
     @field_validator("language")
     @classmethod
     def _lang(cls, v: str) -> str:
         if v not in LANGUAGES:
-            raise ValueError("language 必须为 zh/yue/en/ja")
+            raise ValueError(tr("language 必须为 zh/yue/en/ja", "language must be zh/yue/en/ja"))
         return v
 
 
@@ -106,7 +109,7 @@ def _check_uuid(v: str | None) -> str | None:
     if v is None:
         return None
     if not re.fullmatch(r"[0-9a-fA-F]{32}", v):
-        raise ValueError("id 必须为 32 位 UUID hex")
+        raise ValueError(tr("id 必须为 32 位 UUID hex", "id must be 32-char UUID hex"))
     return v.lower()
 
 
@@ -127,14 +130,14 @@ class GenerationRequest(BaseModel):
     @classmethod
     def _mode(cls, v: str) -> str:
         if v not in MODES:
-            raise ValueError("mode 必须为 simple/custom")
+            raise ValueError(tr("mode 必须为 simple/custom", "mode must be simple/custom"))
         return v
 
     @field_validator("model")
     @classmethod
     def _model(cls, v: str) -> str:
         if v not in MODELS:
-            raise ValueError("model 必须为 v1_pro/v1_fast")
+            raise ValueError(tr("model 必须为 v1_pro/v1_fast", "model must be v1_pro/v1_fast"))
         return v
 
     @field_validator("work_id", "parent_version_id")
@@ -145,9 +148,11 @@ class GenerationRequest(BaseModel):
     @model_validator(mode="after")
     def _mode_required(self):
         if self.mode == "simple" and not (self.simple_prompt or "").strip():
-            raise ValueError("mode=simple 时 simple_prompt 必填")
+            raise ValueError(tr("mode=simple 时 simple_prompt 必填",
+                            "simple_prompt is required when mode=simple"))
         if self.mode == "custom" and not (self.style_prompt or "").strip():
-            raise ValueError("mode=custom 时 style_prompt 必填")
+            raise ValueError(tr("mode=custom 时 style_prompt 必填",
+                            "style_prompt is required when mode=custom"))
         return self
 
     def payload(self) -> dict:
@@ -169,7 +174,8 @@ class ExportRequest(BaseModel):
     @classmethod
     def _fmt(cls, v: str) -> str:
         if v not in ("mp3", "wav", "midi", "stems"):
-            raise ValueError("format 必须为 mp3/wav/midi/stems")
+            raise ValueError(tr("format 必须为 mp3/wav/midi/stems",
+                            "format must be mp3/wav/midi/stems"))
         return v
 
     @field_validator("version_id")
@@ -197,7 +203,8 @@ class RegenSectionRequest(BaseModel):
     @classmethod
     def _sec(cls, v: str) -> str:
         if v not in SECTIONS:
-            raise ValueError(f"section 必须为 {SECTIONS} 之一")
+            raise ValueError(tr(f"section 必须为 {SECTIONS} 之一",
+                            f"section must be one of {SECTIONS}"))
         return v
 
 
@@ -213,7 +220,8 @@ class SwitchPlanRequest(BaseModel):
     @classmethod
     def _plan(cls, v: str) -> str:
         if v not in ("free", "pro", "studio", "team"):
-            raise ValueError("plan 必须为 free/pro/studio/team")
+            raise ValueError(tr("plan 必须为 free/pro/studio/team",
+                            "plan must be free/pro/studio/team"))
         return v
 
 
@@ -228,16 +236,18 @@ class WorkPatchRequest(BaseModel):
         if v is None:
             return None
         if len(v) > 8:
-            raise ValueError("tags 最多 8 个")
+            raise ValueError(tr("tags 最多 8 个", "at most 8 tags"))
         for t in v:
             if not (1 <= len(t) <= 12):
-                raise ValueError("每个 tag 长度须为 1~12 字")
+                raise ValueError(tr("每个 tag 长度须为 1~12 字",
+                            "each tag must be 1-12 characters"))
         return v
 
     @model_validator(mode="after")
     def _at_least_one(self):
         if self.title is None and self.tags is None and self.favorite is None:
-            raise ValueError("至少传入一个待更新字段")
+            raise ValueError(tr("至少传入一个待更新字段",
+                            "provide at least one field to update"))
         return self
 
 
@@ -252,7 +262,7 @@ class LyricGenerateRequest(BaseModel):
     @classmethod
     def _lang(cls, v: str) -> str:
         if v not in ("zh", "en"):
-            raise ValueError("language 必须为 zh/en")
+            raise ValueError(tr("language 必须为 zh/en", "language must be zh/en"))
         return v
 
     @field_validator("sections")
@@ -261,10 +271,10 @@ class LyricGenerateRequest(BaseModel):
         if v is None:
             return None
         if len(v) > 12:
-            raise ValueError("sections 最多 12 段")
+            raise ValueError(tr("sections 最多 12 段", "at most 12 sections"))
         for s in v:
             if s not in SECTIONS:
-                raise ValueError(f"section 必须为 {SECTIONS} 之一")
+                raise ValueError(tr(f"section 必须为 {SECTIONS} 之一", f"section must be one of {SECTIONS}"))
         return v
 
 
@@ -278,7 +288,8 @@ class LyricPolishRequest(BaseModel):
     @classmethod
     def _sec(cls, v: str | None):
         if v is not None and v not in SECTIONS:
-            raise ValueError(f"target_section 必须为 {SECTIONS} 之一")
+            raise ValueError(tr(f"target_section 必须为 {SECTIONS} 之一",
+                            f"target_section must be one of {SECTIONS}"))
         return v
 
     @field_validator("locked_lines")
@@ -287,7 +298,8 @@ class LyricPolishRequest(BaseModel):
         if v is None:
             return None
         if any(n < 1 for n in v):
-            raise ValueError("locked_lines 为全局 1 起始行号")
+            raise ValueError(tr("locked_lines 为全局 1 起始行号",
+                            "locked_lines are 1-based global line numbers"))
         return v
 
 

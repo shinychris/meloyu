@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core import audio_files as af
 from app.core.errors import err_conflict, err_not_found, err_validation
+from app.core.i18n import tr
 from app.core.responses import ok
 from app.core.security import get_current_user, get_current_user_optional
 from app.database import get_db
@@ -45,12 +46,12 @@ def version_audio(version_id: str, request: Request,
     u = af.user_from_request_or_token(db, request, user)
     version = works_svc.get_version_owned(db, version_id, u)
     if not version.active_candidate_id:
-        raise err_conflict("该版本尚未采用候选")
+        raise err_conflict(tr("该版本尚未采用候选", "No candidate adopted for this version yet"))
     f = db.execute(select(File).where(
         File.candidate_id == version.active_candidate_id,
         File.kind == "master")).scalars().first()
     if not f:
-        raise err_not_found("版本音频不存在")
+        raise err_not_found(tr("版本音频不存在", "Version audio not found"))
     af.check_owner(db, f, u)
     return af.file_stream_response(request, f)
 
@@ -62,7 +63,9 @@ def version_certificate(version_id: str,
                         db: Session = Depends(get_db)):
     """授权证书下载（format=json 契约 §8.4；format=pdf 为 V1.1 扩展）。"""
     if format not in cert_svc.CERT_FORMATS:
-        raise err_validation(f"format 必须为 {'/'.join(cert_svc.CERT_FORMATS)}")
+        raise err_validation(
+            tr(f"format 必须为 {'/'.join(cert_svc.CERT_FORMATS)}",
+               f"format must be {'/'.join(cert_svc.CERT_FORMATS)}"))
     version = works_svc.get_version_owned(db, version_id, user)
     _, filename, payload, mime = cert_svc.issue_certificate(db, user, version, fmt=format)
     return Response(

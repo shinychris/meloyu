@@ -1,7 +1,9 @@
 import { useStudioStore } from '../../stores/studio'
+import { useT } from '../../i18n'
 
 /** 四步引导条（点亮逻辑复刻原型 markStep/refreshSteps） */
 export default function StepBar() {
+  const t = useT()
   const stepDone = useStudioStore((s) => s.stepDone)
   const submitting = useStudioStore((s) => s.submitting)
   const hasResult = useStudioStore((s) => s.candidates.length > 0)
@@ -11,10 +13,10 @@ export default function StepBar() {
   const active = submitting || hasResult ? 4 : reached
 
   const steps = [
-    { n: 1, label: '描述灵感' },
-    { n: 2, label: '歌词与结构' },
-    { n: 3, label: '参数与模型' },
-    { n: 4, label: '生成与精修' },
+    { n: 1, label: t('studio.step.1') },
+    { n: 2, label: t('studio.step.2') },
+    { n: 3, label: t('studio.step.3') },
+    { n: 4, label: t('studio.step.4') },
   ]
 
   return (

@@ -7,6 +7,7 @@ import { usePlayerStore } from '../stores/player'
 import { useSessionStore } from '../stores/session'
 import { useConfirmStore } from '../stores/confirm'
 import { toast } from '../stores/toast'
+import { useT } from '../i18n'
 import { formatDuration, keyLabel } from '../lib/format'
 import Pagination from '../components/common/Pagination'
 import SearchInput from '../components/common/SearchInput'
@@ -17,6 +18,7 @@ const PAGE_SIZE = 20
 
 /** 作品库：表格 + 筛选 chips + 搜索/排序 + 标签 + 收藏星标 + 回收站闭环 + 行内试听 */
 export default function LibraryView() {
+  const t = useT()
   const navigate = useNavigate()
   const [filter, setFilter] = useState<Filter>('all')
   const [items, setItems] = useState<Work[]>([])
@@ -112,7 +114,7 @@ export default function LibraryView() {
     e.stopPropagation()
     try {
       await restoreWork(w.id)
-      toast(`已恢复「${w.title}」`)
+      toast(t('library.toast.restored', { title: w.title }))
       void load()
     } catch {
       /* 40901 等已 toast */
@@ -122,15 +124,15 @@ export default function LibraryView() {
   const onPermanentDelete = async (e: React.MouseEvent, w: Work) => {
     e.stopPropagation()
     const ok = await confirm({
-      title: `永久删除「${w.title}」？`,
-      description: '将级联删除全部版本、候选与音频文件，不可恢复。此操作不可撤销。',
-      confirmText: '永久删除',
+      title: t('library.confirm.deleteTitle', { title: w.title }),
+      description: t('library.confirm.deleteDesc'),
+      confirmText: t('library.action.permanentDelete'),
       danger: true,
     })
     if (!ok) return
     try {
       await deleteWork(w.id, true)
-      toast('已永久删除')
+      toast(t('library.toast.deleted'))
       void load()
     } catch {
       /* 拦截器已 toast */
@@ -140,15 +142,15 @@ export default function LibraryView() {
   const onTrash = async (e: React.MouseEvent, w: Work) => {
     e.stopPropagation()
     const ok = await confirm({
-      title: `移入回收站「${w.title}」？`,
-      description: '作品将进入回收站并保留 30 天，期间可随时恢复；已生成的版本与音频不受影响。',
-      confirmText: '移入回收站',
+      title: t('library.confirm.trashTitle', { title: w.title }),
+      description: t('library.confirm.trashDesc'),
+      confirmText: t('library.action.trash'),
       danger: true,
     })
     if (!ok) return
     try {
       await deleteWork(w.id, false)
-      toast(`已将「${w.title}」移入回收站`)
+      toast(t('library.toast.trashed', { title: w.title }))
       void load()
     } catch {
       /* 拦截器已 toast */
@@ -158,7 +160,7 @@ export default function LibraryView() {
   const onPlay = (e: React.MouseEvent, w: Work) => {
     e.stopPropagation()
     if (!w.preview_file_id) {
-      toast('该作品暂无预览音频（尚未采用候选）', 'warn')
+      toast(t('library.toast.noPreview'), 'warn')
       return
     }
     void playTrack({
@@ -170,41 +172,41 @@ export default function LibraryView() {
   }
 
   const chipLabel: Record<Filter, string> = {
-    all: `全部 ${filter === 'all' ? total : ''}`.trim(),
-    draft: '草稿',
-    fav: '已收藏',
-    trash: '回收站',
+    all: t('library.filter.all', { n: filter === 'all' ? total : '' }).trim(),
+    draft: t('library.filter.draft'),
+    fav: t('library.filter.fav'),
+    trash: t('library.filter.trash'),
   }
 
   return (
     <section className="view flex flex-col h-full">
       <header className="flex items-end justify-between px-8 pt-6 pb-4 flex-wrap gap-3">
         <div>
-          <div className="label">Library / 作品库</div>
+          <div className="label">{t('library.header.label')}</div>
           <h1 className="text-[28px] font-extrabold tracking-tight mt-1">
-            {filter === 'trash' ? '回收站' : '全部作品'}
+            {filter === 'trash' ? t('library.title.trash') : t('library.title.all')}
           </h1>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <SearchInput onQueryChange={onQueryChange} placeholder="搜索标题 / 歌词…" />
+          <SearchInput onQueryChange={onQueryChange} placeholder={t('library.search.placeholder')} />
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as 'updated_at' | 'created_at' | 'title')}
             className="!text-[12px]"
-            title="排序字段"
+            title={t('library.sort.title')}
           >
-            <option value="updated_at">最近更新</option>
-            <option value="created_at">创建时间</option>
-            <option value="title">标题</option>
+            <option value="updated_at">{t('library.sort.updated')}</option>
+            <option value="created_at">{t('library.sort.created')}</option>
+            <option value="title">{t('library.col.title')}</option>
           </select>
           <select
             value={order}
             onChange={(e) => setOrder(e.target.value as 'desc' | 'asc')}
             className="!text-[12px]"
-            title="排序方向"
+            title={t('library.order.title')}
           >
-            <option value="desc">降序</option>
-            <option value="asc">升序</option>
+            <option value="desc">{t('library.order.desc')}</option>
+            <option value="asc">{t('library.order.asc')}</option>
           </select>
           {(['all', 'draft', 'fav', 'trash'] as Filter[]).map((f) => (
             <span key={f} className={`chip ${filter === f ? 'on' : ''}`} onClick={() => setFilter(f)}>
@@ -216,31 +218,31 @@ export default function LibraryView() {
       <div className="rule-t flex-1 overflow-y-auto">
         {filter !== 'trash' && (
           <div className="row !cursor-default" style={{ color: 'var(--dim)' }}>
-            <span className="label">编号</span>
-            <span className="label">封面</span>
-            <span className="label">标题</span>
-            <span className="label">调性</span>
-            <span className="label">BPM</span>
-            <span className="label">导出</span>
-            <span className="label">授权</span>
+            <span className="label">{t('library.col.no')}</span>
+            <span className="label">{t('library.col.cover')}</span>
+            <span className="label">{t('library.col.title')}</span>
+            <span className="label">{t('library.col.key')}</span>
+            <span className="label">{t('library.col.bpm')}</span>
+            <span className="label">{t('library.col.export')}</span>
+            <span className="label">{t('library.col.license')}</span>
             <span></span>
           </div>
         )}
         {loading && items.length === 0 ? (
           <div className="py-16 text-center text-[12px]" style={{ color: 'var(--dim)' }}>
-            加载中…
+            {t('common.loading')}
           </div>
         ) : shown.length === 0 ? (
           <div className="py-16 text-center">
             <div className="text-[13px] font-semibold" style={{ color: 'var(--muted)' }}>
-              {filter === 'trash' ? '回收站是空的' : '还没有作品'}
+              {filter === 'trash' ? t('library.empty.trashTitle') : t('library.empty.title')}
             </div>
             <div className="text-[11px] mt-2" style={{ color: 'var(--dim)' }}>
-              {filter === 'trash' ? '删除的作品会在这里保留 30 天' : '去创作工作台生成你的第一首歌'}
+              {filter === 'trash' ? t('library.empty.trashHint') : t('library.empty.hint')}
             </div>
             {filter !== 'trash' && (
               <button className="btn btn-ghost text-[11px] mt-4" onClick={() => navigate('/studio')}>
-                进入工作台 →
+                {t('library.empty.cta')}
               </button>
             )}
           </div>
@@ -254,18 +256,18 @@ export default function LibraryView() {
               <span className="text-[12px] num" style={{ color: 'var(--muted)' }}>{w.bpm}</span>
               <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{formatDuration(w.duration_sec)}</span>
               <span className="text-[11px]" style={{ color: 'var(--dim)' }}>
-                {w.trashed_at ? '回收站' : ''}
+                {w.trashed_at ? t('library.trashBadge') : ''}
               </span>
               <div className="flex gap-1.5 justify-end">
                 <button className="btn btn-ghost !py-1 !px-2.5 text-[11px]" onClick={(e) => void onRestore(e, w)}>
-                  恢复
+                  {t('library.action.restore')}
                 </button>
                 <button
                   className="btn btn-ghost !py-1 !px-2.5 text-[11px]"
                   style={{ borderColor: 'var(--bad)', color: 'var(--bad)' }}
                   onClick={(e) => void onPermanentDelete(e, w)}
                 >
-                  永久删除
+                  {t('library.action.permanentDelete')}
                 </button>
               </div>
             </div>
@@ -273,7 +275,8 @@ export default function LibraryView() {
         ) : (
           shown.map((w) => {
             const exports = exportsOf(w)
-            const badge = exports.length > 0 ? [...new Set(exports)].map((f) => f.toUpperCase()).join(' · ') : '未导出'
+            const badge =
+              exports.length > 0 ? [...new Set(exports)].map((f) => f.toUpperCase()).join(' · ') : t('library.export.none')
             return (
               <div className="row" key={w.id} onClick={() => navigate(`/works/${w.id}`)}>
                 <span className="text-[11px] num" style={{ color: 'var(--dim)' }}>{w.display_code}</span>
@@ -282,9 +285,9 @@ export default function LibraryView() {
                   <div className="text-[13px] font-semibold truncate">{w.title}</div>
                   {w.tags.length > 0 && (
                     <div className="flex gap-1 mt-1 flex-wrap">
-                      {w.tags.slice(0, 4).map((t) => (
-                        <span key={t} className="text-[10px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>
-                          {t}
+                      {w.tags.slice(0, 4).map((tg) => (
+                        <span key={tg} className="text-[10px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>
+                          {tg}
                         </span>
                       ))}
                       {w.tags.length > 4 && (
@@ -297,26 +300,26 @@ export default function LibraryView() {
                 <span className="text-[12px] num" style={{ color: 'var(--muted)' }}>{w.bpm}</span>
                 <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{badge}</span>
                 <span className="text-[11px]" style={{ color: commercial ? 'var(--acc)' : 'var(--muted)' }}>
-                  {commercial ? '商用授权' : '非商用'}
+                  {commercial ? t('library.license.commercial') : t('library.license.nonCommercial')}
                 </span>
                 <div className="flex gap-2 justify-end items-center">
                   <button
                     className={`star-btn ${w.favorite ? 'on' : ''}`}
-                    title={w.favorite ? '取消收藏' : '收藏'}
+                    title={w.favorite ? t('library.fav.remove') : t('library.fav.add')}
                     onClick={(e) => void toggleFav(e, w)}
                   >
                     <svg viewBox="0 0 16 16" fill={w.favorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.4">
                       <path d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.4l-3.8 2 .7-4.3-3.1-3 4.3-.6z" />
                     </svg>
                   </button>
-                  <button className="iconbtn" title="试听" onClick={(e) => onPlay(e, w)}>
+                  <button className="iconbtn" title={t('library.action.preview')} onClick={(e) => onPlay(e, w)}>
                     <svg viewBox="0 0 16 16" fill="currentColor">
                       <path d="M5 3l8 5-8 5z" />
                     </svg>
                   </button>
                   <button
                     className="iconbtn"
-                    title="移入回收站"
+                    title={t('library.action.trash')}
                     onClick={(e) => void onTrash(e, w)}
                   >
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
