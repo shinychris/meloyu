@@ -1,0 +1,8 @@
+# 宿主机构建产物与依赖在容器内重建
+node_modules/
+dist/
+# 杂项
+reports/
+coverage/
+.eslintcache/
+*.log

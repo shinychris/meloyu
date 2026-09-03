@@ -23,6 +23,8 @@ Thumbs.db
 .DS_Store
 # Env
 .env
+# Docker 生产部署密钥（deploy/.env.prod.example 为入库模板）
+deploy/.env.prod
 
 # 本地测试会话产物（模拟测试工具输出，含临时凭据，不入库）
 reports/sim-sessions/
