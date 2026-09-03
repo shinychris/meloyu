@@ -1331,6 +1331,21 @@ def main() -> int:
                                                "password": "DelMe12345"})
     check("16.6 注销后原账号无法登录", r.status_code == 401)
 
+    # 16.7 防侵权防护（MiniMax 义务②：在世艺术家名义/声音冒用 → 42202，服务端强制）
+    r = client.post(f"{API}/generations", headers=auth_headers(token), json={
+        "mode": "simple", "simple_prompt": "a song in the style of Taylor Swift",
+        "params": {"duration_sec": 30},
+    })
+    check("16.7 生成请求艺术家冒用 → 42202（义务②防护）",
+          r.status_code == 422 and unwrap(r)["code"] == 42202,
+          json.dumps(unwrap(r))[:120])
+    r = client.post(f"{API}/generations", headers=auth_headers(token), json={
+        "mode": "simple", "simple_prompt": "dreamy synthwave night drive",
+        "params": {"duration_sec": 30},
+    })
+    check("16.7 正常风格描述不被误拦（201）", r.status_code == 201,
+          json.dumps(unwrap(r))[:120])
+
     # ============ 汇总 ============
     passed = sum(1 for _, ok, _ in results if ok)
     total = len(results)

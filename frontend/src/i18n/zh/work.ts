@@ -24,6 +24,7 @@ export const workZh: Record<keyof typeof workEn, string> = {
   'work.candidate.name': '候选 {label}',
   'work.candidate.untitledWork': '作品',
   'work.candidate.external': '外部模型',
+  'work.candidate.engine': '生成引擎',
   'work.candidate.quality': 'AI 质量 {n}',
   'work.candidate.adopted': '已定稿',
   'work.candidate.adopt': '采用定稿',

@@ -51,6 +51,12 @@ def err_sensitive() -> BizError:
                               "Content contains sensitive words; please revise and retry"), 422)
 
 
+def err_ip_protection(msg: str | None = None) -> BizError:
+    """42202：防侵权拦截（在世艺术家名义/声音冒用等；服务端强制，无开关）。"""
+    return BizError(42202, msg or tr("请求触发防侵权防护，请修改后重试",
+                                     "Request blocked by IP protection; please revise and retry"), 422)
+
+
 def err_validation(msg: str, details: list | None = None) -> BizError:
     data = {"details": details} if details else None
     return BizError(40001, tr("参数校验失败：", "Validation failed: ") + msg, 422, data=data)

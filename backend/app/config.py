@@ -85,6 +85,9 @@ class Settings(BaseSettings):
     admin_emails: str = ""
     # ---- 监控 ----
     sentry_dsn: str = ""
+    # MiniMax-Music3 商用开放开关（义务①署名/②防侵权防护/③AUP 披露已落实，默认开放；
+    # 条款修订或营收接近 $20M 门槛时置 false 回退非商用签发）
+    mmax_commercial_enabled: bool = True
     # HuggingFace 端点覆盖（.env 配 HF_ENDPOINT=https://hf-mirror.com 走国内镜像）
     hf_endpoint: str = ""
     # ACE-Step 独立部署目录（默认 backend/data/acestep：代码+独立 venv+checkpoints，

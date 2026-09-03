@@ -110,6 +110,9 @@ def check_generation_content(payload: dict) -> None:
     ]))
     if check_sensitive(text):
         raise err_sensitive()
+    # 义务②（MiniMax 社区许可）：在世艺术家名义/声音冒用防护（服务端强制）
+    from app.services.ip_protection import check_ip_protection
+    check_ip_protection(text)
 
 
 def check_free_daily_limit(db: Session, user: User) -> None:
@@ -603,7 +606,18 @@ def list_candidates(db: Session, version_id: str, user: User) -> dict:
     rows = db.execute(select(Candidate).where(Candidate.version_id == version.id)
                       .order_by(Candidate.label.asc())).scalars().all()
     items = [candidate_to_dict(c) for c in rows]
-    return {"items": items, "inferred_structure": bool(version.inferred_structure)}
+    # 义务①（MiniMax 社区许可）：生成结果页（作品详情候选卡）展示生成引擎署名——
+    # 取该版本最近一次生成任务的 provider 留痕，随候选列表下发
+    from app.models import Task
+    from app.services.certificate import provider_attribution
+    gen_task = db.execute(
+        select(Task.provider).where(Task.version_id == version.id,
+                                    Task.type == "generation")
+        .order_by(Task.created_at.desc(), Task.id.desc()).limit(1)
+    ).first()
+    provider = (gen_task[0] if gen_task else None) or "localsynth"
+    return {"items": items, "inferred_structure": bool(version.inferred_structure),
+            "provider": provider, "provider_display": provider_attribution(provider)}
 
 
 def get_candidate_owned(db: Session, candidate_id: str, user: User) -> Candidate:

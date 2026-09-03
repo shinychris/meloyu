@@ -62,12 +62,13 @@ class TestLicenseForGeneration(unittest.TestCase):
         self.assertEqual(lic["grade"], "nc")
 
     def test_paid_conditional(self):
+        # v0.7.0 义务落实后：MiniMax conditional → commercial（basis 明示 $20M 门槛，
+        # 回退开关行为见 tests/test_mmax_obligations.py）
         lic = licensing.license_for_generation("studio", "mmax_local", "minimax-music-3")
-        self.assertEqual(lic["type"], "non_commercial")
+        self.assertEqual(lic["type"], "commercial")
         self.assertEqual(lic["grade"], "conditional")
-        # basis 必须向用户说明收入门槛路径
-        self.assertIn("核验", lic["basis_zh"])
-        self.assertIn("verify", lic["basis_en"].lower())
+        self.assertIn("2000", lic["basis_zh"])
+        self.assertIn("$20 million", lic["basis_en"])
 
 
 if __name__ == "__main__":

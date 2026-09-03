@@ -356,6 +356,9 @@ export interface GenerationSubmitResult {
 export interface CandidatesResult {
   items: Candidate[]
   inferred_structure: boolean
+  /** 生成引擎署名（义务①：MiniMax 产出在生成结果页显著展示；v0.7.1） */
+  provider: string
+  provider_display: string
 }
 
 /* ============ V1.1 候选派生操作（契约 §5.5~5.7，响应复用 POST /generations 的 task+work 形态） ============ */

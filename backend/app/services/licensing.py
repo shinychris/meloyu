@@ -79,6 +79,27 @@ def commercial_grade(provider: str, model_id: str | None = None) -> str:
     return PROVIDER_DEFAULT.get(provider, "unverified")
 
 
+# MiniMax 社区许可义务落实后的商用开放口径（义务清单见 docs/06-商业化/
+# 2026-09-02-通道许可核验.md「义务落实记录」）：义务①UI 署名/②防侵权防护+
+# 持续测试/③AUP 机器生成内容披露均已产品化，mmax_local 可对付费用户签商用证书；
+# 证书 basis 明示 $20M 年营收门槛（用户自行确认）与义务落实状态。
+# 运营回退开关（如 MiniMax 条款修订/营收接近门槛）：MMAX_COMMERCIAL_ENABLED=false。
+_BASIS_MMAX_COMMERCIAL = (
+    "MiniMax-Music3 社区许可允许商用（Meloyu 已落实署名/防侵权防护/内容披露三项义务），"
+    "但仅限年营收（含关联方）≤ 2000 万美元的使用者；超出须另行取得 MiniMax 书面授权——"
+    "请自行确认符合该门槛后再商用",
+    "The MiniMax-Music3 Community License permits commercial use (Meloyu has "
+    "implemented the attribution, IP-protection, and AI-disclosure obligations), "
+    "but only for users whose aggregate yearly revenue (including affiliates) does "
+    "not exceed US$20 million; above that, separate written authorization from "
+    "MiniMax is required - verify your eligibility before commercial use")
+
+
+def _mmax_commercial_enabled() -> bool:
+    from app.config import settings
+    return getattr(settings, "mmax_commercial_enabled", True)
+
+
 def license_for_generation(user_plan: str, provider: str,
                            model_id: str | None = None) -> dict:
     """签发证书时的授权判定：plan × 通道/模型许可 → 证书 license 段。"""
@@ -87,6 +108,12 @@ def license_for_generation(user_plan: str, provider: str,
         return {"type": "non_commercial", "grade": "free_plan",
                 "basis_zh": zh, "basis_en": en}
     grade = commercial_grade(provider, model_id)
+    # MiniMax 义务落实后的条件型商用：conditional + 义务已落实 + 开关开 → commercial
+    if (grade == "conditional" and model_id == "minimax-music-3"
+            and _mmax_commercial_enabled()):
+        zh, en = _BASIS_MMAX_COMMERCIAL
+        return {"type": "commercial", "grade": "conditional", "basis_zh": zh,
+                "basis_en": en}
     zh, en = _BASIS[grade]
     return {"type": "commercial" if grade == "allowed" else "non_commercial",
             "grade": grade, "basis_zh": zh, "basis_en": en}

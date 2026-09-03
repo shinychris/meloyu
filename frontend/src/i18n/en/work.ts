@@ -22,6 +22,7 @@ export const workEn = {
   'work.candidate.name': 'Candidate {label}',
   'work.candidate.untitledWork': 'Work',
   'work.candidate.external': 'External model',
+  'work.candidate.engine': 'Generated with',
   'work.candidate.quality': 'AI quality {n}',
   'work.candidate.adopted': 'Finalized',
   'work.candidate.adopt': 'Adopt as final',

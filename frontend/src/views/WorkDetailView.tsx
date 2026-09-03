@@ -31,6 +31,7 @@ export default function WorkDetailView() {
   const [currentVersionId, setCurrentVersionId] = useState<string | null>(null)
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null)
   const [candidates, setCandidates] = useState<Candidate[]>([])
+  const [engineDisplay, setEngineDisplay] = useState('')
   const [loading, setLoading] = useState(true)
   /** 标题/标签内联编辑（PATCH /works/{id}，契约 §7.3） */
   const [editing, setEditing] = useState(false)
@@ -43,8 +44,10 @@ export default function WorkDetailView() {
     try {
       const res = await fetchCandidates(versionId)
       setCandidates(res.items)
+      setEngineDisplay(res.provider_display || '')
     } catch {
       setCandidates([])
+      setEngineDisplay('')
     }
   }, [])
 
@@ -292,8 +295,13 @@ export default function WorkDetailView() {
                       <div className="flex items-center gap-2">
                         <span className="text-[13px] font-semibold">{t('work.candidate.name', { label: c.label })}</span>
                         <span className="text-[9px] px-1.5 py-0.5 font-bold num" style={{ background: 'var(--acc-dim)', color: 'var(--acc)' }}>
-                          {c.quality_score == null ? t('work.candidate.external') : t('work.candidate.quality', { n: c.quality_score })}
+                          {c.quality_score == null ? (engineDisplay || t('work.candidate.external')) : t('work.candidate.quality', { n: c.quality_score })}
                         </span>
+                        {engineDisplay && (
+                          <span className="text-[9px] px-1.5 py-0.5" style={{ background: 'var(--panel-2, #1a1a1a)', border: '1px solid var(--line)', color: 'var(--muted, #9a9a9a)' }} title={t('work.candidate.engine')}>
+                            {engineDisplay}
+                          </span>
+                        )}
                         {c.adopted && (
                           <span className="text-[9px] px-1.5 py-0.5 font-bold" style={{ background: 'var(--acc)', color: '#000' }}>{t('work.candidate.adopted')}</span>
                         )}

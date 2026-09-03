@@ -24,6 +24,43 @@ DISCLOSURE_EN = ("This work was created with AI assistance ({provider_display} {
 
 CERT_FORMATS = ("json", "pdf")
 
+# MiniMax 社区许可义务①：商用产品对 MiniMax 产出须显著展示 "MiniMax-Music3"——
+# 证书/导出标识/披露中的引擎署名统一走本映射（其余通道同规则补全）。
+# 英文版同时作为导出产物（ID3/RIFF ASCII 帧）的固定署名（不随请求 locale 漂移）。
+PROVIDER_DISPLAY_ZH: dict[str, str] = {}
+PROVIDER_DISPLAY_EN: dict[str, str] = {}
+
+
+def _init_provider_display() -> None:
+    from app.providers.music_api import APIMusicProvider
+    from app.providers.music_local import LocalSynthProvider
+    PROVIDER_DISPLAY_ZH.update({
+        LocalSynthProvider.name: "Meloyu 本地引擎",
+        APIMusicProvider.name: APIMusicProvider.base_display,
+        "musicgen_local": "MusicGen 本地（Meta，CC-BY-NC 权重）",
+        "replicate": "Replicate 托管",
+        "acestep_local": "ACE-Step v1.5 本地（MIT）",
+        "mmax_local": "MiniMax-Music3",
+        "songgen_local": "SongGeneration（腾讯学术许可，禁商用）",
+    })
+    PROVIDER_DISPLAY_EN.update({
+        LocalSynthProvider.name: "Meloyu local engine",
+        APIMusicProvider.name: "External song API (Suno-compatible)",
+        "musicgen_local": "MusicGen local (Meta, CC-BY-NC weights)",
+        "replicate": "Replicate hosting",
+        "acestep_local": "ACE-Step v1.5 local (MIT)",
+        "mmax_local": "MiniMax-Music3",
+        "songgen_local": "SongGeneration (Tencent academic license)",
+    })
+
+
+_init_provider_display()
+
+
+def provider_attribution(provider: str) -> str:
+    """导出产物 AIGC 标识用的固定英文引擎署名（未知通道回退原通道名）。"""
+    return PROVIDER_DISPLAY_EN.get(provider, provider)
+
 
 def _version_provider(db: Session, version: Version) -> tuple[str, str]:
     """版本生成引擎留痕：取该版本生成任务的 provider（V1.3 起为真实引擎，不再硬编码）。"""
@@ -31,14 +68,10 @@ def _version_provider(db: Session, version: Version) -> tuple[str, str]:
         select(Task).where(Task.version_id == version.id, Task.type == "generation")
         .order_by(Task.created_at.desc(), Task.id.desc()).limit(1)
     ).scalars().first()
-    from app.providers.music_api import APIMusicProvider
     from app.providers.music_local import LocalSynthProvider
-    zh_map = {LocalSynthProvider.name: "Meloyu 本地引擎",
-              APIMusicProvider.name: APIMusicProvider.base_display}
-    en_map = {LocalSynthProvider.name: "Meloyu local engine",
-              APIMusicProvider.name: "External song API (Suno-compatible)"}
     provider = (task.provider if task and task.provider else LocalSynthProvider.name)
-    display_map = en_map if current_locale() != "zh" else zh_map
+    display_map = (PROVIDER_DISPLAY_EN if current_locale() != "zh"
+                   else PROVIDER_DISPLAY_ZH)
     return provider, display_map.get(provider, provider)
 
 _ACTION_LABELS = [

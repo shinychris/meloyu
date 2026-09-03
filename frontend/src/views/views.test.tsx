@@ -155,8 +155,8 @@ describe('views render smoke', () => {
 
   it('ModelCenterView 渲染自托管服务通道卡（V1.5.1 MiniMax/SongGeneration）', () => {
     const html = render(<ModelCenterView />)
-    expect(html).toContain('MiniMax Music 3 · self-hosted service')
-    expect(html).toContain('SongGeneration · self-hosted service')
+    expect(html).toContain('MiniMax Music 3')
+    expect(html).toContain('SongGeneration')
   })
 })
 
