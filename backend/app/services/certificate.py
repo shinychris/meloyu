@@ -109,7 +109,10 @@ def issue_certificate(db: Session, user: User, version: Version, fmt: str = "jso
     human_summary = _human_summary(db, work.id)
 
     provider_name, provider_display = _version_provider(db, version)
-    model_id = version.params.get("model", "v1_pro")
+    # 目录模型优先（params.model 是本地档位 v1_pro/v1_fast，对外部通道无意义；
+    # catalog_model 为执行时刻目录模型留痕，见 generation._persist_success）
+    model_id = (version.params.get("catalog_model")
+                or version.params.get("model", "v1_pro"))
     # P0-1 证书×许可分流：授权类型 = 用户档位 × 通道/模型许可双重判定（不再只看 plan）
     from app.services import licensing
     lic = licensing.license_for_generation(user.plan, provider_name, model_id)
@@ -172,7 +175,7 @@ def issue_certificate(db: Session, user: User, version: Version, fmt: str = "jso
 
     db.add(Certificate(certificate_code=cert_code, work_id=work.id, version_id=version.id,
                        provider=provider_name, provider_display=provider_display,
-                       model=version.params.get("model", "v1_pro"), seed=cand.seed,
+                       model=model_id, seed=cand.seed,
                        generated_at=version.created_at, license_type=license_type,
                        license_grade=lic["grade"],
                        plan_at_issuance=user.plan, license_valid=True,

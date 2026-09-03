@@ -109,8 +109,8 @@ def license_for_generation(user_plan: str, provider: str,
                 "basis_zh": zh, "basis_en": en}
     grade = commercial_grade(provider, model_id)
     # MiniMax 义务落实后的条件型商用：conditional + 义务已落实 + 开关开 → commercial
-    if (grade == "conditional" and model_id == "minimax-music-3"
-            and _mmax_commercial_enabled()):
+    if (grade == "conditional" and _mmax_commercial_enabled()
+            and (model_id == "minimax-music-3" or provider == "mmax_local")):
         zh, en = _BASIS_MMAX_COMMERCIAL
         return {"type": "commercial", "grade": "conditional", "basis_zh": zh,
                 "basis_en": en}

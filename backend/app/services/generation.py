@@ -386,6 +386,15 @@ def _persist_success(db: Session, task_id: str, user_id: str, output, provider) 
     task.provider = provider.name  # 执行时实际引擎（提交与执行间配置可能已切换）
     work = db.get(Work, task.work_id)
     version = db.get(Version, task.version_id)
+    # 目录模型留痕（真实业务测试 2026-09-02 抓到的传导断点）：params.model 是本地
+    # 引擎档位（v1_pro/v1_fast），通道实际使用的目录模型此前未随版本落库——证书
+    # 许可分流拿不到真实模型。此处快照执行时刻 provider 的目录模型（无则不写）。
+    catalog_model = getattr(provider, "model_id", None)
+    if catalog_model and version.params.get("catalog_model") != catalog_model:
+        import copy as _copy
+        merged = _copy.deepcopy(version.params) if version.params else {}
+        merged["catalog_model"] = catalog_model
+        version.params = merged
     now = utc_now_iso()
     result_candidates = []
     first_cand = None

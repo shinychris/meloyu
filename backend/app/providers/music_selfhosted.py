@@ -25,7 +25,11 @@ from pathlib import Path
 
 import httpx
 
-from app.config import SELFHOSTED_DEFAULT_HOSTS, SELFHOSTED_PROBE_TIMEOUT_SEC
+from app.config import (
+    AUDIOCPP_TASK_TIMEOUT_SEC,
+    SELFHOSTED_DEFAULT_HOSTS,
+    SELFHOSTED_PROBE_TIMEOUT_SEC,
+)
 from app.config import SELFHOSTED_TASK_TIMEOUT_SEC as _TIMEOUT
 from app.core.i18n import tr
 from app.core.logging import logger
@@ -348,9 +352,13 @@ class MiniMaxSelfHostedProvider:
 
     def __init__(self, model_id: str, hosts: dict | None = None):
         _check_channel(model_id, self.name)
-        self.display_name = ("MiniMax Music 3 · " + CATALOG_BY_ID[model_id]['name']
-                             + tr("（自托管）", " (self-hosted)"))
+        self.display_name = "MiniMax Music 3 · " + CATALOG_BY_ID[model_id]['name']
         self.host = service_host(self.name, hosts)
+        # 真实业务测试（2026-09-02）抓到的时序缺陷：任务层熔断在 generate() 调用前
+        # 读取 timeout_sec，若 audio.cpp 的 4h 覆盖留在 _generate_local 内部才做，
+        # 读到的仍是 1800s 默认值 → 本机形态任务被误熔断。构造期即按形态定型：
+        self.timeout_sec = (AUDIOCPP_TASK_TIMEOUT_SEC if audiocpp_ready()
+                            else _TIMEOUT)
 
     # ---------- 本地 audio.cpp 形态 ----------
 
@@ -518,7 +526,7 @@ class SongGenSelfHostedProvider:
     def __init__(self, model_id: str, hosts: dict | None = None):
         _check_channel(model_id, self.name)
         self.display_name = ("SongGeneration · " + CATALOG_BY_ID[model_id]['name']
-                             + tr("（自托管）", " (self-hosted)"))
+                             )
         self.host = service_host(self.name, hosts)
 
     def _ensure_model(self, client: httpx.Client) -> str:

@@ -130,6 +130,21 @@ class TestMmaxCommercialOpen(unittest.TestCase):
         self.assertEqual(lic["type"], "non_commercial")
         self.assertEqual(lic["grade"], "free_plan")
 
+    def test_provider_level_fallback_for_legacy_versions(self):
+        # 存量版本无 catalog_model（传导断点修复前生成）：provider 级兜底仍开放商用
+        lic = licensing.license_for_generation("studio", "mmax_local", "v1_pro")
+        self.assertEqual(lic["type"], "commercial")
+        self.assertEqual(lic["grade"], "conditional")
+
+    def test_replicate_resolves_by_catalog_model(self):
+        # replicate 通道按目录模型分流（catalog_model 传导修复后的判定路径）
+        self.assertEqual(
+            licensing.license_for_generation("pro", "replicate", "ace-step")["type"],
+            "commercial")
+        self.assertEqual(
+            licensing.license_for_generation("pro", "replicate", "musicgen-small")["type"],
+            "non_commercial")
+
     def test_other_conditionals_untouched(self):
         # Stable Audio 的 conditional 不因 MiniMax 开放而变化
         lic = licensing.license_for_generation("pro", "replicate",
