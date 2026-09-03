@@ -23,4 +23,7 @@ export const commonEn = {
   'common.total': 'Total {n}',
   'common.empty': 'Nothing here yet',
   'common.language': 'Language',
+  // 语言切换下拉选项全名（按当前界面语言渲染；en 侧对中文用英文名，界面零中文）
+  'common.lang.en': 'English',
+  'common.lang.zh': 'Chinese (Simplified)',
 } as const

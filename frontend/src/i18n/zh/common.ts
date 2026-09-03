@@ -22,4 +22,7 @@ export const commonZh: Record<keyof typeof commonEn, string> = {
   'common.total': '共 {n} 条',
   'common.empty': '暂无内容',
   'common.language': '语言',
+  // 语言名：English 为专有名词（允许），简体中文为本地名
+  'common.lang.en': 'English',
+  'common.lang.zh': '简体中文',
 }

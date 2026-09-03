@@ -154,6 +154,13 @@ details.faq[open] .faq-plus { transform: rotate(45deg) }
 .accmenu-item.danger { color: var(--bad) }
 .accmenu-item.danger:hover { background: var(--bad); color: #fff }
 
+/* ---------- 语言切换下拉（LangSwitch，v0.7.2：按钮组改下拉；令牌随 accmenu） ---------- */
+.langmenu { position: absolute; top: 100%; left: 0; min-width: 158px; margin-top: 6px; background: var(--bg2); border: 1px solid var(--line2); z-index: 70; animation: pop .2s ease both }
+.langmenu.up { top: auto; bottom: 100%; margin-top: 0; margin-bottom: 6px }
+.langmenu-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; padding: 8px 12px; font-size: 12px; color: var(--muted); cursor: pointer; border: none; background: transparent; font-family: inherit; transition: all .15s ease }
+.langmenu-item:hover { color: var(--txt); background: var(--bg3) }
+.langmenu-item.on { color: var(--acc) }
+
 /* ---------- 响应式基础（v0.7.0：窄窗口可用不破版，不求完美移动端） ----------
  * 本节规则不进 @layer，优先于 tailwind utilities 生效；按档收窄：
  * ≤1280 工作台三栏收窄 / ≤1024 侧栏图标化 / ≤768 主要视图单列、落地页网格 1 列 */

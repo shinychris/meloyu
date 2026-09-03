@@ -114,8 +114,9 @@ export default function Sidebar() {
         </div>
         {/* 账号管理区：档位行 + 弹出菜单（改密/导出/登出全部/删号/登出） */}
         <AccountMenu />
+        {/* up：菜单向上展开，避开下方固定播放器遮挡带 */}
         <div className="mt-3 flex sidebar-lang">
-          <LangSwitch />
+          <LangSwitch up />
         </div>
       </div>
     </aside>
