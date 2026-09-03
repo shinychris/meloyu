@@ -46,13 +46,29 @@ _STYLE_EXPAND_SYSTEM = (
     "你是音乐制作总监。把用户的一句话创意扩写成 30~60 字的中文风格描述，"
     "涵盖编曲思路、乐器、情绪与节奏；只输出风格描述本身，不要解释或引号。"
 )
+_STYLE_EXPAND_SYSTEM_EN = (
+    "You are a music production director. Expand the user's one-line idea into an "
+    "English style description of roughly 30-60 words, covering arrangement, "
+    "instruments, mood, and tempo. Output only the style description itself - no "
+    "explanations, no quotes."
+)
 
 
 def expand_style_by_llm(chat, simple_prompt: str) -> str:
-    """simple 模式风格扩写（走歌词引擎同一 LLM 配置）；失败/坏输出返回空串由规则兜底。"""
+    """simple 模式风格扩写（走歌词引擎同一 LLM 配置）；失败/坏输出返回空串由规则兜底。
+
+    按提交请求的 locale 要求对应语言的风格描述（en 用户不产出中文风格文案）；
+    长度校验/截断阈值随语言分别设定（zh 按字符、en 按词折算的字符量）。
+    """
     try:
-        text = chat(_STYLE_EXPAND_SYSTEM, f"一句话创意：{simple_prompt}").strip()
+        en = current_locale() != "zh"
+        system = _STYLE_EXPAND_SYSTEM_EN if en else _STYLE_EXPAND_SYSTEM
+        user = (f"One-line idea: {simple_prompt}" if en
+                else f"一句话创意：{simple_prompt}")
+        text = chat(system, user).strip()
         text = text.strip('"“”‘’').strip()
+        if en:
+            return text[:240] if 20 <= len(text) <= 400 else ""
         return text[:120] if 8 <= len(text) <= 200 else ""
     except Exception as e:  # noqa: BLE001 —— 扩写失败回退规则拼接，不阻断生成
         logger.warning(f"LLM 风格扩写失败，回退规则引擎: {e}")

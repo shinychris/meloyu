@@ -17,6 +17,7 @@ from dataclasses import replace
 
 import numpy as np
 
+from app.core.i18n import tr
 from app.synth import harmony as harmony_mod
 from app.synth import melody as melody_mod
 from app.synth import rhythm as rhythm_mod
@@ -162,7 +163,9 @@ def regenerate_sections(base_ir: SongIR, section: str, occurrence: int,
     """
     matches = [sp for sp in base_ir.sections if sp.section == section]
     if not 1 <= occurrence <= len(matches):
-        raise ValueError(f"occurrence 越界：段落 {section} 共出现 {len(matches)} 次")
+        raise ValueError(tr(f"occurrence 越界：段落 {section} 共出现 {len(matches)} 次",
+                         f"occurrence out of range: section {section} appears "
+                         f"{len(matches)} time(s)"))
     selected = [matches[occurrence - 1]]
     ir = SongIR(req=base_ir.req, seed=base_ir.seed)
     ir.style_family = base_ir.style_family
@@ -204,7 +207,8 @@ def regenerate_sections(base_ir: SongIR, section: str, occurrence: int,
     for c in ir_sel.chords:
         merged[c.bar] = c
     if any(c is None for c in merged):
-        raise ValueError("段落重生成后和弦未覆盖全部小节")
+        raise ValueError(tr("段落重生成后和弦未覆盖全部小节",
+                            "regenerated section chords do not cover all bars"))
     ir.chords = [c for c in merged if c is not None]
 
     for attr in ("melody", "vocal_notes", "bass_notes", "drums"):
@@ -261,7 +265,9 @@ def splice_regen(rendered: np.ndarray, orig: np.ndarray, structure: list[dict],
     target_index 为 structure 下标（由 section + occurrence 解析，同名其他出现不选中）。
     """
     if len(rendered) != len(orig):
-        raise ValueError(f"长度不一致：渲染 {len(rendered)} vs 原始 {len(orig)}")
+        raise ValueError(tr(f"长度不一致：渲染 {len(rendered)} vs 原始 {len(orig)}",
+                            f"length mismatch: rendered {len(rendered)} vs original "
+                            f"{len(orig)}"))
     n = len(orig)
     out = np.array(rendered, dtype=np.float64, copy=True)
     ranges = structure_sample_ranges(structure, n)

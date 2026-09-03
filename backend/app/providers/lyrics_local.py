@@ -290,14 +290,17 @@ class LocalLyricsProvider:
             for idx, ln in enumerate(sec["lines"]):
                 if ln["in_rhyme"] is False:
                     off_count += 1
+                    # en 侧只嵌拉丁韵尾（rhyme_group/main_final 本就是 final 如 "ang"），
+                    # 不嵌中文辙名（江阳/怀来），保证英文界面零中文
                     suggestions.append({
                         "line_no": ln["line_no"], "type": "rhyme",
                         "message": tr(f"尾字「{ln['tail_char']}」属 "
                                    f"{rhyme_group_of(ln['rhyme_group']) or '未知'} 辙，与主韵 "
                                    f"{main_group} 不一致，建议换 {main_group} 辙词",
-                                   f'Tail char "{ln["tail_char"]}" belongs to rhyme '
-                                   f"{rhyme_group_of(ln['rhyme_group']) or 'unknown'}, not the main "
-                                   f"rhyme {main_group}; consider a {main_group}-rhyming word")})
+                                   f'Tail char "{ln["tail_char"]}" ends in '
+                                   f'"{ln["rhyme_group"]}", which differs from the main '
+                                   f'rhyme "{main_final}"; consider a word ending in '
+                                   f'"{main_final}"')})
                 # 重音：每段末行的句尾双字词建议落长音
                 text = ln["text"]
                 if idx == len(sec["lines"]) - 1 and re.search(r"[\u4e00-\u9fff]{2}$", text):

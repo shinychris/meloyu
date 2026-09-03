@@ -151,5 +151,154 @@ class TestStageLabels(unittest.TestCase):
         set_locale("en")
 
 
+class TestTrEnglishHalvesSweep(unittest.TestCase):
+    """静态扫描全部 tr(zh, en) 调用：英文侧（含 f-string 字面部分）不得出现中文。
+
+    防回归网：后续新增 tr() 时英文侧误写中文会在本测试暴露。
+    """
+
+    def test_no_chinese_in_en_halves(self):
+        import ast
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parent.parent / "app"
+        checked = 0
+        problems: list[str] = []
+        for py in root.rglob("*.py"):
+            tree = ast.parse(py.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                fname = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
+                if fname != "tr" or len(node.args) < 2:
+                    continue
+                parts: list[str] = []
+                en_arg = node.args[1]
+                for sub in ast.walk(en_arg):
+                    if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
+                        parts.append(sub.value)
+                text = "".join(parts)
+                if not text:
+                    continue  # 全变量拼接，无法静态判定
+                checked += 1
+                if _has_cjk(text):
+                    problems.append(f"{py.name}:{node.lineno} {text[:60]!r}")
+        self.assertTrue(checked > 50, f"sweep unexpectedly scanned only {checked} calls")
+        self.assertEqual(problems, [], "tr() English halves contain Chinese:\n"
+                         + "\n".join(problems))
+
+
+class TestEnglishOutputNoChinese(unittest.TestCase):
+    """v0.7.2 i18n 收口回归：英文 locale 下各输出面零中文。"""
+
+    def tearDown(self):
+        set_locale("en")
+
+    def test_rhyme_suggestion_en_uses_latin_finals(self):
+        from app.providers.lyrics_local import LocalLyricsProvider
+        lyrics = ("[Verse]\n雨停在凌晨三点的窗台\n霓虹把影子拉得好长\n"
+                  "[Chorus]\n我们把未来说得太轻\n像风穿过无人的巷口")
+        set_locale("en")
+        res = LocalLyricsProvider().rhyme_check(lyrics)
+        lines_by_no = {ln["line_no"]: ln for sec in res["sections"] for ln in sec["lines"]}
+        for s in res["suggestions"]:
+            if s["type"] != "rhyme":
+                continue
+            # 引用的尾字本身是歌词内容（允许），剥离后不得再有中文（辙名等）
+            stripped = s["message"].replace(lines_by_no[s["line_no"]]["tail_char"], "")
+            self.assertFalse(_has_cjk(stripped),
+                             f"en rhyme message has Chinese: {s['message']!r}")
+        set_locale("zh")
+        res_zh = LocalLyricsProvider().rhyme_check(lyrics)
+        self.assertTrue(any(_has_cjk(s["message"]) for s in res_zh["suggestions"]
+                            if s["type"] == "rhyme"), "zh 侧应保持中文文案")
+
+    def test_style_tags_en(self):
+        from app.providers.music_local import _style_tags
+        set_locale("en")
+        tags = _style_tags("", "guofeng")
+        self.assertEqual(tags, ["Chinese traditional"])
+        set_locale("zh")
+        self.assertEqual(_style_tags("", "guofeng"), ["国风"])
+
+    def test_synth_raise_messages_bilingual(self):
+        import tempfile
+        import wave
+        from types import SimpleNamespace
+
+        import numpy as np
+        from app.synth import editing as editing_mod
+        from app.synth import wav_io as wav_mod
+        from app.synth.ir import SAMPLE_RATE
+
+        set_locale("en")
+        with self.assertRaises(ValueError) as ctx:
+            editing_mod.regenerate_sections(
+                SimpleNamespace(sections=[]), "chorus", 1, None)  # type: ignore[arg-type]
+        self.assertFalse(_has_cjk(str(ctx.exception)),
+                         f"editing en message has Chinese: {ctx.exception!r}")
+        with self.assertRaises(ValueError) as ctx2:
+            editing_mod.splice_regen(np.zeros(100), np.zeros(90), None, 0)  # type: ignore[arg-type]
+        self.assertFalse(_has_cjk(str(ctx2.exception)),
+                         f"splice en message has Chinese: {ctx2.exception!r}")
+        # 错采样率的真实 wav → read_wav 触发采样率不符
+        import pathlib
+        wrong_sr = pathlib.Path(tempfile.gettempdir()) / "meloyu_test_wrong_sr.wav"
+        with wave.open(str(wrong_sr), "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(SAMPLE_RATE // 2)
+            wf.writeframes(b"\x00\x00" * 8)
+        try:
+            with self.assertRaises(ValueError) as ctx3:
+                wav_mod.read_wav(wrong_sr)
+            self.assertFalse(_has_cjk(str(ctx3.exception)),
+                             f"wav_io en message has Chinese: {ctx3.exception!r}")
+        finally:
+            wrong_sr.unlink(missing_ok=True)
+        set_locale("zh")
+        with self.assertRaises(ValueError) as ctx4:
+            editing_mod.splice_regen(np.zeros(100), np.zeros(90), None, 0)  # type: ignore[arg-type]
+        self.assertTrue(_has_cjk(str(ctx4.exception)), "zh 侧应保持中文文案")
+
+    def test_expand_style_llm_en_prompt(self):
+        from app.services import generation as gen
+        captured = {}
+
+        def fake_chat(system: str, user: str) -> str:
+            captured["system"], captured["user"] = system, user
+            return ("A warm indie-pop ballad with soft piano arpeggios, airy synth "
+                    "pads, gentle percussion, and an emotionally building bridge.")
+
+        set_locale("en")
+        out = gen.expand_style_by_llm(fake_chat, "a rainy night in the city")
+        self.assertFalse(_has_cjk(out))
+        self.assertFalse(_has_cjk(captured["system"]))
+        self.assertFalse(_has_cjk(captured["user"]))
+        set_locale("zh")
+        gen.expand_style_by_llm(fake_chat, "城市雨夜")
+        self.assertTrue(_has_cjk(captured["system"]))
+
+    def test_mail_single_language_per_locale(self):
+        from unittest.mock import patch
+        from app.services import mail
+        sent: list[tuple[str, str, str]] = []
+        with patch.object(mail, "_send", lambda to, subject, body: sent.append((to, subject, body))):
+            with patch.object(mail, "smtp_configured", lambda: True):
+                set_locale("en")
+                mail.send_verification_code("u@x.com")
+                mail.send_password_reset_email("u@x.com", "https://r")
+                set_locale("zh")
+                mail.send_verification_code("u2@x.com")
+                mail.send_password_reset_email("u2@x.com", "https://r")
+        en_sub, en_body = sent[0][1], sent[0][2]
+        self.assertFalse(_has_cjk(en_sub), f"en mail subject has Chinese: {en_sub!r}")
+        self.assertFalse(_has_cjk(en_body), f"en mail body has Chinese: {en_body!r}")
+        self.assertFalse(_has_cjk(sent[1][1]) or _has_cjk(sent[1][2]))
+        self.assertTrue(_has_cjk(sent[2][1]) and _has_cjk(sent[3][2]))
+        mail.consume_code("u@x.com")
+        mail.consume_code("u2@x.com")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -56,12 +56,15 @@ def _stage(progress: ProgressCallback, should_cancel: CancelCheck, key: str, pct
 
 
 def _style_tags(style_prompt: str, family: str) -> list[str]:
-    """由 style_prompt 派生风格标签（候选展示用）。"""
+    """由 style_prompt 派生风格标签（候选展示用）；家族兜底标签按当前 locale。"""
     tags = [t for t in re.split(r"[，,。;；\s]+", style_prompt or "") if t][:3]
-    family_zh = {"pop": "流行", "guofeng": "国风", "edm": "电子", "hiphop": "嘻哈",
-                 "lofi": "Lo-fi", "rock": "摇滚"}.get(family, "流行")
-    if not any(family_zh in t for t in tags):
-        tags.insert(0, family_zh)
+    families = {"pop": ("流行", "pop"), "guofeng": ("国风", "Chinese traditional"),
+                "edm": ("电子", "electronic"), "hiphop": ("嘻哈", "hip-hop"),
+                "lofi": ("Lo-fi", "Lo-fi"), "rock": ("摇滚", "rock")}
+    zh, en = families.get(family, families["pop"])
+    family_label = tr(zh, en)
+    if not any(family_label in t for t in tags):
+        tags.insert(0, family_label)
     return tags[:4]
 
 

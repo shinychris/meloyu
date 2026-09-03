@@ -15,7 +15,7 @@ export const landingZh: Record<keyof typeof landingEn, string> = {
   'landing.nav.login': '登录',
   'landing.nav.cta': '免费开始',
   // Hero
-  'landing.hero.eyebrow': 'AI Music Creation Workstation',
+  'landing.hero.eyebrow': 'AI 音乐创作工作台',
   'landing.hero.title.a': '从一句灵感，',
   'landing.hero.title.b1': '到',
   'landing.hero.title.b2': '可发行',

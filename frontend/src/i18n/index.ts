@@ -13,8 +13,8 @@ import { zh } from './zh'
 
 export type Locale = 'en' | 'zh'
 
-/** 语言切换按钮上的短标签 */
-export const LOCALE_LABEL: Record<Locale, string> = { en: 'EN', zh: '中文' }
+/** 语言切换按钮上的短标签（语言代码缩写：英文界面零中文硬性要求，ZH 属通用简写） */
+export const LOCALE_LABEL: Record<Locale, string> = { en: 'EN', zh: 'ZH' }
 export const LOCALES: readonly Locale[] = ['en', 'zh']
 
 export type TranslationKey = keyof typeof en

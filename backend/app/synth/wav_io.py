@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
+from app.core.i18n import tr
 from app.synth.ir import SAMPLE_RATE
 
 
@@ -23,7 +24,7 @@ def _to_int32(x: np.ndarray, bits: int) -> np.ndarray:
 def write_wav(path: str | Path, channels: list[np.ndarray], bits: int = 24,
               sample_rate: int = SAMPLE_RATE) -> int:
     """写 WAV（interleave 多声道）；返回字节数。确定性：无时间戳进入文件。"""
-    assert channels, "至少一个声道"
+    assert channels, tr("至少一个声道", "at least one channel required")
     n = max(len(c) for c in channels)
     ints = [_to_int32(np.resize(c, n) if len(c) < n else c, bits) for c in channels]
     interleaved = np.stack(ints, axis=-1)
@@ -54,7 +55,8 @@ def read_wav(path: str | Path) -> list[np.ndarray]:
         sr = wf.getframerate()
         raw = wf.readframes(wf.getnframes())
     if sr != SAMPLE_RATE:
-        raise ValueError(f"采样率不符（{sr} != {SAMPLE_RATE}）：{path}")
+        raise ValueError(tr(f"采样率不符（{sr} != {SAMPLE_RATE}）：{path}",
+                       f"sample rate mismatch ({sr} != {SAMPLE_RATE}): {path}"))
     if sw == 3:
         b = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 3).astype(np.int32)
         v = b[:, 0] | (b[:, 1] << 8) | (b[:, 2] << 16)

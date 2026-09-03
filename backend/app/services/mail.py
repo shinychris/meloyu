@@ -70,9 +70,10 @@ def send_verification_code(email: str) -> None:
     digest = hashlib.sha256(code.encode()).hexdigest()
     expires = (now + timedelta(seconds=CODE_TTL_SEC)).strftime("%Y-%m-%dT%H:%M:%SZ")
     _codes[email] = (digest, expires, _now_iso())
-    _send(email, "Meloyu verification code / 验证码",
-          f"Your Meloyu verification code is {code}. It expires in 10 minutes.\n"
-          f"您的 Meloyu 验证码为 {code}，10 分钟内有效。")
+    # 邮件按发起请求的 Accept-Language 单语发送（en 用户不再收到中英混排）
+    _send(email, tr("Meloyu 验证码", "Meloyu verification code"),
+          tr(f"您的 Meloyu 验证码为 {code}，10 分钟内有效。",
+             f"Your Meloyu verification code is {code}. It expires in 10 minutes."))
 
 
 def verify_code(email: str, code: str) -> bool:
@@ -91,6 +92,6 @@ def consume_code(email: str) -> None:
 
 
 def send_password_reset_email(email: str, reset_url: str) -> None:
-    _send(email, "Meloyu password reset / 找回密码",
-          f"Reset your Meloyu password (valid 30 minutes):\n{reset_url}\n\n"
-          f"重置您的 Meloyu 密码（30 分钟内有效）：\n{reset_url}")
+    _send(email, tr("Meloyu 找回密码", "Meloyu password reset"),
+          tr(f"重置您的 Meloyu 密码（30 分钟内有效）：\n{reset_url}",
+             f"Reset your Meloyu password (valid for 30 minutes):\n{reset_url}"))
