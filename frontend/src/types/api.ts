@@ -28,6 +28,8 @@ export type TimeSignature = '4/4' | '3/4' | '6/8'
 export type VocalType =
   | 'female_air' | 'female_bright' | 'female_deep'
   | 'male_magnetic' | 'male_clear' | 'choir' | 'instrumental'
+  /** FR-5（v0.8.2）：本人音色档案（须 voice_profile_id，仅本地引擎通道） */
+  | 'voice_clone'
 export type Language = 'zh' | 'yue' | 'en' | 'ja'
 export type Section = 'intro' | 'verse' | 'pre_chorus' | 'chorus' | 'bridge' | 'outro'
 export type PlanCode = 'free' | 'pro' | 'studio' | 'team'
@@ -181,6 +183,10 @@ export interface Work {
    * 后端未重启/旧数据时可能缺失，前端需回退推导（契约 §14 R1 / 审查 P2-5）。
    */
   exported_formats?: string[]
+  /** FR-13 协作上下文（详情接口在登录态返回；旧后端可能缺失） */
+  space_id?: string | null
+  is_owner?: boolean
+  my_role?: 'owner' | 'editor' | 'commenter' | 'viewer' | null
   created_at: string
   updated_at: string
   trashed_at: string | null
@@ -195,6 +201,23 @@ export interface GenerationParams {
   vocal: VocalType
   language: Language
   instrument_density: number
+  /** FR-5：vocal=voice_clone 时必填（已验证音色档案） */
+  voice_profile_id?: string
+}
+
+/* ============ voice-profiles（FR-5） ============ */
+export interface VoiceProfile {
+  id: string
+  name: string
+  status: 'pending' | 'verified' | 'rejected' | 'revoked'
+  phrase1: string
+  phrase2: string | null
+  verify_score: number | null
+  verify_attempts: number
+  timbre: { center_midi: number; f1_scale: number; f2_scale: number; harm_scale: number; basis: string } | null
+  consent_log: Array<{ step: number; phrase: string; sample_sha256: string; at: string; score?: number }>
+  verified_at: string | null
+  created_at: string
 }
 
 export interface Version {
@@ -345,6 +368,82 @@ export interface GenerationSubmitRequest {
   simplified?: boolean
   seed?: number
   params?: GenerationParams
+  /** FR-4 参考音频：特征级参考（分析值覆盖 bpm/调性/器乐密度） */
+  reference_track_id?: string
+}
+
+/* ============ 开放 API 密钥（FR-19） ============ */
+export interface ApiKeyInfo {
+  id: string
+  name: string
+  prefix: string
+  created_at: string
+  last_used_at: string | null
+}
+
+/* ============ team spaces & comments（FR-13） ============ */
+export type TeamRole = 'owner' | 'editor' | 'commenter' | 'viewer'
+
+export interface TeamMemberInfo {
+  user_id: string
+  role: TeamRole
+  created_at: string
+}
+
+export interface TeamSpaceInfo {
+  id: string
+  name: string
+  owner_user_id: string
+  is_owner: boolean
+  my_role: TeamRole | null
+  member_count: number
+  work_count: number
+  members: TeamMemberInfo[]
+  created_at: string
+}
+
+export interface WorkCommentItem {
+  id: string
+  work_id: string
+  version_id: string | null
+  author_id: string
+  author_nickname: string
+  time_sec: number
+  body: string
+  resolved: boolean
+  created_at: string
+}
+
+/* ============ reference-tracks（FR-4） ============ */
+export interface ReferenceAnalysis {
+  bpm: number
+  key_tonic: Tonic
+  key_mode: KeyMode
+  energy: number
+  brightness: number
+  duration_sec: number
+}
+
+export interface ReferenceTrack {
+  id: string
+  name: string
+  mime: string
+  bytes: number
+  duration_sec: number | null
+  sha256: string
+  ack_rights: boolean
+  analysis: ReferenceAnalysis | null
+  analyzed: boolean
+  /** 合规提示（双语固定）：参考非采样 + 上传者权利确认 */
+  notice: string
+  created_at: string
+}
+
+export interface ReferenceTrackList {
+  items: ReferenceTrack[]
+  total: number
+  page: number
+  page_size: number
 }
 
 export interface GenerationSubmitResult {

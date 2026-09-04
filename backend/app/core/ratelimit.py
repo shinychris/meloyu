@@ -30,6 +30,7 @@ _RULES: list[tuple[str, int, int]] = [
     ("/api/v1/auth/send-code", 3600, 3),
     ("/api/v1/auth/forgot-password", 3600, 3),
     ("/api/v1/generations", 3600, 30),
+    ("/api/v1/public/generations", 3600, 30),  # FR-19 开放 API β：与站内同额度
     ("/api/v1/billing/webhook", 0, 0),  # 0 = 不限流（显式豁免）
     ("/api/v1/", 60, 300),
 ]

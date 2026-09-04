@@ -18,6 +18,7 @@ from app.core.errors import (
     err_not_found,
     err_payment_required,
     err_sensitive,
+    err_validation,
 )
 from app.core.i18n import current_locale, tr
 from app.core.logging import logger
@@ -109,6 +110,7 @@ def resolve_generation_request(payload: dict) -> dict:
         "duration_sec": params.get("duration_sec", 210),
         "vocal": vocal, "language": params.get("language", "zh"),
         "instrument_density": params.get("instrument_density", 65),
+        "voice_profile_id": params.get("voice_profile_id"),
     }
     seed = payload.get("seed")
     if seed is None:
@@ -161,6 +163,55 @@ def submit_generation(db: Session, user: User, payload: dict) -> dict:
 
     resolved = resolve_generation_request(payload)
     params = resolved["params"]
+
+    # FR-4 参考音频（v0.8.1）：特征级参考——分析值覆盖 bpm/调性/器乐密度
+    reference_info = None
+    reference_track_id = (payload.get("reference_track_id") or "").lower()
+    if reference_track_id:
+        from app.services import reference as reference_svc
+        track = reference_svc.resolve_for_generation(db, user, reference_track_id)
+        params = reference_svc.apply_to_params(params, track.analysis)
+        resolved["params"] = params
+        reference_info = {
+            "reference_track_id": track.id, "name": track.name,
+            "analysis": {
+                "bpm": track.analysis["bpm"],
+                "key_tonic": track.analysis["key_tonic"],
+                "key_mode": track.analysis["key_mode"],
+                "energy": track.analysis["energy"],
+                "brightness": track.analysis["brightness"],
+            },
+            # 合规留痕：参考非采样（特征级），上传时已确认权利
+            "feature_level": True, "ack_rights": True,
+        }
+
+    # FR-5 人声克隆（v0.8.2）：vocal=voice_clone 需已验证档案，仅本地引擎通道
+    voice_info = None
+    if params.get("vocal") == "voice_clone":
+        from app.models.enums import VOCALS  # noqa: F401 —— 校验已在 schema 完成
+        from app.services import model_center as _mc
+        backend = _mc.current_music_backend(db)
+        if backend != "localsynth":
+            raise err_conflict(
+                tr("人声克隆仅支持本地合成引擎通道（当前歌曲引擎需在模型中心切回本地）",
+                   "Voice cloning is only supported on the local synth engine channel "
+                   "(switch the song engine back to local in the model center)"))
+        from app.services import voice as voice_svc
+        profile_id = (params.get("voice_profile_id") or "").lower()
+        if not profile_id:
+            raise err_validation(
+                tr("vocal=voice_clone 时 params.voice_profile_id 必填",
+                   "params.voice_profile_id is required when vocal=voice_clone"))
+        profile = voice_svc.get_verified_owned(db, user, profile_id)
+        params["voice_timbre"] = profile.timbre
+        resolved["params"] = params
+        voice_info = {
+            "voice_profile_id": profile.id, "name": profile.name,
+            "verify_score": profile.verify_score,
+            "liveness": "two_random_phrases",
+            # 合规留痕：克隆音轨标记（导出 AIGC 标识 + 事件水印口径）
+            "voice_clone": True,
+        }
     cost = MODEL_CREDIT_COST.get(params["model"], 12)
 
     # work / version
@@ -211,6 +262,8 @@ def submit_generation(db: Session, user: User, payload: dict) -> dict:
         "parent_version_id": parent_version_id,
         "simplified": bool(payload.get("simplified", False)),
         "seed": payload.get("seed"), "params": payload.get("params"),
+        "reference": reference_info,
+        "voice": voice_info,
         "_resolved": resolved,
     }
     task = Task(user_id=user.id, type="generation", status="queued", progress=0,
@@ -332,6 +385,7 @@ def execute_generation(task_id: str) -> None:
             time_signature=params["time_signature"], duration_sec=params["duration_sec"],
             vocal=params["vocal"], language=params["language"],
             instrument_density=params["instrument_density"], seed=resolved["seed"],
+            voice_timbre=params.get("voice_timbre"),
         )
         dest = settings.audio_path / task.work_id / task.version_id
 
@@ -627,7 +681,7 @@ def cancel_task(db: Session, user: User, task_id: str) -> dict:
 # ---------- 候选 ----------
 
 def list_candidates(db: Session, version_id: str, user: User) -> dict:
-    version = works_svc.get_version_owned(db, version_id, user)
+    version = works_svc.get_version_owned(db, version_id, user, min_role="viewer")
     rows = db.execute(select(Candidate).where(Candidate.version_id == version.id)
                       .order_by(Candidate.label.asc())).scalars().all()
     items = [candidate_to_dict(c) for c in rows]

@@ -39,9 +39,12 @@ def abs_path(f: File) -> Path:
 
 
 def check_owner(db: Session, f: File, user: User) -> None:
+    """文件访问校验（FR-13 角色化：共享作品成员 viewer 即可读流）。"""
     work = db.get(Work, f.work_id)
-    if not work or work.user_id != user.id:
+    if not work:
         raise err_forbidden()
+    from app.services.team import require_work_access
+    require_work_access(db, work, user, min_role="viewer")
 
 
 def user_from_request_or_token(db: Session, request: Request,

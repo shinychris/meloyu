@@ -283,4 +283,6 @@ export const landingZh: Record<keyof typeof landingEn, string> = {
   'landing.data.milestone.7.title': '自托管 MiniMax Music 3 + SongGeneration，七通道全通',
   'landing.data.milestone.8.title': '商业化：Stripe 订阅、积分充值与账号中心',
   'landing.data.milestone.9.title': '发行导出：抖音/流媒体平台模板打包',
+  'landing.data.milestone.10.title': '参考音频与人声克隆（V1.1）',
+  'landing.data.milestone.11.title': '团队协作与开放 API（V1.1 收官）',
 }

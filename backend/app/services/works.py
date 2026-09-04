@@ -16,12 +16,22 @@ from app.repositories import counters
 from app.services.serializers import event_to_dict, work_to_dict
 
 
-def _get_work_owned(db: Session, work_id: str, user: User) -> Work:
+def _get_work_owned(db: Session, work_id: str, user: User,
+                    min_role: str = "editor", owner_only: bool = False) -> Work:
+    """归属/权限校验取行（FR-13 角色化：共享作品的团队成员按 rank 判权）。
+
+    min_role：viewer（读）/ commenter（评论，服务层内部用）/ editor（写）；
+    owner_only=True 时仅作品属主本人（破坏性操作：删除/回收站/共享管理）。
+    """
     work = db.get(Work, work_id)
     if not work:
         raise err_not_found(tr("作品不存在", "Work not found"))
-    if work.user_id != user.id:
-        raise err_forbidden()
+    if owner_only:
+        if work.user_id != user.id:
+            raise err_forbidden()
+        return work
+    from app.services.team import require_work_access
+    require_work_access(db, work, user, min_role=min_role)
     return work
 
 
@@ -48,9 +58,16 @@ def exported_formats_map(db: Session, work_ids: list[str]) -> dict[str, list[str
     return {wid: sorted(fmts) for wid, fmts in grouped.items()}
 
 
-def _serialize(db: Session, work: Work) -> dict:
+def _serialize(db: Session, work: Work, user: User | None = None) -> dict:
     fmts = exported_formats_map(db, [work.id]).get(work.id, [])
-    return work_to_dict(work, exported_formats=fmts)
+    out = work_to_dict(work, exported_formats=fmts)
+    if user is not None:
+        # FR-13：协作上下文（共享空间/是否属主/我的角色）——前端据此渲染评论与共享入口
+        from app.services.team import role_for_work
+        out["space_id"] = work.space_id
+        out["is_owner"] = work.user_id == user.id
+        out["my_role"] = role_for_work(db, work, user)
+    return out
 
 
 def list_works(db: Session, user: User, *, q: str | None, tag: str | None,
@@ -87,7 +104,7 @@ def list_works(db: Session, user: User, *, q: str | None, tag: str | None,
 
 
 def get_work(db: Session, work_id: str, user: User) -> dict:
-    return _serialize(db, _get_work_owned(db, work_id, user))
+    return _serialize(db, _get_work_owned(db, work_id, user, min_role="viewer"), user)
 
 
 def update_work(db: Session, work_id: str, user: User, *, title: str | None,
@@ -108,11 +125,11 @@ def update_work(db: Session, work_id: str, user: User, *, title: str | None,
                      action="update", actor="human", detail=changes))
     db.commit()
     db.refresh(work)
-    return _serialize(db, work)
+    return _serialize(db, work, user)
 
 
 def delete_work(db: Session, work_id: str, user: User, permanent: bool) -> dict:
-    work = _get_work_owned(db, work_id, user)
+    work = _get_work_owned(db, work_id, user, owner_only=True)
     if permanent:
         if work.status != "trash":
             raise err_conflict(tr("作品不在回收站，无法直接物理删除（先移入回收站）",
@@ -129,7 +146,7 @@ def delete_work(db: Session, work_id: str, user: User, permanent: bool) -> dict:
 
 
 def restore_work(db: Session, work_id: str, user: User) -> dict:
-    work = _get_work_owned(db, work_id, user)
+    work = _get_work_owned(db, work_id, user, owner_only=True)
     if work.status != "trash":
         raise err_conflict(tr("作品不在回收站", "Work is not in the trash"))
     work.status = "active"
@@ -139,7 +156,7 @@ def restore_work(db: Session, work_id: str, user: User) -> dict:
                      action="restore", actor="human", detail={}))
     db.commit()
     db.refresh(work)
-    return _serialize(db, work)
+    return _serialize(db, work, user)
 
 
 def _physical_delete(db: Session, work: Work) -> None:
@@ -179,7 +196,7 @@ def list_events(db: Session, work_id: str, user: User, page: int, page_size: int
 
 
 def version_tree(db: Session, work_id: str, user: User) -> dict:
-    work = _get_work_owned(db, work_id, user)
+    work = _get_work_owned(db, work_id, user, min_role="viewer")
     rows = db.execute(select(Version).where(Version.work_id == work.id)
                       .order_by(Version.created_at.asc(), Version.id.asc())).scalars().all()
     nodes = [{
@@ -198,13 +215,16 @@ def version_tree(db: Session, work_id: str, user: User) -> dict:
     return {"current_version_id": current, "nodes": nodes}
 
 
-def get_version_owned(db: Session, version_id: str, user: User) -> Version:
+def get_version_owned(db: Session, version_id: str, user: User,
+                      min_role: str = "editor") -> Version:
     version = db.get(Version, version_id)
     if not version:
         raise err_not_found(tr("版本不存在", "Version not found"))
     work = db.get(Work, version.work_id)
-    if not work or work.user_id != user.id:
-        raise err_forbidden()
+    if not work:
+        raise err_not_found(tr("作品不存在", "Work not found"))
+    from app.services.team import require_work_access
+    require_work_access(db, work, user, min_role=min_role)
     return version
 
 

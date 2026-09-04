@@ -12,7 +12,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 REPO_DIR = BACKEND_DIR.parent
 
 API_PREFIX = "/api/v1"
-APP_VERSION = "0.8.0"
+APP_VERSION = "0.8.2"
 
 # 模型积分单价（架构 §9.1：v1_pro=12、v1_fast=6）
 MODEL_CREDIT_COST: dict[str, int] = {"v1_pro": 12, "v1_fast": 6}
@@ -85,6 +85,8 @@ class Settings(BaseSettings):
     admin_emails: str = ""
     # ---- 监控 ----
     sentry_dsn: str = ""
+    # 人声克隆同人校验余弦阈值（FR-5；0=用服务默认 0.55，运营可调）
+    voice_verify_threshold: float = 0
     # MiniMax-Music3 商用开放开关（义务①署名/②防侵权防护/③AUP 披露已落实，默认开放；
     # 条款修订或营收接近 $20M 门槛时置 false 回退非商用签发）
     mmax_commercial_enabled: bool = True

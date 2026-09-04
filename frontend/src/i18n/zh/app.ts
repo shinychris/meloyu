@@ -44,6 +44,7 @@ export const appZh: Record<keyof typeof appEn, string> = {
   'app.format.vocal.male_clear': '男声 · 清朗',
   'app.format.vocal.choir': '合唱',
   'app.format.vocal.instrumental': '纯器乐',
+  'app.format.vocal.voice_clone': '我的音色',
   'app.format.credit.signup_bonus': '注册赠送',
   'app.format.credit.generation': '生成消耗',
   'app.format.credit.refund': '失败退款',

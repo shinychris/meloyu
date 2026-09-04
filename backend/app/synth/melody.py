@@ -178,7 +178,11 @@ def _compose_instrumental_phrase(ir: SongIR, rng: np.random.Generator,
 def compose_melody(ir: SongIR, rng: np.random.Generator) -> None:
     """逐段落、逐行作曲；人声段落同步产出音节对齐的 vocal_notes。"""
     req = ir.req
-    center = VOCAL_CENTER[req.vocal]
+    # FR-5：voice_clone 音域中心取档案实测基频（无档案参数时回退中性 60）
+    if req.vocal == "voice_clone":
+        center = int((req.voice_timbre or {}).get("center_midi", 60))
+    else:
+        center = VOCAL_CENTER[req.vocal]
     instrumental = req.vocal == "instrumental" or not req.lyrics
     for sp in ir.sections:
         if instrumental or not sp.lines:

@@ -5,6 +5,7 @@ import { checkout, openPortal, redirectToUrl } from '../api/billing'
 import { useSessionStore } from '../stores/session'
 import { toast } from '../stores/toast'
 import { creditReasonLabel, formatDateTime, formatNum, planLabel } from '../lib/format'
+import ApiKeysCard from '../components/pricing/ApiKeysCard'
 import Pagination from '../components/common/Pagination'
 import { useT } from '../i18n'
 
@@ -309,6 +310,9 @@ export default function PricingView() {
         )}
         <Pagination page={txPage} totalPages={txTotalPages} onChange={setTxPage} />
       </div>
+
+      {/* 开放 API（FR-19 β） */}
+      <ApiKeysCard />
     </section>
   )
 }

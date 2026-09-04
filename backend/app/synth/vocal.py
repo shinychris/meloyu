@@ -35,7 +35,7 @@ def _formant_response(n_fft: int, f1: float, f2: float) -> np.ndarray:
 
 def _syllable_wave(f0: float, dur: float, vowel: str, rng: np.random.Generator,
                    n_harm: int, detune_cents: float = 0.0,
-                   prev_f0: float | None = None) -> np.ndarray:
+                   prev_f0: float | None = None, formant_scale: tuple[float, float] = (1.0, 1.0)) -> np.ndarray:
     """合成一个音节：加法合成锯齿源 → 共振峰滤波 → 包络。"""
     n = max(8, int(dur * SAMPLE_RATE))
     t = np.arange(n) / SAMPLE_RATE
@@ -64,7 +64,8 @@ def _syllable_wave(f0: float, dur: float, vowel: str, rng: np.random.Generator,
     n_fft = 1 << max(9, int(np.ceil(np.log2(n))))
     spec = np.fft.rfft(wave, n=n_fft)
     f1, f2 = FORMANTS.get(vowel, FORMANTS["a"])
-    spec *= _formant_response(n_fft, f1, f2)
+    # FR-5：voice_clone 按档案实测共振峰比例缩放（参数级适配，非采样）
+    spec *= _formant_response(n_fft, f1 * formant_scale[0], f2 * formant_scale[1])
     wave = np.fft.irfft(spec, n=n_fft)[:n]
 
     # 包络：20ms 起音 / 90ms 收尾 / 轻微衰减
@@ -89,6 +90,11 @@ def synth_vocal(ir: SongIR, rng: np.random.Generator, bus: np.ndarray) -> None:
     if req.vocal == "instrumental" or not ir.vocal_notes:
         return
     n_harm = 28 if req.model == "v1_pro" else 16
+    # FR-5：voice_clone 谐波数按档案亮度系数调整（限 12~40）
+    timbre = req.voice_timbre or {}
+    formant_scale = (float(timbre.get("f1_scale", 1.0)), float(timbre.get("f2_scale", 1.0)))
+    if timbre.get("harm_scale"):
+        n_harm = int(max(12, min(40, round(n_harm * float(timbre["harm_scale"])))))
     prev_f0: float | None = None
     for note in ir.vocal_notes:
         vowel = vowel_of_syllable(note.syllable, req.language)
@@ -99,7 +105,7 @@ def synth_vocal(ir: SongIR, rng: np.random.Generator, bus: np.ndarray) -> None:
             copies, detunes = 3, [-8.0, 0.0, 8.0]
         seg_total = np.zeros(max(8, int(note.dur * SAMPLE_RATE)))
         for dc in detunes:
-            seg = _syllable_wave(f0, note.dur, vowel, rng, n_harm, dc, prev_f0)
+            seg = _syllable_wave(f0, note.dur, vowel, rng, n_harm, dc, prev_f0, formant_scale)
             seg_total[:len(seg)] += seg
         seg_total /= copies
         seg_total *= note.vel * 0.9

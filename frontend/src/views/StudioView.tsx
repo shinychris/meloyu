@@ -12,6 +12,7 @@ import ParamPanel from '../components/studio/ParamPanel'
 import GenProgress from '../components/studio/GenProgress'
 import CandidateCard from '../components/studio/CandidateCard'
 import VersionTree from '../components/studio/VersionTree'
+import ReferencePanel from '../components/studio/ReferencePanel'
 
 const MODE_HINTS: Record<string, TranslationKey> = {
   simple: 'studio.modeHint.simple',
@@ -25,6 +26,8 @@ export default function StudioView() {
   const navigate = useNavigate()
   const t = useT()
   const [songEngine, setSongEngine] = useState('')
+  /** FR-4 参考音频面板开合（参考轨挂上后常显，可在面板内移除） */
+  const [refOpen, setRefOpen] = useState(false)
   const form = useStudioStore((s) => s.form)
   const { patchForm, markStep, submitGeneration } = useStudioStore()
   const task = useStudioStore((s) => s.task)
@@ -33,6 +36,7 @@ export default function StudioView() {
   const failureMessage = useStudioStore((s) => s.failureMessage)
   const workTitle = useStudioStore((s) => s.workTitle)
   const meta = useMetaStore((s) => s.meta)
+  const referenceTrack = useStudioStore((s) => s.referenceTrack)
 
   const creditCost = meta.models.find((m) => m.value === form.model)?.credit_cost ?? 12
   const modelLabel = meta.models.find((m) => m.value === form.model)?.label ?? 'V1 Pro'
@@ -50,8 +54,13 @@ export default function StudioView() {
   }, [locale])
 
   const onMode = (mode: string) => {
-    if (mode === 'ref' || mode === 'hum') {
-      toast(t(MODE_HINTS[mode]), 'warn')
+    if (mode === 'ref') {
+      setRefOpen((v) => !v)
+      toast(t(MODE_HINTS.ref))
+      return
+    }
+    if (mode === 'hum') {
+      toast(t(MODE_HINTS.hum), 'warn')
       return
     }
     patchForm({ mode: mode as typeof form.mode })
@@ -124,12 +133,14 @@ export default function StudioView() {
               {t('studio.mode.custom')}
             </span>
             <span
-              className="chip disabled"
-              title={t('studio.mode.comingSoon')}
-              style={{ opacity: 0.35, cursor: 'not-allowed' }}
+              className={`chip ${referenceTrack || refOpen ? 'on' : ''}`}
+              title={t('studio.modeHint.ref')}
               onClick={() => onMode('ref')}
             >
               {t('studio.mode.ref')}
+              {referenceTrack && (
+                <span className="dot ml-1" style={{ background: 'var(--acc)', display: 'inline-block' }}></span>
+              )}
             </span>
             <span
               className="chip disabled"
@@ -140,6 +151,10 @@ export default function StudioView() {
               {t('studio.mode.hum')}
             </span>
           </div>
+
+          {(refOpen || referenceTrack) && (
+            <ReferencePanel onClose={() => setRefOpen(false)} />
+          )}
 
           {form.mode === 'simple' ? (
             <>

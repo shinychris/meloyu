@@ -2,12 +2,16 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { Candidate, VersionTreeNode, Work } from '../types/api'
 import { getWork, getVersionTree, patchWork } from '../api/works'
+import { listSpaces, shareWork, unshareWork } from '../api/team'
+import type { TeamSpaceInfo } from '../types/api'
 import { adoptCandidate, listCandidates as fetchCandidates } from '../api/generation'
 import { usePlayerStore } from '../stores/player'
 import { toast } from '../stores/toast'
 import { useT } from '../i18n'
 import { formatDuration, keyLabel, sectionLabel, versionSourceLabel } from '../lib/format'
 import ExportPanel from '../components/work/ExportPanel'
+import CommentsPanel from '../components/work/CommentsPanel'
+import TeamPanel from '../components/work/TeamPanel'
 
 function depthOf(nodes: VersionTreeNode[], node: VersionTreeNode): number {
   const map = new Map(nodes.map((n) => [n.id, n]))
@@ -39,6 +43,38 @@ export default function WorkDetailView() {
   const [tagsDraft, setTagsDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const playTrack = usePlayerStore((s) => s.playTrack)
+  /** FR-13 协作上下文：共享空间/角色（详情接口返回；属主可管理） */
+  const [spaces, setSpaces] = useState<TeamSpaceInfo[]>([])
+  const isOwner = work?.is_owner ?? false
+  const myRole = work?.my_role ?? null
+
+  useEffect(() => {
+    if (isOwner) {
+      listSpaces().then((r) => setSpaces(r.items)).catch(() => {})
+    }
+  }, [isOwner, work?.space_id])
+
+  const doShare = async (spaceId: string) => {
+    if (!workId) return
+    try {
+      await shareWork(workId, spaceId)
+      const w = await getWork(workId)
+      setWork(w)
+    } catch {
+      /* 拦截器已 toast */
+    }
+  }
+
+  const doUnshare = async () => {
+    if (!workId) return
+    try {
+      await unshareWork(workId)
+      const w = await getWork(workId)
+      setWork(w)
+    } catch {
+      /* 拦截器已 toast */
+    }
+  }
 
   const loadCandidates = useCallback(async (versionId: string) => {
     try {
@@ -264,8 +300,55 @@ export default function WorkDetailView() {
               </div>
             ))}
           </div>
+          {selectedVersionId && isOwner && (
+            <div className="mt-4">
+              <div className="card p-3" data-testid="share-card">
+                <div className="label">{t('share.title')}</div>
+                {work.space_id ? (
+                  <div className="mt-2">
+                    <div className="text-[10px]" style={{ color: 'var(--muted)' }}>{t('share.sharedTo')}</div>
+                    <button className="btn btn-ghost w-full mt-1.5 !py-1 text-[10px]" onClick={() => void doUnshare()}>
+                      {t('share.unshare')}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-2 space-y-1">
+                    {spaces.length === 0 ? (
+                      <div className="text-[9px]" style={{ color: 'var(--dim)' }}>{t('share.noSpaces')}</div>
+                    ) : (
+                      spaces.map((sp) => (
+                        <button
+                          key={sp.id}
+                          className="btn btn-ghost w-full !py-1 text-[10px] text-left"
+                          onClick={() => void doShare(sp.id)}
+                        >
+                          {t('share.to', { name: sp.name })}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {selectedVersionId && work.space_id && (() => {
+            const sp = spaces.find((x) => x.id === work.space_id)
+            return sp ? (
+              <div className="mt-3">
+                <TeamPanel space={sp} onChanged={() => listSpaces().then((r) => setSpaces(r.items)).catch(() => {})} />
+              </div>
+            ) : null
+          })()}
+
           {selectedVersionId && (
-            <div className="mt-6">
+            <div className="mt-3">
+              <CommentsPanel workId={work.id} canComment={myRole !== null && myRole !== 'viewer'} />
+            </div>
+          )}
+
+          {selectedVersionId && (
+            <div className="mt-4">
               <ExportPanel versionId={selectedVersionId} work={work} />
             </div>
           )}

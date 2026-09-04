@@ -43,6 +43,8 @@ _ADD_COLUMNS: list[tuple[str, str, str]] = [
     # M-20260902-b：certificates 补证书×许可分流等级列（P0-1）
     ("certificates", "license_grade",
      "ALTER TABLE certificates ADD COLUMN license_grade VARCHAR(16) NOT NULL DEFAULT ''"),
+    # M-20260904-c：v0.8.3 团队空间——works 补共享空间列（FR-13）
+    ("works", "space_id", "ALTER TABLE works ADD COLUMN space_id VARCHAR(32)"),
 ]
 
 
@@ -105,6 +107,14 @@ def run(engine: Engine) -> list[str]:
         if ddl and "'export_release_zip'" not in ddl:
             _rebuild_table(conn, "files", "files__v08")
             applied.append("files.kind 增加 export_release_zip 枚举")
+
+        # M-20260904-b：v0.8.1 人声克隆——candidates.vocal 补 voice_clone（FR-5）
+        ddl = conn.execute(
+            text("SELECT sql FROM sqlite_master WHERE type='table' AND name='candidates'")
+        ).scalar_one_or_none()
+        if ddl and "'voice_clone'" not in ddl:
+            _rebuild_table(conn, "candidates", "candidates__v081")
+            applied.append("candidates.vocal 增加 voice_clone 枚举")
     if applied:
         logger.info(f"sqlite migrations applied: {', '.join(applied)}")
     return applied

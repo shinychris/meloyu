@@ -76,6 +76,7 @@ const VOCAL_KEYS: Record<VocalType, TranslationKey> = {
   male_clear: 'app.format.vocal.male_clear',
   choir: 'app.format.vocal.choir',
   instrumental: 'app.format.vocal.instrumental',
+  voice_clone: 'app.format.vocal.voice_clone',
 }
 
 export function vocalLabel(vocal: VocalType): string {

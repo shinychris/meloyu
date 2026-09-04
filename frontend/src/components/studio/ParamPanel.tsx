@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { useMetaStore } from '../../stores/meta'
 import { useStudioStore } from '../../stores/studio'
 import { useT, type TranslationKey } from '../../i18n'
 import type { KeyMode, Tonic } from '../../types/api'
+import VoicePanel from './VoicePanel'
 
 const DURATION_PRESETS: Array<{ label: TranslationKey; value: number }> = [
   { label: 'studio.param.durationFull', value: 210 },
@@ -17,6 +19,7 @@ export default function ParamPanel() {
   const { patchForm, markStep } = useStudioStore()
   const limits = meta.generation_limits
   const keyValue = `${form.keyTonic}|${form.keyMode}`
+  const [voiceOpen, setVoiceOpen] = useState(false)
 
   const onKeyChange = (v: string) => {
     const [tonic, mode] = v.split('|') as [Tonic, KeyMode]
@@ -42,6 +45,14 @@ export default function ParamPanel() {
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
+          {form.vocal === 'voice_clone' && !form.voiceProfileId && (
+            <div className="text-[9px] mt-1" style={{ color: 'var(--bad)' }}>{t('studio.voice.pickFirst')}</div>
+          )}
+          {form.vocal !== 'voice_clone' && !voiceOpen && (
+            <button className="text-[9px] mt-1 underline" style={{ color: 'var(--dim)' }} onClick={() => setVoiceOpen(true)}>
+              {t('studio.voice.manage')}
+            </button>
+          )}
         </div>
         <div>
           <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>{t('studio.param.key')}</div>
@@ -115,6 +126,8 @@ export default function ParamPanel() {
           onChange={(e) => { patchForm({ density: Number(e.target.value) }); markStep(3) }}
         />
       </div>
+      {(form.vocal === 'voice_clone' || voiceOpen) && <VoicePanel />}
+
       <div className="mt-2.5">
         <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>{t('studio.param.negative')}</div>
         <input

@@ -42,4 +42,14 @@ export const pricingZh: Record<keyof typeof pricingEn, string> = {
   'pricing.tx.balance': '余额',
   'pricing.tx.task': '关联任务',
   'pricing.tx.empty': '暂无流水记录',
+  // ===== 开放 API 密钥（FR-19，v0.8.2）=====
+  'apikey.title': '开放 API（β）',
+  'apikey.hint': '文本生歌 / 任务查询 / 作品列表 / 文件下载四个机器接口，密钥鉴权；按量计费直接扣本账号积分（与站内同价：v1_pro=12 / v1_fast=6），商用授权随账号档位×通道许可（证书同源）。',
+  'apikey.namePlaceholder': '密钥名（如 production）',
+  'apikey.issue': '签发密钥',
+  'apikey.revoke': '吊销',
+  'apikey.empty': '还没有密钥',
+  'apikey.freshNotice': '完整密钥仅此一次显示，请立即复制保存（丢失只能吊销重发）',
+  'apikey.toast.nameRequired': '请先填写密钥名',
+  'apikey.endpointHint': '调用方式：POST /api/v1/public/generations（X-API-Key 头）→ 轮询 GET /api/v1/public/tasks/{id} → succeeded 后按 downloads 链接下载。限流：生歌 30 次/小时（与站内共享额度）。',
 }

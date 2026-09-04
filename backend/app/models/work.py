@@ -70,6 +70,8 @@ class Work(BaseModel):
                    name="fk_works_preview_file")
     )
     trashed_at: Mapped[str | None] = mapped_column(ISOTimestamp())
+    # FR-13（v0.8.3）：共享到的团队空间（可空；同刻至多一个空间，走迁移补列）
+    space_id: Mapped[str | None] = mapped_column(String(32))
 
     user: Mapped[User] = relationship(back_populates="works")
     versions: Mapped[list[Version]] = relationship(

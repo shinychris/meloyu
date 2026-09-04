@@ -64,6 +64,8 @@ class SongRequest:
     language: str
     instrument_density: int
     seed: int
+    # FR-5（v0.8.2）：voice_clone 的音色参数（音域中心/共振峰缩放/谐波系数）
+    voice_timbre: dict | None = None
 
 
 @dataclass

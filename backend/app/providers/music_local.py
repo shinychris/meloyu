@@ -81,6 +81,7 @@ def _base_request(spec: dict) -> SongRequest:
         vocal=p.get("vocal", "female_air"), language=p.get("language", "zh"),
         instrument_density=p.get("instrument_density", 65),
         seed=int(spec.get("base_seed", 0)),
+        voice_timbre=p.get("voice_timbre"),
     )
 
 

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type {
   Candidate,
   GenerationSubmitRequest,
+  ReferenceTrack,
   GenerationSubmitResult,
   KeyMode,
   Language,
@@ -35,6 +36,8 @@ export interface StudioForm {
   vocal: VocalType
   language: Language
   density: number
+  /** FR-5：vocal=voice_clone 时必填（已验证音色档案 id） */
+  voiceProfileId?: string
 }
 
 export interface InspireSelection {
@@ -85,6 +88,10 @@ interface StudioState {
   submitting: boolean
   failureMessage: string | null
   opLog: string[]
+  /** FR-4 参考音频：挂到本次生成的参考轨（特征级，提交时带 reference_track_id） */
+  referenceTrack: ReferenceTrack | null
+  setReferenceTrack: (track: ReferenceTrack) => void
+  clearReferenceTrack: () => void
   patchForm: (patch: Partial<StudioForm>) => void
   setInspire: (patch: Partial<InspireSelection>) => void
   /** 把灵感组合写回风格描述（原型 composePrompt） */
@@ -180,7 +187,16 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   inferredStructure: false,
   submitting: false,
   failureMessage: null,
+  referenceTrack: null,
   opLog: [t('studio.log.templateLoaded')],
+
+  setReferenceTrack(track) {
+    set({ referenceTrack: track })
+  },
+
+  clearReferenceTrack() {
+    set({ referenceTrack: null })
+  },
 
   patchForm(patch) {
     set({ form: { ...get().form, ...patch } })
@@ -235,6 +251,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         vocal: form.vocal,
         language: form.language,
         instrument_density: form.density,
+        ...(form.vocal === 'voice_clone' && form.voiceProfileId
+          ? { voice_profile_id: form.voiceProfileId }
+          : {}),
       },
     }
     if (form.mode === 'simple') {
@@ -242,6 +261,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     } else {
       req.style_prompt = form.stylePrompt.trim()
       req.lyrics = form.lyrics
+    }
+    if (s.referenceTrack) {
+      req.reference_track_id = s.referenceTrack.id
     }
     set({ submitting: true, failureMessage: null, candidates: [], task: null })
     try {

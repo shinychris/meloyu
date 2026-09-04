@@ -96,6 +96,11 @@ def wav_segment_sha(content: bytes, start_sec: float, end_sec: float) -> str | N
         return None
 
 
+
+def _smoke_data_dir() -> str:
+    import os
+    return os.environ.get("DATA_DIR", str(Path(__file__).resolve().parent.parent / "data"))
+
 def main() -> int:
     global BASE, API
     parser = argparse.ArgumentParser()
@@ -1394,6 +1399,339 @@ def main() -> int:
     })
     check("16.7 正常风格描述不被误拦（201）", r.status_code == 201,
           json.dumps(unwrap(r))[:120])
+
+    # ============ 17. FR-4 参考音频（v0.8.1） ============
+    import io as _io
+    import struct as _struct
+    import wave as _wave
+
+    def _smoke_ref_wav(bpm: int, sr: int = 22050, dur: float = 20.0) -> bytes:
+        n = int(dur * sr)
+        x = __import__("numpy").random.default_rng(7).normal(0, 0.02, n)
+        beat = int(sr * 60.0 / bpm)
+        for k in range(0, n - sr // 40, beat):
+            L = sr // 40
+            env = __import__("numpy").exp(__import__("numpy").linspace(0, 8, L))
+            x[k:k + L] += 0.8 * env * __import__("numpy").sin(
+                2 * 3.14159265 * 2000 * __import__("numpy").arange(L) / sr)
+        x = (x / abs(x).max() * 0.7 * 32767).astype("<i2")
+        buf = _io.BytesIO()
+        with _wave.open(buf, "wb") as wf:
+            wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(sr)
+            wf.writeframes(x.tobytes())
+        return buf.getvalue()
+
+    r = client.post(f"{API}/reference-tracks", headers=auth_headers(token),
+                    params={"filename": "ref.wav"}, content=_smoke_ref_wav(120))
+    b = unwrap(r)
+    ref_track = b["data"]
+    check("17.1 POST /reference-tracks（wav 上传即分析）",
+          r.status_code == 201 and b["data"]["analyzed"] is True
+          and 60 <= b["data"]["analysis"]["bpm"] <= 174
+          and "非采样" in b["data"]["notice"] and "no waveform" in b["data"]["notice"],
+          json.dumps(b)[:150])
+    r = client.post(f"{API}/reference-tracks", headers=auth_headers(token),
+                    params={"filename": "bad.flac"}, content=b"x" * 100)
+    check("17.1 非法扩展名 → 40001", r.status_code == 422
+          and unwrap(r)["code"] == 40001)
+    r = client.post(f"{API}/reference-tracks", headers=auth_headers(token),
+                    params={"filename": "song.mp3"}, content=bytes([0xFF, 0xFB]) + b"0" * 2048)
+    b = unwrap(r)
+    mp3_track = b["data"]
+    check("17.1 mp3 上传 → 未分析（待浏览器解码补传）",
+          r.status_code == 201 and mp3_track["analyzed"] is False)
+    r = client.post(f"{API}/generations", headers=auth_headers(token), json={
+        "mode": "custom", "style_prompt": "night drive synthwave",
+        "params": {"duration_sec": 30, "vocal": "instrumental"},
+        "reference_track_id": mp3_track["id"],
+    })
+    check("17.2 未分析参考用于生成 → 40901 可读指引", r.status_code == 409
+          and unwrap(r)["code"] == 40901)
+    r = client.post(f"{API}/reference-tracks/{mp3_track['id']}/analysis-wav",
+                    headers=auth_headers(token), content=_smoke_ref_wav(96))
+    b = unwrap(r)
+    check("17.3 POST /reference-tracks/{id}/analysis-wav（补传后分析）",
+          r.status_code == 200 and b["data"]["analyzed"] is True
+          and b["data"]["analysis"]["duration_sec"] > 0, json.dumps(b)[:150])
+    r = client.get(f"{API}/reference-tracks", headers=auth_headers(token))
+    b = unwrap(r)
+    check("17.4 GET /reference-tracks（列表）", r.status_code == 200
+          and b["data"]["total"] >= 2 and len(b["data"]["items"]) >= 2)
+    # 参考生成 E2E：参数覆盖 + 留痕（30s 器乐，走当前默认引擎）
+    r = client.post(f"{API}/generations", headers=auth_headers(token), json={
+        "mode": "custom", "style_prompt": "night drive synthwave",
+        "params": {"duration_sec": 30, "vocal": "instrumental"},
+        "reference_track_id": ref_track["id"],
+    })
+    b = unwrap(r)
+    ref_gen_ok = r.status_code == 201
+    check("17.5 参考生成提交（201）", ref_gen_ok, json.dumps(b)[:150])
+    if ref_gen_ok:
+        gtask = wait_task(client, b["data"]["task"]["id"], token, timeout=300)
+        check("17.5 参考生成执行成功", gtask["status"] == "succeeded",
+              json.dumps(gtask.get("error", ""))[:150])
+        wid = b["data"]["work"]["id"]
+        r = client.get(f"{API}/works/{wid}", headers=auth_headers(token))
+        wdet = unwrap(r)["data"]
+        ref_bpm = ref_track["analysis"]["bpm"]
+        check("17.5 参考特征落到作品快照（bpm/key 来自分析值）",
+              wdet["bpm"] == ref_bpm
+              and wdet["key"]["tonic"] == ref_track["analysis"]["key_tonic"]
+              and wdet["key"]["mode"] == ref_track["analysis"]["key_mode"],
+              f"work={wdet['bpm']}/{wdet['key']} ref={ref_bpm}")
+    r = client.delete(f"{API}/reference-tracks/{mp3_track['id']}",
+                      headers=auth_headers(token))
+    check("17.6 DELETE /reference-tracks/{id}", r.status_code == 200
+          and unwrap(r)["data"]["ok"] is True)
+    r = client.get(f"{API}/reference-tracks/{mp3_track['id']}",
+                   headers=auth_headers(token))
+    check("17.6 删除后读取 → 40401", r.status_code == 404
+          and unwrap(r)["code"] == 40401)
+
+    # ============ 18. FR-5 我的音色（v0.8.2） ============
+    np_ = __import__("numpy")
+
+    def _smoke_voice_wav(f0: float, formant: float, seed: int, sr: int = 22050,
+                         dur: float = 4.0) -> bytes:
+        rng = np_.random.default_rng(seed)
+        n = int(dur * sr)
+        t = np_.arange(n) / sr
+        f0_t = f0 * (1.0 + 0.03 * np_.sin(2 * 3.14159265 * 1.7 * t)
+                     + 0.01 * rng.standard_normal(n).cumsum() / n)
+        phase = 2 * 3.14159265 * np_.cumsum(f0_t) / sr
+        x = np_.zeros(n)
+        for k in range(1, 25):
+            x += (1.0 / k) * np_.sin(k * phase)
+        x += 0.6 * np_.sin(2 * 3.14159265 * 800 * formant * t) * (0.5 + 0.5 * np_.sin(2 * 3.14159265 * 3 * t))
+        x += 0.4 * np_.sin(2 * 3.14159265 * 1200 * formant * t) * (0.5 + 0.5 * np_.sin(2 * 3.14159265 * 2.2 * t))
+        x = (x / np_.abs(x).max() * 0.6 * 32767).astype("<i2")
+        buf = _io.BytesIO()
+        with _wave.open(buf, "wb") as wf:
+            wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(sr)
+            wf.writeframes(x.tobytes())
+        return buf.getvalue()
+
+    r = client.post(f"{API}/voice-profiles", headers=auth_headers(token),
+                    params={"name": "我的音色"})
+    b = unwrap(r)
+    vp = b["data"]
+    check("18.1 POST /voice-profiles 注册（下发随机短语1）",
+          r.status_code == 201 and vp["status"] == "pending" and vp["phrase1"]
+          and vp["phrase2"] is None, json.dumps(b)[:150])
+    r = client.post(f"{API}/voice-profiles/{vp['id']}/samples",
+                    headers=auth_headers(token), params={"step": 1},
+                    content=_smoke_voice_wav(180, 1.0, seed=1))
+    b = unwrap(r)
+    vp = b["data"]
+    check("18.1 样本1提交 → 短语2后发且不同（防重放）",
+          r.status_code == 200 and vp["phrase2"] and vp["phrase2"] != vp["phrase1"])
+    r = client.post(f"{API}/generations", headers=auth_headers(token), json={
+        "mode": "custom", "style_prompt": "dream pop with airy pads",
+        "params": {"duration_sec": 30, "vocal": "voice_clone",
+                   "voice_profile_id": vp["id"]},
+    })
+    check("18.2 未验证音色用于生成 → 40901", r.status_code == 409
+          and unwrap(r)["code"] == 40901)
+    r = client.post(f"{API}/voice-profiles/{vp['id']}/samples",
+                    headers=auth_headers(token), params={"step": 2},
+                    content=_smoke_voice_wav(180, 1.0, seed=11))
+    b = unwrap(r)
+    vp = b["data"]
+    check("18.3 同人样本2 → verified + timbre + 留痕2条",
+          r.status_code == 200 and vp["status"] == "verified"
+          and vp["timbre"] and vp["verify_score"] is not None
+          and len(vp["consent_log"]) == 2, json.dumps(b)[:200])
+    # 他人音频档案：样本2 用显著不同的“人”（低沉男声）→ 不通过
+    r = client.post(f"{API}/voice-profiles", headers=auth_headers(token),
+                    params={"name": "冒名档案"})
+    vp_bad = unwrap(r)["data"]
+    client.post(f"{API}/voice-profiles/{vp_bad['id']}/samples",
+                headers=auth_headers(token), params={"step": 1},
+                content=_smoke_voice_wav(180, 1.0, seed=2))
+    r = client.post(f"{API}/voice-profiles/{vp_bad['id']}/samples",
+                    headers=auth_headers(token), params={"step": 2},
+                    content=_smoke_voice_wav(95, 0.75, seed=5))
+    vp_bad = unwrap(r)["data"]
+    check("18.3 他人音频做样本2 → 拒绝（status≠verified）",
+          vp_bad["status"] != "verified", f"status={vp_bad['status']}")
+    # 音色克隆生成 E2E（本地引擎）
+    r = client.post(f"{API}/generations", headers=auth_headers(token), json={
+        "mode": "custom", "style_prompt": "dream pop with airy pads",
+        "params": {"duration_sec": 30, "vocal": "voice_clone",
+                   "voice_profile_id": vp["id"]},
+    })
+    b = unwrap(r)
+    vc_ok = r.status_code == 201
+    check("18.4 voice_clone 生成提交（201，vocal=我的音色）", vc_ok,
+          json.dumps(b)[:150])
+    if vc_ok:
+        gtask = wait_task(client, b["data"]["task"]["id"], token, timeout=300)
+        check("18.4 voice_clone 生成执行成功", gtask["status"] == "succeeded",
+              json.dumps(gtask.get("error", ""))[:150])
+        r = client.get(f"{API}/versions/{gtask['version_id']}", headers=auth_headers(token))
+        # version 详情不直接暴露 params？改查任务 payload 口径：留痕在 request_payload
+        from app.models import Task as _T, Version as _V  # noqa: F401
+        import sqlite3 as _sq
+        conn = _sq.connect(str(Path(_smoke_data_dir()) / "meloyu.db"))
+        row = conn.execute(
+            "SELECT request_payload FROM tasks WHERE id=?", (gtask["id"],)).fetchone()
+        conn.close()
+        snap = json.loads(row[0]) if row else {}
+        check("18.4 voice 留痕（voice_clone=true + profile/活体口径）",
+              snap.get("voice", {}).get("voice_clone") is True
+              and snap["voice"]["voice_profile_id"] == vp["id"]
+              and snap["voice"]["liveness"] == "two_random_phrases")
+    r = client.get(f"{API}/voice-profiles", headers=auth_headers(token))
+    b = unwrap(r)
+    check("18.5 GET /voice-profiles（列表）", r.status_code == 200
+          and b["data"]["total"] >= 2)
+    r = client.delete(f"{API}/voice-profiles/{vp_bad['id']}", headers=auth_headers(token))
+    check("18.6 DELETE /voice-profiles/{id}（删除=吊销）", r.status_code == 200
+          and unwrap(r)["data"]["ok"] is True)
+
+    # ============ 19. FR-13 团队空间与协作评论（v0.8.1） ============
+    mate_email = f"mate_{uuid.uuid4().hex[:8]}@meloyu.test"
+    r = client.post(f"{API}/auth/register", json={"email": mate_email,
+                                                  "password": "Smoke1234",
+                                                  "nickname": "队友"})
+    mate_token = unwrap(r)["data"]["access_token"]
+    r = client.post(f"{API}/team/spaces", headers=auth_headers(token),
+                    json={"name": "冒烟小队"})
+    b = unwrap(r)
+    space = b["data"]
+    check("19.1 POST /team/spaces（创建即含 owner 成员）",
+          r.status_code == 201 and space["my_role"] == "owner"
+          and space["member_count"] == 1, json.dumps(b)[:150])
+    r = client.post(f"{API}/team/spaces/{space['id']}/members",
+                    headers=auth_headers(token),
+                    json={"email": mate_email, "role": "viewer"})
+    b = unwrap(r)
+    check("19.1 添加 viewer 成员", r.status_code == 200 and b["data"]["member_count"] == 2)
+    r = client.post(f"{API}/works/{work_id}/share", headers=auth_headers(token),
+                    json={"space_id": space["id"]})
+    check("19.2 POST /works/{id}/share", r.status_code == 200
+          and unwrap(r)["data"]["space_id"] == space["id"])
+    # viewer 成员：可读详情/评论列表，不可评论、不可改标题
+    r = client.get(f"{API}/works/{work_id}", headers=auth_headers(mate_token))
+    b = unwrap(r)
+    check("19.3 viewer 读共享作品（详情含 my_role/space_id）",
+          r.status_code == 200 and b["data"]["my_role"] == "viewer"
+          and b["data"]["space_id"] == space["id"])
+    r = client.post(f"{API}/works/{work_id}/comments", headers=auth_headers(mate_token),
+                    json={"time_sec": 10, "body": "viewer 不该能发"})
+    check("19.3 viewer 评论 → 40301", r.status_code == 403)
+    r = client.patch(f"{API}/works/{work_id}", headers=auth_headers(mate_token),
+                     json={"title": "越权改名"})
+    check("19.3 viewer 改标题 → 40301", r.status_code == 403)
+    # 升级 commenter：可评论、锚点排序、resolve 自己的（member user_id 从空间详情取）
+    r = client.get(f"{API}/team/spaces/{space['id']}", headers=auth_headers(token))
+    mate_id = next(m["user_id"] for m in unwrap(r)["data"]["members"]
+                   if m["role"] == "viewer")
+    r = client.patch(f"{API}/team/spaces/{space['id']}/members/{mate_id}",
+                     headers=auth_headers(token), json={"role": "commenter"})
+    check("19.4 升级 commenter", r.status_code == 200)
+    r = client.post(f"{API}/works/{work_id}/comments", headers=auth_headers(mate_token),
+                    json={"time_sec": 20.5, "body": "副歌混响再多点"})
+    c_mid = unwrap(r)["data"]
+    check("19.4 commenter 评论（锚定 120.5s）", r.status_code == 201
+          and abs(c_mid["time_sec"] - 20.5) < 0.01)
+    r = client.post(f"{API}/works/{work_id}/comments", headers=auth_headers(token),
+                    json={"time_sec": 3.2, "body": "开头轻一点"})
+    c_owner = unwrap(r)["data"]
+    r = client.post(f"{API}/works/{work_id}/comments", headers=auth_headers(mate_token),
+                    json={"time_sec": 999, "body": "超界锚点"})
+    check("19.4 锚点超时间轴 → 40001", r.status_code == 422
+          and unwrap(r)["code"] == 40001)
+    r = client.get(f"{API}/works/{work_id}/comments", headers=auth_headers(mate_token))
+    items = unwrap(r)["data"]["items"]
+    check("19.5 GET /works/{id}/comments（按时间轴排序）",
+          r.status_code == 200 and len(items) == 2
+          and items[0]["id"] == c_owner["id"] and items[1]["id"] == c_mid["id"])
+    r = client.patch(f"{API}/comments/{c_mid['id']}", headers=auth_headers(mate_token),
+                     json={"resolved": True})
+    check("19.5 作者 resolve 评论", r.status_code == 200
+          and unwrap(r)["data"]["resolved"] is True)
+    # editor：可改标题
+    r = client.patch(f"{API}/team/spaces/{space['id']}/members/{mate_id}",
+                     headers=auth_headers(token), json={"role": "editor"})
+    r = client.patch(f"{API}/works/{work_id}", headers=auth_headers(mate_token),
+                     json={"title": "队友改名"})
+    check("19.6 editor 改标题（角色写权）", r.status_code == 200
+          and unwrap(r)["data"]["title"] == "队友改名")
+    # editor 不可删除作品（owner_only）
+    r = client.delete(f"{API}/works/{work_id}", headers=auth_headers(mate_token))
+    check("19.6 editor 删除作品 → 40301（owner 专属）", r.status_code == 403)
+    # 取消共享 → 成员失权
+    r = client.delete(f"{API}/works/{work_id}/share", headers=auth_headers(token))
+    check("19.7 DELETE /works/{id}/share", r.status_code == 200)
+    r = client.get(f"{API}/works/{work_id}", headers=auth_headers(mate_token))
+    check("19.7 取消共享后成员 → 40301", r.status_code == 403)
+    # 恢复属主标题（后续节不受影响）+ 共享状态复位完成
+    client.patch(f"{API}/works/{work_id}", headers=auth_headers(token),
+                 json={"title": "冒烟作品改名"})
+
+    # ============ 20. FR-19 开放 API β（v0.8.2） ============
+    r = client.post(f"{API}/api-keys", headers=auth_headers(token),
+                    json={"name": "冒烟密钥"})
+    b = unwrap(r)
+    apikey = b["data"]
+    check("20.1 POST /api-keys（完整 key 仅此一次）",
+          r.status_code == 201 and apikey["key"].startswith("meloyu_sk_")
+          and len(apikey["key"]) == len("meloyu_sk_") + 40
+          and apikey["notice"], json.dumps(b)[:150])
+    r = client.get(f"{API}/api-keys", headers=auth_headers(token))
+    b = unwrap(r)
+    check("20.1 GET /api-keys（列表仅前缀）", r.status_code == 200
+          and b["data"]["total"] >= 1 and "key" not in b["data"]["items"][0])
+    r = client.get(f"{API}/public/works", headers={"X-API-Key": apikey["key"]})
+    check("20.2 GET /public/works（X-API-Key）", r.status_code == 200
+          and "items" in unwrap(r)["data"])
+    r = client.get(f"{API}/public/works",
+                   headers={"X-API-Key": "meloyu_sk_deadbeef00"})
+    check("20.2 无效 key → 40101", r.status_code == 401)
+    # 公开生歌（按量计费走积分）+ via 留痕 + 任务查询 + 下载
+    bal_before = client.get(f"{API}/credits/balance",
+                            headers=auth_headers(token)).json()["data"]["balance"]
+    r = client.post(f"{API}/public/generations", headers={"X-API-Key": apikey["key"]},
+                    json={"mode": "custom", "style_prompt": "lofi study beat",
+                          "params": {"duration_sec": 30, "vocal": "instrumental"}})
+    b = unwrap(r)
+    pub_ok = r.status_code == 201 and b["data"]["poll"].endswith(
+        b["data"]["task"]["id"])
+    check("20.3 POST /public/generations（201 + poll 指引）", pub_ok,
+          json.dumps(b)[:150])
+    if pub_ok:
+        ptid = b["data"]["task"]["id"]
+        # 密钥侧轮询
+        for _ in range(200):
+            pr = client.get(f"{API}/public/tasks/{ptid}",
+                            headers={"X-API-Key": apikey["key"]})
+            td = unwrap(pr)["data"]
+            if td["status"] in ("succeeded", "failed", "canceled"):
+                break
+            time.sleep(1.5)
+        check("20.4 GET /public/tasks/{id}（终态+downloads）",
+              td["status"] == "succeeded" and td.get("downloads"),
+              json.dumps(td.get("error", ""))[:150])
+        if td.get("downloads"):
+            dl = td["downloads"][0]  # 服务端返回相对路径，客户端自行拼 base
+            r = client.get(f"{BASE}{dl}", headers={"X-API-Key": apikey["key"]})
+            check("20.5 GET /public/files/{id}/download（密钥鉴权下载）",
+                  r.status_code == 200
+                  and r.headers.get("content-disposition", "").startswith("attachment"))
+            r = client.get(f"{BASE}{dl}", headers={"X-API-Key": "meloyu_sk_wrong"})
+            check("20.5 错误 key 下载 → 40101", r.status_code == 401)
+        bal_after = client.get(f"{API}/credits/balance",
+                               headers=auth_headers(token)).json()["data"]["balance"]
+        check("20.3 按量计费（积分扣 12：站内账本）", bal_before - bal_after == 12,
+              f"{bal_before} -> {bal_after}")
+    # 吊销后鉴权失效
+    kid = client.get(f"{API}/api-keys", headers=auth_headers(token)).json()         ["data"]["items"][0]["id"]
+    r = client.delete(f"{API}/api-keys/{kid}", headers=auth_headers(token))
+    check("20.6 DELETE /api-keys/{id}（吊销）", r.status_code == 200
+          and unwrap(r)["data"]["ok"] is True)
+    r = client.get(f"{API}/public/works", headers={"X-API-Key": apikey["key"]})
+    check("20.6 吊销后 → 40101", r.status_code == 401)
 
     # ============ 汇总 ============
     passed = sum(1 for _, ok, _ in results if ok)

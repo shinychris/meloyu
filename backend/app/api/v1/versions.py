@@ -29,7 +29,7 @@ def version_tree(work_id: str, user: User = Depends(get_current_user),
 @router.get("/versions/{version_id}")
 def get_version(version_id: str, user: User = Depends(get_current_user),
                 db: Session = Depends(get_db)):
-    version = works_svc.get_version_owned(db, version_id, user)
+    version = works_svc.get_version_owned(db, version_id, user, min_role="viewer")
     return ok(version_to_dict(version))
 
 
@@ -44,7 +44,7 @@ def version_audio(version_id: str, request: Request,
                   user: User | None = Depends(get_current_user_optional),
                   db: Session = Depends(get_db)):
     u = af.user_from_request_or_token(db, request, user)
-    version = works_svc.get_version_owned(db, version_id, u)
+    version = works_svc.get_version_owned(db, version_id, u, min_role="viewer")
     if not version.active_candidate_id:
         raise err_conflict(tr("该版本尚未采用候选", "No candidate adopted for this version yet"))
     f = db.execute(select(File).where(

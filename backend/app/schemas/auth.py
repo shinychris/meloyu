@@ -142,6 +142,8 @@ class GenerationParams(BaseModel):
     vocal: str = Field(default="female_air")
     language: str = Field(default="zh")
     instrument_density: int = Field(default=65, ge=0, le=100)
+    # FR-5（v0.8.2）：vocal=voice_clone 时必填（已验证的本人音色档案）
+    voice_profile_id: str | None = Field(default=None, max_length=32)
 
     @field_validator("time_signature")
     @classmethod
@@ -186,6 +188,8 @@ class GenerationRequest(BaseModel):
     simplified: bool = False
     seed: int | None = Field(default=None, ge=0, le=4294967295)
     params: GenerationParams = Field(default_factory=GenerationParams)
+    # FR-4 参考音频（v0.8.1）：特征级参考——分析值覆盖 bpm/调性/器乐密度
+    reference_track_id: str | None = Field(default=None, max_length=32)
 
     @field_validator("mode")
     @classmethod
@@ -201,7 +205,7 @@ class GenerationRequest(BaseModel):
             raise ValueError(tr("model 必须为 v1_pro/v1_fast", "model must be v1_pro/v1_fast"))
         return v
 
-    @field_validator("work_id", "parent_version_id")
+    @field_validator("work_id", "parent_version_id", "reference_track_id")
     @classmethod
     def _uuids(cls, v: str | None) -> str | None:
         return _check_uuid(v)
@@ -224,6 +228,7 @@ class GenerationRequest(BaseModel):
             "negative_prompt": self.negative_prompt, "model": self.model,
             "work_id": self.work_id, "parent_version_id": self.parent_version_id,
             "simplified": self.simplified, "seed": self.seed, "params": p,
+            "reference_track_id": self.reference_track_id,
         }
 
 

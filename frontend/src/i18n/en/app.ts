@@ -48,6 +48,7 @@ export const appEn = {
   'app.format.vocal.male_clear': 'Male · clear',
   'app.format.vocal.choir': 'Choir',
   'app.format.vocal.instrumental': 'Instrumental',
+  'app.format.vocal.voice_clone': 'My voice',
   'app.format.credit.signup_bonus': 'Signup bonus',
   'app.format.credit.generation': 'Generation spend',
   'app.format.credit.refund': 'Failed-run refund',

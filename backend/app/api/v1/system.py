@@ -28,6 +28,8 @@ _VOCAL_LABELS = {
     "male_clear": ("男声 · 清朗", "Male · clear"),
     "choir": ("合唱", "Choir"),
     "instrumental": ("纯器乐", "Instrumental"),
+    # FR-5（v0.8.2）：本人音色档案（需已验证 voice_profile_id，仅本地引擎）
+    "voice_clone": ("我的音色（已验证）", "My voice (verified)"),
 }
 _LANG_LABELS = {"zh": ("中文（普通话）", "Chinese (Mandarin)"), "yue": ("粤语", "Cantonese"),
                 "en": ("英语", "English"), "ja": ("日语", "Japanese")}

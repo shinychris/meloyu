@@ -144,6 +144,20 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     return user
 
 
+def get_user_from_api_key(request: Request, db: Session = Depends(get_db)) -> tuple[User, object]:
+    """开放 API 鉴权（FR-19）：Authorization: Bearer meloyu_sk_* 或 X-API-Key 头。
+
+    返回 (User, ApiKey 行)；密钥即账号身份的机器代理——计费走账号积分账本，
+    商用授权随账号档位×通道许可（证书同源），任务留痕 via=api_key。
+    """
+    from app.services.api_keys import authenticate
+    raw = _extract_bearer(request) or request.headers.get("X-API-Key")
+    user, key_row = authenticate(db, raw)
+    request.state.request_id = current_request_id()
+    request.state.api_key_id = key_row.id
+    return user, key_row
+
+
 def get_current_user_optional(request: Request, db: Session = Depends(get_db)) -> User | None:
     """可选鉴权：无 Authorization 头返回 None（供 ?st= 流地址端点）；
     有头但无效仍然抛 40101/40102。"""

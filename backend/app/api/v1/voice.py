@@ -1,0 +1,52 @@
+"""人声音色档案路由（FR-5，v0.8.2）：octet-stream 采样上传（与参考音频同协议）。"""
+from __future__ import annotations
+
+from fastapi import APIRouter, Body, Depends, Query
+from sqlalchemy.orm import Session
+
+from app.core.responses import ok
+from app.core.security import get_current_user
+from app.database import get_db
+from app.models import User
+from app.services import voice as voice_svc
+
+router = APIRouter(tags=["voice"])
+
+
+@router.post("/voice-profiles", status_code=201)
+def enroll_voice_profile(
+    name: str = Query(min_length=1, max_length=60),
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """注册音色档案（步骤0）：服务端下发随机短语1，客户端录音回传 samples?step=1。"""
+    return ok(voice_svc.enroll(db, user, name), status_code=201)
+
+
+@router.post("/voice-profiles/{profile_id}/samples")
+def submit_voice_sample(
+    profile_id: str, step: int = Query(ge=1, le=2),
+    body: bytes = Body(media_type="application/octet-stream"),
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """上传朗读采样（mono wav，浏览器解码渲染）。
+
+    step=1 存样本并下发短语2；step=2 双样本同人校验 → verified（timbre 随响应返回）。
+    """
+    return ok(voice_svc.submit_sample(db, user, profile_id, step, body))
+
+
+@router.get("/voice-profiles")
+def list_voice_profiles(user: User = Depends(get_current_user),
+                        db: Session = Depends(get_db)):
+    return ok(voice_svc.list_profiles(db, user))
+
+
+@router.get("/voice-profiles/{profile_id}")
+def get_voice_profile(profile_id: str, user: User = Depends(get_current_user),
+                      db: Session = Depends(get_db)):
+    return ok(voice_svc.profile_to_dict(voice_svc.get_owned(db, user, profile_id)))
+
+
+@router.delete("/voice-profiles/{profile_id}")
+def delete_voice_profile(profile_id: str, user: User = Depends(get_current_user),
+                         db: Session = Depends(get_db)):
+    """删除=吊销：档案与采样清除（FR-5：仅本人可操作）。"""
+    return ok(voice_svc.delete_profile(db, user, profile_id))

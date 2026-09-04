@@ -9,6 +9,7 @@ TIME_SIGNATURES = ("4/4", "3/4", "6/8")
 VOCALS = (
     "female_air", "female_bright", "female_deep",
     "male_magnetic", "male_clear", "choir", "instrumental",
+    "voice_clone",  # v0.8.2（FR-5）：本人音色档案（须 voice_profile_id，仅本地引擎）
 )
 LANGUAGES = ("zh", "yue", "en", "ja")
 SECTIONS = ("intro", "verse", "pre_chorus", "chorus", "bridge", "outro")
