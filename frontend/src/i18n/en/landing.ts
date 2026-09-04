@@ -277,4 +277,6 @@ export const landingEn = {
   'landing.data.milestone.10.title': 'Reference audio & voice cloning (V1.1)',
   'landing.data.milestone.12.title': 'Open API: keys & usage billing',
   'landing.data.milestone.13.title': 'Multi-track editor: mix, retune & save (V2)',
+  'landing.data.milestone.14.title': 'Leadsheet generation: notation + lyrics + chords PDF',
+  'landing.data.milestone.15.title': 'Marketplace: trade, split & licenses (V2 wrap-up)',
 } as const

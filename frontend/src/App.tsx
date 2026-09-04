@@ -19,6 +19,7 @@ const PricingView = lazy(() => import('./views/PricingView'))
 const ModelCenterView = lazy(() => import('./views/ModelCenterView'))
 const ComingSoonView = lazy(() => import('./views/ComingSoonView'))
 const ArrangementView = lazy(() => import('./views/ArrangementView'))
+const MarketView = lazy(() => import('./views/MarketView'))
 const BillingReturnView = lazy(() => import('./views/BillingReturnView'))
 const ResetPasswordView = lazy(() => import('./views/ResetPasswordView'))
 import { useSessionStore } from './stores/session'
@@ -171,6 +172,7 @@ function RootRoutes() {
           <Route path="/studio" element={<StudioView />} />
           <Route path="/lyrics" element={<LyricsView />} />
           <Route path="/arrange" element={<ArrangementView />} />
+          <Route path="/market" element={<MarketView />} />
           <Route path="/edit" element={<ComingSoonView kind="edit" />} />
           <Route path="/pitch" element={<ComingSoonView kind="pitch" />} />
           <Route path="/library" element={<LibraryView />} />

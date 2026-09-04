@@ -69,3 +69,8 @@ export async function downloadCertificate(versionId: string, filename: string): 
   const blob = await apiBlob(`/versions/${versionId}/certificate`)
   saveBlob(blob, filename)
 }
+
+/** GET /versions/{id}/leadsheet?format=pdf —— 词谱 PDF（简谱+歌词+和弦，v0.10.0） */
+export function downloadLeadsheet(versionId: string, filename: string): Promise<void> {
+  return apiBlob(`/versions/${versionId}/leadsheet?format=pdf`).then((blob) => saveBlob(blob, filename))
+}

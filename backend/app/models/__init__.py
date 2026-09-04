@@ -3,6 +3,7 @@ from app.models.api_key import ApiKey
 from app.models.base import Base, BaseModel, ISOTimestamp, new_uuid, utc_now_iso
 from app.models.certificate import Certificate
 from app.models.llm_setting import SETTING_ID, LLMSetting, ModelOp
+from app.models.market import MarketListing, MarketOrder
 from app.models.lyrics import LyricsProject
 from app.models.order import Order
 from app.models.reference import ReferenceTrack
@@ -21,5 +22,5 @@ __all__ = [
     "Work", "Version", "Candidate", "EditEvent",
     "Task", "File", "TeamSpace", "TeamMember", "WorkComment", "TasteProfile",
     "Certificate", "LyricsProject",
-    "LLMSetting", "ModelOp", "SETTING_ID", "Order", "ReferenceTrack", "VoiceProfile",
+    "LLMSetting", "ModelOp", "SETTING_ID", "Order", "MarketListing", "MarketOrder", "ReferenceTrack", "VoiceProfile",
 ]

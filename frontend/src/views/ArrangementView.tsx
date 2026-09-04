@@ -14,6 +14,7 @@ import { useT } from '../i18n'
 import { formatDuration } from '../lib/format'
 
 const STEM_NAMES = ['vocals', 'drums', 'bass', 'other'] as const
+const EQ_KEYS = { low: 'editor.eq.low', mid: 'editor.eq.mid', high: 'editor.eq.high' } as const
 const STEM_LABEL_KEYS: Record<string, 'editor.stem.vocals' | 'editor.stem.drums' | 'editor.stem.bass' | 'editor.stem.other'> = {
   vocals: 'editor.stem.vocals',
   drums: 'editor.stem.drums',
@@ -375,7 +376,7 @@ export default function ArrangementView() {
                   </label>
                   {(['low', 'mid', 'high'] as const).map((band) => (
                     <label key={band} className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--dim)' }}>
-                      {t(`editor.eq.${band}` as never)}
+                      {t(EQ_KEYS[band])}
                       <input
                         type="range"
                         min={-12}

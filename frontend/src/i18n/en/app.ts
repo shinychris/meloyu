@@ -22,6 +22,7 @@ export const appEn = {
   'app.sidebar.nav.pitch': 'Pitch Correction',
   'app.sidebar.nav.library': 'Library',
   'app.sidebar.nav.rights': 'Rights & Compliance',
+  'app.sidebar.nav.market': 'Marketplace',
   'app.sidebar.nav.pricing': 'Pricing & Credits',
   'app.sidebar.nav.models': 'Model Center',
   'app.sidebar.onboarding': 'Take the Tour',

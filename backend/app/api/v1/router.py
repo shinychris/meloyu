@@ -10,6 +10,7 @@ from app.api.v1 import (
     files,
     generations,
     lyrics,
+    market,
     models,
     public,
     reference,
@@ -35,6 +36,7 @@ api_router.include_router(models.router)
 api_router.include_router(reference.router)
 api_router.include_router(team.router)
 api_router.include_router(taste.router)
+api_router.include_router(market.router)
 api_router.include_router(works.router)
 api_router.include_router(versions.router)
 api_router.include_router(exports.router)

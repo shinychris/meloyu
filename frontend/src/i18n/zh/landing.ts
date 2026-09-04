@@ -286,4 +286,6 @@ export const landingZh: Record<keyof typeof landingEn, string> = {
   'landing.data.milestone.10.title': '参考音频与人声克隆（V1.1）',
   'landing.data.milestone.12.title': '开放 API：密钥与按量计费',
   'landing.data.milestone.13.title': '多轨编辑器：混音、变速与回存（V2）',
+  'landing.data.milestone.14.title': '词谱生成：简谱+歌词+和弦 PDF',
+  'landing.data.milestone.15.title': '作品市场：买卖、分账与授权凭证（V2 收官）',
 }

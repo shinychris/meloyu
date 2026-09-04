@@ -3,7 +3,7 @@ import type { ExportFormat, ReleaseMeta, Task, Work } from '../../types/api'
 import { createExport } from '../../api/files'
 import { getTask } from '../../api/generation'
 import { downloadFileRef } from '../../api/files'
-import { downloadCertificate } from '../../api/works'
+import { downloadCertificate, downloadLeadsheet } from '../../api/works'
 import { toast } from '../../stores/toast'
 import { useSessionStore } from '../../stores/session'
 import { useT, type TranslationKey } from '../../i18n'
@@ -36,6 +36,7 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
   const user = useSessionStore((s) => s.user)
   const [busy, setBusy] = useState<BusyMap>({})
   const [certBusy, setCertBusy] = useState(false)
+  const [sheetBusy, setSheetBusy] = useState(false)
   const [releaseOpen, setReleaseOpen] = useState(false)
   const [platform, setPlatform] = useState<ReleasePlatform>('douyin')
   const [meta, setMeta] = useState<ReleaseMeta>({ title: '', artist: '', explicit: false })
@@ -138,6 +139,18 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
     } catch {
       setBusy((b) => ({ ...b, release: undefined }))
       /* 流媒体预设遇 mp3 母带 40901 等已 toast */
+    }
+  }
+
+  const onSheet = async () => {
+    if (sheetBusy) return
+    setSheetBusy(true)
+    try {
+      await downloadLeadsheet(versionId, `${versionId}_leadsheet.pdf`)
+    } catch {
+      /* 拦截器已 toast（无 MIDI 候选 40901 等） */
+    } finally {
+      setSheetBusy(false)
     }
   }
 
@@ -289,6 +302,14 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
 
       <button className="btn btn-acc w-full mt-2 !py-2 text-[11px] font-bold" disabled={certBusy} onClick={() => void onCert()}>
         {certBusy ? t('work.export.generating') : t('work.export.certificate')}
+      </button>
+      <button
+        className="btn btn-ghost w-full mt-1.5 !py-2 text-[11px] font-bold"
+        disabled={sheetBusy}
+        onClick={() => void onSheet()}
+        title={t('work.export.sheetHint')}
+      >
+        {sheetBusy ? t('work.export.generating') : t('work.export.sheet')}
       </button>
       <div className="text-[9px] mt-2 leading-relaxed" style={{ color: 'var(--dim)' }}>
         {t('work.export.footnote')}

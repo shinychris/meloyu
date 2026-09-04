@@ -372,6 +372,34 @@ export interface GenerationSubmitRequest {
   reference_track_id?: string
 }
 
+/* ============ 作品市场（V2-c） ============ */
+export interface MarketListingInfo {
+  id: string
+  work_id: string
+  title: string
+  tags: string[]
+  price_credits: number
+  status: 'active' | 'delisted'
+  preview_file_id: string | null
+  seller: { user_id: string; nickname: string }
+  sales: number
+  created_at: string
+}
+
+export interface MarketOrderInfo {
+  id: string
+  listing_id: string
+  work_id: string
+  buyer_user_id: string
+  seller_user_id: string
+  price_credits: number
+  seller_earnings: number
+  platform_fee: number
+  created_at: string
+  /** 固定双语授权口径（非独占/不可转让/AIGC 署名保留） */
+  license: string
+}
+
 /* ============ 开放 API 密钥（FR-19） ============ */
 export interface ApiKeyInfo {
   id: string

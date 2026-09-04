@@ -101,4 +101,9 @@ export const workZh: Record<keyof typeof workEn, string> = {
   'team.toast.emailRequired': '请填写成员邮箱',
   'team.toast.memberAdded': '成员已添加',
   'team.toast.spaceCreated': '空间已创建',
+
+  // ===== 词谱（v0.10.0）=====
+  'work.export.sheet': '下载词谱 PDF（简谱+歌词+和弦）',
+  'work.export.sheetHint': '由候选 MIDI 生成的简谱词谱：调内级数记谱、歌词音节对齐、逐小节和弦；仅本地引擎候选支持',
+
 }

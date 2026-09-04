@@ -31,6 +31,7 @@ const NAV_GROUPS: Array<{
     items: [
       { to: '/library', labelKey: 'app.sidebar.nav.library', kbd: '6' },
       { to: '/rights', labelKey: 'app.sidebar.nav.rights', kbd: '7' },
+      { to: '/market', labelKey: 'app.sidebar.nav.market', kbd: '0' },
     ],
   },
   {

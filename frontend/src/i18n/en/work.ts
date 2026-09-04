@@ -102,4 +102,9 @@ export const workEn = {
   'team.toast.emailRequired': 'Enter a member email',
   'team.toast.memberAdded': 'Member added',
   'team.toast.spaceCreated': 'Space created',
+
+  // ===== Leadsheet (v0.10.0) =====
+  'work.export.sheet': 'Download leadsheet PDF (notation + lyrics + chords)',
+  'work.export.sheetHint': 'Numbered-notation leadsheet from the candidate MIDI: scale degrees, syllable-aligned lyrics, per-bar chords; local-engine candidates only',
+
 } as const

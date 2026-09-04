@@ -108,6 +108,14 @@ def run(engine: Engine) -> list[str]:
             _rebuild_table(conn, "files", "files__v08")
             applied.append("files.kind 增加 export_release_zip 枚举")
 
+        # M-20260905-b：v0.10.1 市场——credit_transactions.reason 补 market_sale
+        ddl = conn.execute(
+            text("SELECT sql FROM sqlite_master WHERE type='table' AND name='credit_transactions'")
+        ).scalar_one_or_none()
+        if ddl and "'market_sale'" not in ddl:
+            _rebuild_table(conn, "credit_transactions", "credit_transactions__v101")
+            applied.append("credit_transactions.reason 增加 market_sale 枚举")
+
         # M-20260905-a：v0.9.0 V2 编辑器——versions.source 补 retune/mixdown
         ddl = conn.execute(
             text("SELECT sql FROM sqlite_master WHERE type='table' AND name='versions'")

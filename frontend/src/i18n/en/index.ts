@@ -17,6 +17,7 @@ import { layoutEn } from './layout'
 import { authEn } from './auth'
 import { billingEn } from './billing'
 import { editorEn } from './editor'
+import { marketEn } from './market'
 
 export const en = {
   ...commonEn,
@@ -34,4 +35,5 @@ export const en = {
   ...authEn,
   ...billingEn,
   ...editorEn,
+  ...marketEn,
 } as const

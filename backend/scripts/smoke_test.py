@@ -1811,6 +1811,77 @@ def main() -> int:
           r2.status_code == 200
           and unwrap(r2)["data"]["profile"] == prof)
 
+    # ============ 23. 词谱生成（v0.10.0） ============
+    r = client.get(f"{API}/versions/{version_id}/leadsheet", headers=auth_headers(token),
+                   params={"format": "json"})
+    b = unwrap(r)
+    ls = b["data"]
+    check("23.1 GET /versions/{id}/leadsheet?format=json",
+          r.status_code == 200 and ls["schema"] == "meloyu.leadsheet/1.0"
+          and ls["stats"]["note_count"] > 0 and ls["stats"]["bar_count"] > 0
+          and ls["meta"]["bpm"] > 0 and ls["meta"]["key"], json.dumps(b)[:150])
+    syls = [n["syllable"] for bb in ls["bars"] for n in bb["notes"] if n["syllable"]]
+    check("23.1 词谱音节对齐（歌词上谱）", len(syls) >= 4,
+          f"syllables={len(syls)}")
+    r = client.get(f"{API}/versions/{version_id}/leadsheet", headers=auth_headers(token),
+                   params={"format": "pdf"})
+    check("23.2 GET /versions/{id}/leadsheet?format=pdf",
+          r.status_code == 200 and r.content[:5] == b"%PDF-"
+          and r.headers.get("content-type") == "application/pdf"
+          and r.headers.get("content-disposition", "").endswith('.pdf"'))
+    r = client.get(f"{API}/versions/{version_id}/leadsheet", headers=auth_headers(token),
+                   params={"format": "docx"})
+    check("23.2 非法 format → 40001", r.status_code == 422
+          and unwrap(r)["code"] == 40001)
+
+    # ============ 24. V2-c 作品市场（v0.10.1） ============
+    r = client.post(f"{API}/market/listings", headers=auth_headers(token),
+                    json={"work_id": work_id, "price_credits": 100})
+    b = unwrap(r)
+    listing = b["data"]
+    check("24.1 POST /market/listings（上架）", r.status_code == 201
+          and listing["status"] == "active" and listing["price_credits"] == 100
+          and listing["preview_file_id"], json.dumps(b)[:150])
+    r = client.post(f"{API}/market/listings", headers=auth_headers(token),
+                    json={"work_id": work_id, "price_credits": 50})
+    check("24.1 重复上架 → 40901", r.status_code == 409)
+    r = client.get(f"{API}/market/listings", params={"page_size": 50})
+    b = unwrap(r)
+    check("24.2 GET /market/listings（浏览免鉴权）", r.status_code == 200
+          and any(x["id"] == listing["id"] for x in b["data"]["items"]))
+    r = client.post(f"{API}/market/listings/{listing['id']}/purchase",
+                    headers=auth_headers(token))
+    check("24.3 买自己 → 40901", r.status_code == 409)
+    # mate（19 节注册的队友，editor 曾有积分？用其注册赠送 200）购买
+    bal_s = client.get(f"{API}/credits/balance", headers=auth_headers(mate_token)).json()["data"]["balance"]
+    r = client.post(f"{API}/market/listings/{listing['id']}/purchase",
+                    headers=auth_headers(mate_token))
+    b = unwrap(r)
+    order = b["data"]
+    check("24.3 购买（分账 90/10 + 非独占授权）", r.status_code == 200
+          and order["seller_earnings"] == 90 and order["platform_fee"] == 10
+          and "非独占" in order["license"] and "Non-exclusive" in order["license"],
+          json.dumps(b)[:150])
+    bal_s2 = client.get(f"{API}/credits/balance", headers=auth_headers(mate_token)).json()["data"]["balance"]
+    check("24.3 买家积分扣减", bal_s - bal_s2 == 100, f"{bal_s} -> {bal_s2}")
+    r = client.post(f"{API}/market/listings/{listing['id']}/purchase",
+                    headers=auth_headers(mate_token))
+    check("24.3 重复购买 → 40901", r.status_code == 409)
+    r = client.get(f"{API}/market/my/orders", headers=auth_headers(mate_token))
+    check("24.4 GET /market/my/orders（授权凭证）", r.status_code == 200
+          and unwrap(r)["data"]["total"] >= 1)
+    r = client.get(f"{API}/market/my/listings", headers=auth_headers(token))
+    check("24.4 GET /market/my/listings", r.status_code == 200
+          and unwrap(r)["data"]["total"] >= 1
+          and unwrap(r)["data"]["items"][0]["sales"] >= 1)
+    r = client.delete(f"{API}/market/listings/{listing['id']}", headers=auth_headers(token))
+    check("24.5 DELETE /market/listings/{id}（下架）", r.status_code == 200
+          and unwrap(r)["data"]["status"] == "delisted")
+    r = client.get(f"{API}/market/listings")
+    check("24.5 下架后浏览不可见", r.status_code == 200
+          and not any(x["id"] == listing["id"]
+                      for x in unwrap(r)["data"]["items"]))
+
     # ============ 汇总 ============
     passed = sum(1 for _, ok, _ in results if ok)
     total = len(results)

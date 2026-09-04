@@ -83,6 +83,40 @@ async def upload_mixdown(version_id: str, request: Request,
               status_code=201)
 
 
+@router.get("/versions/{version_id}/leadsheet")
+def version_leadsheet(version_id: str,
+                      format: str = Query(default="pdf"),
+                      user: User = Depends(get_current_user),
+                      db: Session = Depends(get_db)):
+    """词谱（v0.10.0）：候选 MIDI → 简谱+歌词+和弦；format=pdf|json。
+
+    仅本地引擎候选（有 MIDI 产物；外部整曲 40901）。读权限（团队 viewer 可读）。
+    """
+    from app.services import leadsheet as ls_svc
+    from app.core.errors import err_validation
+    from app.core.i18n import tr
+    if format not in ("pdf", "json"):
+        raise err_validation(tr("format 必须为 pdf/json", "format must be pdf/json"))
+    version = works_svc.get_version_owned(db, version_id, user, min_role="viewer")
+    if not version.active_candidate_id:
+        from app.core.errors import err_conflict
+        raise err_conflict(tr("该版本尚未采用候选", "No candidate adopted for this version yet"))
+    from sqlalchemy import select as _select
+    from app.models import Candidate as _C, Work as _W
+    cand = db.get(_C, version.active_candidate_id)
+    work = db.get(_W, version.work_id)
+    data = ls_svc.build_leadsheet(work, version, cand)
+    if format == "json":
+        return ok(data)
+    payload = ls_svc.render_leadsheet_pdf(data)
+    return Response(
+        content=payload,
+        media_type="application/pdf",
+        headers={"Content-Disposition":
+                 f'attachment; filename="{work.display_code}_{version.version_no}_leadsheet.pdf"'},
+    )
+
+
 @router.get("/versions/{version_id}/certificate")
 def version_certificate(version_id: str,
                         format: str = Query(default="json"),

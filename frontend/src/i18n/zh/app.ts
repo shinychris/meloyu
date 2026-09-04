@@ -19,6 +19,7 @@ export const appZh: Record<keyof typeof appEn, string> = {
   'app.sidebar.nav.pitch': '修调',
   'app.sidebar.nav.library': '作品库',
   'app.sidebar.nav.rights': '合规与权利中心',
+  'app.sidebar.nav.market': '作品市场',
   'app.sidebar.nav.pricing': '定价与积分',
   'app.sidebar.nav.models': '模型中心',
   'app.sidebar.onboarding': '新手引导',

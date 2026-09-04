@@ -18,6 +18,7 @@ import { layoutZh } from './layout'
 import { authZh } from './auth'
 import { billingZh } from './billing'
 import { editorZh } from './editor'
+import { marketZh } from './market'
 
 export const zh: Record<keyof typeof en, string> = {
   ...commonZh,
@@ -35,4 +36,5 @@ export const zh: Record<keyof typeof en, string> = {
   ...authZh,
   ...billingZh,
   ...editorZh,
+  ...marketZh,
 }
