@@ -46,7 +46,7 @@ export type FileKind =
   | 'preview' | 'master' | 'stem' | 'midi'
   | 'export_mp3' | 'export_wav' | 'export_midi' | 'export_stems_zip' | 'certificate'
 export type StemName = 'vocals' | 'drums' | 'bass' | 'other'
-export type ExportFormat = 'mp3' | 'wav' | 'midi' | 'stems'
+export type ExportFormat = 'mp3' | 'wav' | 'midi' | 'stems' | 'release'
 export type WorkStatus = 'active' | 'trash'
 /** 版本来源（契约 §1.6：MVP 仅 generate，extend/variant/regen_section 为 V1.1 值） */
 export type VersionSource = 'generate' | 'extend' | 'variant' | 'regen_section'
@@ -441,9 +441,26 @@ export interface CompleteTagsResult {
 }
 
 /* ============ exports / files ============ */
+export interface ReleaseMeta {
+  title: string
+  artist: string
+  album?: string
+  explicit?: boolean
+  language?: string
+  genre?: string
+  release_date?: string
+  isrc?: string
+  upc?: string
+  lyrics_copyright?: string
+  songwriter?: string
+}
+
 export interface ExportRequest {
   version_id: string
   format: ExportFormat
+  /** FR-11 发行导出预设：format=release 时必填 */
+  platform?: 'douyin' | 'streaming'
+  meta?: ReleaseMeta
 }
 
 export interface StreamTokenResult {

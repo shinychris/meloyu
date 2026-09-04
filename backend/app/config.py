@@ -12,7 +12,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 REPO_DIR = BACKEND_DIR.parent
 
 API_PREFIX = "/api/v1"
-APP_VERSION = "0.7.0"
+APP_VERSION = "0.8.0"
 
 # 模型积分单价（架构 §9.1：v1_pro=12、v1_fast=6）
 MODEL_CREDIT_COST: dict[str, int] = {"v1_pro": 12, "v1_fast": 6}

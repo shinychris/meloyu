@@ -266,7 +266,7 @@ export default function WorkDetailView() {
           </div>
           {selectedVersionId && (
             <div className="mt-6">
-              <ExportPanel versionId={selectedVersionId} />
+              <ExportPanel versionId={selectedVersionId} work={work} />
             </div>
           )}
         </div>

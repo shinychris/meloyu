@@ -11,9 +11,11 @@ import argparse
 import hashlib
 import io
 import json
+import struct
 import sys
 import time
 import uuid
+import zipfile
 import wave
 from pathlib import Path
 
@@ -507,7 +509,9 @@ def main() -> int:
                 t["status"] == "succeeded"  # 依赖已装且模型已下载（真机）
                 or (t["status"] == "failed" and t["error"] is not None
                     and ("依赖未安装" in t["error"]["message"]
-                         or "未下载" in t["error"]["message"])))
+                         or "未下载" in t["error"]["message"]
+                         or "not installed" in t["error"]["message"]
+                         or "not downloaded" in t["error"]["message"])))
             smoke_state["mg6_refunded"] = t["status"] == "failed"
             check("15.6 musicgen 执行终态（未就绪→fail-fast 可读指引；就绪→成功）",
                   mg_failed_clean, json.dumps(t.get("error"))[:200])
@@ -1096,7 +1100,7 @@ def main() -> int:
     b = unwrap(r)
     check("8.4 证书非法 format → 40001", r.status_code == 422 and b["code"] == 40001)
 
-    # ============ 导出（4 格式） ============
+    # ============ 导出（4 格式 + FR-11 发行导出预设） ============
     for fmt in ("mp3", "wav", "midi", "stems"):
         r = client.post(f"{API}/exports", headers=auth_headers(token),
                         json={"version_id": version_id, "format": fmt})
@@ -1124,17 +1128,61 @@ def main() -> int:
                   and r.content[:2] == b"PK")
             globals()["downloaded_zip_sha"] = hashlib.sha256(r.content).hexdigest()
 
+    # ---- FR-11 发行导出预设（v0.8.0）：douyin/streaming 两平台 ----
+    r = client.post(f"{API}/exports", headers=auth_headers(token),
+                    json={"version_id": version_id, "format": "release"})
+    b = unwrap(r)
+    check("9.4 POST /exports format=release 缺 platform → 40001",
+          r.status_code == 422 and b["code"] == 40001, json.dumps(b)[:120])
+    r = client.post(f"{API}/exports", headers=auth_headers(token),
+                    json={"version_id": version_id, "format": "release",
+                          "platform": "myspace"})
+    b = unwrap(r)
+    check("9.4 POST /exports 非法 platform → 40001",
+          r.status_code == 422 and b["code"] == 40001, json.dumps(b)[:120])
+    for platform in ("douyin", "streaming"):
+        r = client.post(f"{API}/exports", headers=auth_headers(token),
+                        json={"version_id": version_id, "format": "release",
+                              "platform": platform,
+                              "meta": {"title": "雨夜航班", "artist": "demo",
+                                       "explicit": True, "release_date": "2026-10-01"}})
+        b = unwrap(r)
+        accepted = (r.status_code == 202 and b["code"] == 0
+                    and b["data"]["task"]["format"] == "release")
+        check(f"9.4 POST /exports release/{platform}", accepted, json.dumps(b)[:150])
+        etask = wait_task(client, b["data"]["task"]["id"], token, timeout=120)
+        ok = (etask["status"] == "succeeded"
+              and len(etask["result"]["files"]) == 1
+              and etask["result"]["files"][0]["kind"] == "export_release_zip")
+        check(f"9.4 release/{platform} 产物 zip", ok,
+              json.dumps(etask.get("result", {}))[:150])
+        r = client.get(f"{API}/files/{etask['result']['files'][0]['file_id']}/download",
+                       headers=auth_headers(token))
+        zf = zipfile.ZipFile(io.BytesIO(r.content))
+        names = sorted(zf.namelist())
+        audio = "audio.mp3" if platform == "douyin" else "audio.wav"
+        meta_json = json.loads(zf.read("metadata.json"))
+        cover_w = 1400 if platform == "douyin" else 3000
+        ok = (names == ["README.txt", audio, "cover.png", "metadata.json"]
+              and meta_json["platform"] == platform
+              and meta_json["track"]["title"] == "雨夜航班"
+              and meta_json["track"]["explicit"] is True
+              and meta_json["aigc"]["ai_generated"] is True
+              and struct.unpack(">II", zf.read("cover.png")[16:24]) == (cover_w, cover_w))
+        check(f"9.4 release/{platform} 包内容（音频+封面{cover_w}+metadata+README）",
+              ok, f"names={names}")
+
     # 契约 §14 R1 转正：exported_formats 派生字段（succeeded 导出格式去重升序）
     r = client.get(f"{API}/works/{work_id}", headers=auth_headers(token))
     b = unwrap(r)
-    check("R1 work.exported_formats（详情：四格式去重升序）",
+    check("R1 work.exported_formats（详情：含 release 去重升序）",
           r.status_code == 200 and b["data"]["exported_formats"]
-          == ["midi", "mp3", "stems", "wav"], json.dumps(b["data"])[:120])
+          == ["midi", "mp3", "release", "stems", "wav"], json.dumps(b["data"])[:120])
     r = client.get(f"{API}/works", headers=auth_headers(token))
     b = unwrap(r)
     hit = next((w for w in b["data"]["items"] if w["id"] == work_id), None)
     check("R1 work.exported_formats（列表与详情一致）",
-          hit is not None and hit["exported_formats"] == ["midi", "mp3", "stems", "wav"])
+          hit is not None and hit["exported_formats"] == ["midi", "mp3", "release", "stems", "wav"])
 
     # ============ 文件（3） ============
     file_id = cand_a["preview_file_id"]
@@ -1226,7 +1274,8 @@ def main() -> int:
     check("11.2 切换 team → 40001", r.status_code == 422 and b["code"] == 40001)
 
     # plan_switch 全局事件（不出现在作品事件里，通过流水+用户对象间接验证）
-    r = client.get(f"{API}/credits/transactions", headers=auth_headers(token))
+    r = client.get(f"{API}/credits/transactions", headers=auth_headers(token),
+                   params={"page_size": 100})
     b = unwrap(r)
     check("11.2 stripe 激活发放 10000 积分（plan_grant）", any(
         t["reason"] == "plan_grant" and t["delta"] == 10000

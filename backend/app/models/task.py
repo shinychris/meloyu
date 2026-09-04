@@ -57,7 +57,7 @@ class Task(BaseModel):
     version_id: Mapped[str | None] = mapped_column(
         String(32), ForeignKey("versions.id", ondelete="SET NULL")
     )
-    format: Mapped[str | None] = mapped_column(String(6))
+    format: Mapped[str | None] = mapped_column(String(10))  # release=7字符（FR-11）
     provider: Mapped[str | None] = mapped_column(String(16))
     seed: Mapped[int | None] = mapped_column(Integer)
     cost_credits: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

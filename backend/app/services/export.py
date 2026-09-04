@@ -21,16 +21,24 @@ from app.services.serializers import file_ref, task_to_dict
 from app.synth.mp3_io import encode_mp3
 
 
-def create_export(db: Session, user: User, version_id: str, fmt: str) -> dict:
+def create_export(db: Session, user: User, version_id: str, fmt: str,
+                  platform: str | None = None, meta: dict | None = None) -> dict:
     version = works_svc.get_version_owned(db, version_id, user)
     if not version.active_candidate_id:
         raise err_conflict(tr("该版本尚未采用候选", "No candidate adopted for this version yet"))
+    payload = {"version_id": version_id, "format": fmt}
+    if fmt == "release":
+        # FR-11 发行导出预设：platform 已由 schema 校验（douyin/streaming）
+        payload["platform"] = platform
+        payload["meta"] = meta or {}
+        payload["meta"].setdefault("title", work_title_of(db, version))
+        payload["meta"].setdefault("artist", user_email_prefix(user))
     now = utc_now_iso()
     task = Task(user_id=user.id, type="export", status="queued", progress=0,
                 stage_key="queued", stage_label=tr("排队中", "Queued"),
                 work_id=version.work_id, version_id=version.id,
                 format=fmt, cost_credits=0,
-                request_payload={"version_id": version_id, "format": fmt},
+                request_payload=payload,
                 created_at=now, updated_at=now)
     db.add(task)
     db.commit()
@@ -38,6 +46,15 @@ def create_export(db: Session, user: User, version_id: str, fmt: str) -> dict:
     from app.core.tasks import schedule_export
     schedule_export(task.id)
     return {"task": task_to_dict(task)}
+
+
+def work_title_of(db: Session, version: Version) -> str:
+    work = db.get(Work, version.work_id)
+    return work.title if work else ""
+
+
+def user_email_prefix(user: User) -> str:
+    return (user.email or "").split("@", 1)[0] or "artist"
 
 
 def execute_export(task_id: str) -> None:
@@ -54,13 +71,14 @@ def execute_export(task_id: str) -> None:
         db.commit()
         fmt = task.format
         version_id = task.version_id
+        payload = task.request_payload or {}
 
     try:
         with SessionLocal() as db:
             version = db.get(Version, version_id)
             work = db.get(Work, version.work_id)
             cand = db.get(Candidate, version.active_candidate_id)
-            files = _export_artifacts(db, work, version, cand, fmt)
+            files = _export_artifacts(db, work, version, cand, fmt, payload)
             now = utc_now_iso()
             task_row = db.get(Task, task_id)
             task_row.status = "succeeded"
@@ -72,6 +90,7 @@ def execute_export(task_id: str) -> None:
             task_row.updated_at = now
             works_svc.add_event(db, user_id=task_row.user_id, action="export", actor="human",
                                 detail={"task_id": task_id, "format": fmt,
+                                        "platform": payload.get("platform"),
                                         "file_ids": [f["file_id"] for f in files]},
                                 work_id=work.id, version_id=version.id)
             db.commit()
@@ -161,8 +180,39 @@ def _mark_aigc(path: Path, fmt: str, attribution: str | None = None) -> None:
         logger.warning(f"AIGC marking failed for {path.name}: {e}")
 
 
+def _make_export_mp3(exports_dir: Path, master: File) -> tuple[Path, int | None]:
+    """母带 → export.mp3（mp3 母带直接复制防二压；wav 按真实采样率 320k 编码）。"""
+    if (master.mime or "").startswith("audio/mpeg"):
+        p = exports_dir / "export.mp3"
+        p.write_bytes(_abs(master.path).read_bytes())
+        return p, None
+    with wav_mod.open(str(_abs(master.path)), "rb") as wf:
+        n = wf.getnframes()
+        ch = wf.getnchannels()
+        sw = wf.getsampwidth()
+        src_rate = wf.getframerate()
+        raw = wf.readframes(n)
+    data = _wav_bytes_to_float(raw, sw)
+    if ch == 1:
+        left = right = data
+    else:
+        left, right = data[0::2], data[1::2]
+    p = exports_dir / "export.mp3"
+    # 按母带真实采样率编码：外部模型母带可能非 48kHz（如 MusicGen 32kHz），
+    # 若按默认 48k 编码会把全部样本时间轴压缩（时长缩水、变速变调）
+    encode_mp3(p, left, right, bitrate=320, sample_rate=src_rate)
+    return p, src_rate
+
+
+def _make_export_wav(exports_dir: Path, master: File) -> Path:
+    """母带 wav 复制（导出登记与 AIGC 标识由调用方处理）。"""
+    p = exports_dir / "master.wav"
+    p.write_bytes(_abs(master.path).read_bytes())
+    return p
+
+
 def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate,
-                      fmt: str) -> list[dict]:
+                      fmt: str, payload: dict | None = None) -> list[dict]:
     # 路径含候选标签：换候选重导出不会撞路径；同候选重导出由 _register 复用记录
     base = f"{work.id}/{version.id}/exports/{cand.label}"
     exports_dir = _abs(base)
@@ -192,27 +242,7 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
                "only MP3 export is supported"))
 
     if fmt == "mp3":
-        src_rate: int | None = None
-        if mp3_master:
-            # 母带即 mp3：直接复制（无 WAV 可解码，不做有损→有损二压）
-            p = exports_dir / "export.mp3"
-            p.write_bytes(_abs(master.path).read_bytes())
-        else:
-            with wav_mod.open(str(_abs(master.path)), "rb") as wf:
-                n = wf.getnframes()
-                ch = wf.getnchannels()
-                sw = wf.getsampwidth()
-                src_rate = wf.getframerate()
-                raw = wf.readframes(n)
-            data = _wav_bytes_to_float(raw, sw)
-            if ch == 1:
-                left = right = data
-            else:
-                left, right = data[0::2], data[1::2]
-            p = exports_dir / "export.mp3"
-            # 按母带真实采样率编码：外部模型母带可能非 48kHz（如 MusicGen 32kHz），
-            # 若按默认 48k 编码会把全部样本时间轴压缩（时长缩水、变速变调）
-            encode_mp3(p, left, right, bitrate=320, sample_rate=src_rate)
+        p, src_rate = _make_export_mp3(exports_dir, master)
         _mark_aigc(p, "mp3", attribution)
         row = _register(db, work, version, kind="export_mp3", relpath=f"{base}/export.mp3",
                         mime="audio/mpeg", path=p, duration_sec=master.duration_sec,
@@ -221,8 +251,7 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
         out.append(file_ref(row))
 
     elif fmt == "wav":
-        p = exports_dir / "master.wav"
-        p.write_bytes(_abs(master.path).read_bytes())
+        p = _make_export_wav(exports_dir, master)
         _mark_aigc(p, "wav", attribution)
         row = _register(db, work, version, kind="export_wav", relpath=f"{base}/master.wav",
                         mime="audio/wav", path=p, duration_sec=master.duration_sec,
@@ -269,6 +298,57 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
                              duration_sec=src_row.duration_sec,
                              name=f"{work.display_code}_{version.version_no}_stem_{stem}.wav")
             out.append(file_ref(srow))
+    elif fmt == "release":
+        # FR-11 发行导出预设（v0.8.0）：平台模板打包（音频+封面占位+metadata+README）
+        from app.services.release_export import (build_metadata, build_readme,
+                                                 preset_of, write_release_zip)
+        platform = (payload or {}).get("platform") or "douyin"
+        preset = preset_of(platform)
+        meta = (payload or {}).get("meta") or {}
+        if preset["audio"] == "wav" and mp3_master:
+            raise err_conflict(
+                tr("流媒体发行预设需 WAV 母带；该候选母带为 mp3（外部歌曲 API 通道），请改用抖音预设",
+                   "Streaming preset requires a WAV master; this candidate's master is mp3 "
+                   "(external song API channel) — use the Douyin preset instead"))
+        if preset["audio"] == "mp3":
+            audio, src_rate = _make_export_mp3(exports_dir, master)
+            arcname = "audio.mp3"
+        else:
+            audio = _make_export_wav(exports_dir, master)
+            src_rate = _wav_sample_rate(audio)
+            arcname = "audio.wav"
+        _mark_aigc(audio, preset["audio"], attribution)
+        work_snap = {
+            "work_id": work.id, "display_code": work.display_code,
+            "version_id": version.id, "version_no": version.version_no,
+            "title": work.title, "bpm": work.bpm,
+            "key": f"{work.key_tonic} {work.key_mode}",
+            "duration_sec": work.duration_sec, "model": work.model,
+        }
+        aigc = {
+            "engine_attribution": attribution,
+            "ai_generated": True,
+            # FR-16 披露协助：双语披露语与证书同口径（不随下载者 locale 漂移）
+            "disclosure": (f"本作品由 AI 辅助生成（{attribution}），人类创作参与记录见授权证书。"
+                           f"This work was created with AI assistance ({attribution}); "
+                           f"see the license certificate for human participation records."),
+            "certificate_endpoint": f"/api/v1/works/{work.id}/versions/{version.id}/certificate",
+        }
+        metadata_json = build_metadata(platform=platform, preset=preset, meta=meta,
+                                       work=work_snap, aigc=aigc)
+        readme_txt = build_readme(platform=platform, preset=preset,
+                                  entries=[arcname, "cover.png", "metadata.json", "README.txt"])
+        zip_path = exports_dir / f"release_{platform}.zip"
+        write_release_zip(zip_path, platform=platform, audio_arcname=arcname,
+                          audio_path=audio, cover_size=preset["cover_size"],
+                          cover_color=work.cover_color,
+                          metadata_json=metadata_json, readme_txt=readme_txt)
+        row = _register(db, work, version, kind="export_release_zip",
+                        relpath=f"{base}/release_{platform}.zip", mime="application/zip",
+                        path=zip_path, duration_sec=master.duration_sec,
+                        name=f"{work.display_code}_{version.version_no}_release_{platform}.zip",
+                        sample_rate=src_rate)
+        out.append(file_ref(row))
     else:
         raise err_not_found(tr(f"未知导出格式：{fmt}", f"Unknown export format: {fmt}"))
     return out

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
 from app.core.i18n import tr
 from app.models.enums import (
@@ -227,16 +227,48 @@ class GenerationRequest(BaseModel):
         }
 
 
+class ReleaseMeta(BaseModel):
+    """FR-11 发行导出元数据表单（metadata.json 的 track 段；发行方人工确认项）。"""
+    title: str = Field(min_length=1, max_length=80)
+    artist: str = Field(min_length=1, max_length=60)
+    album: str = Field(default="", max_length=80)
+    explicit: bool = False
+    language: str = Field(default="", max_length=20)
+    genre: str = Field(default="", max_length=30)
+    release_date: str = Field(default="", pattern=r"^\d{4}-\d{2}-\d{2}$")
+    isrc: str = Field(default="", max_length=15)
+    upc: str = Field(default="", max_length=15)
+    lyrics_copyright: str = Field(default="", max_length=120)
+    songwriter: str = Field(default="", max_length=120)
+
+
 class ExportRequest(BaseModel):
     version_id: str
     format: str
+    # FR-11 发行导出预设：format=release 时必填 platform（douyin/streaming），
+    # meta 为发行元数据表单（缺省 title/artist 由作品标题/账号邮箱前缀兜底）
+    # validate_default：platform 缺省也要跑校验（release 时 None 必须报错）
+    platform: str | None = Field(default=None, validate_default=True)
+    meta: ReleaseMeta | None = None
 
     @field_validator("format")
     @classmethod
     def _fmt(cls, v: str) -> str:
-        if v not in ("mp3", "wav", "midi", "stems"):
-            raise ValueError(tr("format 必须为 mp3/wav/midi/stems",
-                            "format must be mp3/wav/midi/stems"))
+        if v not in ("mp3", "wav", "midi", "stems", "release"):
+            raise ValueError(tr("format 必须为 mp3/wav/midi/stems/release",
+                            "format must be mp3/wav/midi/stems/release"))
+        return v
+
+    @field_validator("platform")
+    @classmethod
+    def _platform(cls, v: str | None, info: ValidationInfo) -> str | None:
+        if info.data.get("format") == "release":
+            if v not in ("douyin", "streaming"):
+                raise ValueError(tr("format=release 时 platform 必须为 douyin/streaming",
+                                "platform must be douyin/streaming when format=release"))
+        elif v:
+            raise ValueError(tr("platform 仅在 format=release 时允许",
+                            "platform is only allowed when format=release"))
         return v
 
     @field_validator("version_id")

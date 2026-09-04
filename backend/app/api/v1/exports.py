@@ -17,5 +17,7 @@ router = APIRouter(tags=["exports"])
 @router.post("/exports", status_code=202)
 def create_export(body: ExportRequest, user: User = Depends(get_current_user),
                   db: Session = Depends(get_db)):
-    return ok(export_svc.create_export(db, user, body.version_id, body.format),
+    return ok(export_svc.create_export(db, user, body.version_id, body.format,
+                                       platform=body.platform,
+                                       meta=(body.meta.model_dump() if body.meta else None)),
               status_code=202)

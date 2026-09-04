@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ExportFormat, Task } from '../../types/api'
+import type { ExportFormat, ReleaseMeta, Task, Work } from '../../types/api'
 import { createExport } from '../../api/files'
 import { getTask } from '../../api/generation'
 import { downloadFileRef } from '../../api/files'
 import { downloadCertificate } from '../../api/works'
 import { toast } from '../../stores/toast'
+import { useSessionStore } from '../../stores/session'
 import { useT, type TranslationKey } from '../../i18n'
 
 // 格式说明文案走 i18n（work.export.note.*）；WAV/MP3 等为专有名词保留原文
@@ -15,13 +16,29 @@ const FORMATS: Array<{ code: ExportFormat; label: string; noteKey: TranslationKe
   { code: 'stems', label: 'Stems', noteKey: 'work.export.note.stems' },
 ]
 
+// FR-11 发行导出预设：platform 与后端 RELEASE_PRESETS 单一事实源对齐
+const PLATFORMS: Array<{
+  code: 'douyin' | 'streaming'
+  labelKey: TranslationKey
+  noteKey: TranslationKey
+}> = [
+  { code: 'douyin', labelKey: 'work.export.release.douyin', noteKey: 'work.export.release.douyinNote' },
+  { code: 'streaming', labelKey: 'work.export.release.streaming', noteKey: 'work.export.release.streamingNote' },
+]
+
 type BusyMap = Partial<Record<ExportFormat, number>>
 
-/** 导出面板：WAV / MP3 / MIDI / Stems + 授权证书（导出任务轮询完成后自动下载） */
-export default function ExportPanel({ versionId }: { versionId: string }) {
+type ReleasePlatform = 'douyin' | 'streaming'
+
+/** 导出面板：WAV / MP3 / MIDI / Stems + 发行导出预设（FR-11）+ 授权证书 */
+export default function ExportPanel({ versionId, work }: { versionId: string; work?: Work | null }) {
   const t = useT()
+  const user = useSessionStore((s) => s.user)
   const [busy, setBusy] = useState<BusyMap>({})
   const [certBusy, setCertBusy] = useState(false)
+  const [releaseOpen, setReleaseOpen] = useState(false)
+  const [platform, setPlatform] = useState<ReleasePlatform>('douyin')
+  const [meta, setMeta] = useState<ReleaseMeta>({ title: '', artist: '', explicit: false })
   const timers = useRef<number[]>([])
   const mounted = useRef(true)
 
@@ -33,7 +50,17 @@ export default function ExportPanel({ versionId }: { versionId: string }) {
     }
   }, [])
 
-  const schedule = (taskId: string, format: ExportFormat, fails: number) => {
+  const openRelease = () => {
+    // 打开时预填：曲名=作品标题、艺人=昵称（回退邮箱前缀）
+    setMeta((m) => ({
+      ...m,
+      title: m.title || work?.title || '',
+      artist: m.artist || user?.nickname || (user?.email ?? '').split('@')[0] || '',
+    }))
+    setReleaseOpen((v) => !v)
+  }
+
+  const schedule = (taskId: string, format: ExportFormat, fails: number, namePrefix?: string) => {
     const timer = window.setTimeout(async () => {
       try {
         const task: Task = await getTask(taskId)
@@ -42,7 +69,7 @@ export default function ExportPanel({ versionId }: { versionId: string }) {
           setBusy((b) => ({ ...b, [format]: undefined }))
           if (task.result && 'files' in task.result && task.result.files.length > 0) {
             for (const f of task.result.files) {
-              await downloadFileRef(f, `${format}_${f.file_id}`)
+              await downloadFileRef(f, `${namePrefix ?? format}_${f.file_id}`)
             }
             toast(t('work.export.toast.done', { format: format.toUpperCase(), n: task.result.files.length }))
           } else {
@@ -53,7 +80,7 @@ export default function ExportPanel({ versionId }: { versionId: string }) {
           toast(task.error?.message ?? t('work.export.failed'), 'bad')
         } else {
           setBusy((b) => ({ ...b, [format]: task.progress }))
-          schedule(taskId, format, 0)
+          schedule(taskId, format, 0, namePrefix)
         }
       } catch {
         if (!mounted.current) return
@@ -61,7 +88,7 @@ export default function ExportPanel({ versionId }: { versionId: string }) {
           setBusy((b) => ({ ...b, [format]: undefined }))
           toast(t('work.export.toast.pollBroken'), 'bad')
         } else {
-          schedule(taskId, format, fails + 1)
+          schedule(taskId, format, fails + 1, namePrefix)
         }
       }
     }, 1500)
@@ -80,6 +107,40 @@ export default function ExportPanel({ versionId }: { versionId: string }) {
     }
   }
 
+  const runRelease = async () => {
+    if (busy.release !== undefined) return
+    const title = meta.title.trim()
+    const artist = meta.artist.trim()
+    if (title.length < 1 || title.length > 80) {
+      toast(t('work.export.release.titleRequired'), 'warn')
+      return
+    }
+    if (artist.length < 1 || artist.length > 60) {
+      toast(t('work.export.release.artistRequired'), 'warn')
+      return
+    }
+    setBusy((b) => ({ ...b, release: 0 }))
+    try {
+      const { task } = await createExport({
+        version_id: versionId,
+        format: 'release',
+        platform,
+        meta: {
+          title,
+          artist,
+          album: meta.album?.trim() || undefined,
+          genre: meta.genre?.trim() || undefined,
+          release_date: meta.release_date || undefined,
+          explicit: Boolean(meta.explicit),
+        },
+      })
+      schedule(task.id, 'release', 0, `release_${platform}`)
+    } catch {
+      setBusy((b) => ({ ...b, release: undefined }))
+      /* 流媒体预设遇 mp3 母带 40901 等已 toast */
+    }
+  }
+
   const onCert = async () => {
     if (certBusy) return
     setCertBusy(true)
@@ -92,6 +153,8 @@ export default function ExportPanel({ versionId }: { versionId: string }) {
       setCertBusy(false)
     }
   }
+
+  const releasePct = busy.release
 
   return (
     <div className="card p-4">
@@ -114,6 +177,116 @@ export default function ExportPanel({ versionId }: { versionId: string }) {
           )
         })}
       </div>
+
+      {/* 发行导出预设（FR-11）：平台模板打包 */}
+      <div className="rule-t mt-3 pt-3" style={{ borderColor: 'var(--line)' }}>
+        <button
+          className="w-full text-left flex items-center justify-between"
+          onClick={openRelease}
+          disabled={releasePct !== undefined}
+        >
+          <span className="text-[11px] font-bold">{t('work.export.release.title')}</span>
+          <span
+            aria-hidden="true"
+            className="text-[9px]"
+            style={{ color: 'var(--dim)', transform: releaseOpen ? 'rotate(180deg)' : undefined }}
+          >
+            ▾
+          </span>
+        </button>
+        <div className="text-[9px] mt-1 leading-relaxed" style={{ color: 'var(--dim)' }}>
+          {t('work.export.release.sub')}
+        </div>
+        {releaseOpen && (
+          <div className="mt-2">
+            <div className="grid grid-cols-2 gap-2">
+              {PLATFORMS.map((p) => (
+                <button
+                  key={p.code}
+                  className={`btn !py-2 text-[11px] text-left ${platform === p.code ? 'btn-acc' : 'btn-ghost'}`}
+                  onClick={() => setPlatform(p.code)}
+                  disabled={releasePct !== undefined}
+                >
+                  <span className="font-bold">{t(p.labelKey)}</span>
+                  <span className="block text-[9px] font-normal mt-0.5" style={{ color: platform === p.code ? '#000' : 'var(--dim)' }}>
+                    {t(p.noteKey)}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 space-y-1.5">
+              <input
+                type="text"
+                className="!text-[11px]"
+                maxLength={80}
+                placeholder={t('work.export.release.trackTitle')}
+                value={meta.title}
+                onChange={(e) => setMeta((m) => ({ ...m, title: e.target.value }))}
+                disabled={releasePct !== undefined}
+              />
+              <input
+                type="text"
+                className="!text-[11px]"
+                maxLength={60}
+                placeholder={t('work.export.release.artist')}
+                value={meta.artist}
+                onChange={(e) => setMeta((m) => ({ ...m, artist: e.target.value }))}
+                disabled={releasePct !== undefined}
+              />
+              <div className="grid grid-cols-2 gap-1.5">
+                <input
+                  type="text"
+                  className="!text-[11px]"
+                  maxLength={80}
+                  placeholder={t('work.export.release.album')}
+                  value={meta.album ?? ''}
+                  onChange={(e) => setMeta((m) => ({ ...m, album: e.target.value }))}
+                  disabled={releasePct !== undefined}
+                />
+                <input
+                  type="text"
+                  className="!text-[11px]"
+                  maxLength={30}
+                  placeholder={t('work.export.release.genre')}
+                  value={meta.genre ?? ''}
+                  onChange={(e) => setMeta((m) => ({ ...m, genre: e.target.value }))}
+                  disabled={releasePct !== undefined}
+                />
+              </div>
+              <input
+                type="date"
+                className="!text-[11px]"
+                value={meta.release_date ?? ''}
+                onChange={(e) => setMeta((m) => ({ ...m, release_date: e.target.value || undefined }))}
+                disabled={releasePct !== undefined}
+                title={t('work.export.release.date')}
+              />
+              <label className="flex items-center gap-1.5 text-[10px] cursor-pointer" style={{ color: 'var(--muted)' }}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(meta.explicit)}
+                  onChange={(e) => setMeta((m) => ({ ...m, explicit: e.target.checked }))}
+                  disabled={releasePct !== undefined}
+                />
+                {t('work.export.release.explicit')}
+              </label>
+            </div>
+            <button
+              className="btn btn-ghost w-full mt-2 !py-2 text-[11px] font-bold"
+              disabled={releasePct !== undefined}
+              onClick={() => void runRelease()}
+            >
+              {releasePct !== undefined
+                ? t('work.export.processing', { n: releasePct })
+                : `${t('work.export.release.run')} · ${t(platform === 'douyin' ? 'work.export.release.douyin' : 'work.export.release.streaming')}`}
+            </button>
+            <div className="text-[9px] mt-1.5 leading-relaxed" style={{ color: 'var(--dim)' }}>
+              {t('work.export.release.hint')}
+            </div>
+          </div>
+        )}
+      </div>
+
       <button className="btn btn-acc w-full mt-2 !py-2 text-[11px] font-bold" disabled={certBusy} onClick={() => void onCert()}>
         {certBusy ? t('work.export.generating') : t('work.export.certificate')}
       </button>

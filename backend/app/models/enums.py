@@ -31,7 +31,7 @@ STAGE_KEYS = (
     "api_submit", "api_queue", "api_render", "api_download",
     "model_load", "model_sample", "model_export",
 )
-EXPORT_FORMATS = ("mp3", "wav", "midi", "stems")
+EXPORT_FORMATS = ("mp3", "wav", "midi", "stems", "release")  # v0.8.0 增 release（FR-11 发行导出预设）——需 tasks 表重建迁移
 
 # 积分
 # v0.7.0 增 topup（Stripe 充值包发放）——需 credit_transactions 表重建迁移
@@ -47,7 +47,9 @@ EVENT_ACTORS = ("human", "ai", "system")
 # 文件
 FILE_KINDS = (
     "preview", "master", "stem", "midi",
-    "export_mp3", "export_wav", "export_midi", "export_stems_zip", "certificate",
+    "export_mp3", "export_wav", "export_midi", "export_stems_zip",
+    "export_release_zip",  # v0.8.0 发行导出预设打包（FR-11）——需 files 表重建迁移
+    "certificate",
 )
 STEM_NAMES = ("vocals", "drums", "bass", "other")
 

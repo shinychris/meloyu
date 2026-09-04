@@ -90,6 +90,21 @@ def run(engine: Engine) -> list[str]:
         if ddl and "'stripe'" not in ddl:
             _rebuild_table(conn, "subscriptions", "subscriptions__v07")
             applied.append("subscriptions.source 增加 stripe 枚举")
+
+        # M-20260904-a：v0.8.0 发行导出预设（FR-11）——tasks.format 补 release、
+        # files.kind 补 export_release_zip（两表均带 CHECK 约束，走表重建）
+        ddl = conn.execute(
+            text("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'")
+        ).scalar_one_or_none()
+        if ddl and "'release'" not in ddl:
+            _rebuild_table(conn, "tasks", "tasks__v08")
+            applied.append("tasks.format 增加 release 枚举")
+        ddl = conn.execute(
+            text("SELECT sql FROM sqlite_master WHERE type='table' AND name='files'")
+        ).scalar_one_or_none()
+        if ddl and "'export_release_zip'" not in ddl:
+            _rebuild_table(conn, "files", "files__v08")
+            applied.append("files.kind 增加 export_release_zip 枚举")
     if applied:
         logger.info(f"sqlite migrations applied: {', '.join(applied)}")
     return applied
@@ -100,13 +115,14 @@ def _rebuild_table(conn, table_name: str, tmp_name: str) -> None:
     from sqlalchemy.schema import CreateIndex, CreateTable
 
     from app.models.plan import Subscription
-    from app.models.task import Task
+    from app.models.task import File, Task
     from app.models.user import CreditTransaction
     from app.models.work import Candidate
 
     tables = {"candidates": Candidate.__table__, "tasks": Task.__table__,
               "credit_transactions": CreditTransaction.__table__,
-              "subscriptions": Subscription.__table__}
+              "subscriptions": Subscription.__table__,
+              "files": File.__table__}
     table = tables[table_name]
 
     conn.execute(text("PRAGMA foreign_keys=OFF"))

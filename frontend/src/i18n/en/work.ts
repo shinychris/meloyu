@@ -52,4 +52,24 @@ export const workEn = {
   'work.export.failed': 'Export failed',
   'work.export.toast.pollBroken': 'Export task polling interrupted',
   'work.export.toast.certStarted': 'License certificate JSON download started',
+  // 发行导出预设（FR-11）
+  'work.export.release.title': 'Release export',
+  'work.export.release.sub':
+    'Platform-ready package: audio + cover placeholder + metadata.json + README',
+  'work.export.release.douyin': 'Douyin Musician',
+  'work.export.release.streaming': 'Streaming',
+  'work.export.release.douyinNote': 'MP3 320k · cover 1400×1400',
+  'work.export.release.streamingNote': 'WAV 48k/24bit · cover 3000×3000',
+  'work.export.release.meta': 'Release metadata',
+  'work.export.release.trackTitle': 'Title',
+  'work.export.release.artist': 'Artist',
+  'work.export.release.album': 'Album (optional)',
+  'work.export.release.genre': 'Genre (optional)',
+  'work.export.release.date': 'Release date (optional)',
+  'work.export.release.explicit': 'Explicit content',
+  'work.export.release.run': 'Build release package',
+  'work.export.release.hint':
+    'Metadata and the AI disclosure go into metadata.json; the cover is a placeholder — replace it before uploading.',
+  'work.export.release.titleRequired': 'Release title is required (1–80 characters)',
+  'work.export.release.artistRequired': 'Artist name is required (1–60 characters)',
 } as const
