@@ -1733,6 +1733,84 @@ def main() -> int:
     r = client.get(f"{API}/public/works", headers={"X-API-Key": apikey["key"]})
     check("20.6 吊销后 → 40101", r.status_code == 401)
 
+    # ============ 21. V2 多轨编辑器后端（v0.9.0）：retune + mixdown ============
+    r = client.post(f"{API}/candidates/{cand_a['id']}/retune",
+                    headers=auth_headers(token), json={})
+    check("21.1 retune 无变更参数 → 40001", r.status_code == 422
+          and unwrap(r)["code"] == 40001)
+    r = client.post(f"{API}/candidates/{cand_a['id']}/retune",
+                    headers=auth_headers(token), json={"bpm": 300})
+    check("21.1 retune bpm 越界 → 40001", r.status_code == 422
+          and unwrap(r)["code"] == 40001)
+    r = client.post(f"{API}/candidates/{cand_a['id']}/retune",
+                    headers=auth_headers(token), json={"bpm": 132})
+    b = unwrap(r)
+    rt_ok = r.status_code == 201
+    check("21.1 POST /candidates/{id}/retune（bpm=132，6 积分）", rt_ok
+          and b["data"]["task"]["provider"] == "localsynth", json.dumps(b)[:150])
+    if rt_ok:
+        t = wait_task(client, b["data"]["task"]["id"], token, timeout=300)
+        check("21.1 retune 执行成功（同 seed 确定性重渲染）", t["status"] == "succeeded",
+              json.dumps(t.get("error", ""))[:150])
+        r = client.get(f"{API}/versions/{t['version_id']}", headers=auth_headers(token))
+        vdet = unwrap(r)["data"]
+        check("21.1 retune 子版本（source=retune、bpm=132）",
+              vdet["source"] == "retune" and vdet["params"]["bpm"] == 132,
+              json.dumps(vdet.get("params", {}))[:120])
+    # mixdown：35s 立体声正弦 wav → 子版本 source=mixdown
+    sr_, dur_ = 48000, 35
+    tt = np_.arange(int(sr_ * dur_)) / sr_
+    xx = 0.4 * np_.sin(2 * 3.14159265 * 440 * tt)
+    pcm = (xx * 32767).astype("<i2")
+    buf = _io.BytesIO()
+    with _wave.open(buf, "wb") as wf:
+        wf.setnchannels(2); wf.setsampwidth(2); wf.setframerate(sr_)
+        wf.writeframes(np_.repeat(pcm, 2).tobytes())
+    mix_bytes = buf.getvalue()
+    # 找 retune 后的当前版本
+    r = client.get(f"{API}/works/{work_id}", headers=auth_headers(token))
+    cur_vid = unwrap(r)["data"]["active_version_id"]
+    r = client.post(f"{API}/versions/{cur_vid}/mixdown", headers=auth_headers(token),
+                    params={"notes": "人声+1dB，鼓组低切"},
+                    content=mix_bytes)
+    b = unwrap(r)
+    check("21.2 POST /versions/{id}/mixdown（octet wav → 子版本）",
+          r.status_code == 201 and b["data"]["version"]["source"] == "mixdown",
+          json.dumps(b)[:150])
+    if r.status_code == 201:
+        mv = b["data"]["version"]["id"]
+        r = client.get(f"{API}/versions/{mv}/candidates", headers=auth_headers(token))
+        cands = unwrap(r)["data"]["items"]
+        check("21.2 mixdown 候选（1 个已采用、无 AI 分、带 preview/master）",
+              len(cands) == 1 and cands[0]["adopted"] is True
+              and cands[0]["quality_score"] is None
+              and {f["kind"] for f in cands[0]["files"]} == {"master", "preview"})
+        r = client.get(f"{API}/works/{work_id}", headers=auth_headers(token))
+        check("21.2 work 当前版本切到 mixdown",
+              unwrap(r)["data"]["active_version_id"] == mv)
+    r = client.post(f"{API}/versions/{cur_vid}/mixdown", headers=auth_headers(token),
+                    content=b"not a wav")
+    check("21.2 非 wav → 40001", r.status_code == 422 and unwrap(r)["code"] == 40001)
+    r = client.post(f"{API}/versions/{cur_vid}/mixdown", headers=auth_headers(token),
+                    content=_smoke_ref_wav(120)[:20000])  # 截断的合法 wav 头也解不出帧
+    check("21.2 时长过短 → 40001", r.status_code == 422
+          and unwrap(r)["code"] == 40001)
+
+    # ============ 22. V2-b 我的口味（v0.9.0） ============
+    r = client.post(f"{API}/taste/rebuild", headers=auth_headers(token))
+    b = unwrap(r)
+    prof = b["data"]["profile"]
+    check("22.1 POST /taste/rebuild（作品库统计画像）",
+          r.status_code == 200 and b["data"]["sample_count"] >= 3
+          and 60 <= (prof.get("bpm") or 0) <= 174 and prof.get("key")
+          and isinstance(prof.get("top_tags"), list)
+          and b["data"]["semantics"][0] == "suggestions_only",
+          json.dumps(b)[:200])
+    r2 = client.get(f"{API}/taste", headers=auth_headers(token))
+    check("22.1 GET /taste（幂等读取）",
+          r2.status_code == 200
+          and unwrap(r2)["data"]["profile"] == prof)
+
     # ============ 汇总 ============
     passed = sum(1 for _, ok, _ in results if ok)
     total = len(results)

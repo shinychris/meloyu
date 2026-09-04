@@ -275,5 +275,6 @@ export const landingEn = {
   'landing.data.milestone.8.title': 'Commercialization: Stripe subscriptions, credit top-ups, account center',
   'landing.data.milestone.9.title': 'Release export: Douyin / streaming platform packages',
   'landing.data.milestone.10.title': 'Reference audio & voice cloning (V1.1)',
-  'landing.data.milestone.11.title': 'Team collaboration & Open API (V1.1 wrap-up)',
+  'landing.data.milestone.12.title': 'Open API: keys & usage billing',
+  'landing.data.milestone.13.title': 'Multi-track editor: mix, retune & save (V2)',
 } as const

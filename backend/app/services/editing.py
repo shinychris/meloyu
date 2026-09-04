@@ -15,10 +15,11 @@ from app.core.i18n import tr
 from app.models import Candidate, File, Task, User, Version, Work
 from app.models.base import utc_now_iso
 from app.services import generation as gen_svc
+from app.services import works as works_svc
 from app.services.serializers import task_to_dict
 from app.synth.editing import derive_op_seed
 
-DERIVED_OPS = ("extend", "variant", "regen_section")
+DERIVED_OPS = ("extend", "variant", "regen_section", "retune")  # v0.9.0 增 retune
 MAX_TOTAL_DURATION_SEC = 240  # 与契约 generation_limits.max_duration_sec 一致
 
 
@@ -72,7 +73,8 @@ def _base_params(version: Version, cand: Candidate) -> dict:
 
 def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
                    seconds: int | None = None, style_prompt: str | None = None,
-                   section: str | None = None, occurrence: int = 1) -> dict:
+                   section: str | None = None, occurrence: int = 1,
+                   bpm: int | None = None, key: dict | None = None) -> dict:
     """提交派生生成：建子版本 + 任务 + 扣积分，返回 POST /generations 同构响应。"""
     if op not in DERIVED_OPS:
         raise err_validation(tr(f"未知派生操作：{op}", f"Unknown derived operation: {op}"))
@@ -98,6 +100,24 @@ def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
             if check_sensitive(style_prompt):
                 from app.core.errors import err_sensitive
                 raise err_sensitive()
+    elif op == "retune":
+        # V2 多轨编辑器（v0.9.0）：变速/变调——确定性引擎同 seed 重渲染（素材一致）
+        from app.models.enums import KEY_MODES, TONICS
+        if bpm is None and not key:
+            raise err_validation(
+                tr("retune 需要至少 bpm 或 key 之一", "retune needs at least bpm or key"))
+        if bpm is not None:
+            if not 60 <= int(bpm) <= 174:
+                raise err_validation(
+                    tr("bpm 必须在 60~174", "bpm must be within 60-174"))
+            params["bpm"] = int(bpm)
+        if key:
+            tonic = str(key.get("tonic", params["key"]["tonic"])).upper()
+            mode = str(key.get("mode", params["key"]["mode"])).lower()
+            if tonic not in TONICS or mode not in KEY_MODES:
+                raise err_validation(tr("key 无效（tonic/mode）", "invalid key (tonic/mode)"))
+            params["key"] = {"tonic": tonic, "mode": mode}
+        extra = f"{params['bpm']}:{params['key']['tonic']}{params['key']['mode']}"
     elif op == "regen_section":
         seg_sections = {str(seg.get("section")) for seg in (cand.structure or [])}
         if section not in seg_sections:
@@ -145,6 +165,9 @@ def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
     elif op == "regen_section":
         derived_spec["section"] = section or ""
         derived_spec["occurrence"] = int(occurrence)
+    elif op == "retune":
+        derived_spec["retune_bpm"] = params["bpm"]
+        derived_spec["retune_key"] = dict(params["key"])
 
     cost = EDIT_OPERATION_CREDIT_COST.get(op, 6)
     task = Task(user_id=user.id, type="generation", status="queued", progress=0,
@@ -190,3 +213,111 @@ def submit_regen_section(db: Session, user: User, candidate_id: str, section: st
                          occurrence: int = 1) -> dict:
     return submit_derived(db, user, candidate_id, "regen_section", section=section,
                           occurrence=occurrence)
+
+
+def submit_retune(db: Session, user: User, candidate_id: str, bpm: int | None,
+                  key: dict | None) -> dict:
+    """V2 编辑器：变速/变调（同 seed 确定性重渲染，子版本 source=retune）。"""
+    return submit_derived(db, user, candidate_id, "retune", bpm=bpm, key=key)
+
+
+def submit_mixdown(db: Session, user: User, version_id: str, wav: bytes,
+                   notes: str = "") -> dict:
+    """V2 编辑器混音回存（v0.9.0）：浏览器多轨编辑（音量/EQ）OfflineAudioContext
+    渲染的成品 wav → 子版本（source=mixdown，1 候选自动采用）。
+
+    人类参与留痕：EQ/音量决策=人类编辑（事件 detail 携带 notes），证书
+    human_participation 计入；不扣积分（渲染在客户端完成）。
+    """
+    from app.services.export import _wav_bytes_to_float
+    version = works_svc.get_version_owned(db, version_id, user)
+    if not version.active_candidate_id:
+        raise err_conflict(tr("该版本尚未采用候选", "No candidate adopted for this version yet"))
+    if len(wav) > 200 * 1024 * 1024:
+        raise err_validation(tr("混音文件超过 200MB 上限", "Mixdown exceeds the 200MB limit"))
+    import wave as wav_mod
+    import hashlib
+    from app.config import settings
+    from app.models import File as FileRow
+    work = db.get(Work, version.work_id)
+    try:
+        with wav_mod.open(__import__("io").BytesIO(wav), "rb") as wf:
+            n, ch, sw, sr = wf.getnframes(), wf.getnchannels(), wf.getsampwidth(), wf.getframerate()
+            raw = wf.readframes(n)
+    except Exception as e:  # noqa: BLE001
+        raise err_validation(tr(f"wav 无法解析：{e}", f"cannot parse wav: {e}")) from e
+    duration = round(n / sr, 2)
+    # 与 works.duration CHECK(30~240) 对齐——编辑器不改变歌曲时长量级
+    if duration < 30 or duration > 240:
+        raise err_validation(tr(f"混音时长 {duration}s 越界（30~240s）",
+                            f"Mixdown duration {duration}s out of range (30-240s)"))
+
+    data = _wav_bytes_to_float(raw, sw)
+    if ch == 1:
+        left = right = data
+    else:
+        left, right = data[0::2], data[1::2]
+
+    now = utc_now_iso()
+    child = Version(work_id=work.id, parent_version_id=version.id,
+                    version_no=f"v{work.version_count + 1}", source="mixdown",
+                    candidate_count=0, params=dict(version.params or {}),
+                    lyrics=version.lyrics or "", created_at=now, updated_at=now)
+    db.add(child)
+    db.flush()
+    work.version_count += 1
+    work.updated_at = now
+    cand = Candidate(
+        version_id=child.id, label="A", adopted=True, seed=0,
+        quality_score=None,  # 人工混音不产 AI 质量分（不造假分）
+        duration_sec=int(duration), bpm=version.params.get("bpm", 90) if isinstance(version.params, dict) else 90,
+        key_tonic=work.key_tonic, key_mode=work.key_mode,
+        time_signature=(version.params or {}).get("time_signature", "4/4"),
+        vocal=(version.params or {}).get("vocal", "female_air"),
+        language=(version.params or {}).get("language", "zh"),
+        style_tags=["mixdown"], structure=[],
+        created_at=now, updated_at=now)
+    db.add(cand)
+    db.flush()
+    child.active_candidate_id = cand.id
+    child.candidate_count = 1
+    work.active_version_id = child.id
+    # work 快照回写（人工混音时长为准）
+    work.duration_sec = int(duration)
+    work.bpm = cand.bpm
+
+    dest = settings.audio_path / work.id / child.id / "candidates" / "A"
+    dest.mkdir(parents=True, exist_ok=True)
+    from app.synth.wav_io import write_wav
+    from app.synth.mp3_io import encode_mp3
+    m = dest / "master.wav"
+    size = write_wav(m, [left, right], bits=24)
+    sha = hashlib.sha256(m.read_bytes()).hexdigest()
+    now2 = utc_now_iso()
+    db.add(FileRow(work_id=work.id, version_id=child.id, candidate_id=cand.id,
+                   kind="master", stem_name=None, name=f"{work.display_code}_{child.version_no}_mixdown.wav",
+                   path=str(m.relative_to(settings.audio_path)).replace(chr(92), "/"),
+                   mime="audio/wav", bytes=size, duration_sec=duration,
+                   sample_rate=sr, sha256=sha, created_at=now2, updated_at=now2))
+    p = dest / "preview.mp3"
+    size = encode_mp3(p, left, right, bitrate=192)
+    sha = hashlib.sha256(p.read_bytes()).hexdigest()
+    db.add(FileRow(work_id=work.id, version_id=child.id, candidate_id=cand.id,
+                   kind="preview", stem_name=None, name=f"{work.display_code}_{child.version_no}_mixdown_preview.mp3",
+                   path=str(p.relative_to(settings.audio_path)).replace(chr(92), "/"),
+                   mime="audio/mpeg", bytes=size, duration_sec=duration,
+                   sample_rate=sr, sha256=sha, created_at=now2, updated_at=now2))
+    db.flush()
+    cand.preview_file_id = db.execute(
+        select(FileRow.id).where(FileRow.version_id == child.id,
+                                 FileRow.kind == "preview")).scalars().first()
+    works_svc.add_event(db, user_id=user.id, action="generate", actor="human",
+                                detail={"op": "mixdown", "source_version_id": version.id,
+                                        "notes": (notes or "")[:500],
+                                        "duration_sec": duration,
+                                        "auto_adopted": True},
+                                work_id=work.id, version_id=child.id)
+    db.commit()
+    return {"version": {"id": child.id, "version_no": child.version_no,
+                        "source": "mixdown"},
+            "work": {"id": work.id, "title": work.title}}

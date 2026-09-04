@@ -284,5 +284,6 @@ export const landingZh: Record<keyof typeof landingEn, string> = {
   'landing.data.milestone.8.title': '商业化：Stripe 订阅、积分充值与账号中心',
   'landing.data.milestone.9.title': '发行导出：抖音/流媒体平台模板打包',
   'landing.data.milestone.10.title': '参考音频与人声克隆（V1.1）',
-  'landing.data.milestone.11.title': '团队协作与开放 API（V1.1 收官）',
+  'landing.data.milestone.12.title': '开放 API：密钥与按量计费',
+  'landing.data.milestone.13.title': '多轨编辑器：混音、变速与回存（V2）',
 }

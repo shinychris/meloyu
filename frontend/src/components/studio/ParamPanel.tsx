@@ -3,6 +3,7 @@ import { useMetaStore } from '../../stores/meta'
 import { useStudioStore } from '../../stores/studio'
 import { useT, type TranslationKey } from '../../i18n'
 import type { KeyMode, Tonic } from '../../types/api'
+import { toast } from '../../stores/toast'
 import VoicePanel from './VoicePanel'
 
 const DURATION_PRESETS: Array<{ label: TranslationKey; value: number }> = [
@@ -27,8 +28,38 @@ export default function ParamPanel() {
     markStep(3)
   }
 
+  const applyTaste = async () => {
+    try {
+      const { getTaste } = await import('../../api/taste')
+      const r = await getTaste()
+      const p = r.profile
+      if (r.sample_count === 0 || p.bpm == null) {
+        toast(t('studio.taste.empty'), 'warn')
+        return
+      }
+      const patch: Parameters<typeof patchForm>[0] = { bpm: p.bpm, density: p.density ?? form.density }
+      if (p.key) {
+        const [tonic, mode] = p.key.split(' ') as [Tonic, KeyMode]
+        patch.keyTonic = tonic
+        patch.keyMode = mode
+      }
+      if (p.vocal) patch.vocal = p.vocal as typeof form.vocal
+      patchForm(patch)
+      markStep(3)
+      toast(t('studio.taste.applied', { n: r.sample_count }))
+    } catch {
+      /* 拦截器已 toast */
+    }
+  }
+
   return (
     <>
+      <div className="flex items-center justify-between mt-2">
+        <span className="text-[10px]" style={{ color: 'var(--dim)' }}>{t('studio.param.label')}</span>
+        <button className="text-[9px] underline" style={{ color: 'var(--dim)' }} onClick={() => void applyTaste()}>
+          {t('studio.taste.apply')}
+        </button>
+      </div>
       <div className="grid grid-cols-2 gap-2.5 mt-2">
         <div>
           <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>{t('studio.param.language')}</div>

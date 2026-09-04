@@ -12,7 +12,7 @@ from app.core.responses import ok
 from app.core.security import get_current_user, get_current_user_optional
 from app.database import get_db
 from app.models import File, User
-from app.schemas.auth import ExtendRequest, RegenSectionRequest, VariantRequest
+from app.schemas.auth import ExtendRequest, RegenSectionRequest, RetuneRequest, VariantRequest
 from app.services import editing as edit_svc
 from app.services import generation as gen_svc
 from app.services.serializers import candidate_to_dict
@@ -62,6 +62,15 @@ def variant(candidate_id: str, body: VariantRequest,
             user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """同结构（段落划分/时长逐段一致）换编曲风格，生成新候选建子版本。"""
     return ok(edit_svc.submit_variant(db, user, candidate_id, body.style_prompt),
+              status_code=201)
+
+
+@router.post("/{candidate_id}/retune", status_code=201)
+def retune(candidate_id: str, body: RetuneRequest,
+           user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """V2 编辑器：变速/变调（同 seed 确定性重渲染，子版本 source=retune，6 积分）。"""
+    return ok(edit_svc.submit_retune(db, user, candidate_id, body.bpm,
+                                     body.key.model_dump() if body.key else None),
               status_code=201)
 
 

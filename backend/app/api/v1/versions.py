@@ -13,11 +13,27 @@ from app.core.security import get_current_user, get_current_user_optional
 from app.database import get_db
 from app.models import File, User
 from app.services import certificate as cert_svc
+from app.services import editing as edit_svc
 from app.services import generation as gen_svc
 from app.services import works as works_svc
 from app.services.serializers import version_to_dict
 
 router = APIRouter(tags=["versions"])
+
+
+async def yield_body(request: Request) -> bytes:
+    """octet-stream 请求体读取（上限 200MB，超限即拒）。"""
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        chunks.append(chunk)
+        total += len(chunk)
+        if total > 200 * 1024 * 1024:
+            from app.core.errors import err_validation
+            from app.core.i18n import tr
+            raise err_validation(tr("混音文件超过 200MB 上限",
+                                "Mixdown exceeds the 200MB limit"))
+    return b"".join(chunks)
 
 
 @router.get("/works/{work_id}/versions")
@@ -54,6 +70,17 @@ def version_audio(version_id: str, request: Request,
         raise err_not_found(tr("版本音频不存在", "Version audio not found"))
     af.check_owner(db, f, u)
     return af.file_stream_response(request, f)
+
+
+@router.post("/versions/{version_id}/mixdown", status_code=201)
+async def upload_mixdown(version_id: str, request: Request,
+                         notes: str = Query(default="", max_length=500),
+                         user: User = Depends(get_current_user),
+                         db: Session = Depends(get_db)):
+    """V2 编辑器混音回存（octet-stream wav）→ 子版本 source=mixdown（人类参与留痕）。"""
+    body = await yield_body(request)
+    return ok(edit_svc.submit_mixdown(db, user, version_id, body, notes=notes),
+              status_code=201)
 
 
 @router.get("/versions/{version_id}/certificate")

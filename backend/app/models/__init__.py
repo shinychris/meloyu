@@ -8,6 +8,7 @@ from app.models.order import Order
 from app.models.reference import ReferenceTrack
 from app.models.plan import Plan, SequenceCounter, Subscription
 from app.models.task import File, Task
+from app.models.taste import TasteProfile
 from app.models.team import TeamMember, TeamSpace, WorkComment
 from app.models.user import CreditTransaction, User
 from app.models.voice import VoiceProfile
@@ -18,7 +19,7 @@ __all__ = [
     "Plan", "Subscription", "SequenceCounter",
     "User", "CreditTransaction",
     "Work", "Version", "Candidate", "EditEvent",
-    "Task", "File", "TeamSpace", "TeamMember", "WorkComment",
+    "Task", "File", "TeamSpace", "TeamMember", "WorkComment", "TasteProfile",
     "Certificate", "LyricsProject",
     "LLMSetting", "ModelOp", "SETTING_ID", "Order", "ReferenceTrack", "VoiceProfile",
 ]

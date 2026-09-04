@@ -223,6 +223,9 @@ class LocalSynthProvider:
         elif op == "regen_section":
             art, inferred = self._derive_regen(request, spec, base_req, base_dir, dest,
                                                progress, should_cancel)
+        elif op == "retune":
+            art, inferred = self._derive_retune(request, spec, base_req, dest,
+                                                progress, should_cancel)
         else:
             raise ValueError(tr(f"未知派生操作：{op}", f"Unknown derived operation: {op}"))
         return GenerationOutput([art], list(art.applied_negative_ext), inferred)
@@ -315,6 +318,45 @@ class LocalSynthProvider:
             language=ir.req.language, files=files,
         )
         art.applied_negative_ext = ir.applied_negative
+        art.inferred_ext = base_ir.inferred_structure
+        return art, base_ir.inferred_structure
+
+    def _derive_retune(self, request: SongRequest, spec: dict, base_req: SongRequest,
+                       dest: Path, progress: ProgressCallback,
+                       should_cancel: CancelCheck) -> tuple[CandidateArtifact, bool]:
+        """变速/变调（V2 编辑器）：同 seed 重建原曲素材，仅 bpm/调性不同 → 确定性重渲染。
+
+        与 variant（换风格重作）不同：retune 保留原曲和声/旋律/编曲素材（同 rng 消费序），
+        时长随 bpm 变化（bar_sec），调性整体移调。
+        """
+        from dataclasses import replace as dc_replace
+        _stage(progress, should_cancel, "structure", 10)
+        tuned_req = dc_replace(base_req, bpm=request.bpm, tonic=request.tonic,
+                               mode=request.mode)
+        base_ir = editing_mod.rebuild_ir(tuned_req, base_req.seed)
+
+        _stage(progress, should_cancel, "harmony", 35)
+        _stage(progress, should_cancel, "melody", 50)
+        _stage(progress, should_cancel, "arrange", 60)
+        _stage(progress, should_cancel, "vocal", 70)
+        rng = editing_mod.make_rng(tuned_req.seed)
+        result = render_song(base_ir, rng)
+
+        _stage(progress, should_cancel, "serialize", 90)
+        files = _write_candidate_files(dest, "A", result.master_l, result.master_r,
+                                       result.stems, base_ir.total_sec, base_ir)
+        # seed 留痕=base seed：素材重建由 (bpm/key 参数 + base seed) 唯一确定，
+        # 该候选后续派生（extend/regen）可确定性重建本候选
+        art = CandidateArtifact(
+            label="A", seed=base_req.seed,
+            quality_score=self._quality_score(base_req.seed, "A"),
+            duration_sec=round(base_ir.total_sec, 2), structure=base_ir.structure_json(),
+            style_tags=_style_tags(tuned_req.style_prompt, base_ir.style_family),
+            bpm=base_ir.req.bpm, tonic=base_ir.req.tonic, mode=base_ir.req.mode,
+            time_signature=base_ir.req.time_signature, vocal=base_ir.req.vocal,
+            language=base_ir.req.language, files=files,
+        )
+        art.applied_negative_ext = base_ir.applied_negative
         art.inferred_ext = base_ir.inferred_structure
         return art, base_ir.inferred_structure
 

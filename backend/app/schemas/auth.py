@@ -292,6 +292,12 @@ class VariantRequest(BaseModel):
     style_prompt: str = Field(min_length=1, max_length=500)
 
 
+class RetuneRequest(BaseModel):
+    """V2 编辑器（v0.9.0）：变速/变调——至少一项（确定性同 seed 重渲染）。"""
+    bpm: int | None = Field(default=None, ge=60, le=174)
+    key: KeySchema | None = None
+
+
 class RegenSectionRequest(BaseModel):
     """契约 v1.2 §5.7：仅重生成指定段落的第 occurrence 次出现（1 起始，默认 1）。"""
     section: str

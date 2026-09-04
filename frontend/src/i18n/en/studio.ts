@@ -212,4 +212,10 @@ export const studioEn = {
     'Mandopop ballad, piano-led with string pads, rainy-night atmosphere, breathy female vocals, chorus lifts',
   'studio.default.lyrics':
     '[Verse]\nRain stops on the windowsill at 3 a.m.\nNeon stretches my shadow pale\n[Chorus]\nWe said the future far too lightly\nLike wind through an empty street',
+
+  // ===== My taste (V2-b, v0.9.1) =====
+  'studio.taste.apply': 'Prefill by my taste',
+  'studio.taste.applied': 'Params prefilled from your taste (stats over {n} works; freely editable)',
+  'studio.taste.empty': 'Library is too small to build a taste profile',
+
 } as const

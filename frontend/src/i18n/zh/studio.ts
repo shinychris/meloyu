@@ -202,4 +202,10 @@ export const studioZh: Record<keyof typeof studioEn, string> = {
   'studio.default.stylePrompt': '华语流行抒情，钢琴主导，弦乐铺底，雨夜氛围，女声气声，副歌情绪推起',
   'studio.default.lyrics':
     '[Verse]\n雨停在凌晨三点的窗台\n霓虹把影子拉得好白\n[Chorus]\n我们把未来说得太轻\n像风穿过无人的街心',
+
+  // ===== 我的口味（V2-b，v0.9.1）=====
+  'studio.taste.apply': '按我的口味预填',
+  'studio.taste.applied': '已按口味预填参数（基于 {n} 首作品统计，可自由修改）',
+  'studio.taste.empty': '作品库还太空，暂无法生成口味画像',
+
 }

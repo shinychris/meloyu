@@ -108,6 +108,14 @@ def run(engine: Engine) -> list[str]:
             _rebuild_table(conn, "files", "files__v08")
             applied.append("files.kind 增加 export_release_zip 枚举")
 
+        # M-20260905-a：v0.9.0 V2 编辑器——versions.source 补 retune/mixdown
+        ddl = conn.execute(
+            text("SELECT sql FROM sqlite_master WHERE type='table' AND name='versions'")
+        ).scalar_one_or_none()
+        if ddl and "'retune'" not in ddl:
+            _rebuild_table(conn, "versions", "versions__v09")
+            applied.append("versions.source 增加 retune/mixdown 枚举")
+
         # M-20260904-b：v0.8.1 人声克隆——candidates.vocal 补 voice_clone（FR-5）
         ddl = conn.execute(
             text("SELECT sql FROM sqlite_master WHERE type='table' AND name='candidates'")
@@ -127,12 +135,13 @@ def _rebuild_table(conn, table_name: str, tmp_name: str) -> None:
     from app.models.plan import Subscription
     from app.models.task import File, Task
     from app.models.user import CreditTransaction
-    from app.models.work import Candidate
+    from app.models.work import Candidate, Version
 
     tables = {"candidates": Candidate.__table__, "tasks": Task.__table__,
               "credit_transactions": CreditTransaction.__table__,
               "subscriptions": Subscription.__table__,
-              "files": File.__table__}
+              "files": File.__table__,
+              "versions": Version.__table__}
     table = tables[table_name]
 
     conn.execute(text("PRAGMA foreign_keys=OFF"))

@@ -16,6 +16,7 @@ import { loginEn } from './login'
 import { layoutEn } from './layout'
 import { authEn } from './auth'
 import { billingEn } from './billing'
+import { editorEn } from './editor'
 
 export const en = {
   ...commonEn,
@@ -32,4 +33,5 @@ export const en = {
   ...layoutEn,
   ...authEn,
   ...billingEn,
+  ...editorEn,
 } as const
