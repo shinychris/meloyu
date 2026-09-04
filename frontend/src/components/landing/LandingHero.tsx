@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { INSPIRE_CHIPS, LANDING_METRICS } from '../../lib/landing-data'
-import { useT } from '../../i18n'
+import { useT, getLocale } from '../../i18n'
 import { scrollToSection } from './LandingNav'
 
 /** Hero：定位语 + 双 CTA + 灵感 chips + 指标条 */
@@ -71,7 +71,7 @@ export default function LandingHero() {
             <span className="dot" style={{ background: 'var(--acc)' }} />
             <span className="label ml-2">{t('landing.hero.shotLabel')}</span>
           </div>
-          <img src="/shots/studio.png" alt={t('landing.hero.shotAlt')} className="w-full block" />
+          <img src={`/shots/${getLocale()}/studio.png`} alt={t('landing.hero.shotAlt')} className="w-full block" />
         </div>
       </div>
     </section>

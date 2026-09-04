@@ -368,15 +368,15 @@ export const FAQS: Array<{ q: TranslationKey; a: TranslationKey }> = [
   { q: 'landing.data.faq.6.q', a: 'landing.data.faq.6.a' },
 ]
 
-/** 界面一览（真机截图） */
+/** 界面一览（真机截图；src 为文件名，按 locale 从 /shots/{en|zh}/ 取图，组件侧拼前缀） */
 export const SHOWCASE: Array<{ src: string; title: TranslationKey; desc: TranslationKey }> = [
   {
-    src: '/shots/studio.png',
+    src: 'studio.png',
     title: 'landing.data.showcase.1.title',
     desc: 'landing.data.showcase.1.desc',
   },
   {
-    src: '/shots/generating.png',
+    src: 'generating.png',
     title: 'landing.data.showcase.2.title',
     desc: 'landing.data.showcase.2.desc',
   },

@@ -18,6 +18,13 @@ import { landingEn } from '../i18n/en/landing'
 import { landingZh } from '../i18n/zh/landing'
 import pkg from '../../package.json'
 
+/** 双语言截图资产（/shots/{en|zh}/*.png），glob 键为相对本文件的路径 */
+const shotFiles = import.meta.glob('../../public/shots/*/*.png', {
+  query: '?url',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>
+
 /** 落地页数据完整性：对外口径的事实以 backend 为准，此处防止手改失真。
  *  文案字段已 key 化（landing.data.*），断言分两层：key 结构 + en 字典译文。 */
 type LandingKey = keyof typeof landingEn
@@ -112,7 +119,13 @@ describe('landing-data 落地页数据完整性', () => {
     expect(INSPIRE_CHIPS).toHaveLength(12)
     expect(MILESTONES.length).toBeGreaterThanOrEqual(7)
     expect(MILESTONES[MILESTONES.length - 1].ver).toBe(LANDING_VERSION)
-    for (const s of SHOWCASE) expect(s.src).toMatch(/^\/shots\/.+\.png$/)
+    // src 为纯文件名，en/zh 双目录都必须有对应截图（英文界面零中文的截图面）
+    for (const s of SHOWCASE) {
+      expect(s.src).toMatch(/^[a-z]+\.png$/)
+      for (const locale of ['en', 'zh']) {
+        expect(shotFiles[`../../public/shots/${locale}/${s.src}`], `public/shots/${locale}/${s.src} missing`).toBeTruthy()
+      }
+    }
     for (const s of SHOWCASE) {
       expect(en(s.title)).toBeTruthy()
       expect(en(s.desc)).toBeTruthy()
