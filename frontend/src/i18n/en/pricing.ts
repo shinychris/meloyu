@@ -25,6 +25,7 @@ export const pricingEn = {
   'pricing.switching': 'Switching…',
   'pricing.contactSales': 'Contact sales',
   'pricing.contactSalesToast': 'Team plan — please contact sales (MVP demo)',
+  'pricing.contactSalesMail': 'Team plan - email {email}',
   'pricing.downgrade': 'Downgrade to Free',
   'pricing.upgrade': 'Upgrade to {name}',
   'pricing.switched': 'Switched to "{name}" — this month’s credits have been granted',

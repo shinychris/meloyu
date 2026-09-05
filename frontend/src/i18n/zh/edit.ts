@@ -1,0 +1,37 @@
+import { editEn } from '../en/edit'
+
+/** zh 字典 key 与 en 严格一一对应（编译期校验，漏 key 报 type error）。 */
+export const editZh: Record<keyof typeof editEn, string> = {
+  'edit.view.label': '制作 / 音频剪辑',
+  'edit.view.headline': '波形选区编辑 · 存为新版本',
+  'edit.pick.work': '选择作品…',
+  'edit.pick.version': '选择版本…',
+  'edit.empty': '选择一首作品，开始剪辑它的母带波形',
+  'edit.loading': '母带加载与解码中…',
+  'edit.tool.cut': '剪掉选区',
+  'edit.tool.keep': '只保留选区',
+  'edit.tool.fadein': '淡入',
+  'edit.tool.fadeout': '淡出',
+  'edit.tool.gainUp': '增益 +3dB',
+  'edit.tool.gainDown': '增益 −3dB',
+  'edit.tool.normalize': '标准化',
+  'edit.apply': '应用到选区',
+  'edit.undo': '撤销',
+  'edit.redo': '重做',
+  'edit.preview': '试听结果',
+  'edit.info.clips': '爆音 {n} 采样',
+  'edit.info.clean': '未检测到爆音',
+  'edit.info.silence': '静音 {pct}%',
+  'edit.save': '保存为新版本',
+  'edit.saving': '渲染保存中…',
+  'edit.save.notes': '音频剪辑（{n} 步非破坏操作）',
+  'edit.save.rangeWarn': '剪辑后时长 {s} 超出 30~240s，请少剪一点',
+  'edit.save.hint': '非破坏：每次从原始母带重放操作；经混音回存通道保存并计入人类参与留痕',
+  'edit.ops.title': '操作栈',
+  'edit.toast.noAudio': '该候选没有音频文件',
+  'edit.toast.needSelection': '请先在波形上拖选一个区间',
+  'edit.toast.opApplied': '已应用第 {n} 步操作',
+  'edit.toast.saved': '已保存为新版本 {no}',
+  'edit.footnote':
+    '所有操作每次渲染都从原始母带重放（非破坏）。也可随时导出 48kHz WAV 与 4 分轨到专业 DAW 深度处理。',
+}

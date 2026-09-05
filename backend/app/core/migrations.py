@@ -141,6 +141,14 @@ def run(engine: Engine) -> list[str]:
             _rebuild_table(conn, "works", "works__v102")
             applied.append("works.duration CHECK 放宽 25~300")
 
+        # M-20260905-e：v0.11.0 /pitch 修调——versions.source 补 pitch_edit
+        ddl = conn.execute(
+            text("SELECT sql FROM sqlite_master WHERE type='table' AND name='versions'")
+        ).scalar_one_or_none()
+        if ddl and "'pitch_edit'" not in ddl:
+            _rebuild_table(conn, "versions", "versions__v011")
+            applied.append("versions.source 增加 pitch_edit 枚举")
+
         # M-20260905-d：v0.10.2 市场——credit_transactions.reason 补 market_purchase
         # （买家扣款与卖家入账区分 reason，账本审计可辨方向）
         ddl = conn.execute(

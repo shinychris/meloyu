@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { Suspense } from 'react'
 import { renderToString } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import StudioView from './StudioView'
@@ -6,9 +7,10 @@ import LyricsView from './LyricsView'
 import LibraryView from './LibraryView'
 import RightsView from './RightsView'
 import PricingView from './PricingView'
-import ComingSoonView from './ComingSoonView'
 import WorkDetailView from './WorkDetailView'
 import LoginView from './LoginView'
+import EditView from './EditView'
+import PitchView from './PitchView'
 import ModelCenterView from './ModelCenterView'
 import BillingReturnView from './BillingReturnView'
 import ResetPasswordView from './ResetPasswordView'
@@ -124,9 +126,11 @@ describe('views render smoke', () => {
     expect(form).toContain('Reset password')
   })
 
-  it('ComingSoonView edit/pitch 两个占位页渲染（arrange 已上线真实编辑器）', () => {
-    expect(render(<ComingSoonView kind="edit" />)).toContain('Non-destructive audio editing')
-    expect(render(<ComingSoonView kind="pitch" />)).toContain('Melody tuning workshop')
+  it('/edit 与 /pitch 路由渲染真实视图（v0.11.0 占位转正）', () => {
+    const editHtml = renderAt('/edit', <Suspense fallback={null}><EditView /></Suspense>)
+    expect(editHtml).toContain('Waveform selection editing')
+    const pitchHtml = renderAt('/pitch', <Suspense fallback={null}><PitchView /></Suspense>)
+    expect(pitchHtml).toContain('Piano-roll note editing')
   })
 
   it('ModelCenterView 渲染双引擎通道区（V1.3 歌曲生成引擎）', () => {

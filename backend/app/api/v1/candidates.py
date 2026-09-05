@@ -12,7 +12,8 @@ from app.core.responses import ok
 from app.core.security import get_current_user, get_current_user_optional
 from app.database import get_db
 from app.models import File, User
-from app.schemas.auth import ExtendRequest, RegenSectionRequest, RetuneRequest, VariantRequest
+from app.schemas.auth import (ExtendRequest, PitchEditRequest, RegenSectionRequest,
+                              RetuneRequest, VariantRequest)
 from app.services import editing as edit_svc
 from app.services import generation as gen_svc
 from app.services.serializers import candidate_to_dict
@@ -72,6 +73,15 @@ def retune(candidate_id: str, body: RetuneRequest,
     return ok(edit_svc.submit_retune(db, user, candidate_id, body.bpm,
                                      body.key.model_dump() if body.key else None),
               status_code=201)
+
+
+@router.post("/{candidate_id}/pitch-edit", status_code=201)
+def pitch_edit(candidate_id: str, body: PitchEditRequest,
+               user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """V2 /pitch 修调（v0.11.0）：音符级移调/节奏量化——同 seed 确定性重渲染，
+    子版本 source=pitch_edit，6 积分（与词谱 beat 键对齐，±0.05s 容差匹配）。"""
+    return ok(edit_svc.submit_pitch_edit(db, user, candidate_id,
+                                         body.payload(), body.quantize), status_code=201)
 
 
 @router.post("/{candidate_id}/regen-section", status_code=201)

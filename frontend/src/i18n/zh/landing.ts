@@ -288,4 +288,6 @@ export const landingZh: Record<keyof typeof landingEn, string> = {
   'landing.data.milestone.13.title': '多轨编辑器：混音、变速与回存（V2）',
   'landing.data.milestone.14.title': '词谱生成：简谱+歌词+和弦 PDF',
   'landing.data.milestone.15.title': '作品市场：买卖、分账与授权凭证（V2 收官）',
+  'landing.data.milestone.16.title': '业务可用性整改：市场闭环/采纳修复/PDF 字体内嵌',
+  'landing.data.milestone.17.title': '音频剪辑·旋律修调·哼唱成歌上线（占位全转正）',
 }

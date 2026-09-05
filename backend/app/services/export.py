@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.core.errors import err_conflict, err_not_found
+from app.core.errors import err_conflict, err_not_found, err_validation
 from app.core.i18n import tr
 from app.core.logging import logger
 from app.database import SessionLocal
@@ -33,6 +33,11 @@ def create_export(db: Session, user: User, version_id: str, fmt: str,
         payload["meta"] = meta or {}
         payload["meta"].setdefault("title", work_title_of(db, version))
         payload["meta"].setdefault("artist", user_email_prefix(user))
+        # v0.11.0：封面校验前移到提交期（40001 快速失败，不建任务不占队列）
+        if (payload["meta"].get("cover_png_b64")):
+            from app.services.release_export import preset_of as _preset_of
+            validate_cover_png(payload["meta"]["cover_png_b64"],
+                               _preset_of(platform)["cover_size"])
     now = utc_now_iso()
     task = Task(user_id=user.id, type="export", status="queued", progress=0,
                 stage_key="queued", stage_label=tr("排队中", "Queued"),
@@ -46,6 +51,36 @@ def create_export(db: Session, user: User, version_id: str, fmt: str,
     from app.core.tasks import schedule_export
     schedule_export(task.id)
     return {"task": task_to_dict(task)}
+
+
+def validate_cover_png(b64: str, preset_size: tuple[int, int] = (3000, 3000)) -> bytes:
+    """自定义封面校验（v0.11.0）：base64/PNG 魔数/≤4MB/≥600x600 → 返回字节。
+
+    在 create_export（提交期，扣积分前 40001 快速失败）与 execute_export
+    （执行期防御副本）两处调用，口径一致。
+    """
+    import base64 as _b64
+    import struct as _st
+    try:
+        data = _b64.b64decode(str(b64), validate=True)
+    except Exception:
+        raise err_validation(tr("cover_png_b64 不是合法 base64",
+                             "cover_png_b64 is not valid base64"))
+    if not data.startswith(bytes((137, 80, 78, 71, 13, 10, 26, 10))):
+        raise err_validation(tr("自定义封面须为 PNG 图片",
+                             "Custom cover must be a PNG image"))
+    if len(data) > 4 * 1024 * 1024:
+        raise err_validation(tr("自定义封面超过 4MB 上限",
+                             "Custom cover exceeds the 4MB limit"))
+    w = h = 0
+    if len(data) > 24:
+        w, h = _st.unpack(">II", data[16:24])
+    if w < 600 or h < 600:
+        raise err_validation(tr(
+            f"自定义封面尺寸 {w}x{h} 过小（≥600x600，建议 {preset_size[0]}x{preset_size[1]}）",
+            f"Custom cover {w}x{h} is too small (>=600x600; "
+            f"{preset_size[0]}x{preset_size[1]} recommended)"))
+    return data
 
 
 def work_title_of(db: Session, version: Version) -> str:
@@ -305,6 +340,11 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
         platform = (payload or {}).get("platform") or "douyin"
         preset = preset_of(platform)
         meta = (payload or {}).get("meta") or {}
+        # v0.11.0 自定义封面：base64 PNG 优先于程序占位图（校验见 validate_cover_png）
+        cover_png_bytes: bytes | None = None
+        if meta.get("cover_png_b64"):
+            cover_png_bytes = validate_cover_png(meta["cover_png_b64"],
+                                                 preset["cover_size"])
         if preset["audio"] == "wav" and mp3_master:
             raise err_conflict(
                 tr("流媒体发行预设需 WAV 母带；该候选母带为 mp3（外部歌曲 API 通道），请改用抖音预设",
@@ -345,7 +385,8 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
         write_release_zip(zip_path, platform=platform, audio_arcname=arcname,
                           audio_path=audio, cover_size=preset["cover_size"],
                           cover_color=work.cover_color,
-                          metadata_json=metadata_json, readme_txt=readme_txt)
+                          metadata_json=metadata_json, readme_txt=readme_txt,
+                          cover_png_bytes=cover_png_bytes)
         row = _register(db, work, version, kind="export_release_zip",
                         relpath=f"{base}/release_{platform}.zip", mime="application/zip",
                         path=zip_path, duration_sec=master.duration_sec,

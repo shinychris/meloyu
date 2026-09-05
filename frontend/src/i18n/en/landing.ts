@@ -279,4 +279,6 @@ export const landingEn = {
   'landing.data.milestone.13.title': 'Multi-track editor: mix, retune & save (V2)',
   'landing.data.milestone.14.title': 'Leadsheet generation: notation + lyrics + chords PDF',
   'landing.data.milestone.15.title': 'Marketplace: trade, split & licenses (V2 wrap-up)',
+  'landing.data.milestone.16.title': 'Usability fixes: market loop, adoption & PDF fonts',
+  'landing.data.milestone.17.title': 'Audio editing, melody tuning & hum-to-song go live',
 } as const

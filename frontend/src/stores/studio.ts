@@ -38,6 +38,8 @@ export interface StudioForm {
   density: number
   /** FR-5：vocal=voice_clone 时必填（已验证音色档案 id） */
   voiceProfileId?: string
+  /** 哼唱成歌（v0.11.0）：[[相对半音, 拍长], ...]（/hum/analyze 应用后写入） */
+  humMelody?: number[][]
 }
 
 export interface InspireSelection {
@@ -253,6 +255,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         instrument_density: form.density,
         ...(form.vocal === 'voice_clone' && form.voiceProfileId
           ? { voice_profile_id: form.voiceProfileId }
+          : {}),
+        ...(form.humMelody && form.humMelody.length >= 2
+          ? { hum_melody: form.humMelody }
           : {}),
       },
     }

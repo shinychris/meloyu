@@ -1,6 +1,5 @@
 /**
  * models 命名空间：模型中心（ModelCenterView）；
- * 另含 coming.* —— 编曲/剪辑/修调占位页（ComingSoonView）。
  */
 export const modelsEn = {
   // 页头与运行时状态
@@ -149,25 +148,4 @@ export const modelsEn = {
   'models.ext.baseUrlRequired': 'base_url and model are required',
   'models.ext.note':
     'Standard chat/completions protocol: Zhipu GLM, DeepSeek, OpenAI, Moonshot, Qwen and more connect directly; local gateways also work (e.g. Ollama at http://localhost:11434/v1 — any key value is fine).',
-  // ComingSoonView（edit / pitch 占位页；arrange 已上线真实多轨编辑器）
-  'coming.badge': 'In development for V2 · Coming soon',
-  'coming.soonTitle': '“{title}” is coming soon',
-  'coming.backStudio': 'Back to Studio',
-  'coming.goLibrary': 'Export from Library',
-  'coming.edit.label': 'Edit / Audio Editing',
-  'coming.edit.title': 'Non-destructive audio editing',
-  'coming.edit.desc':
-    'Waveform selection editing, fades, gain/normalize, AI denoise and de-reverb, one-click click repair — landing in V2. The 48kHz/24bit WAV and 4 stems you export today go straight into a professional DAW.',
-  'coming.edit.f1': 'Selection tools + undo stack',
-  'coming.edit.f2': 'AI denoise / de-reverb / breath control',
-  'coming.edit.f3': 'Clip effect chains (non-destructive)',
-  'coming.edit.f4': 'Click and silence detection',
-  'coming.pitch.label': 'Pitch / Correction',
-  'coming.pitch.title': 'Melody tuning workshop',
-  'coming.pitch.desc':
-    'Piano-roll note editing, snap-to-scale pitch, rhythm quantization, vibrato/slide preservation — landing in V2. In the MVP, synthesized vocal pitch is aligned to the scale directly by the MusiCoT pipeline, so no tuning is needed.',
-  'coming.pitch.f1': 'Drag notes to transpose (semitone snap)',
-  'coming.pitch.f2': 'Correction strength / vibrato preserve / formants',
-  'coming.pitch.f3': 'Rhythm quantize 1/8 · 1/16',
-  'coming.pitch.f4': 'Off-pitch detection and one-click fix',
 } as const

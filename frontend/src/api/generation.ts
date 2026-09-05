@@ -10,6 +10,7 @@ import type {
   Task,
   VariantCandidateRequest,
   Version,
+  PitchEditRequest,
 } from '../types/api'
 
 /** POST /generations —— 提交生成（原子扣积分，产出 2 候选） */
@@ -79,4 +80,12 @@ export function regenSectionCandidate(
   req: RegenSectionRequest,
 ): Promise<GenerationSubmitResult> {
   return apiPost<GenerationSubmitResult>(`/candidates/${candidateId}/regen-section`, req)
+}
+
+/** POST /candidates/{id}/pitch-edit（v0.11.0）—— 音符级移调/量化，同 seed 确定性重渲染 */
+export function pitchEditCandidate(
+  candidateId: string,
+  req: PitchEditRequest,
+): Promise<GenerationSubmitResult> {
+  return apiPost<GenerationSubmitResult>(`/candidates/${candidateId}/pitch-edit`, req)
 }

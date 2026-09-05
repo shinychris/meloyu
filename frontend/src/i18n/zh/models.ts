@@ -148,25 +148,4 @@ export const modelsZh: Record<keyof typeof modelsEn, string> = {
   'models.ext.baseUrlRequired': 'base_url 与 model 必填',
   'models.ext.note':
     '标准 chat/completions 协议：智谱 GLM、DeepSeek、OpenAI、Moonshot、通义等均可直连；也兼容本地网关（如 Ollama 的 http://localhost:11434/v1，Key 可任意填）。',
-  // ComingSoonView（edit / pitch 占位页；arrange 已上线真实多轨编辑器）
-  'coming.badge': 'V2 开发中 · 即将上线',
-  'coming.soonTitle': '「{title}」即将上线',
-  'coming.backStudio': '返回创作工作台',
-  'coming.goLibrary': '去作品库导出',
-  'coming.edit.label': 'Edit / 音频剪辑',
-  'coming.edit.title': '非破坏性音频剪辑',
-  'coming.edit.desc':
-    '波形选区编辑、淡入淡出、增益/标准化、AI 降噪与去房混、爆音一键修复——将在 V2 版本上线。当前导出的 48kHz/24bit WAV 与 4 Stems 可直接导入专业 DAW 处理。',
-  'coming.edit.f1': '选区操作 + 撤销栈',
-  'coming.edit.f2': 'AI 降噪 / 去房混 / 呼吸控制',
-  'coming.edit.f3': 'Clip 效果链（非破坏性）',
-  'coming.edit.f4': '爆音与空白检测',
-  'coming.pitch.label': 'Pitch / 修调',
-  'coming.pitch.title': '旋律修调工坊',
-  'coming.pitch.desc':
-    '钢琴卷帘式音符编辑、音高吸附音阶、节奏量化、颤音/滑音保留控制——将在 V2 版本上线。MVP 的合成人声音高由 MusiCoT 管线直接对齐音阶，无需修调。',
-  'coming.pitch.f1': '音符拖拽移调（吸附半音）',
-  'coming.pitch.f2': '修正强度 / 颤音保留 / 共振峰',
-  'coming.pitch.f3': '节奏量化 1/8 · 1/16',
-  'coming.pitch.f4': '跑调检测与一键修复',
 }

@@ -209,6 +209,45 @@ def compose_melody(ir: SongIR, rng: np.random.Generator) -> None:
                                                        sp.energy * 0.7)
 
 
+def apply_hum_melody(ir: SongIR, hum: list) -> int:
+    """哼唱成歌（v0.11.0）：把哼唱音高轮廓映射到已作曲的人声旋律上。
+
+    hum = [[semi_rel, dur_beats], ...]（相对哼唱中位音的半音序列）。
+    映射规则（保音程关系，如实口径）：
+    - 人声音符按顺序与哼唱轮廓对齐（轮廓不足循环、多余截断）；
+    - 以哼唱中位半音为轴平移到人声音域中心（vocal 类型查表 / voice_clone 档案）；
+    - 每个音符落最近 MIDI 整数（哼唱半音四舍五入），不做调内强制吸附——
+      蓝调音等用户哼出的离调音如实保留；
+    - 时值/音节对齐/结构/编曲全部沿用既有管线（AI 补全）。
+    返回实际受影响的人声音符数。
+    """
+    if not hum or not ir.vocal_notes:
+        return 0
+    req = ir.req
+    if req.vocal == "voice_clone":
+        center = int((req.voice_timbre or {}).get("center_midi", 60))
+    else:
+        center = VOCAL_CENTER.get(req.vocal, 67)
+    hum_semis = [int(h[0]) for h in hum if isinstance(h, (list, tuple)) and len(h) >= 1]
+    if not hum_semis:
+        return 0
+    med = sorted(hum_semis)[len(hum_semis) // 2]
+    # 中位音平移到音域中心下方 2 半音（主歌区不顶满音域）
+    anchor = center - 2
+    changed = 0
+    for i, note in enumerate(ir.vocal_notes):
+        semi = hum_semis[i % len(hum_semis)]
+        new_midi = anchor + (semi - med)
+        lo, hi = center - VOCAL_RANGE, center + VOCAL_RANGE
+        new_midi = max(lo, min(hi, new_midi))
+        if new_midi != note.midi:
+            note.midi = new_midi
+            changed += 1
+        else:
+            note.midi = new_midi  # 显式落位（即使值相同也视为已映射）
+    return len(ir.vocal_notes)
+
+
 def vowel_of_syllable(syl: str, language: str) -> str:
     """音节 → 主元音（共振峰查表键：a/i/u/e/o）。"""
     if language in ("zh", "yue", "ja") and _CJK_RE.match(syl):

@@ -144,6 +144,27 @@ class GenerationParams(BaseModel):
     instrument_density: int = Field(default=65, ge=0, le=100)
     # FR-5（v0.8.2）：vocal=voice_clone 时必填（已验证的本人音色档案）
     voice_profile_id: str | None = Field(default=None, max_length=32)
+    # v0.11.0 哼唱成歌：[[semi_rel(-24..24), dur_beats(0.25..4)], ...] ≤64 项，
+    # 仅本地引擎；来自 POST /hum/analyze 的音高轮廓（前端展示确认后透传）
+    hum_melody: list | None = Field(default=None)
+
+    @field_validator("hum_melody")
+    @classmethod
+    def _hum(cls, v: list | None) -> list | None:
+        if v is None:
+            return None
+        if not 2 <= len(v) <= 64:
+            raise ValueError(tr("hum_melody 需为 2~64 个音符",
+                            "hum_melody must contain 2-64 notes"))
+        for item in v:
+            if (not isinstance(item, (list, tuple)) or len(item) != 2
+                    or not isinstance(item[0], (int, float)) or not isinstance(item[1], (int, float))):
+                raise ValueError(tr("hum_melody 每项须为 [半音, 拍长]",
+                                "each hum_melody item must be [semitone, beats]"))
+            if not -24 <= item[0] <= 24 or not 0.25 <= item[1] <= 4:
+                raise ValueError(tr("hum_melody 半音须 -24~24、拍长须 0.25~4",
+                                "hum_melody semitones must be -24 to 24, beats 0.25 to 4"))
+        return v
 
     @field_validator("time_signature")
     @classmethod
@@ -245,6 +266,8 @@ class ReleaseMeta(BaseModel):
     upc: str = Field(default="", max_length=15)
     lyrics_copyright: str = Field(default="", max_length=120)
     songwriter: str = Field(default="", max_length=120)
+    # v0.11.0 自定义封面：PNG base64（解码后 ≤4MB、≥600x600；缺省用系统占位图）
+    cover_png_b64: str | None = Field(default=None, max_length=6_000_000)
 
 
 class ExportRequest(BaseModel):
@@ -296,6 +319,28 @@ class RetuneRequest(BaseModel):
     """V2 编辑器（v0.9.0）：变速/变调——至少一项（确定性同 seed 重渲染）。"""
     bpm: int | None = Field(default=None, ge=60, le=174)
     key: KeySchema | None = None
+
+
+class NoteEdit(BaseModel):
+    """单条音符编辑：beat=词谱绝对拍号（0.001 精度），semi=移调半音数。"""
+    beat: float = Field(ge=0, le=10000)
+    semi: int = Field(ge=-12, le=12)
+
+
+class PitchEditRequest(BaseModel):
+    """V2 /pitch 修调（v0.11.0）：音符级移调 + 可选节奏量化（确定性重渲染）。"""
+    edits: list[NoteEdit] = Field(min_length=1, max_length=200)
+    quantize: str = "off"
+
+    @field_validator("quantize")
+    @classmethod
+    def _q(cls, v: str) -> str:
+        if v not in ("off", "8", "16"):
+            raise ValueError(tr("quantize 必须为 off/8/16", "quantize must be off/8/16"))
+        return v
+
+    def payload(self) -> list[dict]:
+        return [{"beat": e.beat, "semi": e.semi} for e in self.edits]
 
 
 class RegenSectionRequest(BaseModel):

@@ -19,7 +19,8 @@ from app.services import works as works_svc
 from app.services.serializers import task_to_dict
 from app.synth.editing import derive_op_seed
 
-DERIVED_OPS = ("extend", "variant", "regen_section", "retune")  # v0.9.0 增 retune
+DERIVED_OPS = ("extend", "variant", "regen_section", "retune",
+               "pitch_edit")  # v0.9.0 增 retune；v0.11.0 增 pitch_edit（/pitch）
 MAX_TOTAL_DURATION_SEC = 240  # 与契约 generation_limits.max_duration_sec 一致
 
 
@@ -74,7 +75,8 @@ def _base_params(version: Version, cand: Candidate) -> dict:
 def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
                    seconds: int | None = None, style_prompt: str | None = None,
                    section: str | None = None, occurrence: int = 1,
-                   bpm: int | None = None, key: dict | None = None) -> dict:
+                   bpm: int | None = None, key: dict | None = None,
+                   note_edits: list | None = None, quantize: str = "off") -> dict:
     """提交派生生成：建子版本 + 任务 + 扣积分，返回 POST /generations 同构响应。"""
     if op not in DERIVED_OPS:
         raise err_validation(tr(f"未知派生操作：{op}", f"Unknown derived operation: {op}"))
@@ -118,6 +120,25 @@ def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
                 raise err_validation(tr("key 无效（tonic/mode）", "invalid key (tonic/mode)"))
             params["key"] = {"tonic": tonic, "mode": mode}
         extra = f"{params['bpm']}:{params['key']['tonic']}{params['key']['mode']}"
+    elif op == "pitch_edit":
+        # /pitch 修调（v0.11.0）：音符级移调 + 可选节奏量化，同 seed 确定性重渲染
+        edits = note_edits or []
+        if not 1 <= len(edits) <= 200:
+            raise err_validation(tr(f"音符编辑须为 1~200 条（收到 {len(edits)}）",
+                                f"Note edits must be 1-200 items (got {len(edits)})"))
+        for e in edits:
+            try:
+                beat, semi = float(e["beat"]), int(e["semi"])
+            except (KeyError, TypeError, ValueError):
+                raise err_validation(tr("每条编辑须为 {beat, semi}",
+                                     "Each edit must be {beat, semi}"))
+            if not 0 <= beat <= 10000 or not -12 <= semi <= 12:
+                raise err_validation(tr("beat 须 0~10000、semi 须 -12~12",
+                                     "beat must be 0-10000 and semi must be -12 to 12"))
+        if quantize not in ("off", "8", "16"):
+            raise err_validation(tr("quantize 须为 off/8/16",
+                                 "quantize must be off/8/16"))
+        extra = f"{len(edits)}:{quantize}"
     elif op == "regen_section":
         seg_sections = {str(seg.get("section")) for seg in (cand.structure or [])}
         if section not in seg_sections:
@@ -168,6 +189,10 @@ def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
     elif op == "retune":
         derived_spec["retune_bpm"] = params["bpm"]
         derived_spec["retune_key"] = dict(params["key"])
+    elif op == "pitch_edit":
+        derived_spec["note_edits"] = [
+            {"beat": float(e["beat"]), "semi": int(e["semi"])} for e in (note_edits or [])]
+        derived_spec["quantize"] = quantize
 
     cost = EDIT_OPERATION_CREDIT_COST.get(op, 6)
     task = Task(user_id=user.id, type="generation", status="queued", progress=0,
@@ -219,6 +244,13 @@ def submit_retune(db: Session, user: User, candidate_id: str, bpm: int | None,
                   key: dict | None) -> dict:
     """V2 编辑器：变速/变调（同 seed 确定性重渲染，子版本 source=retune）。"""
     return submit_derived(db, user, candidate_id, "retune", bpm=bpm, key=key)
+
+
+def submit_pitch_edit(db: Session, user: User, candidate_id: str,
+                      note_edits: list, quantize: str = "off") -> dict:
+    """V2 /pitch 修调：音符级移调/量化（同 seed 确定性重渲染，子版本 source=pitch_edit）。"""
+    return submit_derived(db, user, candidate_id, "pitch_edit",
+                          note_edits=note_edits, quantize=quantize)
 
 
 def submit_mixdown(db: Session, user: User, version_id: str, wav: bytes,

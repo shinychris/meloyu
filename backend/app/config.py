@@ -12,12 +12,13 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 REPO_DIR = BACKEND_DIR.parent
 
 API_PREFIX = "/api/v1"
-APP_VERSION = "0.10.2"
+APP_VERSION = "0.11.0"
 
 # 模型积分单价（架构 §9.1：v1_pro=12、v1_fast=6）
 MODEL_CREDIT_COST: dict[str, int] = {"v1_pro": 12, "v1_fast": 6}
 # V1.1 派生操作积分单价（extend/variant/regen-section，约为整曲生成一半）
-EDIT_OPERATION_CREDIT_COST: dict[str, int] = {"extend": 6, "variant": 6, "regen_section": 6}
+EDIT_OPERATION_CREDIT_COST: dict[str, int] = {"extend": 6, "variant": 6, "regen_section": 6,
+                                               "retune": 6, "pitch_edit": 6}
 # 注册赠送积分
 SIGNUP_BONUS_CREDITS = 200
 # 任务超时熔断（秒）：单候选渲染超过该值中止并退款（架构 §7.9 为 70s，留余量取整任务 90s）
@@ -90,6 +91,8 @@ class Settings(BaseSettings):
     # MiniMax-Music3 商用开放开关（义务①署名/②防侵权防护/③AUP 披露已落实，默认开放；
     # 条款修订或营收接近 $20M 门槛时置 false 回退非商用签发）
     mmax_commercial_enabled: bool = True
+    # 团队版联系邮箱（v0.11.0：空=不展示联系方式，团队档按钮保持提示口径）
+    sales_contact_email: str = ""
     # HuggingFace 端点覆盖（.env 配 HF_ENDPOINT=https://hf-mirror.com 走国内镜像）
     hf_endpoint: str = ""
     # ACE-Step 独立部署目录（默认 backend/data/acestep：代码+独立 venv+checkpoints，

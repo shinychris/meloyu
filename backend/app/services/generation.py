@@ -111,6 +111,7 @@ def resolve_generation_request(payload: dict) -> dict:
         "vocal": vocal, "language": params.get("language", "zh"),
         "instrument_density": params.get("instrument_density", 65),
         "voice_profile_id": params.get("voice_profile_id"),
+        "hum_melody": params.get("hum_melody") or None,
     }
     seed = payload.get("seed")
     if seed is None:
@@ -212,6 +213,16 @@ def submit_generation(db: Session, user: User, payload: dict) -> dict:
             # 合规留痕：克隆音轨标记（导出 AIGC 标识 + 事件水印口径）
             "voice_clone": True,
         }
+    # 哼唱成歌（v0.11.0）：hum_melody 仅本地引擎（外部通道无旋律覆写能力）
+    if params.get("hum_melody"):
+        from app.services import model_center as _mc
+        if _mc.current_music_backend(db) != "localsynth":
+            raise err_conflict(
+                tr("哼唱旋律仅支持本地合成引擎通道（当前歌曲引擎需在模型中心切回本地）",
+                   "Hummed melody is only supported on the local synth engine channel "
+                   "(switch the song engine back to local in the model center)"))
+        voice_info = voice_info or {"hum_melody": True}
+
     cost = MODEL_CREDIT_COST.get(params["model"], 12)
 
     # work / version
@@ -386,6 +397,7 @@ def execute_generation(task_id: str) -> None:
             vocal=params["vocal"], language=params["language"],
             instrument_density=params["instrument_density"], seed=resolved["seed"],
             voice_timbre=params.get("voice_timbre"),
+            hum_melody=params.get("hum_melody") or None,
         )
         dest = settings.audio_path / task.work_id / task.version_id
 

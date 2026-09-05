@@ -63,7 +63,8 @@ ORDER_STATUSES = ("pending", "paid", "failed", "refunded")
 # 作品/版本/证书
 WORK_STATUSES = ("active", "trash")
 VERSION_SOURCES = ("generate", "extend", "variant", "regen_section",
-                    "retune", "mixdown")  # v0.9.0 增 retune/mixdown（V2 编辑器）——需 versions 表重建迁移
+                    "retune", "mixdown", "pitch_edit")
+# v0.9.0 增 retune/mixdown（V2 编辑器）；v0.11.0 增 pitch_edit（/pitch 旋律修调）——需 versions 表重建迁移
 CANDIDATE_LABELS = ("A", "B")
 LICENSE_TYPES = ("commercial", "non_commercial")
 

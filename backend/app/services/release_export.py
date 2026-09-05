@@ -156,14 +156,18 @@ def build_readme(*, platform: str, preset: dict, entries: list[str]) -> str:
 def write_release_zip(zip_path: Path, *, platform: str, audio_arcname: str,
                       audio_path: Path, cover_size: tuple[int, int],
                       cover_color: str | None,
-                      metadata_json: str, readme_txt: str) -> None:
-    """确定性打包（复用 export.write_zip 的固定时间戳口径）。"""
+                      metadata_json: str, readme_txt: str,
+                      cover_png_bytes: bytes | None = None) -> None:
+    """确定性打包（复用 export.write_zip 的固定时间戳口径）。
+
+    v0.11.0：cover_png_bytes（用户上传封面，PNG 字节）优先；缺省生成确定性占位图。
+    """
     import tempfile
 
     from app.services.export import write_zip
     with tempfile.TemporaryDirectory() as td:
         cover_file = Path(td) / "cover.png"
-        cover_file.write_bytes(cover_png(cover_size, cover_color))
+        cover_file.write_bytes(cover_png_bytes or cover_png(cover_size, cover_color))
         meta_file = Path(td) / "metadata.json"
         meta_file.write_text(metadata_json, encoding="utf-8")
         readme_file = Path(td) / "README.txt"

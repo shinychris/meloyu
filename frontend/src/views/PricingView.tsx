@@ -22,6 +22,7 @@ const TOPUP_CREDITS = '1,000'
  */
 export default function PricingView() {
   const [plans, setPlans] = useState<PlanInfo[]>([])
+  const [salesContact, setSalesContact] = useState('')
   const [loading, setLoading] = useState(true)
   const [yearly, setYearly] = useState(true)
   const [switching, setSwitching] = useState<string | null>(null)
@@ -38,6 +39,7 @@ export default function PricingView() {
     try {
       const res = await getPlans()
       setPlans(res.plans)
+      setSalesContact(res.sales_contact ?? '')
     } catch {
       /* 拦截器已 toast */
     } finally {
@@ -104,7 +106,11 @@ export default function PricingView() {
   const onSwitch = (plan: PlanInfo) => {
     if (switching) return
     if (plan.code === 'team') {
-      toast(t('pricing.contactSalesToast'), 'warn')
+      if (salesContact) {
+        window.location.href = `mailto:${salesContact}?subject=${encodeURIComponent('Meloyu Team plan')}`
+      } else {
+        toast(t('pricing.contactSalesToast'), 'warn')
+      }
       return
     }
     if (plan.current) return

@@ -6,6 +6,7 @@ from app.api.v1 import (
     billing,
     candidates,
     credits,
+    hum,
     exports,
     files,
     generations,
@@ -44,6 +45,7 @@ api_router.include_router(files.router)
 api_router.include_router(credits.router)
 api_router.include_router(subscriptions.router)
 api_router.include_router(voice.router)
+api_router.include_router(hum.router)
 api_router.include_router(public.router)
 api_router.include_router(public.keys_router)
 api_router.include_router(system.router)

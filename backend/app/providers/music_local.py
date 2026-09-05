@@ -162,6 +162,9 @@ class LocalSynthProvider:
 
         _stage(progress, should_cancel, "melody", 28)
         melody_mod.compose_melody(ir, rng)
+        # 哼唱成歌（v0.11.0）：AI 作曲后以哼唱轮廓覆写人声音高线（音程关系保留）
+        if req.hum_melody:
+            melody_mod.apply_hum_melody(ir, req.hum_melody)
 
         _stage(progress, should_cancel, "arrange", 42)
         rhythm_mod.build_rhythm(ir, rng)
@@ -226,6 +229,9 @@ class LocalSynthProvider:
         elif op == "retune":
             art, inferred = self._derive_retune(request, spec, base_req, dest,
                                                 progress, should_cancel)
+        elif op == "pitch_edit":
+            art, inferred = self._derive_pitch_edit(request, spec, base_req, dest,
+                                                    progress, should_cancel)
         else:
             raise ValueError(tr(f"未知派生操作：{op}", f"Unknown derived operation: {op}"))
         return GenerationOutput([art], list(art.applied_negative_ext), inferred)
@@ -355,6 +361,66 @@ class LocalSynthProvider:
             bpm=base_ir.req.bpm, tonic=base_ir.req.tonic, mode=base_ir.req.mode,
             time_signature=base_ir.req.time_signature, vocal=base_ir.req.vocal,
             language=base_ir.req.language, files=files,
+        )
+        art.applied_negative_ext = base_ir.applied_negative
+        art.inferred_ext = base_ir.inferred_structure
+        return art, base_ir.inferred_structure
+
+    def _derive_pitch_edit(self, request: SongRequest, spec: dict, base_req: SongRequest,
+                           dest: Path, progress: ProgressCallback,
+                           should_cancel: CancelCheck) -> tuple[CandidateArtifact, bool]:
+        """音符级修调（/pitch，v0.11.0）：同 seed 重建原曲 → 应用移调/量化 → 重渲染。
+
+        素材（和声/编曲/人声音色/歌词对齐）与原曲一致；仅旋律音符的音高/起点
+        按编辑变化。edits 以词谱绝对拍号（beat）为键（±0.05s 容差匹配）。
+        """
+        from dataclasses import replace as dc_replace
+        _stage(progress, should_cancel, "structure", 10)
+        base_ir = editing_mod.rebuild_ir(base_req, base_req.seed)
+        if not editing_mod.structure_matches(base_ir, spec.get("base_structure") or []):
+            raise ValueError(tr("源候选结构重建与存库不一致，无法修调",
+                       "Rebuilt source structure does not match stored data; cannot retune notes"))
+
+        _stage(progress, should_cancel, "melody", 30)
+        beat_sec = 60.0 / base_req.bpm
+        edits = spec.get("note_edits") or []
+        for e in edits:
+            target = float(e["beat"]) * beat_sec
+            semi = int(e["semi"])
+            hit = [n for n in base_ir.melody if abs(n.start - target) <= 0.05]
+            hit += [n for n in base_ir.vocal_notes if abs(n.start - target) <= 0.05]
+            if not hit:
+                raise ValueError(tr(
+                    f"拍位 {e['beat']} 未匹配到音符（旋律可能已被其他派生修改，请刷新词谱后重试）",
+                    f"No note found at beat {e['beat']} (melody may have changed via "
+                    "another derived edit; refresh the leadsheet and retry)"))
+            for n in hit:
+                n.midi = max(24, min(96, n.midi + semi))
+
+        quantize = spec.get("quantize") or "off"
+        if quantize in ("8", "16"):
+            grid_beats = 0.5 if quantize == "8" else 0.25
+            grid_sec = grid_beats * beat_sec
+            bar_sec = base_ir.bar_sec or grid_sec * 4
+            for n in base_ir.melody + base_ir.vocal_notes:
+                bar0 = int(n.start // bar_sec) * bar_sec
+                n.start = bar0 + round((n.start - bar0) / grid_sec) * grid_sec
+
+        _stage(progress, should_cancel, "harmony", 45)
+        rng = editing_mod.make_rng(base_req.seed)
+        result = render_song(base_ir, rng)
+
+        _stage(progress, should_cancel, "serialize", 90)
+        files = _write_candidate_files(dest, "A", result.master_l, result.master_r,
+                                       result.stems, base_ir.total_sec, base_ir)
+        art = CandidateArtifact(
+            label="A", seed=base_req.seed,
+            quality_score=self._quality_score(base_req.seed, "A"),
+            duration_sec=round(base_ir.total_sec, 2), structure=base_ir.structure_json(),
+            style_tags=_style_tags(base_req.style_prompt, base_ir.style_family),
+            bpm=base_req.bpm, tonic=base_req.tonic, mode=base_req.mode,
+            time_signature=base_req.time_signature, vocal=base_req.vocal,
+            language=base_req.language, files=files,
         )
         art.applied_negative_ext = base_ir.applied_negative
         art.inferred_ext = base_ir.inferred_structure

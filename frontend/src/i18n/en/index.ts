@@ -17,6 +17,8 @@ import { layoutEn } from './layout'
 import { authEn } from './auth'
 import { billingEn } from './billing'
 import { editorEn } from './editor'
+import { editEn } from './edit'
+import { pitchEn } from './pitch'
 import { marketEn } from './market'
 
 export const en = {
@@ -35,5 +37,7 @@ export const en = {
   ...authEn,
   ...billingEn,
   ...editorEn,
+  ...editEn,
+  ...pitchEn,
   ...marketEn,
 } as const

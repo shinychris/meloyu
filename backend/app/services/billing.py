@@ -54,7 +54,8 @@ def list_plans(db: Session, user: User) -> dict:
         "features": [_feature_label(f) for f in (p.features or [])
                      if not _is_credit_feature(_feature_label(f))],
     } for p in rows]
-    return {"plans": plans}
+    from app.config import settings
+    return {"plans": plans, "sales_contact": settings.sales_contact_email}
 
 
 def switch_plan(db: Session, user: User, plan_code: str) -> dict:
@@ -67,7 +68,11 @@ def switch_plan(db: Session, user: User, plan_code: str) -> dict:
     - team：联系销售。
     """
     if plan_code == "team":
-        raise err_validation(tr("团队版请联系销售", "Please contact sales for the Team plan"))
+        from app.config import settings
+        contact = settings.sales_contact_email
+        raise err_validation(
+            tr(f"团队版请联系销售{'（' + contact + '）' if contact else ''}",
+               f"Please contact sales for the Team plan{' (' + contact + ')' if contact else ''}"))
     if plan_code not in ("free", "pro", "studio"):
         raise err_validation(tr("plan 必须为 free/pro/studio", "plan must be free/pro/studio"))
     if plan_code == user.plan:

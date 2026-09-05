@@ -203,6 +203,8 @@ export interface GenerationParams {
   instrument_density: number
   /** FR-5：vocal=voice_clone 时必填（已验证音色档案） */
   voice_profile_id?: string
+  /** 哼唱成歌（v0.11.0）：[[相对半音, 拍长], ...]，仅本地引擎 */
+  hum_melody?: number[][]
 }
 
 /* ============ voice-profiles（FR-5） ============ */
@@ -507,6 +509,25 @@ export interface VariantCandidateRequest {
  * 契约 v1.2 §5.7：请求体 { section, occurrence? }；occurrence 为该 section
  * 在候选 structure 中第几次出现，1 起始，缺省 = 1。
  */
+export interface PitchEditItem {
+  beat: number
+  semi: number
+}
+
+export interface PitchEditRequest {
+  edits: PitchEditItem[]
+  quantize: 'off' | '8' | '16'
+}
+
+export interface HumAnalysisData {
+  notes: Array<{ start: number; dur: number; semi: number }>
+  hum_melody: number[][]
+  bpm_hint: number
+  duration_sec: number
+  note_count: number
+  confidence: number
+}
+
 export interface RegenSectionRequest {
   section: Section
   occurrence?: number
@@ -582,6 +603,8 @@ export interface ReleaseMeta {
   upc?: string
   lyrics_copyright?: string
   songwriter?: string
+  /** 自定义封面（v0.11.0）：PNG base64（≥600²；缺省用系统占位图） */
+  cover_png_b64?: string
 }
 
 export interface ExportRequest {
@@ -614,6 +637,8 @@ export interface PlanInfo {
 
 export interface PlansResult {
   plans: PlanInfo[]
+  /** 团队版联系邮箱（env SALES_CONTACT_EMAIL；空=未配置不展示） */
+  sales_contact?: string
 }
 
 /* ============ system/meta ============ */

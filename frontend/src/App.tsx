@@ -17,8 +17,9 @@ const WorkDetailView = lazy(() => import('./views/WorkDetailView'))
 const RightsView = lazy(() => import('./views/RightsView'))
 const PricingView = lazy(() => import('./views/PricingView'))
 const ModelCenterView = lazy(() => import('./views/ModelCenterView'))
-const ComingSoonView = lazy(() => import('./views/ComingSoonView'))
 const ArrangementView = lazy(() => import('./views/ArrangementView'))
+const EditView = lazy(() => import('./views/EditView'))
+const PitchView = lazy(() => import('./views/PitchView'))
 const MarketView = lazy(() => import('./views/MarketView'))
 const BillingReturnView = lazy(() => import('./views/BillingReturnView'))
 const ResetPasswordView = lazy(() => import('./views/ResetPasswordView'))
@@ -174,8 +175,8 @@ function RootRoutes() {
           <Route path="/lyrics" element={<LyricsView />} />
           <Route path="/arrange" element={<ArrangementView />} />
           <Route path="/market" element={<MarketView />} />
-          <Route path="/edit" element={<ComingSoonView kind="edit" />} />
-          <Route path="/pitch" element={<ComingSoonView kind="pitch" />} />
+          <Route path="/edit" element={<EditView />} />
+          <Route path="/pitch" element={<PitchView />} />
           <Route path="/library" element={<LibraryView />} />
           <Route path="/works/:workId" element={<WorkDetailView />} />
           <Route path="/rights" element={<RightsView />} />

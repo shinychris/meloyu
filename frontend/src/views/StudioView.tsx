@@ -13,6 +13,7 @@ import GenProgress from '../components/studio/GenProgress'
 import CandidateCard from '../components/studio/CandidateCard'
 import VersionTree from '../components/studio/VersionTree'
 import ReferencePanel from '../components/studio/ReferencePanel'
+import HumDialog from '../components/studio/HumDialog'
 
 const MODE_HINTS: Record<string, TranslationKey> = {
   simple: 'studio.modeHint.simple',
@@ -26,6 +27,7 @@ export default function StudioView() {
   const t = useT()
   const [songEngine, setSongEngine] = useState('')
   /** FR-4 参考音频面板开合（参考轨挂上后常显，可在面板内移除） */
+  const [humOpen, setHumOpen] = useState(false)
   const [refOpen, setRefOpen] = useState(false)
   const form = useStudioStore((s) => s.form)
   const { patchForm, markStep, submitGeneration } = useStudioStore()
@@ -137,18 +139,26 @@ export default function StudioView() {
                 <span className="dot ml-1" style={{ background: 'var(--acc)', display: 'inline-block' }}></span>
               )}
             </span>
-            <span
-              className="chip disabled"
-              title={t('studio.mode.comingSoon')}
-              style={{ opacity: 0.35, cursor: 'not-allowed' }}
-            >
+            <span className={`chip ${form.humMelody ? 'on' : ''}`} onClick={() => setHumOpen(true)}>
               {t('studio.mode.hum')}
+              {form.humMelody && (
+                <span className="dot ml-1" style={{ background: 'var(--acc)', display: 'inline-block' }}></span>
+              )}
             </span>
           </div>
 
           {(refOpen || referenceTrack) && (
             <ReferencePanel onClose={() => setRefOpen(false)} />
           )}
+
+          <HumDialog
+            open={humOpen}
+            onClose={() => setHumOpen(false)}
+            onApply={(melody, bpmHint) => {
+              patchForm({ humMelody: melody, bpm: bpmHint })
+              markStep(1)
+            }}
+          />
 
           {form.mode === 'simple' ? (
             <>

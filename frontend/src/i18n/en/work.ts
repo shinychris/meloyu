@@ -70,6 +70,11 @@ export const workEn = {
   'work.export.release.run': 'Build release package',
   'work.export.release.hint':
     'Metadata and the AI disclosure go into metadata.json; the cover is a placeholder — replace it before uploading.',
+  'work.export.release.coverPick': 'Upload cover PNG',
+  'work.export.release.coverSet': 'Cover set',
+  'work.export.release.coverClear': 'Remove',
+  'work.export.release.coverTooBig': 'Cover exceeds the 4MB limit',
+  'work.export.release.coverHint': 'Optional: >=600x600 PNG replaces the generated placeholder',
   'work.export.release.titleRequired': 'Release title is required (1–80 characters)',
   'work.export.release.artistRequired': 'Artist name is required (1–60 characters)',
   // ===== Team collaboration (FR-13, v0.8.1) =====

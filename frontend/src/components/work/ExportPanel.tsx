@@ -40,6 +40,7 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
   const [releaseOpen, setReleaseOpen] = useState(false)
   const [platform, setPlatform] = useState<ReleasePlatform>('douyin')
   const [meta, setMeta] = useState<ReleaseMeta>({ title: '', artist: '', explicit: false })
+  const [coverB64, setCoverB64] = useState<string | null>(null)
   const timers = useRef<number[]>([])
   const mounted = useRef(true)
 
@@ -133,6 +134,7 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
           genre: meta.genre?.trim() || undefined,
           release_date: meta.release_date || undefined,
           explicit: Boolean(meta.explicit),
+          ...(coverB64 ? { cover_png_b64: coverB64 } : {}),
         },
       })
       schedule(task.id, 'release', 0, `release_${platform}`)
@@ -283,6 +285,38 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
                 />
                 {t('work.export.release.explicit')}
               </label>
+            </div>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <label className="btn btn-ghost !py-1 !px-2.5 text-[10px] cursor-pointer">
+                {coverB64 ? t('work.export.release.coverSet') : t('work.export.release.coverPick')}
+                <input
+                  type="file"
+                  accept="image/png"
+                  className="hidden"
+                  disabled={releasePct !== undefined}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    e.target.value = ''
+                    if (!f) return
+                    if (f.size > 4 * 1024 * 1024) {
+                      toast(t('work.export.release.coverTooBig'), 'warn')
+                      return
+                    }
+                    const reader = new FileReader()
+                    reader.onload = () => {
+                      const b64 = String(reader.result).split(',')[1] ?? ''
+                      setCoverB64(b64 || null)
+                    }
+                    reader.readAsDataURL(f)
+                  }}
+                />
+              </label>
+              {coverB64 && (
+                <button className="btn btn-ghost !py-1 !px-2 text-[10px]" onClick={() => setCoverB64(null)}>
+                  {t('work.export.release.coverClear')}
+                </button>
+              )}
+              <span className="text-[9px]" style={{ color: 'var(--dim)' }}>{t('work.export.release.coverHint')}</span>
             </div>
             <button
               className="btn btn-ghost w-full mt-2 !py-2 text-[11px] font-bold"

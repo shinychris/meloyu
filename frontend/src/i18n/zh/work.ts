@@ -69,6 +69,11 @@ export const workZh: Record<keyof typeof workEn, string> = {
   'work.export.release.explicit': 'Explicit（含不雅内容标记）',
   'work.export.release.run': '打包发行包',
   'work.export.release.hint': '元数据与 AI 披露写入 metadata.json；封面为占位图，上传前请替换。',
+  'work.export.release.coverPick': '上传封面 PNG',
+  'work.export.release.coverSet': '已选封面',
+  'work.export.release.coverClear': '移除',
+  'work.export.release.coverTooBig': '封面超过 4MB 上限',
+  'work.export.release.coverHint': '可选：不小于 600x600 的 PNG 将替换系统生成的占位图',
   'work.export.release.titleRequired': '发行曲名必填（1~80 字符）',
   'work.export.release.artistRequired': '艺人名必填（1~60 字符）',
   // ===== 团队协作（FR-13，v0.8.1）=====
