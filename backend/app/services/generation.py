@@ -9,6 +9,7 @@ from datetime import UTC
 from pathlib import Path
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.config import GENERATION_TASK_TIMEOUT_SEC, MODEL_CREDIT_COST, settings
@@ -401,16 +402,10 @@ def execute_generation(task_id: str) -> None:
         )
         dest = settings.audio_path / task.work_id / task.version_id
 
-        def progress(stage_key: str, pct: int, label: str) -> None:
-            if time.monotonic() - t_start > timeout_sec:
-                raise TimeoutError(
-                    tr(f"超过 {timeout_sec}s 熔断", f"exceeded {timeout_sec}s circuit limit"))
-            _write_progress(task_id, stage_key, pct, label)
+        progress = _progress_reporter(task_id, t_start, timeout_sec)
 
         def should_cancel() -> bool:
-            with SessionLocal() as db2:
-                t = db2.get(Task, task_id)
-                return bool(t and t.cancel_requested)
+            return _cancel_requested(task_id)
 
         if derived_spec:
             base_dir = str(settings.audio_path / derived_spec["base_dir"])
@@ -445,6 +440,41 @@ def execute_generation(task_id: str) -> None:
             _refund(db, task_id)
             rollback_empty_current_version(db, task_id)
             db.commit()
+
+
+def _progress_reporter(task_id: str, t_start: float, timeout_sec: int):
+    """provider 进度回调：超时熔断 + 进度落库（瞬时库错误跳过该次）。"""
+    def progress(stage_key: str, pct: int, label: str) -> None:
+        if time.monotonic() - t_start > timeout_sec:
+            raise TimeoutError(
+                tr(f"超过 {timeout_sec}s 熔断", f"exceeded {timeout_sec}s circuit limit"))
+        try:
+            _write_progress(task_id, stage_key, pct, label)
+        except OperationalError as e:
+            _skip_transient_db(task_id, "progress", e)
+    return progress
+
+
+def _skip_transient_db(task_id: str, what: str, e: Exception) -> None:
+    """进度/取消轮询遇瞬时库错误（unable to open database file 等）跳过该次。
+
+    坑位：Docker bind 挂载（9p）下 WAL 共享内存偶发瞬时打开失败——v0.11.1
+    容器实测：采样到 70% 时 cancel 轮询新开连接报 OperationalError，5 分钟
+    推理被连带判失败。轮询性操作 fail-open，只告警不打断；持续失败仍会在
+    落库/收尾处正常抛出。"""
+    logger.warning(f"generation {task_id} {what} poll skipped (transient db): {e}")
+
+
+def _cancel_requested(task_id: str) -> bool:
+    try:
+        with SessionLocal() as db2:
+            t = db2.get(Task, task_id)
+            return bool(t and t.cancel_requested)
+    except OperationalError as e:
+        # fail-open：取消检查是轮询性的，跳过一次最多延迟取消感知，
+        # 不该因它把进行中的长时推理连带废掉
+        _skip_transient_db(task_id, "cancel", e)
+        return False
 
 
 def _write_progress(task_id: str, stage_key: str, pct: int, label: str) -> None:

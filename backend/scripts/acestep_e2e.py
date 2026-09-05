@@ -67,7 +67,9 @@ def main() -> int:
                 {"music_backend": "acestep_local", "music_model": "ace-step"})
     check("切 acestep_local", b["data"]["music_backend"] == "acestep_local")
     _, b = call("GET", "/models/runtime", token)
-    check("runtime 引擎标签", b["data"]["song_engine"].startswith("ACE-Step 本地"),
+    # 容器内默认 locale 为英文（tr 回退），中英标签均视为同一引擎
+    check("runtime 引擎标签",
+          b["data"]["song_engine"].startswith(("ACE-Step 本地", "ACE-Step Local")),
           b["data"]["song_engine"])
 
     lyrics = ("[Verse]\n夜风穿过旧街的灯\n我在人海数着星辰\n"

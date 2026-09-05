@@ -27,6 +27,11 @@ services:
       PORT: "8000"
       ENV: production
       DATA_DIR: /app/data
+    # GPU 直通：ACE-Step/MusicGen 本地推理用（本机 nvidia-container-runtime 已
+    # 验证可用，RTX 4060 Ti 8GB）。⚠ 若宿主机 GPU 不可用（驱动卸载等），此行
+    # 会让 backend 起不来——届时删除 gpus 行重启即可（本地通道受影响，
+    # 云端通道不受影响）。
+    gpus: all
     volumes:
       - type: bind
         source: ../backend/data

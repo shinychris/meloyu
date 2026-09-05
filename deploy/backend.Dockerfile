@@ -18,7 +18,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# uv 供容器内部署 ACE-Step 独立 venv（scripts/setup_acestep.py，Linux venv
+# 建在 bind 挂载的 data/acestep/.venv-linux；后端自身运行时不需要它）
+RUN pip install --no-cache-dir -r requirements.txt uv
 
 COPY app ./app
 COPY scripts ./scripts

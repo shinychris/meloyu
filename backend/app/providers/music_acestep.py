@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import queue
 import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -41,6 +42,14 @@ _INSTALL_HINT_ZH = ("ACE-Step 未部署：在 backend/ 下执行 "
 _INSTALL_HINT_EN = ("ACE-Step is not deployed: from backend/ run "
                     "python scripts/setup_acestep.py (downloads the code and uv-syncs an "
                     "isolated venv, ~4GB of dependencies; requires uv and Python 3.11/3.12)")
+_INSTALL_HINT_DOCKER_ZH = ("Docker 部署请在宿主机执行：docker exec -it meloyu-backend "
+                           "python scripts/setup_acestep.py（容器内建 Linux venv "
+                           ".venv-linux，与宿主机 Windows venv 互不干扰，权重经 "
+                           "bind 挂载共用）")
+_INSTALL_HINT_DOCKER_EN = ("In the Docker deployment run from the host: docker exec -it "
+                           "meloyu-backend python scripts/setup_acestep.py (creates a "
+                           "Linux venv .venv-linux inside the container, independent of "
+                           "the host's Windows venv; weights are shared via the bind mount)")
 
 # 主模型 4 组件 + 8GB 档 LM（checkpoints 目录下的子目录名，与 acestep 包一致）
 _COMPONENTS = ("acestep-v15-turbo", "vae", "Qwen3-Embedding-0.6B",
@@ -75,8 +84,33 @@ def acestep_root() -> Path:
     return settings.acestep_path
 
 
+def _in_docker() -> bool:
+    return Path("/.dockerenv").exists()
+
+
+def _venv_dir() -> Path:
+    # Windows 宿主与 Linux 容器共用同一份 bind 挂载的 acestep 目录（data/ 不入
+    # 镜像），而 venv 内是平台二进制且互不可执行——同名 .venv 还会互相覆盖。
+    # Linux 固定用 .venv-linux 隔离，避免容器内把宿主机 Windows venv 的
+    # python.exe 当解释器执行（OSError Exec format error，v0.11.1 实测坑位）。
+    return acestep_root() / (".venv" if sys.platform == "win32" else ".venv-linux")
+
+
 def _venv_python() -> Path:
-    return acestep_root() / ".venv" / "Scripts" / "python.exe"
+    if sys.platform == "win32":
+        return _venv_dir() / "Scripts" / "python.exe"
+    return _venv_dir() / "bin" / "python"
+
+
+def _venv_site_packages() -> Path | None:
+    if sys.platform == "win32":
+        return _venv_dir() / "Lib" / "site-packages"
+    lib = _venv_dir() / "lib"
+    for child in sorted(lib.glob("python*"), reverse=True):
+        sp = child / "site-packages"
+        if sp.is_dir():
+            return sp
+    return None
 
 
 def _runner_path() -> Path:
@@ -88,16 +122,21 @@ def checkpoints_dir() -> Path:
 
 
 def acestep_install_hint() -> str:
-    return tr(_INSTALL_HINT_ZH, _INSTALL_HINT_EN)
+    hint = tr(_INSTALL_HINT_ZH, _INSTALL_HINT_EN)
+    if _in_docker():
+        hint += "；" + tr(_INSTALL_HINT_DOCKER_ZH, _INSTALL_HINT_DOCKER_EN)
+    return hint
 
 
 def acestep_deps_installed() -> bool:
     """独立 venv 存在且 acestep 包已安装（site-packages 校验，秒回；
-    只查 venv python 会在 uv sync 半途误报就绪）。"""
+    只查 venv python 会在 uv sync 半途误报就绪）。平台感知：Linux 容器
+    只认 .venv-linux，宿主机 Windows venv 挂载进来不算数。"""
     if not ((acestep_root() / "acestep").is_dir()):
         return False
-    sp = acestep_root() / ".venv" / "Lib" / "site-packages"
+    sp = _venv_site_packages()
     return (_venv_python().exists()
+            and sp is not None
             and ((sp / "acestep").is_dir() or any(sp.glob("ace_step*.dist-info"))))
 
 
@@ -149,7 +188,6 @@ def _subprocess_env() -> dict:
 
 
 def _spawn(args: list[str]) -> subprocess.Popen:
-    import sys
     flags = 0x08000000 if sys.platform == "win32" else 0  # CREATE_NO_WINDOW
     return subprocess.Popen(
         [_venv_python(), str(_runner_path()), *args],
@@ -278,7 +316,7 @@ def pull_local(model_id: str, on_progress) -> None:
             "download", tr(f"模型不支持本地下载：{model_id}",
                            f"Model does not support local download: {model_id}"))
     if not acestep_deps_installed():
-        raise ACEStepLocalError("deps", tr(_INSTALL_HINT_ZH, _INSTALL_HINT_EN))
+        raise ACEStepLocalError("deps", acestep_install_hint())
     checkpoints_dir().mkdir(parents=True, exist_ok=True)
 
     def on_event(pct: int, message: str) -> None:
@@ -322,7 +360,7 @@ class ACEStepLocalProvider:
         dest_dir: str,
     ) -> GenerationOutput:
         if not acestep_deps_installed():
-            raise ACEStepLocalError("deps", tr(_INSTALL_HINT_ZH, _INSTALL_HINT_EN))
+            raise ACEStepLocalError("deps", acestep_install_hint())
         if not is_downloaded(self.model_id):
             raise ACEStepLocalError(
                 "download",
