@@ -1,7 +1,7 @@
-"""作品市场路由（V2-c，v0.10.1）。"""
+"""作品市场路由（V2-c，v0.10.1；v0.10.2 增公开试听）。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,13 @@ def publish(body: PublishRequest, user: User = Depends(get_current_user),
 def delist(listing_id: str, user: User = Depends(get_current_user),
            db: Session = Depends(get_db)):
     return ok(market_svc.delist(db, user, listing_id))
+
+
+@router.get("/listings/{listing_id}/preview")
+def listing_preview(listing_id: str, request: Request,
+                    db: Session = Depends(get_db)):
+    """市场试听（v0.10.2 公开）：active 条目 preview 流式播放，免鉴权可 Range。"""
+    return market_svc.listing_preview(db, listing_id, request)
 
 
 @router.get("/listings")

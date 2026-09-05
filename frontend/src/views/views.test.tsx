@@ -124,8 +124,7 @@ describe('views render smoke', () => {
     expect(form).toContain('Reset password')
   })
 
-  it('ComingSoonView 三个占位页都渲染', () => {
-    expect(render(<ComingSoonView kind="arrange" />)).toContain('Multitrack timeline arranging')
+  it('ComingSoonView edit/pitch 两个占位页渲染（arrange 已上线真实编辑器）', () => {
     expect(render(<ComingSoonView kind="edit" />)).toContain('Non-destructive audio editing')
     expect(render(<ComingSoonView kind="pitch" />)).toContain('Melody tuning workshop')
   })

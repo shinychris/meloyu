@@ -131,6 +131,24 @@ def run(engine: Engine) -> list[str]:
         if ddl and "'voice_clone'" not in ddl:
             _rebuild_table(conn, "candidates", "candidates__v081")
             applied.append("candidates.vocal 增加 voice_clone 枚举")
+
+        # M-20260905-c：v0.10.2 业务可用性批——works.duration CHECK 30~240 → 25~300
+        # （本地引擎小节取整实际区间 28.5~252，旧约束使 29s 候选采纳必 500）
+        ddl = conn.execute(
+            text("SELECT sql FROM sqlite_master WHERE type='table' AND name='works'")
+        ).scalar_one_or_none()
+        if ddl and "duration_sec BETWEEN 30 AND 240" in ddl:
+            _rebuild_table(conn, "works", "works__v102")
+            applied.append("works.duration CHECK 放宽 25~300")
+
+        # M-20260905-d：v0.10.2 市场——credit_transactions.reason 补 market_purchase
+        # （买家扣款与卖家入账区分 reason，账本审计可辨方向）
+        ddl = conn.execute(
+            text("SELECT sql FROM sqlite_master WHERE type='table' AND name='credit_transactions'")
+        ).scalar_one_or_none()
+        if ddl and "'market_purchase'" not in ddl:
+            _rebuild_table(conn, "credit_transactions", "credit_transactions__v102")
+            applied.append("credit_transactions.reason 增加 market_purchase 枚举")
     if applied:
         logger.info(f"sqlite migrations applied: {', '.join(applied)}")
     return applied
@@ -143,13 +161,14 @@ def _rebuild_table(conn, table_name: str, tmp_name: str) -> None:
     from app.models.plan import Subscription
     from app.models.task import File, Task
     from app.models.user import CreditTransaction
-    from app.models.work import Candidate, Version
+    from app.models.work import Candidate, Version, Work
 
     tables = {"candidates": Candidate.__table__, "tasks": Task.__table__,
               "credit_transactions": CreditTransaction.__table__,
               "subscriptions": Subscription.__table__,
               "files": File.__table__,
-              "versions": Version.__table__}
+              "versions": Version.__table__,
+              "works": Work.__table__}
     table = tables[table_name]
 
     conn.execute(text("PRAGMA foreign_keys=OFF"))

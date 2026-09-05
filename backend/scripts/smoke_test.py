@@ -3,6 +3,10 @@
 用法（后端需已在 127.0.0.1:8000 运行，且已灌种子）：
     ./.venv/Scripts/python scripts/smoke_test.py [--base http://127.0.0.1:8000]
 
+⚠ 单写入方红线：生产栈（127.0.0.1:8180）在运行时本脚本拒绝执行——dev 服务与
+生产容器并发写同一 SQLite 曾致 works 表损坏（2026-09-05 事故，详见
+scripts/recover_works.py 头注）。先 docker compose down 再跑本脚本。
+
 不依赖 pytest；输出逐项 PASS/FAIL 与最终通过率。
 """
 from __future__ import annotations
@@ -112,6 +116,18 @@ def main() -> int:
     email = f"smoke_{uuid.uuid4().hex[:10]}@meloyu.test"
     password = "Smoke1234"
     client = httpx.Client(timeout=120.0, trust_env=False)  # loopback 不走系统代理
+
+    # 单写入方红线守卫（2026-09-05 事故复盘）：生产栈（8180）在跑则拒绝执行，
+    # 防止 dev/生产双进程并发写同一 SQLite 再次损坏库
+    try:
+        probe = client.get("http://127.0.0.1:8180/api/v1/system/health", timeout=3.0)
+        if probe.status_code == 200:
+            print("REFUSED: 生产栈（127.0.0.1:8180）正在运行——dev 与生产容器并发写"
+                  "同一 SQLite 会损坏数据库（单写入方红线）。请先在 deploy/ 执行 "
+                  "docker compose down，再运行本脚本。")
+            return 2
+    except httpx.HTTPError:
+        pass  # 生产栈未运行，放行
 
     # ============ 系统（无鉴权） ============
     r = client.get(f"{API}/system/health")
@@ -1309,9 +1325,14 @@ def main() -> int:
                     json={"old_password": "DefinitelyWrong0", "new_password": "NewPass678"})
     check("16.2 change-password 旧密码错误拒绝（40103）", r.status_code == 401
           and unwrap(r)["code"] == 40103)
+    # v0.10.2：找回密码恒 ok（SMTP 未配置只记日志，不向调用方区分——防注册状态枚举）
     r = client.post(f"{API}/auth/forgot-password", json={"email": email})
-    check("16.2 forgot-password SMTP 未配置 → 40901", r.status_code == 409
-          and unwrap(r)["code"] == 40901)
+    check("16.2 forgot-password 恒 ok（防枚举口径，SMTP 未配置不外露）",
+          r.status_code == 200 and unwrap(r)["data"]["ok"] is True)
+    r = client.post(f"{API}/auth/forgot-password",
+                    json={"email": "nobody-404@meloyu.test"})
+    check("16.2 forgot-password 不存在邮箱同样 ok（响应不可区分）",
+          r.status_code == 200 and unwrap(r)["data"]["ok"] is True)
 
     # 16.3 支付门（Stripe 未配置口径）
     r = client.post(f"{API}/billing/checkout", headers=auth_headers(token),

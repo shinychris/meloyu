@@ -16,6 +16,11 @@ export function register(req: RegisterRequest): Promise<AuthData> {
   return apiPost<AuthData>('/auth/register', req)
 }
 
+/** POST /auth/send-code —— 发送注册验证码（无鉴权；60s 防刷） */
+export function sendCode(email: string): Promise<OkResult> {
+  return apiPost<OkResult>('/auth/send-code', { email })
+}
+
 /** POST /auth/login —— 登录（无鉴权） */
 export function login(req: LoginRequest): Promise<AuthData> {
   return apiPost<AuthData>('/auth/login', req)

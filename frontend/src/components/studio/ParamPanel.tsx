@@ -30,8 +30,10 @@ export default function ParamPanel() {
 
   const applyTaste = async () => {
     try {
-      const { getTaste } = await import('../../api/taste')
-      const r = await getTaste()
+      // v0.10.2：走 rebuild（POST /taste/rebuild）先按当前作品库重算画像再预填，
+      // 否则画像停留在首次访问时的统计、随作品库增长永不更新
+      const { rebuildTaste } = await import('../../api/taste')
+      const r = await rebuildTaste()
       const p = r.profile
       if (r.sample_count === 0 || p.bpm == null) {
         toast(t('studio.taste.empty'), 'warn')

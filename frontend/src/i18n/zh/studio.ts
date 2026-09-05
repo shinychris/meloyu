@@ -17,7 +17,6 @@ export const studioZh: Record<keyof typeof studioEn, string> = {
   'studio.modeHint.simple': '一句话模式：用自然语言描述整首歌',
   'studio.modeHint.custom': '自定义模式：风格 + 结构标签歌词 + 参数',
   'studio.modeHint.ref': '参考音频：上传一段音频（≤8 分钟），提取节奏/调性/能量特征作为生成参考（非采样）',
-  'studio.modeHint.hum': '哼唱成歌：V1.1 上线（录一段哼唱，AI 补全）',
 
   // ===== 左列输入 =====
   'studio.simple.label': '一句话描述',
@@ -131,7 +130,7 @@ export const studioZh: Record<keyof typeof studioEn, string> = {
 
   // ===== toast / 校验 / 失败提示 =====
   'studio.toast.adopted': '已采用候选 {label} 为当前版本',
-  'studio.toast.sentArrange': '已送往编曲：{title}（编曲为 V2 功能，占位页）',
+  'studio.toast.sentArrange': '已送往编曲：{title}（在编曲视图继续多轨混音）',
   'studio.toast.detailPending': '作品详情生成中，请稍候',
   'studio.toast.generated': '已生成 {n} 个候选',
   'studio.toast.generatedEmpty': '生成完成',

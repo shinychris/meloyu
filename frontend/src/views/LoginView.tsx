@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { login, register, forgotPassword } from '../api/auth'
+import { login, register, forgotPassword, sendCode } from '../api/auth'
 import { useSessionStore } from '../stores/session'
+import { useMetaStore } from '../stores/meta'
 import { toast } from '../stores/toast'
 import { useT } from '../i18n'
 import LangSwitch from '../components/common/LangSwitch'
@@ -86,9 +87,36 @@ export default function LoginView() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [forgotOpen, setForgotOpen] = useState(false)
+  const [code, setCode] = useState('')
+  const [codeSent, setCodeSent] = useState(false)
+  const [cooldown, setCooldown] = useState(0)
   const setAuthenticated = useSessionStore((s) => s.setAuthenticated)
+  const verifyEnabled = !!useMetaStore((s) => s.meta.email_verification_enabled)
   const navigate = useNavigate()
   const location = useLocation()
+
+  // 验证码发送冷却倒计时（60s 与后端防刷一致）
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const timer = setTimeout(() => setCooldown((n) => n - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [cooldown])
+
+  const onSendCode = async () => {
+    if (cooldown > 0) return
+    if (!isEmail(email)) {
+      setError(t('login.error.emailInvalid'))
+      return
+    }
+    try {
+      await sendCode(email)
+      setCodeSent(true)
+      setCooldown(60)
+      toast(t('login.verify.sent'))
+    } catch {
+      /* 拦截器已 toast（限流/SMTP 未配置） */
+    }
+  }
 
   const from = (location.state as { from?: string } | null)?.from ?? '/studio'
 
@@ -99,6 +127,7 @@ export default function LoginView() {
       if (password.length < 8 || password.length > 64) return t('login.error.passwordLength')
       if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) return t('login.error.passwordCharset')
       if (nickname.trim().length < 1 || nickname.trim().length > 24) return t('login.error.nicknameLength')
+      if (verifyEnabled && !/^\d{4,8}$/.test(code.trim())) return t('login.verify.required')
     }
     return null
   }
@@ -117,7 +146,8 @@ export default function LoginView() {
       if (tab === 'login') {
         data = await login({ email, password })
       } else {
-        data = await register({ email, password, nickname: nickname.trim() })
+        data = await register({ email, password, nickname: nickname.trim(),
+                                ...(verifyEnabled ? { code: code.trim() } : {}) })
       }
       setAuthenticated(data)
       navigate(from, { replace: true })
@@ -194,6 +224,37 @@ export default function LoginView() {
                 autoComplete="email"
               />
             </div>
+            {tab === 'register' && verifyEnabled && (
+              <div>
+                <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>
+                  {t('login.verify.label')}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder={t('login.verify.placeholder')}
+                    maxLength={8}
+                    className="flex-1 min-w-0"
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost !py-1.5 !px-3 text-[11px] shrink-0"
+                    disabled={cooldown > 0 || loading}
+                    onClick={() => void onSendCode()}
+                  >
+                    {cooldown > 0 ? t('login.verify.resendIn', { n: cooldown }) : t('login.verify.send')}
+                  </button>
+                </div>
+                {codeSent && (
+                  <div className="text-[10px] mt-1" style={{ color: 'var(--dim)' }}>
+                    {t('login.verify.sent')}
+                  </div>
+                )}
+              </div>
+            )}
             <div>
               <div className="text-[10px] mb-1 flex items-center justify-between" style={{ color: 'var(--dim)' }}>
                 <span>{t('login.password.label')}</span>

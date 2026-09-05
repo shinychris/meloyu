@@ -20,7 +20,6 @@ export const studioEn = {
   'studio.modeHint.simple': 'One-liner mode: describe the whole song in natural language',
   'studio.modeHint.custom': 'Custom mode: style prompt + structure-tagged lyrics + parameters',
   'studio.modeHint.ref': 'Reference audio: upload a track (≤8 min) — tempo/key/energy features as a reference (not sampling)',
-  'studio.modeHint.hum': 'Hum-to-song: coming in V1.1 (hum a phrase and AI completes it)',
 
   // ===== 左列输入 =====
   'studio.simple.label': 'One-line description',
@@ -140,7 +139,7 @@ export const studioEn = {
 
   // ===== toast / 校验 / 失败提示 =====
   'studio.toast.adopted': 'Candidate {label} adopted as the current version',
-  'studio.toast.sentArrange': 'Sent to arrange: {title} (arrangement is a V2 feature, placeholder page)',
+  'studio.toast.sentArrange': 'Sent to arrange: {title} (continue multitrack mixing in the Arrange view)',
   'studio.toast.detailPending': 'Work details still generating, please wait',
   'studio.toast.generated': 'Generated {n} candidates',
   'studio.toast.generatedEmpty': 'Generation complete',

@@ -22,4 +22,10 @@ export const loginEn = {
   'login.demo.fill': 'Autofill',
   'login.demo.note': 'Local demo engine · generated content is auto-registered as proof of creation',
   'login.backToLanding': '← Back to home',
+  'login.verify.label': 'Verification code',
+  'login.verify.placeholder': '6-digit code from your email',
+  'login.verify.send': 'Send code',
+  'login.verify.sent': 'Verification code sent, valid for 10 minutes',
+  'login.verify.resendIn': 'Resend in {n}s',
+  'login.verify.required': 'Enter the verification code sent to your email',
 } as const

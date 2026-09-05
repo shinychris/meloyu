@@ -24,4 +24,10 @@ export const loginZh: Record<keyof typeof loginEn, string> = {
   'login.demo.fill': '一键填入',
   'login.demo.note': '本地演示引擎 · 生成内容自动登记创作留痕',
   'login.backToLanding': '← 返回产品主页',
+  'login.verify.label': '邮箱验证码',
+  'login.verify.placeholder': '邮件中的 6 位验证码',
+  'login.verify.send': '发送验证码',
+  'login.verify.sent': '验证码已发送，10 分钟内有效',
+  'login.verify.resendIn': '{n}s 后可重发',
+  'login.verify.required': '请输入邮箱收到的验证码',
 }

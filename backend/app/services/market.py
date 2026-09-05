@@ -39,6 +39,10 @@ def publish(db: Session, user: User, work_id: str, price_credits: int) -> dict:
     work = db.get(Work, work_id)
     if work is None or work.user_id != user.id:
         raise err_not_found(tr("作品不存在", "Work not found"))
+    if not work.preview_file_id:
+        # v0.10.2：无采纳候选=无试听文件，上架后买家无法验货——引导先采纳
+        raise err_conflict(tr("作品尚未采用候选（无试听文件），请先在作品页采纳候选再上架",
+                          "No adopted candidate (missing preview); adopt a candidate on the work page before listing"))
     if not 1 <= int(price_credits) <= 100000:
         raise err_validation(tr("价格须为 1~100000 积分", "Price must be 1-100000 credits"))
     exists = db.execute(select(MarketListing).where(
@@ -106,7 +110,7 @@ def purchase(db: Session, user: User, listing_id: str) -> dict:
     price = int(l.price_credits)
     fee = int(round(price * PLATFORM_FEE_RATE))
     earnings = price - fee
-    atomic_deduct(db, user.id, price, "market_sale", None)
+    atomic_deduct(db, user.id, price, "market_purchase", None)  # 买家扣减（卖家入账=market_sale）
     # 卖家入账（正向调整直写，事务内一致）
     db.execute(
         __import__("sqlalchemy").text(
@@ -127,6 +131,21 @@ def purchase(db: Session, user: User, listing_id: str) -> dict:
     db.commit()
     db.refresh(order)
     return order_to_dict(order)
+
+
+def listing_preview(db: Session, listing_id: str, request):
+    """市场试听（v0.10.2 公开）：active 条目的 preview 文件直接流式返回。
+
+    浏览免登录（与 GET /market/listings 同口径）；文件解析/防穿越/Range 复用
+    audio_files 白名单机制。买家购买后的完整访问走订单授予的 viewer 角色。
+    """
+    from app.core import audio_files as af
+    l = db.get(MarketListing, listing_id)
+    if l is None or l.status != "active" or not l.preview_file_id:
+        raise err_not_found(tr("市场条目不存在、已下架或无试听",
+                           "Listing not found, delisted, or has no preview"))
+    f = af.resolve_file(db, l.preview_file_id)
+    return af.file_stream_response(request, f)
 
 
 def order_to_dict(o: MarketOrder) -> dict:

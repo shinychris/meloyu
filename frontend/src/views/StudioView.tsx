@@ -18,7 +18,6 @@ const MODE_HINTS: Record<string, TranslationKey> = {
   simple: 'studio.modeHint.simple',
   custom: 'studio.modeHint.custom',
   ref: 'studio.modeHint.ref',
-  hum: 'studio.modeHint.hum',
 }
 
 /** 创作工作台（原型核心视图：左控制 / 中结果 / 右版本树） */
@@ -57,10 +56,6 @@ export default function StudioView() {
     if (mode === 'ref') {
       setRefOpen((v) => !v)
       toast(t(MODE_HINTS.ref))
-      return
-    }
-    if (mode === 'hum') {
-      toast(t(MODE_HINTS.hum), 'warn')
       return
     }
     patchForm({ mode: mode as typeof form.mode })
@@ -146,7 +141,6 @@ export default function StudioView() {
               className="chip disabled"
               title={t('studio.mode.comingSoon')}
               style={{ opacity: 0.35, cursor: 'not-allowed' }}
-              onClick={() => onMode('hum')}
             >
               {t('studio.mode.hum')}
             </span>

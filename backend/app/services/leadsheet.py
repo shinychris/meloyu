@@ -226,7 +226,8 @@ def render_leadsheet_pdf(ls: dict) -> bytes:
     """结构化词谱 → A4 PDF（标题/调号拍速、逐小节和弦+简谱+歌词、AI 披露脚注）。"""
     from fpdf import FPDF
 
-    from app.services.certificate import _find_cjk_font, _PDF_CREATION_DATE
+    from app.services.certificate import (_PDF_CREATION_DATE, _find_cjk_font,
+                                          _pdf_safe)
 
     pdf = FPDF(format="A4")
     pdf.set_creation_date(_PDF_CREATION_DATE)
@@ -250,7 +251,8 @@ def render_leadsheet_pdf(ls: dict) -> bytes:
     meta = ls["meta"]
     pdf.add_page()
     pdf.set_font(family, size=18)
-    pdf.cell(0, 9, ls["work"]["title"], align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 9, _pdf_safe(ls["work"]["title"], family),
+             align="C", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font(family, size=10)
     pdf.cell(0, 6, f"{ls['work']['display_code']} · {meta['key']} · {meta['bpm']} BPM · "
                    f"{meta['time_signature']} · {t('词谱 Leadsheet', 'Leadsheet')}",
@@ -285,13 +287,15 @@ def render_leadsheet_pdf(ls: dict) -> bytes:
     pdf.ln(4)
     pdf.set_font(family, size=8)
     pdf.set_text_color(110, 110, 110)
-    pdf.multi_cell(0, 4, ls["aigc"]["disclosure"], align="C")
+    pdf.multi_cell(0, 4, _pdf_safe(ls["aigc"]["disclosure"], family), align="C")
     return bytes(pdf.output())
 
 
 def _flush_row(pdf, row: list[dict], col_w: float, family: str, t) -> None:
     """渲染一行小节格：和弦行 / 简谱行（音级+八度点+时值下划线）/ 歌词行。"""
     from fpdf.enums import XPos, YPos
+
+    from app.services.certificate import _pdf_safe
 
     y_chord = pdf.get_y()
     y_deg = y_chord + 5.5
@@ -320,7 +324,7 @@ def _flush_row(pdf, row: list[dict], col_w: float, family: str, t) -> None:
         pdf.set_font(family, size=8)
         pdf.set_text_color(60, 60, 60)
         syl = " ".join(n["syllable"] for n in bar.get("notes", [])[:8] if n["syllable"])
-        pdf.cell(col_w - 2, 5, syl)
+        pdf.cell(col_w - 2, 5, _pdf_safe(syl, family))
         # 小节分隔线与小节号
         pdf.set_xy(x, y_line)
         pdf.set_draw_color(180, 180, 180)

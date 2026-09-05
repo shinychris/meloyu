@@ -122,6 +122,16 @@ class TestLeadsheet(unittest.TestCase):
         self.assertEqual(pdf[:5], b"%PDF-")
         self.assertGreater(len(pdf), 1000)
 
+    def test_pdf_no_cjk_font_degrades_not_500(self):
+        """v0.10.2 回归：无 CJK 字体环境（如裸容器）对中文标题/歌词不再
+        UnicodeEncodingException 500，清洗后仍产出合法 PDF。"""
+        from unittest import mock
+        ls = ls_svc.build_leadsheet(self.work, self.version, self.cand)
+        with mock.patch("app.services.certificate._find_cjk_font", return_value=None):
+            pdf = ls_svc.render_leadsheet_pdf(ls)
+        self.assertEqual(pdf[:5], b"%PDF-")
+        self.assertGreater(len(pdf), 1000)
+
     def test_missing_midi_conflict(self):
         (settings.audio_path / self.work.id / self.version.id / "candidates" / "A"
          / "midi" / "melody.mid").unlink()

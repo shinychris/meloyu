@@ -9,6 +9,8 @@ export interface PlayerTrack {
   subtitle: string
   /** 展示用时长（秒），无则由 audio.loadedmetadata 提供 */
   durationSec: number | null
+  /** 直连播放地址（公开资产用，如市场试听；设置后跳过 stream-token） */
+  url?: string
 }
 
 /**
@@ -65,7 +67,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       return
     }
     try {
-      const { url } = await getStreamToken(track.fileId)
+      // 公开资产（市场试听）直连；私有文件走 stream-token（契约 §9.4，禁止 JWT 拼 URL）
+      const url = track.url ?? (await getStreamToken(track.fileId)).url
       const el = get().audio
       if (!el) return
       const queue = [...get().queue]

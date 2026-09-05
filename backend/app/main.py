@@ -36,6 +36,11 @@ def _assert_production() -> None:
     origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
     if "*" in origins:
         problems.append("CORS_ORIGINS 含 * 且 allow_credentials=True——禁止，请列明来源域名")
+    # v0.10.2：APP_BASE_URL 指向 localhost 时 Stripe 回跳/密码重置邮件链接会指到
+    # 开发地址（不拒启：反代/本地生产栈可合法回环，但必须可见地告警）
+    if "localhost" in settings.app_base_url or "127.0.0.1" in settings.app_base_url:
+        logger.warning(f"APP_BASE_URL 指向本机地址（{settings.app_base_url}）——"
+                       "对外部署时 Stripe 回跳与密码重置链接将不可达，请在 .env 配置对外域名")
     if problems:
         raise RuntimeError("production startup assertions failed:\n- " + "\n- ".join(problems))
 

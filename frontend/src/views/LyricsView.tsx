@@ -204,9 +204,6 @@ export default function LyricsView() {
             <button className="btn btn-ghost text-[11px]" disabled={busy !== null} onClick={onTags}>
               {t('lyrics.action.tags')}
             </button>
-            <button className="btn btn-ghost text-[11px]" onClick={() => toast(t('lyrics.action.bridgeSoon'), 'warn')}>
-              {t('lyrics.action.bridge')}
-            </button>
             <button
               className="btn btn-ghost text-[11px]"
               style={{ color: 'var(--acc)', borderColor: 'var(--acc)' }}

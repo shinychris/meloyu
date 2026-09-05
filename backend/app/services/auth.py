@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import SIGNUP_BONUS_CREDITS, settings
-from app.core.errors import err_bad_credentials, err_conflict, err_validation
+from app.core.errors import BizError, err_bad_credentials, err_conflict, err_validation
 from app.core.i18n import tr
 from app.core.security import (
     create_access_token,
@@ -103,12 +103,20 @@ def logout(db: Session, user: User) -> dict:
 
 
 def forgot_password(db: Session, email: str) -> dict:
-    """发起找回密码：无论账号是否存在都返回 ok（不泄漏注册状态），存在则发信。"""
+    """发起找回密码：无论账号是否存在都返回 ok（不泄漏注册状态），存在则发信。
+
+    v0.10.2：SMTP 未配置时账号存在会抛 40901、不存在返回 ok——可被用于枚举
+    注册邮箱。改为存在账号但发信失败时统一吞掉异常记日志，对调用方恒 ok。"""
+    from loguru import logger
     user = db.query(User).filter(User.email == email.strip().lower()).first()
     if user is not None:
         token = create_reset_token(user)
         url = f"{settings.app_base_url}/#/reset-password?token={token}"
-        mail_svc.send_password_reset_email(user.email, url)
+        try:
+            mail_svc.send_password_reset_email(user.email, url)
+        except BizError as e:
+            # SMTP 未配置/发信失败：不向调用方区分（防枚举），运维面记日志告警
+            logger.warning(f"password-reset mail failed for {user.email}: {e.message}")
     return {"ok": True}
 
 

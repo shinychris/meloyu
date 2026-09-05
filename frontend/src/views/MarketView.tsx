@@ -7,7 +7,7 @@ import { useSessionStore } from '../stores/session'
 import { usePlayerStore } from '../stores/player'
 import { toast } from '../stores/toast'
 import { useT } from '../i18n'
-import { formatDuration, formatNum } from '../lib/format'
+import { formatNum } from '../lib/format'
 
 type Tab = 'browse' | 'mine' | 'orders'
 const TAB_KEYS: Record<Tab, 'market.tab.browse' | 'market.tab.mine' | 'market.tab.orders'> = {
@@ -56,8 +56,10 @@ export default function MarketView() {
       toast(t('market.toast.noPreview'), 'warn')
       return
     }
+    // 试听走公开端点（免鉴权，买家验货口径）；购买后的完整访问走订单 viewer 权限
     void playTrack({
-      fileId: l.preview_file_id,
+      fileId: `market:${l.id}`,
+      url: `/api/v1/market/listings/${l.id}/preview`,
       title: l.title,
       subtitle: `${t('market.seller')}: ${l.seller.nickname}`,
       durationSec: 0,
@@ -227,7 +229,7 @@ export default function MarketView() {
                       <div className="text-[12px] font-semibold truncate">{l.title}</div>
                       <div className="text-[10px] mt-0.5" style={{ color: 'var(--dim)' }}>
                         {l.status === 'active' ? t('market.status.active') : t('market.status.delisted')} ·{' '}
-                        {t('market.sales', { n: l.sales })} · {formatDuration(0).replace('0:00', '')}{formatNum(l.price_credits)} {t('market.credits')}
+                        {t('market.sales', { n: l.sales })} · {formatNum(l.price_credits)} {t('market.credits')}
                       </div>
                     </div>
                     {l.status === 'active' && (

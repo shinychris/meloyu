@@ -21,8 +21,6 @@ export const lyricsEn = {
   'lyrics.action.rhyme': 'Rhyme / stress check',
   'lyrics.action.checking': 'Checking…',
   'lyrics.action.tags': 'Complete structure tags',
-  'lyrics.action.bridge': 'Extend bridge',
-  'lyrics.action.bridgeSoon': 'Bridge extension arrives in V1.1',
   'lyrics.action.apply': 'Apply to Studio →',
   // 备选版本
   'lyrics.alternatives': 'Alternative drafts',

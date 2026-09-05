@@ -22,8 +22,6 @@ export const lyricsZh: Record<keyof typeof lyricsEn, string> = {
   'lyrics.action.rhyme': '押韵 / 重音检查',
   'lyrics.action.checking': '检查中…',
   'lyrics.action.tags': '补全结构标签',
-  'lyrics.action.bridge': '续写桥段',
-  'lyrics.action.bridgeSoon': '续写桥段将在 V1.1 上线',
   'lyrics.action.apply': '应用到工作台 →',
   // ===== 备选版本 =====
   'lyrics.alternatives': '备选版本',

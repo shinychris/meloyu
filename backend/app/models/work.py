@@ -39,8 +39,10 @@ class Work(BaseModel):
         CheckConstraint(_in("model", MODELS), name="ck_works_model"),
         CheckConstraint(_in("key_tonic", TONICS), name="ck_works_key_tonic"),
         CheckConstraint(_in("key_mode", KEY_MODES), name="ck_works_key_mode"),
-        CheckConstraint("bpm BETWEEN 60 AND 174", name="ck_works_bpm"),
-        CheckConstraint("duration_sec BETWEEN 30 AND 240", name="ck_works_duration"),
+    CheckConstraint("bpm BETWEEN 60 AND 174", name="ck_works_bpm"),
+    # 时长为采纳候选的实际渲染值：引擎按小节取整允许 ±5% 偏差（30s 请求可产出 28.5s+），
+    # 外部通道亦可能轻微超出请求值——约束按实际区间放宽到 25~300（用户输入仍 30~240 校验）
+    CheckConstraint("duration_sec BETWEEN 25 AND 300", name="ck_works_duration"),
         Index("ix_works_user_status_updated", "user_id", "status", "updated_at"),
         Index("ix_works_status_trashed", "status", "trashed_at"),
         Index("ix_works_user_favorite", "user_id", "favorite"),

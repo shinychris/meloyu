@@ -281,6 +281,8 @@ export interface RegisterRequest {
   email: string
   password: string
   nickname: string
+  /** 邮箱验证码（服务端开启 email_verification 时必填） */
+  code?: string
 }
 
 export interface LoginRequest {
@@ -664,6 +666,8 @@ export interface SystemMeta {
   structure_tags: StructureTag[]
   generation_limits: GenerationLimits
   inspiration: InspirationMeta
+  /** 注册邮箱验证码开关（SMTP 配置后开启；v0.10.2） */
+  email_verification_enabled?: boolean
 }
 
 /* ============ 证书（§8.4，非包裹 JSON） ============ */

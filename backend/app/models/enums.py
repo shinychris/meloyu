@@ -37,7 +37,8 @@ EXPORT_FORMATS = ("mp3", "wav", "midi", "stems", "release")  # v0.8.0 增 releas
 # 积分
 # v0.7.0 增 topup（Stripe 充值包发放）——需 credit_transactions 表重建迁移
 CREDIT_REASONS = ("signup_bonus", "generation", "refund", "plan_grant", "plan_switch", "topup",
-                 "market_sale")  # v0.10.1 增市场买卖（买家扣减/卖家入账）——需表重建迁移
+                 "market_sale", "market_purchase")
+# v0.10.1 增市场买卖；v0.10.2 拆分 market_purchase=买家扣减 / market_sale=卖家入账（审计可辨方向）——需表重建迁移
 
 # 留痕
 EVENT_ACTIONS = (

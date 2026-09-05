@@ -220,6 +220,23 @@ def _find_cjk_font() -> Path | None:
     return None
 
 
+def _pdf_safe(text: str, family: str) -> str:
+    """无 CJK 字体（helvetica 降级）时的兜底：不可编码字符替换为 '?'。
+
+    fpdf 对 helvetica 喂 CJK 字符会抛 UnicodeEncodingException（接口 500）。
+    用户内容（作品标题/歌词音节）无法像标签一样切换英文，故按字符集清洗
+    保证 PDF 恒可产出（v0.10.2；生产镜像已随包安装 wqy-microhei，正常路径
+    仍是全保真 CJK 渲染）。
+    """
+    if family != "helvetica":
+        return text
+    try:
+        text.encode("cp1252")
+        return text
+    except UnicodeEncodeError:
+        return text.encode("cp1252", errors="replace").decode("cp1252")
+
+
 def render_certificate_pdf(cert: dict) -> bytes:
     """证书 dict → PDF 字节（A4 竖版；无 CJK 字体时降级为英文标签保证可签发）。"""
     from fpdf import FPDF
@@ -273,7 +290,7 @@ def render_certificate_pdf(cert: dict) -> bytes:
         pdf.cell(46, 7, label, new_x="RIGHT", new_y="TOP")
         pdf.set_font(family, size=11)
         # 值单元格结束后回到左边界（fpdf2 multi_cell 默认停在右边界会挤压下一行）
-        pdf.multi_cell(0, 7, value, new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(0, 7, _pdf_safe(value, family), new_x="LMARGIN", new_y="NEXT")
 
     pdf.ln(3)
     pdf.set_font(family, size=11)
@@ -293,14 +310,15 @@ def render_certificate_pdf(cert: dict) -> bytes:
                    new_x="LMARGIN", new_y="NEXT")
     pdf.set_font(family, size=10)
     for line in hp.get("summary") or []:
-        pdf.multi_cell(0, 6, f"- {line}", new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(0, 6, _pdf_safe(f"- {line}", family),
+                       new_x="LMARGIN", new_y="NEXT")
     if not (hp.get("summary") or []):
         pdf.multi_cell(0, 6, t("- 暂无人工参与记录", "- No human participation records"),
                        new_x="LMARGIN", new_y="NEXT")
 
     pdf.ln(3)
     pdf.set_font(family, size=9)
-    pdf.multi_cell(0, 5, str(cert.get("disclosure", "")),
+    pdf.multi_cell(0, 5, _pdf_safe(str(cert.get("disclosure", "")), family),
                    new_x="LMARGIN", new_y="NEXT")
     return bytes(pdf.output())
 

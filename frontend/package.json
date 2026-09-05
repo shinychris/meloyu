@@ -1,7 +1,7 @@
 {
   "name": "meloyu-frontend",
   "private": true,
-  "version": "0.10.1",
+  "version": "0.10.2",
   "type": "module",
   "description": "Meloyu 旋律屿 · AI 音乐创作系统前端（React SPA）",
   "scripts": {

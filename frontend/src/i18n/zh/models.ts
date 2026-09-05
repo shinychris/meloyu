@@ -148,19 +148,11 @@ export const modelsZh: Record<keyof typeof modelsEn, string> = {
   'models.ext.baseUrlRequired': 'base_url 与 model 必填',
   'models.ext.note':
     '标准 chat/completions 协议：智谱 GLM、DeepSeek、OpenAI、Moonshot、通义等均可直连；也兼容本地网关（如 Ollama 的 http://localhost:11434/v1，Key 可任意填）。',
-  // ComingSoonView（arrange / edit / pitch 占位页）
+  // ComingSoonView（edit / pitch 占位页；arrange 已上线真实多轨编辑器）
   'coming.badge': 'V2 开发中 · 即将上线',
   'coming.soonTitle': '「{title}」即将上线',
   'coming.backStudio': '返回创作工作台',
   'coming.goLibrary': '去作品库导出',
-  'coming.arrange.label': 'Arrange / 编曲',
-  'coming.arrange.title': '多轨时间线编曲',
-  'coming.arrange.desc':
-    '六轨时间线（主唱/鼓/贝斯/钢琴/弦乐/FX）、clip 拖拽与切割、AI 编曲建议（结构/频段/对比/衔接）——将在 V2 版本上线。MVP 阶段请在作品详情页导出分轨与 MIDI，到你的 DAW 中继续编排。',
-  'coming.arrange.f1': '多轨 clip 编辑（移动/切割/画笔/擦除）',
-  'coming.arrange.f2': 'AI 编曲建议 · 一键应用',
-  'coming.arrange.f3': 'Mute / Solo / 声像',
-  'coming.arrange.f4': '版本冻结与回退',
   'coming.edit.label': 'Edit / 音频剪辑',
   'coming.edit.title': '非破坏性音频剪辑',
   'coming.edit.desc':

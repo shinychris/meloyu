@@ -149,19 +149,11 @@ export const modelsEn = {
   'models.ext.baseUrlRequired': 'base_url and model are required',
   'models.ext.note':
     'Standard chat/completions protocol: Zhipu GLM, DeepSeek, OpenAI, Moonshot, Qwen and more connect directly; local gateways also work (e.g. Ollama at http://localhost:11434/v1 — any key value is fine).',
-  // ComingSoonView（arrange / edit / pitch 占位页）
+  // ComingSoonView（edit / pitch 占位页；arrange 已上线真实多轨编辑器）
   'coming.badge': 'In development for V2 · Coming soon',
   'coming.soonTitle': '“{title}” is coming soon',
   'coming.backStudio': 'Back to Studio',
   'coming.goLibrary': 'Export from Library',
-  'coming.arrange.label': 'Arrange / Arrangement',
-  'coming.arrange.title': 'Multitrack timeline arranging',
-  'coming.arrange.desc':
-    'A six-track timeline (lead vocal/drums/bass/piano/strings/FX), clip drag & split, and AI arranging suggestions (structure/frequency/contrast/transitions) — landing in V2. During MVP, export stems and MIDI from the work detail page and keep arranging in your DAW.',
-  'coming.arrange.f1': 'Multitrack clip editing (move/split/paint/erase)',
-  'coming.arrange.f2': 'AI arranging suggestions · one-click apply',
-  'coming.arrange.f3': 'Mute / Solo / Panning',
-  'coming.arrange.f4': 'Version freeze & rollback',
   'coming.edit.label': 'Edit / Audio Editing',
   'coming.edit.title': 'Non-destructive audio editing',
   'coming.edit.desc':

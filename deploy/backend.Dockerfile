@@ -10,9 +10,11 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# curl 仅供容器内 HEALTHCHECK 使用
+# curl 仅供容器内 HEALTHCHECK 使用；fonts-wqy-microhei 供证书/词谱 PDF 渲染
+# CJK 内容（v0.10.2：容器内无中文字体时词谱 PDF 对中文歌词必崩——helvetica
+# 不含 CJK 字形，fpdf 抛 UnicodeEncodingException）
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends curl fonts-wqy-microhei \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./

@@ -1,15 +1,9 @@
 import { useNavigate } from 'react-router-dom'
 import { useT, type TranslationKey } from '../i18n'
 
-type Kind = 'arrange' | 'edit' | 'pitch'
+type Kind = 'edit' | 'pitch'
 
 const META: Record<Kind, { label: TranslationKey; title: TranslationKey; desc: TranslationKey; features: TranslationKey[] }> = {
-  arrange: {
-    label: 'coming.arrange.label',
-    title: 'coming.arrange.title',
-    desc: 'coming.arrange.desc',
-    features: ['coming.arrange.f1', 'coming.arrange.f2', 'coming.arrange.f3', 'coming.arrange.f4'],
-  },
   edit: {
     label: 'coming.edit.label',
     title: 'coming.edit.title',
@@ -24,7 +18,7 @@ const META: Record<Kind, { label: TranslationKey; title: TranslationKey; desc: T
   },
 }
 
-/** 编曲 / 音频剪辑 / 修调 —— V2 占位页（保留侧边栏入口，无任何后端接口） */
+/** 音频剪辑 / 修调 —— V2 占位页（编曲 /arrange 已于 v0.9.0 上线真实多轨编辑器） */
 export default function ComingSoonView({ kind }: { kind: Kind }) {
   const meta = META[kind]
   const navigate = useNavigate()

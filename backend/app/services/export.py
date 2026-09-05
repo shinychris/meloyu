@@ -332,7 +332,10 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
             "disclosure": (f"本作品由 AI 辅助生成（{attribution}），人类创作参与记录见授权证书。"
                            f"This work was created with AI assistance ({attribution}); "
                            f"see the license certificate for human participation records."),
-            "certificate_endpoint": f"/api/v1/works/{work.id}/versions/{version.id}/certificate",
+            # v0.10.2 修正：证书路由实际为 /versions/{id}/certificate（旧 works 前缀路径 404）；
+            # 外部平台无法携带 JWT 访问该端点，凭 display_code+版本在站内「合规与权利中心」可验
+            "certificate_endpoint": f"/api/v1/versions/{version.id}/certificate",
+            "certificate_ref": f"{work.display_code} / {version.version_no}",
         }
         metadata_json = build_metadata(platform=platform, preset=preset, meta=meta,
                                        work=work_snap, aigc=aigc)

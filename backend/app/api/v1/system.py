@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.config import APP_VERSION, EDIT_OPERATION_CREDIT_COST, MODEL_CREDIT_COST
+from app.config import APP_VERSION, EDIT_OPERATION_CREDIT_COST, MODEL_CREDIT_COST, settings
 from app.core.i18n import tr
 from app.core.responses import ok
 from app.database import get_db
@@ -112,6 +112,8 @@ def meta():
             {"tag": "[Bridge]", "section": "bridge", "label": "Bridge"},
             {"tag": "[Outro]", "section": "outro", "label": "Outro"},
         ],
+        # v0.10.2：注册邮箱验证码开关下发（SMTP 配置后开启；前端据此显示验证码输入）
+        "email_verification_enabled": settings.email_verification_enabled,
         "generation_limits": {
             "min_duration_sec": 30, "max_duration_sec": 240,
             "min_bpm": 60, "max_bpm": 174,

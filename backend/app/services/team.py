@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import err_conflict, err_forbidden, err_not_found, err_validation
 from app.core.i18n import tr
-from app.models import TeamMember, TeamSpace, User, Work, WorkComment
+from app.models import MarketOrder, TeamMember, TeamSpace, User, Work, WorkComment
 from app.models.base import utc_now_iso
 from app.models.team import ROLE_RANK, TEAM_ROLES
 
@@ -20,7 +20,9 @@ from app.models.team import ROLE_RANK, TEAM_ROLES
 # ---- 判权 ----
 
 def role_for_work(db: Session, work: Work, user: User) -> str | None:
-    """用户对该作品的角色（owner=作品属主恒 owner；否则查空间成员；无则 None）。"""
+    """用户对该作品的角色（owner=作品属主恒 owner；空间成员按成员角色；
+    市场买家=viewer 只读（v0.10.2：购买订单即非独占使用授权凭证，买家可读/可下载）；
+    无则 None）。"""
     if work.user_id == user.id:
         return "owner"
     if work.space_id:
@@ -29,6 +31,11 @@ def role_for_work(db: Session, work: Work, user: User) -> str | None:
             TeamMember.user_id == user.id)).scalars().first()
         if m:
             return m.role
+    bought = db.execute(select(MarketOrder.id).where(
+        MarketOrder.work_id == work.id,
+        MarketOrder.buyer_user_id == user.id)).first()
+    if bought:
+        return "viewer"
     return None
 
 

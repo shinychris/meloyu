@@ -29,7 +29,7 @@ import { usePlayerStore } from './stores/player'
 import { getToken } from './lib/token'
 import { useT, useI18nStore } from './i18n'
 
-/** 快捷键：1-8 切换视图；空格 播放/暂停（输入控件内不触发，复刻原型行为） */
+/** 快捷键：0/1-9 切换视图；空格 播放/暂停（输入控件内不触发，复刻原型行为） */
 const SHORTCUT_ROUTES: Record<string, string> = {
   '1': '/studio',
   '2': '/lyrics',
@@ -40,6 +40,7 @@ const SHORTCUT_ROUTES: Record<string, string> = {
   '7': '/rights',
   '8': '/pricing',
   '9': '/models',
+  '0': '/market',
 }
 
 /** 路由级 Suspense 兜底（lazy chunk 加载中） */
