@@ -60,5 +60,5 @@ export const lyricsEn = {
   'lyrics.panel.rhymeMain': ' · main rhyme {group}',
   'lyrics.panel.backStudio': 'Back to Studio →',
   'lyrics.defaultLyrics':
-    '[Verse]\nRain stops at the window sill past midnight\nNeon stretches my shadow far too pale\nThe corner store light is still on\nLike a line left unsaid\n\n[Pre-Chorus]\nI count the rhythm dripping from the eaves\nBeat by beat, all of it waiting\n\n[Chorus]\nWe spoke of the future far too lightly\nLike wind through an empty street\nIf a promise is only an echo\nAt least tonight there is still the rain',
+    '[Intro]\n(Piano fades in with rain)\n\n[Verse]\n(Whispered vocals) Rain stops at the window sill past midnight\nNeon stretches my shadow far too pale\nThe corner store light is still on\nLike a line left unsaid\n\n[Pre-Chorus]\n(Drums building) I count the rhythm dripping from the eaves\nBeat by beat, all of it waiting\n\n[Chorus]\n(Harmony backing) We spoke of the future far too lightly\nLike wind through an empty street\nIf a promise is only an echo\nAt least tonight there is still the rain\n\n[Bridge]\n(Strings pad) If we must leave when dawn breaks\nLeave the unspoken with the night wind\n\n[Outro]\n(Piano and rain fading out)',
 } as const

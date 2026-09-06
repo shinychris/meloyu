@@ -210,10 +210,10 @@ export const studioZh: Record<keyof typeof studioEn, string> = {
   'studio.log.regenOp': '段落重生成 {section}',
   'studio.log.deriveOp': '{op} · 候选 {label}',
 
-  // ===== 新会话默认示例内容（stylePrompt / lyrics） =====
+  // ===== 新会话默认示例内容（stylePrompt / lyrics；歌词含括号表演标记示范） =====
   'studio.default.stylePrompt': '华语流行抒情，钢琴主导，弦乐铺底，雨夜氛围，女声气声，副歌情绪推起',
   'studio.default.lyrics':
-    '[Verse]\n雨停在凌晨三点的窗台\n霓虹把影子拉得好白\n[Chorus]\n我们把未来说得太轻\n像风穿过无人的街心',
+    '[Verse]\n（轻声吟唱）雨停在凌晨三点的窗台\n霓虹把影子拉得好白\n[Chorus]\n（和声）我们把未来说得太轻\n像风穿过无人的街心',
 
   // ===== 我的口味（V2-b，v0.9.1）=====
   'studio.taste.apply': '按我的口味预填',

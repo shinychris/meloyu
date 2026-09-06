@@ -293,4 +293,6 @@ export const landingZh: Record<keyof typeof landingEn, string> = {
   'landing.data.milestone.18.title': 'ACE-Step 容器化修复：GPU 直通与跨平台 venv',
   'landing.data.milestone.19.title': '模型中心生产可用化：分类重构与容器寻址',
   'landing.data.milestone.20.title': '段落与灵感词表扩全主流：15 段结构 / 47 风格 / 30 乐器',
+  'landing.data.milestone.21.title': 'Ollama 关思考提速 + 工作台送往编曲闭环',
+  'landing.data.milestone.22.title': '歌词创作增强：想法 AI 生成 / 标签中文说明 / 括号表演标记',
 }

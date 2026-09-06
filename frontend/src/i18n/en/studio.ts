@@ -219,11 +219,11 @@ export const studioEn = {
   'studio.log.regenOp': 'Section re-gen {section}',
   'studio.log.deriveOp': '{op} · Candidate {label}',
 
-  // ===== 新会话默认示例内容（stylePrompt / lyrics） =====
+  // ===== New-session default samples (stylePrompt / lyrics; lyrics demo parenthetical performance marks) =====
   'studio.default.stylePrompt':
     'Mandopop ballad, piano-led with string pads, rainy-night atmosphere, breathy female vocals, chorus lifts',
   'studio.default.lyrics':
-    '[Verse]\nRain stops on the windowsill at 3 a.m.\nNeon stretches my shadow pale\n[Chorus]\nWe said the future far too lightly\nLike wind through an empty street',
+    '[Verse]\n(Whispered vocals) Rain stops on the windowsill at 3 a.m.\nNeon stretches my shadow pale\n[Chorus]\n(Harmony backing) We said the future far too lightly\nLike wind through an empty street',
 
   // ===== My taste (V2-b, v0.9.1) =====
   'studio.taste.apply': 'Prefill by my taste',

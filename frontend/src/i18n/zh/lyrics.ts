@@ -60,5 +60,5 @@ export const lyricsZh: Record<keyof typeof lyricsEn, string> = {
   'lyrics.panel.rhymeMain': ' · 主韵 {group}',
   'lyrics.panel.backStudio': '返回工作台 →',
   'lyrics.defaultLyrics':
-    '[Verse]\n雨停在凌晨三点的窗台\n霓虹把影子拉得好白\n便利店的灯还亮着\n像没说完的对白\n\n[Pre-Chorus]\n我数着屋檐滴落的节拍\n一下一下都是等待\n\n[Chorus]\n我们把未来说得太轻\n像风穿过无人的街心\n承诺若只剩回音\n至少今夜还有雨声',
+    '[Intro]\n（钢琴渐入，雨声采样）\n\n[Verse]\n（轻声吟唱）雨停在凌晨三点的窗台\n霓虹把影子拉得好白\n便利店的灯还亮着\n像没说完的对白\n\n[Pre-Chorus]\n（鼓点渐入）我数着屋檐滴落的节拍\n一下一下都是等待\n\n[Chorus]\n（和声）我们把未来说得太轻\n像风穿过无人的街心\n承诺若只剩回音\n至少今夜还有雨声\n\n[Bridge]\n（弦乐铺底）如果天亮就要出发\n就把心事留给晚风吧\n\n[Outro]\n（钢琴与雨声渐弱）',
 }

@@ -284,4 +284,6 @@ export const landingEn = {
   'landing.data.milestone.18.title': 'ACE-Step container fixes: GPU passthrough & cross-platform venv',
   'landing.data.milestone.19.title': 'Model center production-ready: categories & container addressing',
   'landing.data.milestone.20.title': 'Full mainstream taxonomy: 15 sections / 47 genres / 30 instruments',
+  'landing.data.milestone.21.title': 'Ollama thinking-off speedup & Studio-to-arrange loop',
+  'landing.data.milestone.22.title': 'Lyrics creation boost: idea-driven AI / bilingual tag guides / performance marks',
 } as const
