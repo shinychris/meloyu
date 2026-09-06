@@ -22,6 +22,16 @@ def _norm_base(base_url: str) -> str:
     return base
 
 
+def looks_like_ollama(url: str) -> bool:
+    """识别指向 Ollama OpenAI 兼容端点的 base_url（默认端口 11434 / 主机名含 ollama）。
+
+    仅这类端点支持 reasoning_effort:"none" 关闭思考；对其它厂商多发该字段可能被
+    网关严格校验拒绝，故限定命中才附带。
+    """
+    u = (url or "").lower()
+    return ":11434" in u or "ollama" in u
+
+
 class OpenAICompatClient:
     def __init__(self, base_url: str, api_key: str = "", model: str = ""):
         self.base = _norm_base(base_url)
@@ -46,18 +56,31 @@ class OpenAICompatClient:
         m = (model or self.model).strip()
         if not m:
             raise LLMError("unavailable", tr("model 未配置", "model is not configured"))
+        # Ollama /v1 端点：附带 reasoning_effort:"none" 关闭思考（v0.11+），思考型
+        # 模型不再烧预算在思考链上；旧版 Ollama 不识别该值会 400，届时去掉重试一次
+        disable_reasoning = looks_like_ollama(url)
 
         def once(token_budget: int) -> tuple[str, str]:
-            payload = {
-                "model": m,
-                "messages": [{"role": "system", "content": system},
-                             {"role": "user", "content": prompt}],
-                "temperature": temperature,
-                "max_tokens": token_budget,
-            }
+            def build(include_reasoning: bool) -> dict:
+                p = {
+                    "model": m,
+                    "messages": [{"role": "system", "content": system},
+                                 {"role": "user", "content": prompt}],
+                    "temperature": temperature,
+                    "max_tokens": token_budget,
+                }
+                if include_reasoning:
+                    p["reasoning_effort"] = "none"
+                return p
+
             try:
-                r = httpx.post(url, json=payload, headers=self._headers(api_key),
+                r = httpx.post(url, json=build(disable_reasoning),
+                               headers=self._headers(api_key),
                                timeout=httpx.Timeout(timeout))
+                if (disable_reasoning and r.status_code == 400
+                        and "reasoning_effort" in r.text):
+                    r = httpx.post(url, json=build(False), headers=self._headers(api_key),
+                                   timeout=httpx.Timeout(timeout))
             except httpx.TimeoutException as e:
                 raise LLMError(
                     "timeout",

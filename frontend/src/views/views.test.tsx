@@ -232,6 +232,13 @@ describe('CandidateCard V1.1 派生操作', () => {
     expect(html).not.toMatch(/AI quality \d/)
     expect(html).not.toContain('AI quality null')
   })
+
+  it('送往编曲按钮渲染（v0.12.2：点击携带 work/version/candidate 上下文）', () => {
+    const html = render(
+      <CandidateCard candidate={candidateFixture} index={0} workTitle="测试作品" modelLabel="V1 Pro" />,
+    )
+    expect(html).toContain('Send to arrange')
+  })
 })
 
 describe('DerivePanel 派生面板', () => {

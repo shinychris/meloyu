@@ -158,6 +158,13 @@ function LoginGuard() {
   return <LoginView />
 }
 
+/** 编曲路由壳：URL search 变化（工作台再次「送往编曲」）时以 key remount，
+ *  ArrangementView 的首装参数逻辑无需感知参数更新 */
+function ArrangeRoute() {
+  const location = useLocation()
+  return <ArrangementView key={location.search} />
+}
+
 function RootRoutes() {
   const hasToken = useSessionStore((s) => s.user !== null) || Boolean(getToken())
   return (
@@ -173,7 +180,9 @@ function RootRoutes() {
         <Route element={<AppLayout />}>
           <Route path="/studio" element={<StudioView />} />
           <Route path="/lyrics" element={<LyricsView />} />
-          <Route path="/arrange" element={<ArrangementView />} />
+          {/* 编曲视图以 URL search（?work=&version=&candidate=）为装载契约：
+              参数变化即 remount 重新装载目标，工作台可重复「送往编曲」 */}
+          <Route path="/arrange" element={<ArrangeRoute />} />
           <Route path="/market" element={<MarketView />} />
           <Route path="/edit" element={<EditView />} />
           <Route path="/pitch" element={<PitchView />} />

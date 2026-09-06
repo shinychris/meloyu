@@ -25,6 +25,8 @@ export const editorEn = {
   'editor.mixdown.saving': 'Rendering & uploading…',
   'editor.mixdown.notes': 'Editor mixdown (volume / 3-band EQ per stem)',
   'editor.toast.noStems': 'This version has no stems (external-model output); mixing needs a local-engine version',
+  'editor.stem.fullmix': 'Full mix',
+  'editor.toast.fullmixLoaded': 'No stems for this version (external-engine output) — loaded the full mix as a single lane: volume / EQ / mixdown still work',
   'editor.toast.sameBpm': 'BPM unchanged — nothing to retune',
   'editor.toast.retuneDone': 'Retuned to {bpm} BPM — new version loaded',
   'editor.toast.retuneFailed': 'Retune failed',

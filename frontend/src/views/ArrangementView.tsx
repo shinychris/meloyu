@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { Candidate, FileRef, Work } from '../types/api'
 import { listWorks } from '../api/works'
 import { getVersionTree } from '../api/works'
@@ -36,8 +36,15 @@ interface Lane {
 export default function ArrangementView() {
   const t = useT()
   const navigate = useNavigate()
+  /** 工作台「送往编曲」带来的上下文（?work=&version=&candidate=），仅首次装载生效 */
+  const [searchParams] = useSearchParams()
+  const initialRef = useRef({
+    work: searchParams.get('work'),
+    version: searchParams.get('version'),
+    candidate: searchParams.get('candidate'),
+  })
   const [works, setWorks] = useState<Work[]>([])
-  const [workId, setWorkId] = useState<string | null>(null)
+  const [workId, setWorkId] = useState<string | null>(initialRef.current.work)
   const [nodes, setNodes] = useState<VersionTreeNode[]>([])
   const [currentVersionId, setCurrentVersionId] = useState<string | null>(null)
   const [versionId, setVersionId] = useState<string | null>(null)
@@ -66,7 +73,11 @@ export default function ArrangementView() {
       .then((tree) => {
         setNodes(tree.nodes)
         setCurrentVersionId(tree.current_version_id)
-        setVersionId(tree.current_version_id)
+        // 工作台指定的版本存在则优先装载，否则落回当前版本
+        const wanted = initialRef.current.version
+        setVersionId(
+          wanted && tree.nodes.some((n) => n.id === wanted) ? wanted : tree.current_version_id,
+        )
       })
       .catch(() => setNodes([]))
   }, [workId])
@@ -77,16 +88,29 @@ export default function ArrangementView() {
     tracksRef.current = []
     try {
       const res = await listCandidates(vid)
-      const cand = res.items.find((c) => c.adopted) ?? res.items[0]
+      // 工作台送来的候选优先，其次已采用，最后首个
+      const cand =
+        res.items.find((c) => c.id === initialRef.current.candidate) ??
+        res.items.find((c) => c.adopted) ??
+        res.items[0]
       setCandidates(cand ?? null)
       if (!cand) return
+      setRetuneBpm(cand.bpm || 96)
       const stems = STEM_NAMES.map((n) => cand.files.find((f) => f.kind === 'stem' && f.stem_name === n)).filter(Boolean) as FileRef[]
+      let toLoad = stems
       if (stems.length === 0) {
-        toast(t('editor.toast.noStems'), 'warn')
-        return
+        // 外部引擎（ACE-Step / MusicGen / API）整曲产物无分轨：退化为整曲单轨，
+        // 音量/EQ/混音回存仍可用；确无音频才提示不可混音
+        const full = cand.files.find((f) => f.kind === 'master') ?? cand.files.find((f) => f.kind === 'preview')
+        if (!full) {
+          toast(t('editor.toast.noStems'), 'warn')
+          return
+        }
+        toLoad = [full]
+        toast(t('editor.toast.fullmixLoaded'), 'info')
       }
       const loaded: Lane[] = []
-      for (const f of stems) {
+      for (const f of toLoad) {
         const { url } = await getStreamToken(f.file_id)
         const raw = await fetch(url).then((r) => r.arrayBuffer())
         const Ctx =
@@ -231,7 +255,8 @@ export default function ArrangementView() {
     }
   }
 
-  const stemLabel = (s: string | null) => (s && STEM_LABEL_KEYS[s] ? t(STEM_LABEL_KEYS[s]) : s ?? '')
+  const stemLabel = (s: string | null) =>
+    s && STEM_LABEL_KEYS[s] ? t(STEM_LABEL_KEYS[s]) : s ?? t('editor.stem.fullmix')
 
   const timelinePct = duration > 0 ? Math.min(100, (position / duration) * 100) : 0
   const workOptions = useMemo(() => works, [works])

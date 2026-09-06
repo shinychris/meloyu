@@ -217,7 +217,12 @@ export default function CandidateCard({
           className="btn btn-ghost !py-1 !px-2.5 text-[11px]"
           style={{ color: 'var(--acc)', borderColor: 'var(--acc)' }}
           onClick={() => {
-            navigate('/arrange')
+            // 带上作品/版本/候选上下文：编曲视图按参自动装载该候选的分轨
+            navigate(
+              workId
+                ? `/arrange?work=${workId}&version=${candidate.version_id}&candidate=${candidate.id}`
+                : '/arrange',
+            )
             toast(t('studio.toast.sentArrange', { title }))
             useStudioStore.getState().logOp(t('studio.log.sentArrange', { title }))
           }}

@@ -25,6 +25,8 @@ export const editorZh = {
   'editor.mixdown.saving': '离线渲染与上传中…',
   'editor.mixdown.notes': '编辑器混音（分轨音量 / 三段 EQ）',
   'editor.toast.noStems': '该版本无分轨（外部模型整曲产物）；混音需本地引擎版本',
+  'editor.stem.fullmix': '整曲',
+  'editor.toast.fullmixLoaded': '该版本无分轨（外部引擎整曲产物），已载入整曲单轨：音量 / EQ / 混音回存可用',
   'editor.toast.sameBpm': 'BPM 未变化，无需重渲染',
   'editor.toast.retuneDone': '已重渲染为 {bpm} BPM，新版本已载入',
   'editor.toast.retuneFailed': '重渲染失败',
