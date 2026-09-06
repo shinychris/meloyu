@@ -13,7 +13,7 @@ from pathlib import Path
 from pypinyin import Style, pinyin
 
 from app.core.i18n import tr
-from app.synth.structure import SECTION_ALIASES, TAG_RE, parse_lyrics
+from app.synth.structure import SECTION_ALIASES, SECTION_TAG, TAG_RE, parse_lyrics
 
 BANKS_DIR = Path(__file__).parent / "lyrics" / "banks"
 
@@ -86,6 +86,12 @@ def _rng_for(*parts) -> random.Random:
     return random.Random(int(seed_hex[:16], 16))
 
 
+# 段落行数策略（v0.12.1 新段落）：纯器乐段无歌词行；短段落 2 行，其余 4 行
+_NO_LYRIC_SECTIONS = frozenset({"solo", "drop"})
+_SHORT_SECTIONS = frozenset({"pre_chorus", "bridge", "post_chorus", "refrain",
+                             "spoken", "ad_lib", "interlude", "breakdown"})
+
+
 class LocalLyricsProvider:
     name = "localsynth-lyrics"
     display_name = "Meloyu 本地歌词引擎"
@@ -106,7 +112,10 @@ class LocalLyricsProvider:
 
         lines_by_section: list[tuple[str, list[str]]] = []
         for sec in sections:
-            count = 2 if sec in ("pre_chorus", "bridge") else 4
+            if sec in _NO_LYRIC_SECTIONS:      # 纯器乐段落只出标签不出行
+                lines_by_section.append((sec, []))
+                continue
+            count = 2 if sec in _SHORT_SECTIONS else 4
             lines = [self._fill_line(sec, rng, bank, group, theme, lang) for _ in range(count)]
             lines_by_section.append((sec, lines))
 
@@ -142,7 +151,13 @@ class LocalLyricsProvider:
                     offset: int = 0) -> str:
         mood_groups = {"忧郁": ["一七", "灰堆"], "治愈": ["江阳", "怀来"], "热血": ["江阳", "遥条"],
                        "浪漫": ["言前", "遥条"], "紧张": ["一七", "姑苏"], "思念": ["人辰", "言前"],
-                       "孤独": ["姑苏", "由求"], "宁静": ["中东", "发花"]}
+                       "孤独": ["姑苏", "由求"], "宁静": ["中东", "发花"],
+                       # v0.12.1 灵感词表扩充的情绪 → 韵组（未命中组自由选韵，行为不变）
+                       "欢快": ["发花", "遥条"], "悲伤": ["灰堆", "一七"], "深情": ["言前", "人辰"],
+                       "励志": ["江阳", "中东"], "梦幻": ["由求", "姑苏"], "史诗": ["江阳", "中东"],
+                       "怀旧": ["怀来", "人辰"], "神秘": ["姑苏", "由求"], "黑暗": ["一七", "姑苏"],
+                       "慵懒": ["遥条", "梭波"], "俏皮": ["发花", "怀来"], "温柔": ["言前", "遥条"],
+                       "空灵": ["中东", "由求"]}
         if mood and mood in mood_groups:
             return mood_groups[mood][(hashlib.sha256(theme.encode()).digest()[0] + offset) % 2]
         groups = list(_RHYMES["ending_words"].keys())
@@ -192,13 +207,11 @@ class LocalLyricsProvider:
         return (theme or "")[:2] or "心事"
 
     def _assemble(self, lines_by_section) -> str:
-        tag_map = {"verse": "[Verse]", "pre_chorus": "[Pre-Chorus]", "chorus": "[Chorus]",
-                   "bridge": "[Bridge]", "intro": "[Intro]", "outro": "[Outro]"}
         parts = []
         for sec, lines in lines_by_section:
             if sec in ("intro", "outro") and not lines:
                 continue
-            parts.append(tag_map.get(sec, "[Verse]"))
+            parts.append(SECTION_TAG.get(sec, "[Verse]"))
             parts.extend(lines)
         return "\n".join(parts)
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import time
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -67,6 +68,19 @@ from app.providers.music_selfhosted import (
 
 _op_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="meloyu-model-op")
 
+# ---------- 运行环境感知（Ollama/自托管端点的容器内寻址） ----------
+
+# Docker Desktop（Windows/macOS）内置域名，容器内经它访问宿主机端口；
+# Linux 原生 docker 需在 compose 给服务加 extra_hosts: ["host.docker.internal:host-gateway"]
+_DOCKER_HOST_ALIAS = "http://host.docker.internal:11434"
+_LOOPBACK_OLLAMA_HOSTS = frozenset({
+    "http://localhost:11434", "http://127.0.0.1:11434"})
+
+
+def _in_docker() -> bool:
+    """backend 是否跑在容器里（deploy/docker-compose.yml 生产形态）。"""
+    return Path("/.dockerenv").exists()
+
 # 推荐 pull 的本地模型（tag 须与 Ollama 仓库一致；大小为约值）。
 # 注：qwen3.5 系列支持关闭思考链直出；旧 qwen3 系列常开思考，CPU 混合推理下一首
 # 歌词可能数分钟——无独显机器优先选小模型。
@@ -109,12 +123,24 @@ EXTERNAL_PRESETS: list[dict] = [  # vendor/model_hint 为 (zh, en) 双语
      "model_hint": ("gpt-4o-mini", "gpt-4o-mini")},
     {"vendor": ("Moonshot", "Moonshot"), "base_url": "https://api.moonshot.cn/v1",
      "model_hint": ("moonshot-v1-8k", "moonshot-v1-8k")},
+    {"vendor": ("Ollama 本地网关", "Ollama local gateway"),
+     "base_url": "http://localhost:11434/v1",
+     "model_hint": ("qwen3.5:4b（需先 ollama pull；Key 任意填）",
+                    "qwen3.5:4b (requires ollama pull first; any key value works)")},
 ]
 
 
 def external_presets() -> list[dict]:
-    return [{"vendor": tr(*p["vendor"]), "base_url": p["base_url"],
-             "model_hint": tr(*p["model_hint"])} for p in EXTERNAL_PRESETS]
+    out = []
+    for p in EXTERNAL_PRESETS:
+        base_url = p["base_url"]
+        # Ollama 本地网关预设按运行环境给地址：容器内 localhost 指向容器自身，
+        # 须走 host.docker.internal 才能到宿主机 Ollama
+        if base_url == "http://localhost:11434/v1" and _in_docker():
+            base_url = "http://host.docker.internal:11434/v1"
+        out.append({"vendor": tr(*p["vendor"]), "base_url": base_url,
+                    "model_hint": tr(*p["model_hint"])})
+    return out
 
 # 外部歌曲生成 API 预设（Suno 兼容协议，ADR-010）：base 填网关根，自动补 /api/v1
 MUSIC_API_PRESETS: list[dict] = [  # vendor 为 (zh, en) 双语
@@ -303,9 +329,45 @@ def update_settings(db: Session, patch: dict) -> dict:
 
 # ---------- 运行时状态 / 本地模型 ----------
 
+def _ollama_client(db: Session, s: LLMSetting) -> OllamaClient:
+    """按配置构造 OllamaClient；容器内 loopback 自动改用宿主机别名并持久化。
+
+    生产部署（docker-compose）下 DB 默认值 http://localhost:11434 在容器内指向
+    容器自身而非宿主机 Ollama——统一替换为 host.docker.internal（Docker Desktop
+    内置域名）并写回 DB：状态检测/下载/删除/推理直接用正确地址，模型中心回显
+    一致。宿主机 Ollama 须监听 0.0.0.0（OLLAMA_HOST=0.0.0.0）方可从容器可达，
+    未安装时的引导见 runtime_status 的 install_hint。用户显式配置非 loopback
+    地址（如自建 ollama 容器服务名）不受影响。dev（宿主机 uvicorn）完全不变。
+    """
+    client = OllamaClient(s.ollama_host)
+    if _in_docker() and client.base in _LOOPBACK_OLLAMA_HOSTS:
+        logger.info("ollama_host 容器内自动回退: {} → {}", client.base, _DOCKER_HOST_ALIAS)
+        client = OllamaClient(_DOCKER_HOST_ALIAS)
+        s.ollama_host = _DOCKER_HOST_ALIAS
+        db.commit()
+    return client
+
+
+def _ollama_install_hint() -> str:
+    if _in_docker():
+        return tr(
+            "容器内未检测到 Ollama（host.docker.internal:11434）：宿主机需安装 "
+            "Ollama（https://ollama.com/download）并监听 0.0.0.0——设置环境变量 "
+            "OLLAMA_HOST=0.0.0.0 后重启 Ollama，容器才能经内置域名访问 11434 端口",
+            "No Ollama detected inside the container (host.docker.internal:11434): "
+            "install Ollama on the host (https://ollama.com/download) and make it "
+            "listen on 0.0.0.0 — set OLLAMA_HOST=0.0.0.0 and restart Ollama so the "
+            "container can reach port 11434 via the built-in domain")
+    return tr("本机未检测到 Ollama 服务：https://ollama.com/download 安装后"
+              "运行 `ollama serve`（Windows 安装包常驻自启）",
+              "No local Ollama service detected: install from "
+              "https://ollama.com/download, then run `ollama serve` "
+              "(the Windows installer stays resident and auto-starts)")
+
+
 def runtime_status(db: Session) -> dict:
     s = _setting_row(db)
-    client = OllamaClient(s.ollama_host)
+    client = _ollama_client(db, s)
     running, version, err = False, "", ""
     try:
         version = client.version()
@@ -320,12 +382,9 @@ def runtime_status(db: Session) -> dict:
             "version": version,
             "models_count": len(models),
             "error": err,
-            "install_hint": tr("本机未检测到 Ollama 服务：https://ollama.com/download 安装后"
-                              "运行 `ollama serve`（Windows 安装包常驻自启）",
-                              "No local Ollama service detected: install from "
-                              "https://ollama.com/download, then run `ollama serve` "
-                              "(the Windows installer stays resident and auto-starts)"),
+            "install_hint": _ollama_install_hint(),
         },
+        "docker": _in_docker(),
         "active_backend": s.lyrics_backend,
         "engine": engine_label(db),
         "music_backend": s.music_backend,
@@ -340,7 +399,7 @@ def engine_label(db: Session) -> str:
         return f"Ollama · {s.ollama_model}"
     if s.lyrics_backend == "openai_compat" and s.external_model:
         return tr("外部API · ", "External API · ") + s.external_model
-    return tr("本地规则引擎（离线可用）", "Local rule engine (offline)")
+    return tr("离线规则引擎（兜底·非 AI 模型）", "Offline rules engine (fallback, non-AI)")
 
 
 def song_engine_label(db: Session) -> str:
@@ -370,12 +429,12 @@ def song_engine_label(db: Session) -> str:
     if (s.music_backend in ("replicate", "musicgen_local", "acestep_local")
             or s.music_backend in _SELFHOSTED_BACKENDS):
         return tr("开源模型（未选择模型）", "Open-source model (none selected)")
-    return tr("本地合成引擎（离线可用）", "Local synth engine (offline)")
+    return tr("离线合成引擎（兜底·非 AI 模型）", "Offline synth engine (fallback, non-AI)")
 
 
 def list_local_models(db: Session) -> dict:
     s = _setting_row(db)
-    client = OllamaClient(s.ollama_host)
+    client = _ollama_client(db, s)
     try:
         models = client.list_models()
         err = ""
@@ -441,12 +500,13 @@ def start_pull(db: Session, user_id: str, model: str) -> dict:
                               "Another model download is in progress; wait for it to "
                               "finish before starting a new one"))
     s = _setting_row(db)
+    host = _ollama_client(db, s).base  # 容器内 loopback 已在此修正并持久化
     op = ModelOp(id=new_uuid(), user_id=user_id, op_type="pull", target=model,
                  status="queued", message=tr("排队中", "Queued"))
     db.add(op)
     db.commit()
     db.refresh(op)
-    _submit_op(_execute_pull, op.id, model, s.ollama_host)
+    _submit_op(_execute_pull, op.id, model, host)
     return op.to_dict()
 
 
@@ -462,7 +522,7 @@ def run_delete(db: Session, user_id: str, model: str) -> dict:
     db.commit()
     db.refresh(op)
     try:
-        OllamaClient(s.ollama_host).delete(model)
+        _ollama_client(db, s).delete(model)
     except LLMError as e:
         op.status, op.message = "failed", tr("删除失败", "Delete failed")
         op.error_message = e.message[:280]
@@ -556,7 +616,7 @@ def get_lyrics_provider(db: Session):
         if s.lyrics_backend == "ollama":
             if not s.ollama_model:
                 return LocalLyricsProvider()
-            client = OllamaClient(s.ollama_host)
+            client = _ollama_client(db, s)
             return LLMLyricsProvider(
                 chat=lambda sys, p: client.chat(s.ollama_model, sys, p),
                 engine=f"ollama:{s.ollama_model}",

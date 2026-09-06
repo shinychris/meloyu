@@ -22,6 +22,10 @@ def _norm_host(host: str) -> str:
         host = "http://localhost:11434"
     if not host.startswith(("http://", "https://")):
         host = f"http://{host}"
+    # 容错 OpenAI 兼容习惯：外部 API 通道的 base_url 带 /v1（如
+    # http://host.docker.internal:11434/v1），Ollama 原生端点是 /api/*，剥掉尾缀
+    if host.endswith("/v1"):
+        host = host[: -len("/v1")].rstrip("/")
     return host
 
 

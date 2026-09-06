@@ -6,7 +6,35 @@ export const modelsZh: Record<keyof typeof modelsEn, string> = {
   'models.label': '模型中心 · MODEL HUB',
   'models.title': 'AI 引擎与模型管理',
   'models.intro':
-    '歌词引擎：本地规则（离线兜底）/ 本地开源模型（Ollama）/ 外部 API（OpenAI 兼容）；歌曲引擎：本机 ACE-Step v1.5（开源人声成曲）/ 本地合成（离线兜底）/ Replicate 开源模型托管 / 外部歌曲 API / 本机 MusicGen——开源模型按外部测评参考分排序并给出推荐（见下方目录）。引擎失败时自动回退本地引擎，创作不中断。',
+    '为生产环境配置真实 AI 通道：歌词走外部 API（OpenAI 兼容）或本地 Ollama 模型；歌曲走云端 API / Replicate 托管 / 本机 GPU 模型 / 自托管推理服务。离线规则引擎仅作非 AI 兜底。使用左侧导航浏览分类。',
+  // 左侧分类导航
+  'models.nav.overview': '概览',
+  'models.nav.lyrics': '歌词引擎',
+  'models.nav.music': '歌曲引擎',
+  'models.nav.catalog': '开源模型目录',
+  'models.nav.library': '本地模型库',
+  'models.nav.ops': '操作记录',
+  // 概览分区
+  'models.overview.envLabel': '运行环境',
+  'models.overview.envDocker': 'Docker 容器',
+  'models.overview.envHost': '宿主机（开发）',
+  'models.overview.checkTitle': '生产就绪检查',
+  'models.overview.lyricsOk': '已启用真实模型通道，生产就绪',
+  'models.overview.lyricsFallback':
+    '当前使用离线规则引擎兜底（非 AI 模板生成）——生产环境建议配置真实通道',
+  'models.overview.songOk': '已启用真实模型通道，生产就绪',
+  'models.overview.songFallback':
+    '当前使用离线合成引擎兜底（非 AI 算法作曲）——生产环境建议配置真实通道',
+  'models.overview.goConfigure': '去配置',
+  'models.overview.dockerHint':
+    '后端运行在 Docker 容器内：访问宿主机 Ollama 使用 http://host.docker.internal:11434（已自动适配；Ollama 须以 OLLAMA_HOST=0.0.0.0 监听 0.0.0.0），自托管服务端点默认同样指向 host.docker.internal。',
+  // 通道分组
+  'models.group.recommended': '推荐通道',
+  'models.group.cloud': '云端通道',
+  'models.group.localGpu': '本机 GPU 通道',
+  'models.group.selfhosted': '自托管服务通道',
+  'models.group.fallback': '离线兜底（非 AI）',
+  'models.fallbackBadge': '非 AI · 兜底',
   'models.runtime.running': '运行中 · v{version}',
   'models.runtime.stopped': '未运行',
   'models.runtime.localModels': '{n} 个本地模型',
@@ -22,18 +50,23 @@ export const modelsZh: Record<keyof typeof modelsEn, string> = {
   'models.chan.lyricsEffect': '切换立即生效，影响歌词助手的生成 / 润色',
   // 歌词引擎通道
   'models.lyrics.title': '歌词引擎通道',
+  'models.lyrics.sectionDesc':
+    '推荐外部 API（OpenAI 兼容）或本地 Ollama 模型——均为真实大模型。离线规则引擎仅在无可用通道时自动兜底。',
   'models.lyrics.needModel': '请先在下方选择（或下载）一个本地模型',
   'models.lyrics.needExternal': '请先在下方完成外部 API 配置',
   'models.lyrics.noLocal': '本机还没有本地模型，请先在下方下载',
   'models.lyrics.switched': '歌词引擎已切换：{engine}',
-  'models.backend.localsynth.title': '本地规则引擎',
-  'models.backend.localsynth.desc': '离线可用 · 秒级出稿 · 演示级文采（默认）',
+  'models.backend.localsynth.title': '离线规则引擎（兜底）',
+  'models.backend.localsynth.desc':
+    '非 AI 模型 · 模板规则生成 · 仅作离线兜底，生产建议切换真实模型通道',
   'models.backend.ollama.title': '本地开源模型（Ollama）',
   'models.backend.ollama.desc': '真实大模型 · 数据不出本机 · 速度视模型与硬件',
   'models.backend.openai_compat.title': '外部 API（OpenAI 兼容）',
   'models.backend.openai_compat.desc': '智谱 / DeepSeek / OpenAI 等云端模型 · 需 API Key',
   // 歌曲引擎通道
   'models.music.title': '歌曲生成引擎通道',
+  'models.music.sectionDesc':
+    '云端通道配 Key/Token 即用；本机 GPU 通道真实下载开源权重；自托管通道指向你自己的推理服务。离线合成引擎仅在无可用通道时自动兜底。',
   'models.music.needApi': '请先在下方完成外部歌曲 API 配置',
   'models.music.needCatalogToken': '请先在下方目录区保存 Replicate API Token',
   'models.music.needCatalogModel': '请先在下方目录选择支持本机运行的模型',
@@ -43,8 +76,9 @@ export const modelsZh: Record<keyof typeof modelsEn, string> = {
   'models.music.switched': '歌曲引擎已切换：{engine}',
   'models.music.pullStarted': '开始下载 {name}（约 {size} MB）',
   'models.music.baseUrlRequired': 'base_url 必填',
-  'models.mbackend.localsynth.title': '本地合成引擎',
-  'models.mbackend.localsynth.desc': '离线可用 · 算法作曲实时渲染 · 含分轨/MIDI（默认）',
+  'models.mbackend.localsynth.title': '离线合成引擎（兜底）',
+  'models.mbackend.localsynth.desc':
+    '非 AI 模型 · 算法作曲（含分轨/MIDI）· 仅作离线兜底，生产建议切换真实模型通道',
   'models.mbackend.acestep_local.title': '本机 ACE-Step v1.5（开源·人声成曲）',
   'models.mbackend.acestep_local.desc': '歌词→真人声演唱完整歌曲 · 独立 venv 部署 · 8GB 显存档 · GPU 约 1~3 分钟/首',
   'models.mbackend.mmax_local.title': 'MiniMax Music 3',
@@ -76,6 +110,8 @@ export const modelsZh: Record<keyof typeof modelsEn, string> = {
   'models.testEcho': '（回声：{sample}）',
   // Replicate Token 与开源目录
   'models.catalog.title': '开源歌曲模型目录（按外部测评排序）',
+  'models.catalog.sectionDesc':
+    '真实开源模型，支持本机下载或 Replicate 托管——选用后歌曲引擎自动切到对应通道。测评分数为外部公开来源参考值（ADR-015）。',
   'models.replicate.tokenPh': 'r8_…（replicate.com 账户获取）',
   'models.replicate.needToken': '请先输入 Replicate API Token（r8_ 开头）',
   'models.replicate.needTokenSave': '请先输入 Replicate API Token',
@@ -139,9 +175,21 @@ export const modelsZh: Record<keyof typeof modelsEn, string> = {
   'models.musicDel.desc': '将删除 HuggingFace 缓存中的模型权重以释放磁盘空间；若是当前引擎所用模型，引擎将自动回退到本地合成。',
   // 最近操作
   'models.ops.title': '最近操作',
+  'models.ops.empty': '暂无模型操作记录——下载与删除会记录在此',
   'models.ops.succeeded': '成功',
   'models.ops.failed': '失败：{msg}',
   'models.ops.unknownError': '未知错误',
+  // Ollama 服务地址（v0.12.0：容器内自动 host.docker.internal，UI 可显式配置）
+  'models.ollamaHost.title': 'Ollama 服务地址',
+  'models.ollamaHost.desc':
+    '用于状态检测、模型下载/删除与歌词推理。Docker 部署时默认 localhost 会自动切换为 http://host.docker.internal:11434 并保存。',
+  'models.ollamaHost.ph': 'http://localhost:11434（Docker 部署：http://host.docker.internal:11434）',
+  'models.ollamaHost.save': '保存地址',
+  'models.ollamaHost.saved': 'Ollama 服务地址已保存——当前生效：{host}',
+  'models.ollamaHost.effective': '当前生效：{host}',
+  'models.ollamaHost.required': '请先输入 Ollama 服务地址',
+  'models.ollamaHost.dockerHint':
+    '后端运行在 Docker 容器内：访问宿主机 Ollama 请使用 http://host.docker.internal:11434——Ollama 须监听 0.0.0.0（设置环境变量 OLLAMA_HOST=0.0.0.0 后重启）。地址末尾带 /v1 会被自动容错剥除。',
   // 外部 API（OpenAI 兼容）
   'models.ext.title': '外部 API（OpenAI 兼容）',
   'models.ext.recommended': '推荐 {hint}',

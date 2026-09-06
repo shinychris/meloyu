@@ -9,21 +9,59 @@ import re
 from app.synth.ir import BAR_QUARTER_UNITS, SectionPlan, SongIR
 
 TAG_RE = re.compile(r"^\[\s*([^\]]+?)\s*\]$")
-# 中英文别名 → 归一化段落枚举（大小写不敏感）
+# 段落规范顺序（/system/meta structure_tags 与前端标签条目顺序的单一事实来源）
+SECTION_ORDER = ("intro", "verse", "pre_chorus", "chorus", "post_chorus", "refrain",
+                 "bridge", "interlude", "drop", "breakdown", "rap", "spoken",
+                 "ad_lib", "solo", "outro")
+# 段落 → 规范标签（lyrics_local/_llm 组装与 meta 下发共用；未知段不做映射）
+SECTION_TAG: dict[str, str] = {
+    "intro": "[Intro]", "verse": "[Verse]", "pre_chorus": "[Pre-Chorus]",
+    "chorus": "[Chorus]", "post_chorus": "[Post-Chorus]", "refrain": "[Refrain]",
+    "bridge": "[Bridge]", "interlude": "[Interlude]", "drop": "[Drop]",
+    "breakdown": "[Breakdown]", "rap": "[Rap]", "spoken": "[Spoken]",
+    "ad_lib": "[Ad-Lib]", "solo": "[Solo]", "outro": "[Outro]",
+}
+
+# 中英文别名 → 归一化段落枚举（大小写不敏感；v0.12.1 扩全主流段落）
 SECTION_ALIASES: dict[str, str] = {
     "intro": "intro", "前奏": "intro",
-    "verse": "verse", "verse1": "verse", "verse2": "verse", "主歌": "verse",
-    "pre-chorus": "pre_chorus", "prechorus": "pre_chorus", "pre": "pre_chorus",
-    "导歌": "pre_chorus", "预副歌": "pre_chorus",
-    "chorus": "chorus", "hook": "chorus", "副歌": "chorus",
-    "bridge": "bridge", "interlude": "bridge", "桥段": "bridge", "间奏": "bridge",
+    "verse": "verse", "verse1": "verse", "verse2": "verse", "verse3": "verse",
+    "verse4": "verse", "verse 1": "verse", "verse 2": "verse", "verse 3": "verse",
+    "verse 4": "verse", "主歌": "verse",
+    "pre-chorus": "pre_chorus", "prechorus": "pre_chorus", "pre chorus": "pre_chorus",
+    "pre_chorus": "pre_chorus",
+    "pre": "pre_chorus", "导歌": "pre_chorus", "预副歌": "pre_chorus",
+    "chorus": "chorus", "hook": "chorus", "chorus1": "chorus", "chorus2": "chorus",
+    "chorus3": "chorus", "chorus4": "chorus", "chorus 1": "chorus",
+    "chorus 2": "chorus", "chorus 3": "chorus", "chorus 4": "chorus", "副歌": "chorus",
+    "post-chorus": "post_chorus", "postchorus": "post_chorus",
+    "post chorus": "post_chorus", "post_chorus": "post_chorus",
+    "后副歌": "post_chorus", "副歌后": "post_chorus",
+    "refrain": "refrain", "叠句": "refrain",
+    "bridge": "bridge", "桥段": "bridge",
+    "interlude": "interlude", "间奏": "interlude",
+    "drop": "drop", "爆点": "drop",
+    "breakdown": "breakdown", "分解段": "breakdown", "崩解段": "breakdown",
+    "rap": "rap", "rap verse": "rap", "rapverse": "rap", "rap_verse": "rap",
+    "说唱": "rap", "说唱段": "rap",
+    "spoken": "spoken", "spoken word": "spoken", "spoken_word": "spoken",
+    "念白": "spoken", "独白": "spoken",
+    "ad-lib": "ad_lib", "adlib": "ad_lib", "ad lib": "ad_lib", "ad_lib": "ad_lib",
+    "即兴衬词": "ad_lib", "和声衬词": "ad_lib",
+    "solo": "solo", "guitar solo": "solo", "instrumental": "solo",
+    "独奏": "solo", "器乐段": "solo",
     "outro": "outro", "尾奏": "outro",
 }
 
-# 段落基础小节与能量权重（架构 §7.3）
-SECTION_BASE_BARS = {"intro": 4, "verse": 8, "pre_chorus": 4, "chorus": 8, "bridge": 4, "outro": 4}
+# 段落基础小节与能量权重（架构 §7.3；新段落按其主流音乐功能定档）
+SECTION_BASE_BARS = {"intro": 4, "verse": 8, "pre_chorus": 4, "chorus": 8,
+                     "post_chorus": 4, "refrain": 4, "bridge": 4, "interlude": 4,
+                     "drop": 8, "breakdown": 4, "rap": 8, "spoken": 4,
+                     "ad_lib": 2, "solo": 4, "outro": 4}
 SECTION_ENERGY = {"intro": 0.3, "verse": 0.5, "pre_chorus": 0.65, "chorus": 1.0,
-                  "bridge": 0.4, "outro": 0.35}
+                  "post_chorus": 0.85, "refrain": 0.7, "bridge": 0.4,
+                  "interlude": 0.35, "drop": 1.0, "breakdown": 0.45, "rap": 0.75,
+                  "spoken": 0.35, "ad_lib": 0.8, "solo": 0.8, "outro": 0.35}
 
 # 无标签自动推断模板（按请求时长）
 TEMPLATE_FULL = ["intro", "verse", "pre_chorus", "chorus",
@@ -38,6 +76,8 @@ def parse_lyrics(lyrics: str) -> tuple[list[tuple[str, list[str]]], bool]:
     返回 ([(section, [lines])], has_tags)。
     - 标签行不进入歌词行；标签前出现的行归入 verse。
     - 无任何有效标签时 has_tags=False，lines 为全文非空行。
+    - 空段落保留（v0.12.1：[Drop]/[Solo] 等纯器乐段的规范用法即标签下无
+      歌词行，合成管线对无行段落走器乐主旋律，不因空行丢段）。
     """
     sections: list[tuple[str, list[str]]] = []
     has_tags = False
@@ -46,9 +86,9 @@ def parse_lyrics(lyrics: str) -> tuple[list[tuple[str, list[str]]], bool]:
 
     def flush():
         nonlocal pending_lines
-        if pending_lines:
+        if has_tags or pending_lines:
             sections.append((current, pending_lines))
-            pending_lines = []
+        pending_lines = []
 
     for raw in (lyrics or "").splitlines():
         line = raw.strip()

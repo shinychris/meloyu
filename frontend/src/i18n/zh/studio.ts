@@ -69,6 +69,8 @@ export const studioZh: Record<keyof typeof studioEn, string> = {
   'studio.inspire.mood': '情绪',
   'studio.inspire.genre': '风格',
   'studio.inspire.inst': '主奏乐器',
+  'studio.inspire.more': '更多 {n} 个',
+  'studio.inspire.less': '收起',
   'studio.toast.inspireRandom': '已随机生成一组灵感组合',
 
   // ===== 参数面板 =====

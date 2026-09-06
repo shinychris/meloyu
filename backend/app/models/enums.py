@@ -12,7 +12,11 @@ VOCALS = (
     "voice_clone",  # v0.8.2（FR-5）：本人音色档案（须 voice_profile_id，仅本地引擎）
 )
 LANGUAGES = ("zh", "yue", "en", "ja")
-SECTIONS = ("intro", "verse", "pre_chorus", "chorus", "bridge", "outro")
+# v0.12.1 扩全主流段落：前 6 值为 v1.1 既有值，后 9 值为 v1.20 新增（契约 §1.5），
+# 解析别名见 synth/structure.SECTION_ALIASES
+SECTIONS = ("intro", "verse", "pre_chorus", "chorus", "bridge", "outro",
+            "post_chorus", "refrain", "interlude", "drop", "breakdown",
+            "rap", "spoken", "ad_lib", "solo")
 
 # 订阅
 PLANS = ("free", "pro", "studio", "team")

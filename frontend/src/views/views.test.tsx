@@ -161,6 +161,28 @@ describe('views render smoke', () => {
     expect(html).toContain('MiniMax Music 3')
     expect(html).toContain('SongGeneration')
   })
+
+  it('ModelCenterView 左侧分类导航 + 生产就绪检查 + Ollama 服务地址（v0.12.0 重构）', () => {
+    const html = render(<ModelCenterView />)
+    // 左侧分类导航（六分区）
+    for (const nav of ['Overview', 'Lyrics engine', 'Song engine', 'Open-source catalog',
+      'Local model library', 'Operations']) {
+      expect(html).toContain(nav)
+    }
+    // 生产就绪检查（settings 未加载前区块不渲染，导航文案仍在）
+    expect(html).toContain('Lyrics engine channels')
+    // Ollama 服务地址卡 + 通道分组标签
+    expect(html).toContain('Ollama service address')
+    expect(html).toContain('http://localhost:11434 (Docker deployment: http://host.docker.internal:11434)')
+    expect(html).toContain('Cloud channels')
+    expect(html).toContain('On-device GPU channels')
+    expect(html).toContain('Self-hosted service channels')
+    expect(html).toContain('Offline fallback (non-AI)')
+    // 兜底通道明确标注非 AI
+    expect(html).toContain('Offline rules engine (fallback)')
+    expect(html).toContain('Offline synth engine (fallback)')
+    expect(html).toContain('non-AI · fallback')
+  })
 })
 
 /* ============ V1.1 候选派生操作（延长/变体/段落重生成） ============ */

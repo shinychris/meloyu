@@ -193,15 +193,17 @@ def render_song(ir: SongIR, rng: np.random.Generator) -> RenderResult:
     beats_per_bar = {"4/4": 4.0, "3/4": 3.0, "6/8": 3.0}[ir.req.time_signature]
     beat = 60.0 / ir.req.bpm
     for sp in ir.sections:
-        pad_on = sp.section in ("chorus", "bridge", "pre_chorus") and sp.energy >= 0.4
+        pad_on = sp.section in ("chorus", "bridge", "pre_chorus", "post_chorus",
+                                "drop") and sp.energy >= 0.4
         for b in range(sp.bars):
             bar = sp.start_bar + b
             if bar >= len(ir.chords):
                 break
             cb = ir.chords[bar]
             bar_start = bar * beats_per_bar * beat
-            # 钢琴：主歌分解和弦（根-五-三-八度琶音），副歌柱式
-            if sp.section in ("verse", "intro", "outro") or ir.req.vocal == "instrumental":
+            # 钢琴：低能量/叙事段分解和弦（根-五-三-八度琶音），高能量段柱式
+            if (sp.section in ("verse", "intro", "outro", "spoken", "interlude",
+                               "breakdown", "ad_lib") or ir.req.vocal == "instrumental"):
                 seq = [0, 4, 2, 3] if beats_per_bar >= 4 else [0, 2, 3]
                 for si, beat_pos in enumerate(seq):
                     if beat_pos >= beats_per_bar:

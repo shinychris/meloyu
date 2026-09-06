@@ -74,7 +74,7 @@ export default function HumDialog({ open, onClose, onApply }: {
 
   useEffect(() => () => {
     window.clearInterval(timerRef.current)
-    recRef.current?.state === 'recording' && recRef.current.stop()
+    if (recRef.current?.state === 'recording') recRef.current.stop()
   }, [])
 
   if (!open) return null
@@ -108,7 +108,7 @@ export default function HumDialog({ open, onClose, onApply }: {
         setElapsed((s) => {
           if (s + 1 >= MAX_SEC) {
             window.clearInterval(timerRef.current)
-            recRef.current?.state === 'recording' && recRef.current.stop()
+            if (recRef.current?.state === 'recording') recRef.current.stop()
             setRecording(false)
           }
           return s + 1

@@ -60,7 +60,16 @@ const SECTION_KEYS: Record<Section, TranslationKey> = {
   verse: 'app.format.section.verse',
   pre_chorus: 'app.format.section.pre_chorus',
   chorus: 'app.format.section.chorus',
+  post_chorus: 'app.format.section.post_chorus',
+  refrain: 'app.format.section.refrain',
   bridge: 'app.format.section.bridge',
+  interlude: 'app.format.section.interlude',
+  drop: 'app.format.section.drop',
+  breakdown: 'app.format.section.breakdown',
+  rap: 'app.format.section.rap',
+  spoken: 'app.format.section.spoken',
+  ad_lib: 'app.format.section.ad_lib',
+  solo: 'app.format.section.solo',
   outro: 'app.format.section.outro',
 }
 

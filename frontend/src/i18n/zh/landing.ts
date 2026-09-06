@@ -290,4 +290,7 @@ export const landingZh: Record<keyof typeof landingEn, string> = {
   'landing.data.milestone.15.title': '作品市场：买卖、分账与授权凭证（V2 收官）',
   'landing.data.milestone.16.title': '业务可用性整改：市场闭环/采纳修复/PDF 字体内嵌',
   'landing.data.milestone.17.title': '音频剪辑·旋律修调·哼唱成歌上线（占位全转正）',
+  'landing.data.milestone.18.title': 'ACE-Step 容器化修复：GPU 直通与跨平台 venv',
+  'landing.data.milestone.19.title': '模型中心生产可用化：分类重构与容器寻址',
+  'landing.data.milestone.20.title': '段落与灵感词表扩全主流：15 段结构 / 47 风格 / 30 乐器',
 }

@@ -110,6 +110,7 @@ def _chord_symbol(root_midi: int, mode: str) -> str:
 def _syllable_lines(lyrics: str) -> list[tuple[str, str, list[str]]]:
     """结构标签歌词 → [(section, line, [音节])]（保留顺序，无标签行归 verse）。"""
     from app.synth.melody import syllabify
+    from app.synth.structure import SECTION_ALIASES
     section = "verse"
     out: list[tuple[str, str, list[str]]] = []
     for raw in (lyrics or "").splitlines():
@@ -117,12 +118,11 @@ def _syllable_lines(lyrics: str) -> list[tuple[str, str, list[str]]]:
         if not line:
             continue
         if line.startswith("[") and line.endswith("]"):
-            tag = line[1:-1].strip().lower().replace(" ", "_")
-            alias = {"主歌": "verse", "副歌": "chorus", "预副歌": "pre_chorus",
-                     "桥段": "bridge", "前奏": "intro", "尾奏": "outro"}
-            section = alias.get(tag, tag if tag in
-                                ("intro", "verse", "pre_chorus", "chorus",
-                                 "bridge", "outro") else section)
+            tag = line[1:-1].strip()
+            # 统一别名表（中英文/连字符/带空格编号变体均归一化，synth/structure）
+            section = (SECTION_ALIASES.get(tag.lower())
+                       or SECTION_ALIASES.get(tag.replace(" ", "_").lower())
+                       or section)
             continue
         lang = "zh" if any("\u4e00" <= ch <= "\u9fff" for ch in line) else "en"
         out.append((section, line, syllabify(line, lang)))

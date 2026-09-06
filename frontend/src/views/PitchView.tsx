@@ -91,7 +91,15 @@ export default function PitchView() {
   const editedMidi = useCallback(
     (i: number, base: number) => base + (edits[i] ?? 0), [edits])
 
-  // 键盘：↑/↓ 半音、Esc 取消
+  const bump = (idx: number, delta: number) => {
+    setEdits((prev) => {
+      const cur = prev[idx] ?? 0
+      const next = Math.max(-12, Math.min(12, cur + delta))
+      return { ...prev, [idx]: next }
+    })
+  }
+
+  // 键盘：↑/↓ 半音、Esc 取消（须在 bump 定义之后挂监听）
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (selected === null) return
@@ -111,14 +119,6 @@ export default function PitchView() {
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, edits])
-
-  const bump = (idx: number, delta: number) => {
-    setEdits((prev) => {
-      const cur = prev[idx] ?? 0
-      const next = Math.max(-12, Math.min(12, cur + delta))
-      return { ...prev, [idx]: next }
-    })
-  }
 
   const snapToScale = () => {
     if (!ls) return

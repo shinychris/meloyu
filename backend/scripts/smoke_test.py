@@ -117,14 +117,20 @@ def main() -> int:
     password = "Smoke1234"
     client = httpx.Client(timeout=120.0, trust_env=False)  # loopback 不走系统代理
 
-    # 单写入方红线守卫（2026-09-05 事故复盘）：生产栈（8180）在跑则拒绝执行，
-    # 防止 dev/生产双进程并发写同一 SQLite 再次损坏库
+    # 单写入方红线守卫（2026-09-05 事故复盘；2026-09-06 强化）：本脚本含宿主机
+    # 直写 DB 的辅助（_make_admin_via_db / _activate_plan_via_db），生产栈（8180）
+    # 在跑时一律拒绝——包括 --base 指向 8180 的情况（宿主机直写与容器写入方并发，
+    # 且 WAL 跨 Docker bind mount 的可见性/锁语义不可靠，2026-09-06 实测 exec 内
+    # 第二连接 CANTOPEN、宿主机读刚提交行 NoResultFound）。
+    # 对生产栈版本验收的正确姿势：docker compose down → 宿主机 uvicorn --port 8000
+    # → 本脚本（默认 base）→ 停 uvicorn → docker compose up -d。
     try:
         probe = client.get("http://127.0.0.1:8180/api/v1/system/health", timeout=3.0)
         if probe.status_code == 200:
-            print("REFUSED: 生产栈（127.0.0.1:8180）正在运行——dev 与生产容器并发写"
-                  "同一 SQLite 会损坏数据库（单写入方红线）。请先在 deploy/ 执行 "
-                  "docker compose down，再运行本脚本。")
+            print("REFUSED: 生产栈（127.0.0.1:8180）正在运行——本脚本含宿主机直写 DB 的"
+                  "辅助，与容器并发写违反单写入方红线（含 --base 8180 模式）。请先在 "
+                  "deploy/ 执行 docker compose down，再在宿主机起 uvicorn --port 8000 "
+                  "后对本机 dev 栈运行本脚本。")
             return 2
     except httpx.HTTPError:
         pass  # 生产栈未运行，放行

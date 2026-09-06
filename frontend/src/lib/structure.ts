@@ -1,13 +1,23 @@
 import type { Section } from '../types/api'
 import { getLocale } from '../i18n'
 
-/** 结构标签（中英别名均可，与后端 synth/structure 解析规则保持一致的子集） */
+/** 结构标签（中英别名均可，与后端 synth/structure 解析规则保持一致的子集；
+ *  顺序敏感：post-/pre-chorus 须排在 chorus 前，避免子串误匹配） */
 const TAG_PATTERNS: Array<{ re: RegExp; section: Section }> = [
   { re: /^\[\s*(intro|前奏)\s*\]$/i, section: 'intro' },
-  { re: /^\[\s*(verse|主歌)\s*\]$/i, section: 'verse' },
-  { re: /^\[\s*(pre[-\s]?chorus|pre|导歌|预副歌)\s*\]$/i, section: 'pre_chorus' },
-  { re: /^\[\s*(chorus|hook|副歌)\s*\]$/i, section: 'chorus' },
-  { re: /^\[\s*(bridge|桥段|间奏)\s*\]$/i, section: 'bridge' },
+  { re: /^\[\s*(verse\s?[1-4]?|主歌)\s*\]$/i, section: 'verse' },
+  { re: /^\[\s*(pre[-_\s]?chorus|pre|导歌|预副歌)\s*\]$/i, section: 'pre_chorus' },
+  { re: /^\[\s*(post[-_\s]?chorus|后副歌|副歌后)\s*\]$/i, section: 'post_chorus' },
+  { re: /^\[\s*(chorus\s?[1-4]?|hook|副歌)\s*\]$/i, section: 'chorus' },
+  { re: /^\[\s*(refrain|叠句)\s*\]$/i, section: 'refrain' },
+  { re: /^\[\s*(bridge|桥段)\s*\]$/i, section: 'bridge' },
+  { re: /^\[\s*(interlude|间奏)\s*\]$/i, section: 'interlude' },
+  { re: /^\[\s*(drop|爆点)\s*\]$/i, section: 'drop' },
+  { re: /^\[\s*(breakdown|分解段|崩解段)\s*\]$/i, section: 'breakdown' },
+  { re: /^\[\s*(rap\s?verse|rapverse|rap|说唱段?|说唱)\s*\]$/i, section: 'rap' },
+  { re: /^\[\s*(spoken\s?word|spoken|念白|独白)\s*\]$/i, section: 'spoken' },
+  { re: /^\[\s*(ad[-_\s]?lib|adlib|即兴衬词|和声衬词)\s*\]$/i, section: 'ad_lib' },
+  { re: /^\[\s*((guitar\s+)?solo|instrumental|独奏|器乐段)\s*\]$/i, section: 'solo' },
   { re: /^\[\s*(outro|尾奏)\s*\]$/i, section: 'outro' },
 ]
 

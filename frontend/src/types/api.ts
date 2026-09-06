@@ -31,7 +31,11 @@ export type VocalType =
   /** FR-5（v0.8.2）：本人音色档案（须 voice_profile_id，仅本地引擎通道） */
   | 'voice_clone'
 export type Language = 'zh' | 'yue' | 'en' | 'ja'
-export type Section = 'intro' | 'verse' | 'pre_chorus' | 'chorus' | 'bridge' | 'outro'
+/** 段落枚举（契约 §1.5）：前 6 值 v1.1 既有，后 9 值 v1.20 扩全主流段落 */
+export type Section =
+  | 'intro' | 'verse' | 'pre_chorus' | 'chorus' | 'bridge' | 'outro'
+  | 'post_chorus' | 'refrain' | 'interlude' | 'drop' | 'breakdown'
+  | 'rap' | 'spoken' | 'ad_lib' | 'solo'
 export type PlanCode = 'free' | 'pro' | 'studio' | 'team'
 export type TaskType = 'generation' | 'export'
 export type TaskStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled'
@@ -752,6 +756,8 @@ export interface OllamaRuntime {
 
 export interface ModelsRuntime {
   ollama: OllamaRuntime
+  /** v0.12.0：后端是否运行在 Docker 容器内（loopback 地址自动改 host.docker.internal） */
+  docker: boolean
   active_backend: LyricsBackend
   engine: string
   music_backend: MusicBackend

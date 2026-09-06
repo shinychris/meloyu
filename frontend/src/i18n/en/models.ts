@@ -6,7 +6,35 @@ export const modelsEn = {
   'models.label': 'Model Center · MODEL HUB',
   'models.title': 'AI engines & model management',
   'models.intro':
-    'Lyrics engine: local rules (offline fallback) / local open-source models (Ollama) / external API (OpenAI-compatible); Song engine: on-device ACE-Step v1.5 (open-source vocal songs) / local synthesis (offline fallback) / Replicate open-source hosting / external song API / on-device MusicGen — open-source models are ranked by third-party benchmark scores with recommendations (see the catalog below). If an engine fails, it automatically falls back to the local engine so your creative flow never breaks.',
+    'Configure real AI channels for production: lyrics via an OpenAI-compatible API or local Ollama models; songs via cloud APIs, Replicate hosting, on-device GPU models or self-hosted services. Offline rule-based engines remain only as non-AI fallbacks. Use the left navigation to browse categories.',
+  // 左侧分类导航
+  'models.nav.overview': 'Overview',
+  'models.nav.lyrics': 'Lyrics engine',
+  'models.nav.music': 'Song engine',
+  'models.nav.catalog': 'Open-source catalog',
+  'models.nav.library': 'Local model library',
+  'models.nav.ops': 'Operations',
+  // 概览分区
+  'models.overview.envLabel': 'Environment',
+  'models.overview.envDocker': 'Docker container',
+  'models.overview.envHost': 'Host (dev)',
+  'models.overview.checkTitle': 'Production readiness check',
+  'models.overview.lyricsOk': 'A real model channel is active — production ready',
+  'models.overview.lyricsFallback':
+    'Running on the offline rules fallback (non-AI template generation) — configure a real channel for production',
+  'models.overview.songOk': 'A real model channel is active — production ready',
+  'models.overview.songFallback':
+    'Running on the offline synth fallback (non-AI algorithmic composition) — configure a real channel for production',
+  'models.overview.goConfigure': 'Configure',
+  'models.overview.dockerHint':
+    'Backend runs inside a Docker container: host-side Ollama is reached at http://host.docker.internal:11434 (auto-applied; Ollama must listen on 0.0.0.0 via OLLAMA_HOST=0.0.0.0), self-hosted endpoints default to host.docker.internal as well.',
+  // 通道分组
+  'models.group.recommended': 'Recommended channels',
+  'models.group.cloud': 'Cloud channels',
+  'models.group.localGpu': 'On-device GPU channels',
+  'models.group.selfhosted': 'Self-hosted service channels',
+  'models.group.fallback': 'Offline fallback (non-AI)',
+  'models.fallbackBadge': 'non-AI · fallback',
   'models.runtime.running': 'Running · v{version}',
   'models.runtime.stopped': 'Not running',
   'models.runtime.localModels': '{n} local models',
@@ -22,18 +50,23 @@ export const modelsEn = {
   'models.chan.lyricsEffect': 'Switching takes effect immediately and affects the lyrics assistant’s generation / polish',
   // 歌词引擎通道
   'models.lyrics.title': 'Lyrics engine channels',
+  'models.lyrics.sectionDesc':
+    'Recommended: external API (OpenAI-compatible) or local Ollama models — both are real LLMs. The offline rules engine stays only as an automatic fallback when no channel is available.',
   'models.lyrics.needModel': 'Pick (or download) a local model below first',
   'models.lyrics.needExternal': 'Complete the external API configuration below first',
   'models.lyrics.noLocal': 'No local models on this machine yet — download one below first',
   'models.lyrics.switched': 'Lyrics engine switched: {engine}',
-  'models.backend.localsynth.title': 'Local rules engine',
-  'models.backend.localsynth.desc': 'Works offline · drafts in seconds · demo-grade wording (default)',
+  'models.backend.localsynth.title': 'Offline rules engine (fallback)',
+  'models.backend.localsynth.desc':
+    'Non-AI template/rule-based generation · offline fallback only — switch to a real model channel for production',
   'models.backend.ollama.title': 'Local open-source model (Ollama)',
   'models.backend.ollama.desc': 'Real LLM · data never leaves your machine · speed depends on model and hardware',
   'models.backend.openai_compat.title': 'External API (OpenAI-compatible)',
   'models.backend.openai_compat.desc': 'Cloud models like Zhipu / DeepSeek / OpenAI · requires an API key',
   // 歌曲引擎通道
   'models.music.title': 'Song generation engine channels',
+  'models.music.sectionDesc':
+    'Cloud channels need a key/token and work anywhere; on-device GPU channels download real open-source weights; self-hosted channels point to your own inference service. The offline synth engine stays only as an automatic fallback.',
   'models.music.needApi': 'Complete the external song API configuration below first',
   'models.music.needCatalogToken': 'Save a Replicate API token in the catalog below first',
   'models.music.needCatalogModel': 'Pick a model that supports on-device running in the catalog below first',
@@ -43,8 +76,9 @@ export const modelsEn = {
   'models.music.switched': 'Song engine switched: {engine}',
   'models.music.pullStarted': 'Download started: {name} (about {size} MB)',
   'models.music.baseUrlRequired': 'base_url is required',
-  'models.mbackend.localsynth.title': 'Local synthesis engine',
-  'models.mbackend.localsynth.desc': 'Works offline · real-time algorithmic composition · stems/MIDI included (default)',
+  'models.mbackend.localsynth.title': 'Offline synth engine (fallback)',
+  'models.mbackend.localsynth.desc':
+    'Non-AI algorithmic composition with stems/MIDI · offline fallback only — switch to a real model channel for production',
   'models.mbackend.acestep_local.title': 'On-device ACE-Step v1.5 (open-source · vocal songs)',
   'models.mbackend.acestep_local.desc': 'Lyrics → full songs sung by realistic vocals · isolated venv deployment · 8 GB VRAM tier · ~1–3 min/song on GPU',
   'models.mbackend.mmax_local.title': 'MiniMax Music 3',
@@ -76,6 +110,8 @@ export const modelsEn = {
   'models.testEcho': '(echo: {sample})',
   // Replicate Token 与开源目录
   'models.catalog.title': 'Open-source song model catalog (ranked by third-party benchmarks)',
+  'models.catalog.sectionDesc':
+    'Real open-source models with local download or Replicate hosting — pick one and the song engine switches to its channel. Benchmark scores are third-party reference values (ADR-015).',
   'models.replicate.tokenPh': 'r8_… (from your replicate.com account)',
   'models.replicate.needToken': 'Enter a Replicate API token (starting with r8_) first',
   'models.replicate.needTokenSave': 'Enter a Replicate API token first',
@@ -139,9 +175,21 @@ export const modelsEn = {
   'models.musicDel.desc': 'This deletes the model weights from the HuggingFace cache to free disk space; if it is the model used by the current engine, the engine falls back to local synthesis automatically.',
   // 最近操作
   'models.ops.title': 'Recent operations',
+  'models.ops.empty': 'No model operations yet — downloads and deletions are recorded here',
   'models.ops.succeeded': 'Succeeded',
   'models.ops.failed': 'Failed: {msg}',
   'models.ops.unknownError': 'Unknown error',
+  // Ollama 服务地址（v0.12.0：容器内自动 host.docker.internal，UI 可显式配置）
+  'models.ollamaHost.title': 'Ollama service address',
+  'models.ollamaHost.desc':
+    'Used for status detection, model download/deletion and lyric inference. Inside the Docker deployment the default localhost is automatically switched to http://host.docker.internal:11434 and saved.',
+  'models.ollamaHost.ph': 'http://localhost:11434 (Docker deployment: http://host.docker.internal:11434)',
+  'models.ollamaHost.save': 'Save address',
+  'models.ollamaHost.saved': 'Ollama address saved — effective: {host}',
+  'models.ollamaHost.effective': 'Effective now: {host}',
+  'models.ollamaHost.required': 'Enter an Ollama service address first',
+  'models.ollamaHost.dockerHint':
+    'Backend runs inside a Docker container: reach a host-side Ollama via http://host.docker.internal:11434 — Ollama must listen on 0.0.0.0 (set OLLAMA_HOST=0.0.0.0 and restart Ollama). A trailing /v1 is tolerated and stripped automatically.',
   // 外部 API（OpenAI 兼容）
   'models.ext.title': 'External API (OpenAI-compatible)',
   'models.ext.recommended': 'Recommended: {hint}',

@@ -200,10 +200,20 @@ def audiocpp_ready() -> bool:
 
 
 def service_host(channel: str, hosts: dict | None) -> str:
-    """通道端点：配置覆盖 > 默认（mmax_local=SGLang / songgen_local=Studio）。"""
+    """通道端点：配置覆盖 > 默认（mmax_local=SGLang / songgen_local=Studio）。
+
+    容器内默认端点自动指向宿主机别名：127.0.0.1 在容器里是容器自身，
+    host.docker.internal（Docker Desktop 内置域名）才可达宿主机服务——
+    与模型中心 Ollama host 的容器回退同一逻辑（deploy/README 已知限制表）。
+    """
     hosts = hosts or {}
     v = str(hosts.get(channel) or "").strip().rstrip("/")
-    return v or SELFHOSTED_DEFAULT_HOSTS.get(channel, "")
+    if v:
+        return v
+    default = SELFHOSTED_DEFAULT_HOSTS.get(channel, "")
+    if default.startswith("http://127.0.0.1") and Path("/.dockerenv").exists():
+        default = default.replace("http://127.0.0.1", "http://host.docker.internal")
+    return default
 
 
 def probe_service(channel: str, hosts: dict | None) -> dict:

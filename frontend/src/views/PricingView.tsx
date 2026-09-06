@@ -107,7 +107,8 @@ export default function PricingView() {
     if (switching) return
     if (plan.code === 'team') {
       if (salesContact) {
-        window.location.href = `mailto:${salesContact}?subject=${encodeURIComponent('Meloyu Team plan')}`
+        window.location.assign(
+          `mailto:${salesContact}?subject=${encodeURIComponent('Meloyu Team plan')}`)
       } else {
         toast(t('pricing.contactSalesToast'), 'warn')
       }

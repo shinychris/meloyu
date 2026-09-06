@@ -281,4 +281,7 @@ export const landingEn = {
   'landing.data.milestone.15.title': 'Marketplace: trade, split & licenses (V2 wrap-up)',
   'landing.data.milestone.16.title': 'Usability fixes: market loop, adoption & PDF fonts',
   'landing.data.milestone.17.title': 'Audio editing, melody tuning & hum-to-song go live',
+  'landing.data.milestone.18.title': 'ACE-Step container fixes: GPU passthrough & cross-platform venv',
+  'landing.data.milestone.19.title': 'Model center production-ready: categories & container addressing',
+  'landing.data.milestone.20.title': 'Full mainstream taxonomy: 15 sections / 47 genres / 30 instruments',
 } as const

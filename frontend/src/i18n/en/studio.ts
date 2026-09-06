@@ -76,6 +76,8 @@ export const studioEn = {
   'studio.inspire.mood': 'Mood',
   'studio.inspire.genre': 'Genre',
   'studio.inspire.inst': 'Lead instrument',
+  'studio.inspire.more': '{n} more',
+  'studio.inspire.less': 'Less',
   'studio.toast.inspireRandom': 'Random inspiration set generated',
 
   // ===== 参数面板 =====

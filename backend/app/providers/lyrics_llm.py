@@ -14,7 +14,7 @@ from collections.abc import Callable
 from app.core.i18n import tr
 from app.providers.llm.base import LLMError, extract_json
 from app.providers.lyrics_local import LocalLyricsProvider, check_sensitive
-from app.synth.structure import parse_lyrics
+from app.synth.structure import SECTION_TAG, parse_lyrics
 
 ChatFn = Callable[[str, str], str]
 
@@ -25,8 +25,8 @@ _SYSTEM = (
     "全篇主韵统一（段尾字押韵），意象贴合主题，避免陈词滥调；不使用敏感词汇。"
 )
 
-_TAG_ZH = {"verse": "[Verse]", "pre_chorus": "[Pre-Chorus]", "chorus": "[Chorus]",
-           "bridge": "[Bridge]", "intro": "[Intro]", "outro": "[Outro]"}
+# 段落 → 规范标签（单一事实来源 synth/structure；未收录段退 [Verse]）
+_TAG_ZH = dict(SECTION_TAG)
 
 
 def _structure_of(lyrics: str) -> list[dict]:
