@@ -3,7 +3,10 @@ import { Suspense } from 'react'
 import { renderToString } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import StudioView from './StudioView'
-import LyricsView from './LyricsView'
+import LyricsView, { resolveDraftText } from './LyricsView'
+import { lyricsEn } from '../i18n/en/lyrics'
+import { lyricsZh } from '../i18n/zh/lyrics'
+import { useI18nStore } from '../i18n'
 import LibraryView from './LibraryView'
 import RightsView from './RightsView'
 import PricingView from './PricingView'
@@ -46,6 +49,20 @@ describe('views render smoke', () => {
     const html = render(<LyricsView />)
     expect(html).toContain('Write lyrics that lock to the melody')
     expect(html).toContain('Generate with AI')
+  })
+
+  it('LyricsView 默认样例跟随界面语言（v0.12.3：en 样例 → 切 zh 出中文样例）', () => {
+    const enHtml = render(<LyricsView />)
+    expect(enHtml).toContain('Piano fades in with rain')
+    useI18nStore.setState({ locale: 'zh' })
+    try {
+      const zhHtml = render(<LyricsView />)
+      expect(zhHtml).toContain('雨停在凌晨三点的窗台')
+      expect(zhHtml).toContain('（轻声吟唱）')
+      expect(zhHtml).not.toContain('Piano fades in with rain')
+    } finally {
+      useI18nStore.setState({ locale: 'en' })
+    }
   })
 
   it('LibraryView 渲染表头与筛选 chips', () => {
@@ -282,5 +299,25 @@ describe('DerivePanel 派生面板', () => {
       <DerivePanel {...base} kind="regen" candidate={{ ...candidateFixture, structure: [] }} />,
     )
     expect(html).toContain('No structure info for this candidate')
+  })
+})
+
+/** v0.12.3：草稿解析三态——无草稿/样例草稿归样例态（跟随语言）/用户内容优先 */
+describe('resolveDraftText（默认样例语言跟随）', () => {
+  const enSample = lyricsEn['lyrics.defaultLyrics']
+  const zhSample = lyricsZh['lyrics.defaultLyrics']
+
+  it('无草稿 → null（样例态，显示当前语言样例）', () => {
+    expect(resolveDraftText(null)).toBeNull()
+  })
+
+  it('历史草稿只是任一语言样例 → null（解锁语言锁死，跟随当前语言）', () => {
+    expect(resolveDraftText(zhSample)).toBeNull()
+    expect(resolveDraftText(enSample)).toBeNull()
+  })
+
+  it('用户编辑过的内容 → 原样保留，不被样例覆盖', () => {
+    const mine = '[Verse]\n我自己写的词'
+    expect(resolveDraftText(mine)).toBe(mine)
   })
 })

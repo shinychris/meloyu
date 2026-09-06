@@ -6,6 +6,8 @@ import type { CompleteTagsResult, LyricsGenerateResult, RhymeCheckResult } from 
 import { useStudioStore } from '../stores/studio'
 import { toast } from '../stores/toast'
 import { useT, t as tt, useI18nStore } from '../i18n'
+import { lyricsZh } from '../i18n/zh/lyrics'
+import { lyricsEn } from '../i18n/en/lyrics'
 import { detectSectionAtCaret, insertAtCaret } from '../lib/structure'
 import { sectionLabel } from '../lib/format'
 import { useMetaStore } from '../stores/meta'
@@ -13,19 +15,29 @@ import AnalysisPanel from '../components/lyrics/AnalysisPanel'
 
 const DRAFT_KEY = 'meloyu:lyric-draft:v1' // 契约 §14 R2：草稿由前端 localStorage 承载
 
+/** 全部语言的默认样例文本：判定编辑器里是否仍是「未被改动的样例」 */
+export const SAMPLE_TEXTS = new Set([lyricsZh['lyrics.defaultLyrics'], lyricsEn['lyrics.defaultLyrics']])
+
+/** 草稿解析：用户内容优先；历史草稿若只是旧语言样例则归入样例态（返回
+ *  null，v0.12.3——显示值由当前 locale 的样例派生，切换语言自然跟随） */
+export function resolveDraftText(saved: string | null): string | null {
+  return saved != null && !SAMPLE_TEXTS.has(saved) ? saved : null
+}
+
 /** 本地规则引擎判定（后端 engine 字段按 Accept-Language 本地化，中英都要匹配） */
 const LOCAL_RULE_RE = /本地规则|local rule/i
 
-/** 编辑器初始示例歌词（按当前 locale；用户草稿优先） */
+/** 编辑器初始示例歌词（按当前 locale） */
 function defaultLyrics(): string {
   return tt('lyrics.defaultLyrics')
 }
 
-function loadDraft(): string {
+/** 启动草稿：用户编辑过的内容，或 null（编辑器显示默认样例态） */
+function loadUserDraft(): string | null {
   try {
-    return localStorage.getItem(DRAFT_KEY) ?? defaultLyrics()
+    return resolveDraftText(localStorage.getItem(DRAFT_KEY))
   } catch {
-    return defaultLyrics()
+    return null
   }
 }
 
@@ -38,7 +50,9 @@ interface ChangeEntry {
 /** 歌词助手：AI 生成 / 润色选中段 / 押韵重音检查 / 标签补全（契约 §6 四接口全接） */
 export default function LyricsView() {
   const t = useT()
-  const [text, setText] = useState<string>(loadDraft)
+  /** userText=null 表示样例态：显示值派生自当前 locale 的样例，语言切换自动跟随 */
+  const [userText, setUserText] = useState<string | null>(loadUserDraft)
+  const text = userText ?? defaultLyrics()
   const [theme, setTheme] = useState('')
   const [mood, setMood] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
@@ -58,13 +72,16 @@ export default function LyricsView() {
   const vocalMarks = (meta.performance_marks ?? []).filter((m) => m.group === 'vocal')
   const musicMarks = (meta.performance_marks ?? []).filter((m) => m.group === 'music')
 
+  // 草稿持久化：只有真正编辑过的内容才落 localStorage（样例态不落盘，
+  // 避免旧语言样例锁死语言切换；顺带清掉历史残留）
   useEffect(() => {
     try {
-      localStorage.setItem(DRAFT_KEY, text)
+      if (userText == null) localStorage.removeItem(DRAFT_KEY)
+      else localStorage.setItem(DRAFT_KEY, userText)
     } catch {
       /* ignore */
     }
-  }, [text])
+  }, [userText])
 
   // V1.2：显示当前歌词引擎（模型中心可切换）；依赖 locale——后端按 Accept-Language 本地化
   const locale = useI18nStore((s) => s.locale)
@@ -96,7 +113,7 @@ export default function LyricsView() {
       setGen(res)
       setRhyme(null)
       setChanges([])
-      setText(res.lyrics)
+      setUserText(res.lyrics)
       if (res.fallback && res.fallback_reason) {
         toast(t('lyrics.toast.fallback', { reason: res.fallback_reason }), 'warn')
       } else {
@@ -115,7 +132,7 @@ export default function LyricsView() {
       const section = detectSectionAtCaret(text, caret)
       const res = await polishLyrics({ lyrics: text, ...(section ? { target_section: section } : {}) })
       setChanges(res.changes)
-      setText(res.lyrics)
+      setUserText(res.lyrics)
       if (res.fallback && res.fallback_reason) {
         toast(t('lyrics.toast.fallback', { reason: res.fallback_reason }), 'warn')
       } else {
@@ -150,7 +167,7 @@ export default function LyricsView() {
       }
       const res = await completeTags(text)
       setTagInfo(res)
-      setText(res.lyrics)
+      setUserText(res.lyrics)
       toast(res.inferred ? t('lyrics.toast.tagsInferred') : t('lyrics.toast.tagsNormalized'))
     })
 
@@ -159,7 +176,7 @@ export default function LyricsView() {
     const el = editorRef.current
     const caret = el?.selectionStart ?? text.length
     const [next, pos] = insertAtCaret(text, caret, snippet, { block })
-    setText(next)
+    setUserText(next)
     requestAnimationFrame(() => {
       el?.focus()
       el?.setSelectionRange(pos, pos)
@@ -273,7 +290,7 @@ export default function LyricsView() {
             rows={16}
             maxLength={4000}
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => setUserText(e.target.value)}
           />
           {gen && gen.alternatives.length > 0 && (
             <div className="mt-3">
@@ -284,7 +301,7 @@ export default function LyricsView() {
                     key={i}
                     className="chip"
                     onClick={() => {
-                      setText(alt.lyrics)
+                      setUserText(alt.lyrics)
                       toast(t('lyrics.toast.altLoaded', { n: i + 1 }))
                     }}
                   >
