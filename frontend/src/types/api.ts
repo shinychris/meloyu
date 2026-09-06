@@ -667,6 +667,15 @@ export interface StructureTag {
   tag: string
   section: Section
   label: string
+  /** 段落用途说明（v0.12.3 下发；旧后端可能缺省） */
+  desc?: string
+}
+
+/** 括号表演标记词条（v0.12.3）：插入歌词描述演唱/情感/配器 */
+export interface PerformanceMark {
+  mark: string
+  group: 'vocal' | 'music'
+  label: string
 }
 
 export interface GenerationLimits {
@@ -693,6 +702,7 @@ export interface SystemMeta {
   vocal_types: Option[]
   languages: Option[]
   structure_tags: StructureTag[]
+  performance_marks?: PerformanceMark[]
   generation_limits: GenerationLimits
   inspiration: InspirationMeta
   /** 注册邮箱验证码开关（SMTP 配置后开启；v0.10.2） */

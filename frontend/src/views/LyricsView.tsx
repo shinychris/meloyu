@@ -6,8 +6,9 @@ import type { CompleteTagsResult, LyricsGenerateResult, RhymeCheckResult } from 
 import { useStudioStore } from '../stores/studio'
 import { toast } from '../stores/toast'
 import { useT, t as tt, useI18nStore } from '../i18n'
-import { detectSectionAtCaret } from '../lib/structure'
+import { detectSectionAtCaret, insertAtCaret } from '../lib/structure'
 import { sectionLabel } from '../lib/format'
+import { useMetaStore } from '../stores/meta'
 import AnalysisPanel from '../components/lyrics/AnalysisPanel'
 
 const DRAFT_KEY = 'meloyu:lyric-draft:v1' // 契约 §14 R2：草稿由前端 localStorage 承载
@@ -49,6 +50,13 @@ export default function LyricsView() {
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
   const navigate = useNavigate()
   const setLyricsFromAssistant = useStudioStore((s) => s.setLyricsFromAssistant)
+  const meta = useMetaStore((s) => s.meta)
+  const loadMeta = useMetaStore((s) => s.load)
+  useEffect(() => {
+    void loadMeta()
+  }, [loadMeta])
+  const vocalMarks = (meta.performance_marks ?? []).filter((m) => m.group === 'vocal')
+  const musicMarks = (meta.performance_marks ?? []).filter((m) => m.group === 'music')
 
   useEffect(() => {
     try {
@@ -146,6 +154,18 @@ export default function LyricsView() {
       toast(res.inferred ? t('lyrics.toast.tagsInferred') : t('lyrics.toast.tagsNormalized'))
     })
 
+  /** 在编辑器光标处插入片段（段落标签整行包裹 / 表演标记内联） */
+  const insertSnippet = (snippet: string, block = false) => {
+    const el = editorRef.current
+    const caret = el?.selectionStart ?? text.length
+    const [next, pos] = insertAtCaret(text, caret, snippet, { block })
+    setText(next)
+    requestAnimationFrame(() => {
+      el?.focus()
+      el?.setSelectionRange(pos, pos)
+    })
+  }
+
   return (
     <section className="view flex flex-col h-full">
       <header className="px-8 pt-6 pb-4">
@@ -166,27 +186,25 @@ export default function LyricsView() {
       </header>
       <div className="grid grid-cols-[1fr_300px] rule-t flex-1 min-h-0">
         <div className="px-8 py-5 border-r overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
-          <div className="grid grid-cols-2 gap-2.5 mb-3">
-            <div>
-              <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>{t('lyrics.theme.label')}</div>
-              <input
-                type="text"
-                maxLength={100}
-                placeholder={t('lyrics.theme.placeholder')}
-                value={theme}
-                onChange={(e) => setTheme(e.target.value)}
-              />
-            </div>
-            <div>
-              <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>{t('lyrics.mood.label')}</div>
-              <input
-                type="text"
-                maxLength={20}
-                placeholder={t('lyrics.mood.placeholder')}
-                value={mood}
-                onChange={(e) => setMood(e.target.value)}
-              />
-            </div>
+          <div className="mb-3">
+            <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>{t('lyrics.theme.label')}</div>
+            <textarea
+              rows={3}
+              maxLength={600}
+              placeholder={t('lyrics.theme.placeholder')}
+              value={theme}
+              onChange={(e) => setTheme(e.target.value)}
+            />
+          </div>
+          <div className="w-1/2 pr-1 mb-3">
+            <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>{t('lyrics.mood.label')}</div>
+            <input
+              type="text"
+              maxLength={20}
+              placeholder={t('lyrics.mood.placeholder')}
+              value={mood}
+              onChange={(e) => setMood(e.target.value)}
+            />
           </div>
           <div className="flex gap-2 mb-3 flex-wrap">
             <button className="btn btn-ghost text-[11px]" disabled={busy !== null} onClick={onGenerate}
@@ -214,6 +232,41 @@ export default function LyricsView() {
             >
               {t('lyrics.action.apply')}
             </button>
+          </div>
+          <div className="mt-2 mb-3">
+            <div className="text-[10px] mb-1.5" style={{ color: 'var(--dim)' }}>{t('lyrics.chips.tags')}</div>
+            <div className="flex gap-1.5 flex-wrap">
+              {meta.structure_tags.map((tg) => (
+                <span
+                  key={tg.tag}
+                  className="chip"
+                  title={tg.desc ?? tg.label}
+                  onClick={() => insertSnippet(tg.tag, true)}
+                >
+                  {tg.tag} {tg.label}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="mb-3">
+            <div className="text-[10px] mb-1.5" style={{ color: 'var(--dim)' }}>
+              {t('lyrics.chips.marks')}
+              <span className="ml-2" title={t('lyrics.chips.marksHint')}>ⓘ</span>
+            </div>
+            <div className="flex gap-1.5 flex-wrap">
+              {vocalMarks.map((m) => (
+                <span key={m.mark} className="chip" onClick={() => insertSnippet(m.mark)}>
+                  {m.label}
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-1.5 flex-wrap mt-1.5">
+              {musicMarks.map((m) => (
+                <span key={m.mark} className="chip" onClick={() => insertSnippet(m.mark, true)}>
+                  {m.label}
+                </span>
+              ))}
+            </div>
           </div>
           <textarea
             ref={editorRef}

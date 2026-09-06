@@ -40,6 +40,31 @@ export function countStructureTags(lyrics: string): number {
   return count
 }
 
+/** 括号表演标记统计（v0.12.3：中英括号成对内容，与后端 PAREN_MARK_RE 同口径） */
+const PAREN_MARK_RE = /[（(][^（）()]{0,30}[）)]/g
+
+export function countParenMarks(lyrics: string): number {
+  return (lyrics.match(PAREN_MARK_RE) ?? []).length
+}
+
+/** 在光标处插入片段；返回 [新文本, 新光标位]。
+ *  block=true（段落标签/整行标记）：确保片段独立成行，光标停在片段行末 */
+export function insertAtCaret(
+  text: string,
+  caret: number,
+  snippet: string,
+  { block = false } = {},
+): [string, number] {
+  const head = text.slice(0, caret)
+  const tail = text.slice(caret)
+  if (!block) {
+    return [head + snippet + tail, caret + snippet.length]
+  }
+  const headPad = !head || head.endsWith('\n') ? '' : '\n'
+  const next = `${head}${headPad}${snippet}\n${tail}`
+  return [next, head.length + headPad.length + snippet.length + 1]
+}
+
 /**
  * 光标所在段落（歌词助手「润色选中段」用）：
  * 从光标位置向前找最近一个结构标签行。

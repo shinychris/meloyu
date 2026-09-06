@@ -34,6 +34,8 @@ export const studioZh: Record<keyof typeof studioEn, string> = {
   'studio.style.label': '风格描述',
   'studio.lyrics.label': '歌词',
   'studio.lyrics.tagCount': '（已识别 {n} 段结构标签）',
+  'studio.lyrics.markCount': '表演标记 {n}',
+  'studio.lyrics.markTitle': '插入括号表演标记：描述演唱方式 / 情感 / 配器，不会被唱成歌词',
   'studio.lyrics.openAssistant': '在歌词助手中完善 →',
   'studio.toast.switchedToLyrics': '已切换到歌词助手',
   'studio.param.label': '参数与模型',

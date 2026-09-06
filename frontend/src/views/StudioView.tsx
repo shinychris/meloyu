@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStudioStore } from '../stores/studio'
 import { useMetaStore } from '../stores/meta'
 import { toast } from '../stores/toast'
-import { countStructureTags } from '../lib/structure'
+import { countParenMarks, countStructureTags, insertAtCaret } from '../lib/structure'
 import { getModelsRuntime } from '../api/models'
 import { useT, useI18nStore, type TranslationKey } from '../i18n'
 import StepBar from '../components/studio/StepBar'
@@ -29,6 +29,7 @@ export default function StudioView() {
   /** FR-4 参考音频面板开合（参考轨挂上后常显，可在面板内移除） */
   const [humOpen, setHumOpen] = useState(false)
   const [refOpen, setRefOpen] = useState(false)
+  const lyricBoxRef = useRef<HTMLTextAreaElement | null>(null)
   const form = useStudioStore((s) => s.form)
   const { patchForm, markStep, submitGeneration } = useStudioStore()
   const task = useStudioStore((s) => s.task)
@@ -42,6 +43,7 @@ export default function StudioView() {
   const creditCost = meta.models.find((m) => m.value === form.model)?.credit_cost ?? 12
   const modelLabel = meta.models.find((m) => m.value === form.model)?.label ?? 'V1 Pro'
   const tagCount = countStructureTags(form.lyrics)
+  const markCount = countParenMarks(form.lyrics)
   const generating =
     submitting || (task != null && (task.status === 'queued' || task.status === 'running'))
 
@@ -66,8 +68,28 @@ export default function StudioView() {
   }
 
   const insertTag = (tag: string) => {
-    patchForm({ lyrics: `${form.lyrics}\n${tag}\n` })
+    const el = lyricBoxRef.current
+    const caret = el?.selectionStart ?? form.lyrics.length
+    const [next, pos] = insertAtCaret(form.lyrics, caret, tag, { block: true })
+    patchForm({ lyrics: next })
     markStep(2)
+    requestAnimationFrame(() => {
+      el?.focus()
+      el?.setSelectionRange(pos, pos)
+    })
+  }
+
+  /** 表演标记：内联插入光标处（音乐编排类整行包裹） */
+  const insertMark = (mark: string, group: string) => {
+    const el = lyricBoxRef.current
+    const caret = el?.selectionStart ?? form.lyrics.length
+    const [next, pos] = insertAtCaret(form.lyrics, caret, mark, { block: group === 'music' })
+    patchForm({ lyrics: next })
+    markStep(2)
+    requestAnimationFrame(() => {
+      el?.focus()
+      el?.setSelectionRange(pos, pos)
+    })
   }
 
   const randomInspire = () => {
@@ -201,17 +223,39 @@ export default function StudioView() {
           {form.mode === 'custom' && (
             <>
               <div className="label mt-4">
-                {t('studio.lyrics.label')} <span className="normal-case tracking-normal" style={{ color: 'var(--dim)' }}>{t('studio.lyrics.tagCount', { n: tagCount })}</span>
+                {t('studio.lyrics.label')}{' '}
+                <span className="normal-case tracking-normal" style={{ color: 'var(--dim)' }}>
+                  {t('studio.lyrics.tagCount', { n: tagCount })}
+                  {markCount > 0 ? ` · ${t('studio.lyrics.markCount', { n: markCount })}` : ''}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {meta.structure_tags.map((tg) => (
+                  <span
+                    key={tg.tag}
+                    className="chip"
+                    title={tg.desc ?? tg.label}
+                    onClick={() => insertTag(tg.tag)}
+                  >
+                    {tg.tag} {tg.label}
+                  </span>
+                ))}
               </div>
               <div className="flex flex-wrap gap-1.5 mt-2 mb-2">
-                {meta.structure_tags.map((t) => (
-                  <span key={t.tag} className="chip" onClick={() => insertTag(t.tag)}>
-                    {t.label}
+                {(meta.performance_marks ?? []).map((m) => (
+                  <span
+                    key={m.mark}
+                    className="chip"
+                    title={t('studio.lyrics.markTitle')}
+                    onClick={() => insertMark(m.mark, m.group)}
+                  >
+                    {m.label}
                   </span>
                 ))}
               </div>
               <textarea
                 id="lyricBox"
+                ref={lyricBoxRef}
                 rows={5}
                 maxLength={meta.generation_limits.max_lyrics}
                 value={form.lyrics}

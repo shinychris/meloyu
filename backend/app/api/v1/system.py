@@ -16,17 +16,58 @@ from app.models import File, Task
 from app.models.enums import LANGUAGES, SECTIONS, TIME_SIGNATURES, TONICS
 from app.synth.structure import SECTION_ORDER, SECTION_TAG
 
-# 段落 label（zh, en）双语文案
+# 段落 label/desc（zh, en）双语文案；desc 为用途说明（v0.12.3：标签 chips 悬浮提示）
 _SECTION_LABELS = {
-    "intro": ("前奏", "Intro"), "verse": ("主歌", "Verse"),
-    "pre_chorus": ("导歌", "Pre-Chorus"), "chorus": ("副歌", "Chorus"),
-    "post_chorus": ("副歌后段", "Post-Chorus"), "refrain": ("叠句", "Refrain"),
-    "bridge": ("桥段", "Bridge"), "interlude": ("间奏", "Interlude"),
-    "drop": ("爆点段", "Drop"), "breakdown": ("分解段", "Breakdown"),
-    "rap": ("说唱段", "Rap"), "spoken": ("念白", "Spoken"),
-    "ad_lib": ("即兴衬词", "Ad-Lib"), "solo": ("器乐独奏", "Solo"),
-    "outro": ("尾奏", "Outro"),
+    "intro": ("前奏", "Intro",
+              "开场铺垫，纯器乐或少量哼唱，确立基调", "Opening backdrop; mostly instrumental"),
+    "verse": ("主歌", "Verse",
+              "叙事主体，交代故事与画面，情绪平缓推进", "Main storytelling section, steady build-up"),
+    "pre_chorus": ("导歌", "Pre-Chorus",
+                   "主歌到副歌的过渡，蓄力抬升情绪", "Transition that lifts into the chorus"),
+    "chorus": ("副歌", "Chorus",
+               "全曲记忆点，情感与旋律的最高点，常重复", "The hook; emotional and melodic peak"),
+    "post_chorus": ("副歌后段", "Post-Chorus",
+                    "副歌收尾的短钩子，常为哼唱或器乐 riff", "Short hook tail after the chorus"),
+    "refrain": ("叠句", "Refrain",
+                "段落间反复出现的固定句，独立于副歌", "Repeating line across sections"),
+    "bridge": ("桥段", "Bridge",
+               "后半段的对比转折，换和弦换视角再回副歌", "Contrast section before the final chorus"),
+    "interlude": ("间奏", "Interlude",
+                  "纯器乐过门，连接两个段落", "Instrumental passage between sections"),
+    "drop": ("爆点段", "Drop",
+             "电子舞曲的能量爆发点，常为重节奏器乐", "EDM energy peak, beat-driven"),
+    "breakdown": ("分解段", "Breakdown",
+                  "抽掉主要配器做减法，制造张力后回归", "Stripped-back build of tension"),
+    "rap": ("说唱段", "Rap",
+            "说唱人声，节奏密度高于演唱段", "Rapped vocals, denser rhythm"),
+    "spoken": ("念白", "Spoken",
+               "口语文本朗读，无旋律", "Spoken word without melody"),
+    "ad_lib": ("即兴衬词", "Ad-Lib",
+               "穿插的即兴感叹与和声衬词（哦/耶之类）", "Improvised interjections and backing fills"),
+    "solo": ("器乐独奏", "Solo",
+             "单件乐器（吉他/键盘等）的独奏展示段", "Featured instrumental solo"),
+    "outro": ("尾奏", "Outro",
+              "收尾渐弱，呼应前奏做闭环", "Fading close, echoes the intro"),
 }
+
+# 括号表演标记（v0.12.3）：插入歌词行内/独立行，描述演唱方式、情感或配器；
+# 前端 chips 快捷插入、LLM 生成指令同源。group: vocal=演唱表现 / music=音乐编排
+_PAREN_MARKS = (
+    ("vocal", "（轻声吟唱）", "Whispered vocals"),
+    ("vocal", "（气声）", "Breathy vocals"),
+    ("vocal", "（深情）", "Emotional"),
+    ("vocal", "（合唱）", "Choir unison"),
+    ("vocal", "（和声）", "Harmony backing"),
+    ("vocal", "（哼唱）", "Humming"),
+    ("vocal", "（口哨）", "Whistle"),
+    ("vocal", "（渐强）", "Crescendo"),
+    ("vocal", "（渐弱）", "Diminuendo"),
+    ("music", "（钢琴间奏）", "Piano interlude"),
+    ("music", "（吉他独奏）", "Guitar solo"),
+    ("music", "（弦乐铺底）", "Strings pad"),
+    ("music", "（鼓点渐入）", "Drums building"),
+    ("music", "（停顿留白）", "Pause / silence"),
+)
 
 router = APIRouter(prefix="/system", tags=["system"])
 
@@ -167,8 +208,13 @@ def meta():
         "languages": [{"value": v, "label": tr(*_LANG_LABELS[v])} for v in LANGUAGES],
         "structure_tags": [
             {"tag": SECTION_TAG[sec], "section": sec,
-             "label": tr(*_SECTION_LABELS[sec])}
-            for sec in SECTION_ORDER
+             "label": tr(lbl[0], lbl[1]), "desc": tr(lbl[2], lbl[3])}
+            for sec, lbl in ((s, _SECTION_LABELS[s]) for s in SECTION_ORDER)
+        ],
+        # v0.12.3：括号表演标记词表（歌词内描述演唱/情感/配器）
+        "performance_marks": [
+            {"mark": mark, "group": group, "label": tr(mark, en)}
+            for group, mark, en in _PAREN_MARKS
         ],
         # v0.10.2：注册邮箱验证码开关下发（SMTP 配置后开启；前端据此显示验证码输入）
         "email_verification_enabled": settings.email_verification_enabled,

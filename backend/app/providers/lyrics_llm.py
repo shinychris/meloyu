@@ -22,7 +22,9 @@ _SYSTEM = (
     "你是专业的中文/英文歌词作者，服务于 AI 音乐创作工具。严格遵守："
     "只输出 JSON，不输出任何解释、寒暄或 markdown 之外的内容；"
     "歌词必须有段落标签（如 [Verse]/[Chorus]），每段 2~4 行，每行 6~12 字；"
-    "全篇主韵统一（段尾字押韵），意象贴合主题，避免陈词滥调；不使用敏感词汇。"
+    "全篇主韵统一（段尾字押韵），意象贴合主题，避免陈词滥调；不使用敏感词汇；"
+    "在合适位置用括号表演标记描述演唱方式、情感或配器（中文歌词用中文括号，"
+    "如（轻声吟唱）（合唱）（钢琴间奏），每段至多 2 处，标记不单独成段）。"
 )
 
 # 段落 → 规范标签（单一事实来源 synth/structure；未收录段退 [Verse]）
@@ -79,10 +81,13 @@ class LLMLyricsProvider:
                                 else ["verse", "pre_chorus", "chorus", "chorus"])
             layout = " → ".join(_TAG_ZH.get(s, "[Verse]") for s in secs[:12])
             prompt = (
-                f"为主题创作一首{lang}歌词。\n"
-                f"主题：{theme}\n风格提示：{style_hint or '自由发挥'}\n"
-                f"情绪：{mood or '未指定'}\n段落结构（按顺序）：{layout}\n\n"
-                '输出 JSON：{"lyrics": "带段落标签的完整歌词", '
+                f"根据下面的创作想法写一首完整的{lang}歌词（想法可长可短，"
+                f"抓住其中的故事、情绪与画面展开，不要简单复述）。\n"
+                f"创作想法：{theme}\n风格提示：{style_hint or '自由发挥'}\n"
+                f"情绪：{mood or '未指定'}\n段落结构（按顺序）：{layout}\n"
+                f"要求：在段落开头或行内合适位置插入括号表演标记，描述演唱方式、"
+                f"情感变化或配器（如（轻声吟唱）（渐强）（钢琴间奏）），全篇 3~6 处。\n\n"
+                '输出 JSON：{"lyrics": "带段落标签与括号表演标记的完整歌词", '
                 '"alternatives": ["备选版本一（带标签）", "备选版本二（带标签）"]}'
             )
             data = self._ask_json(prompt)
@@ -114,6 +119,7 @@ class LLMLyricsProvider:
             lock = sorted(set(locked_lines or []))
             prompt = (
                 f"润色以下歌词：提升文学性与押韵一致性，保持段落标签与整体结构不变。\n"
+                f"保留原词中括号表演标记的用法与位置风格（可按润色后的情绪微调措辞）。\n"
                 f"风格提示：{style_hint or '保持原风格'}\n"
                 + (f"只润色 {_TAG_ZH.get(target_section, target_section)} 段，其余段落原样保留。\n"
                    if target_section else "")

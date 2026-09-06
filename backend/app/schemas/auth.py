@@ -401,7 +401,8 @@ class WorkPatchRequest(BaseModel):
 
 
 class LyricGenerateRequest(BaseModel):
-    theme: str = Field(min_length=1, max_length=100)
+    # v0.12.3：theme 升级为「创作想法」，容纳多行故事/画面描述
+    theme: str = Field(min_length=1, max_length=600)
     style_hint: str = Field(default="", max_length=100)
     mood: str | None = Field(default=None, max_length=50)
     language: str = Field(default="zh")

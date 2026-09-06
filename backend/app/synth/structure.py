@@ -9,6 +9,10 @@ import re
 from app.synth.ir import BAR_QUARTER_UNITS, SectionPlan, SongIR
 
 TAG_RE = re.compile(r"^\[\s*([^\]]+?)\s*\]$")
+# 括号表演标记（v0.12.3）：行内/独立行的（中文/英文）括号内容，描述演唱方式、
+# 情感或配器（如（轻声吟唱）（合唱）(piano interlude)）。保留在原文供支持标记的
+# 歌唱引擎（ACE-Step 等）消费；本地合成与行级计算（韵脚/行号/diff）一律剥离。
+PAREN_MARK_RE = re.compile(r"[（(][^（）()]{0,30}[）)]")
 # 段落规范顺序（/system/meta structure_tags 与前端标签条目顺序的单一事实来源）
 SECTION_ORDER = ("intro", "verse", "pre_chorus", "chorus", "post_chorus", "refrain",
                  "bridge", "interlude", "drop", "breakdown", "rap", "spoken",
@@ -70,11 +74,18 @@ TEMPLATE_MEDIUM = ["intro", "verse", "chorus", "outro"]
 TEMPLATE_LOOP = ["intro", "chorus", "outro"]
 
 
+def strip_paren_marks(line: str) -> str:
+    """剥去一行内的全部括号表演标记；纯标记行剥完为空串。"""
+    return PAREN_MARK_RE.sub("", line).strip()
+
+
 def parse_lyrics(lyrics: str) -> tuple[list[tuple[str, list[str]]], bool]:
     """解析歌词结构标签。
 
     返回 ([(section, [lines])], has_tags)。
     - 标签行不进入歌词行；标签前出现的行归入 verse。
+    - 括号表演标记不进入歌词行（v0.12.3）：行内标记原地剥除，纯标记行跳过
+      ——本地合成的音节化不会哼唱标记文本，韵脚取真实尾字。
     - 无任何有效标签时 has_tags=False，lines 为全文非空行。
     - 空段落保留（v0.12.1：[Drop]/[Solo] 等纯器乐段的规范用法即标签下无
       歌词行，合成管线对无行段落走器乐主旋律，不因空行丢段）。
@@ -104,7 +115,10 @@ def parse_lyrics(lyrics: str) -> tuple[list[tuple[str, list[str]]], bool]:
                 has_tags = True
                 continue
             # 未知标签当普通文本处理
-        pending_lines.append(line)
+        content = strip_paren_marks(line)
+        if not content:
+            continue
+        pending_lines.append(content)
     flush()
 
     if not has_tags:

@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach } from 'vitest'
-import { composeStylePrompt, countStructureTags, detectSectionAtCaret, parseSectionTag } from './structure'
+import { composeStylePrompt, countParenMarks, countStructureTags, detectSectionAtCaret, insertAtCaret, parseSectionTag } from './structure'
 import { useI18nStore } from '../i18n'
 
 afterEach(() => {
@@ -61,6 +61,37 @@ describe('countStructureTags', () => {
   })
   it('无标签为 0', () => {
     expect(countStructureTags('只是歌词\n没有标签')).toBe(0)
+  })
+})
+
+describe('countParenMarks（括号表演标记统计，v0.12.3）', () => {
+  it('中英括号均计数', () => {
+    const lyrics = '[Verse]\n（轻声吟唱）雨停在凌晨三点的窗台\n（钢琴间奏）\nwe said it (soft)\n普通行'
+    expect(countParenMarks(lyrics)).toBe(3)
+  })
+  it('无标记为 0', () => {
+    expect(countParenMarks('[Verse]\n一行\n两行')).toBe(0)
+  })
+})
+
+describe('insertAtCaret（光标处插入，v0.12.3）', () => {
+  it('内联片段：光标处直接插入，返回新光标', () => {
+    const [next, pos] = insertAtCaret('一行\n三行', 3, '（轻声）')
+    expect(next).toBe('一行\n（轻声）三行')
+    expect(next.slice(pos).startsWith('三行')).toBe(true)
+  })
+  it('整行片段：自动换行包裹', () => {
+    const [next, pos] = insertAtCaret('[Verse]\n词', 9, '[Chorus]', { block: true })
+    expect(next).toBe('[Verse]\n词\n[Chorus]\n')
+    expect(pos).toBe(next.length)
+  })
+  it('光标在行中间时整行片段拆行不吞内容', () => {
+    expect(insertAtCaret('[Verse]\n词', 8, '[Chorus]', { block: true })[0])
+      .toBe('[Verse]\n[Chorus]\n词')
+  })
+  it('光标在行首/空文本时整行片段不重复换行', () => {
+    expect(insertAtCaret('词一行', 0, '[Verse]', { block: true })[0]).toBe('[Verse]\n词一行')
+    expect(insertAtCaret('', 0, '[Verse]', { block: true })[0]).toBe('[Verse]\n')
   })
 })
 

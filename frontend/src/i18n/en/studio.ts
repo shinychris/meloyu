@@ -39,6 +39,8 @@ export const studioEn = {
   'studio.style.label': 'Style prompt',
   'studio.lyrics.label': 'Lyrics',
   'studio.lyrics.tagCount': '({n} structure tags detected)',
+  'studio.lyrics.markCount': '{n} performance marks',
+  'studio.lyrics.markTitle': 'Insert a parenthetical performance mark: describes vocal delivery / emotion / instrumentation — never sung as lyric text',
   'studio.lyrics.openAssistant': 'Refine in Lyrics Assistant →',
   'studio.toast.switchedToLyrics': 'Switched to the Lyrics Assistant',
   'studio.param.label': 'Parameters & model',

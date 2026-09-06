@@ -7,10 +7,14 @@ export const lyricsEn = {
   'lyrics.engine.title':
     'Switch the AI lyrics engine in Model Center (local rules / local open-source model / external API)',
   // 生成参数
-  'lyrics.theme.label': 'Theme / one line (required to generate)',
-  'lyrics.theme.placeholder': 'e.g. waiting at a convenience store on a rainy night',
+  'lyrics.theme.label': 'Creative idea / theme (required to generate)',
+  'lyrics.theme.placeholder': 'e.g. waiting at a convenience store on a rainy night, urban loneliness, a catchy chorus (multi-line, up to 600 chars)',
   'lyrics.mood.label': 'Mood (optional, e.g. melancholic / fired-up)',
   'lyrics.mood.placeholder': 'Matches the imagery library',
+  // 插入 chips
+  'lyrics.chips.tags': 'Section tags (click to insert at the caret, hover for details)',
+  'lyrics.chips.marks': 'Performance marks (parenthetical vocal / emotion / arrangement cues)',
+  'lyrics.chips.marksHint': 'Parenthetical marks sit inline or on their own line to describe vocal delivery, emotion, and instrumentation; AI generation references them and singing engines consume them — they are never sung as lyric text',
   // 操作按钮
   'lyrics.action.generate': 'Generate with AI',
   'lyrics.action.generating': 'Generating…',
@@ -27,7 +31,7 @@ export const lyricsEn = {
   'lyrics.alternative': 'Alt {n}',
   'lyrics.toast.altLoaded': 'Loaded alternative {n}',
   // 提示
-  'lyrics.toast.themeRequired': 'Enter a theme or one-line idea first (1–100 characters)',
+  'lyrics.toast.themeRequired': 'Write down your creative idea or theme first (1–600 characters)',
   'lyrics.toast.empty': 'The lyrics are empty',
   'lyrics.toast.fallback': 'Engine unavailable, fell back to local rules: {reason}',
   'lyrics.toast.generated': 'AI lyrics draft generated ({engine}) — ready to polish',
