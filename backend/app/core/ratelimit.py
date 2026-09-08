@@ -40,10 +40,23 @@ _MAX_KEYS = 20000  # 内存上限：超量整体重置（防地址随机化撑�
 
 
 def _client_ip(request: Request) -> str:
-    # 前置反代场景取 X-Forwarded-For 首位（单层代理假设，多 层代理需配置可信跳数）
-    fwd = request.headers.get("x-forwarded-for", "")
-    if fwd:
-        return fwd.split(",")[0].strip()
+    """限流计数的客户端 IP。
+
+    安审计 H-1（2026-09-09）：无条件取 X-Forwarded-For 链首=攻击者可控，
+    轮换伪造头即可绕过全部按 IP 限流（登录防爆破、注册防批量）。现改为：
+    - 默认（TRUST_PROXY=false，直连部署）：只用 TCP 对端地址，忽略一切转发头；
+    - TRUST_PROXY=true（自有反代之后）：优先 X-Real-IP（nginx 以 $remote_addr
+      覆写，不可伪造），退取 XFF 链尾（最近一跳可信代理追加的真实 IP）。
+      链首（客户端自带值）永远不采信。
+    """
+    from app.config import settings
+    if settings.trust_proxy:
+        real_ip = request.headers.get("x-real-ip", "").strip()
+        if real_ip:
+            return real_ip
+        fwd = request.headers.get("x-forwarded-for", "")
+        if fwd:
+            return fwd.split(",")[-1].strip()
     return request.client.host if request.client else "unknown"
 
 

@@ -59,7 +59,9 @@ class LoginRequest(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str = Field(min_length=10, max_length=128)
+    # v0.13.0：refresh 主通道为 HttpOnly Cookie，body 字段降为可选（旧客户端
+    # 兼容）；两者皆空时由服务层按无效令牌拒绝（40103）
+    refresh_token: str = Field(default="", max_length=128)
 
 
 class SendCodeRequest(BaseModel):

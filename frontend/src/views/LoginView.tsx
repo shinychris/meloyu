@@ -159,13 +159,6 @@ export default function LoginView() {
     }
   }
 
-  const fillDemo = () => {
-    setTab('login')
-    setEmail('demo@meloyu.local')
-    setPassword('Meloyu2026')
-    setError(null)
-  }
-
   return (
     <div className="login-bg h-screen flex items-center justify-center overflow-hidden">
       {/* 未登录也可切换语言：右上角固定入口 */}
@@ -290,14 +283,9 @@ export default function LoginView() {
           </form>
 
           <div className="mt-5 pt-4 rule-t text-[11px] leading-relaxed" style={{ color: 'var(--dim)' }}>
-            {t('login.demo.account')}
-            <span className="num" style={{ color: 'var(--muted)' }}>
-              demo@meloyu.local / Meloyu2026
-            </span>
-            <button className="text-[11px] font-bold ml-2" style={{ color: 'var(--acc)' }} type="button" onClick={fillDemo}>
-              {t('login.demo.fill')}
-            </button>
-            <div className="mt-1">{t('login.demo.note')}</div>
+            {/* 2026-09-09 安审计 L2/M-4：移除 demo 固定凭据提示与自动填充——生产栈
+                启动即禁用种子账号，该凭据已不可用；dev 演示凭据见 backend/README.md */}
+            <div>{t('login.demo.note')}</div>
             <button
               className="mt-3 flex items-center gap-1 transition-colors hover:text-white"
               type="button"

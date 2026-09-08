@@ -60,7 +60,11 @@ def track_to_dict(t: ReferenceTrack) -> dict:
 
 
 def create_track(db: Session, user: User, *, filename: str, content: bytes) -> dict:
-    name = (filename or "").strip()
+    # 安审计 L-2（2026-09-09）：文件名入库前消毒——去路径分量（../、盘符、
+    # 目录分隔符）与控制字符（CRLF 等），防元数据污染；落盘名本就是服务端
+    # UUID，此处仅影响展示与后续 Content-Disposition 回显
+    name = Path((filename or "").replace("\\", "/")).name.strip()
+    name = "".join(ch for ch in name if ch.isprintable()).strip()
     ext = Path(name).suffix.lower()
     if ext not in ALLOWED_EXTS or not name or len(name) > 120:
         raise err_validation(

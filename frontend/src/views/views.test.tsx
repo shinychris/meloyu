@@ -31,10 +31,10 @@ function renderAt(path: string, ui: React.ReactElement): string {
 
 /** 渲染冒烟：保证每个视图 mount 时不会抛错（useEffect 在 SSR 不执行，不触发请求）；默认 locale=en 断言英文文案 */
 describe('views render smoke', () => {
-  it('LoginView 渲染登录表单、演示账号与忘记密码入口（v0.7.0）', () => {
+  it('LoginView 渲染登录表单与忘记密码入口（v0.13.0 起 demo 固定凭据提示已移除）', () => {
     const html = render(<LoginView />)
     expect(html).toContain('Sign in to Studio')
-    expect(html).toContain('demo@meloyu.local')
+    expect(html).not.toContain('demo@meloyu.local')
     expect(html).toContain('Forgot password?')
   })
 

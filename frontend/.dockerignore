@@ -6,3 +6,6 @@ reports/
 coverage/
 .eslintcache/
 *.log
+# 环境变量不进镜像（Vite 仅注入 VITE_* 前缀变量，本仓库当前无此类文件；纵深防御）
+.env
+.env.*

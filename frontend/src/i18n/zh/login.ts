@@ -20,8 +20,6 @@ export const loginZh: Record<keyof typeof loginEn, string> = {
   'login.submitting': '请稍候…',
   'login.submit.login': '登录工作台',
   'login.submit.register': '注册并赠送 200 积分',
-  'login.demo.account': '演示账号：',
-  'login.demo.fill': '一键填入',
   'login.demo.note': '本地演示引擎 · 生成内容自动登记创作留痕',
   'login.backToLanding': '← 返回产品主页',
   'login.verify.label': '邮箱验证码',

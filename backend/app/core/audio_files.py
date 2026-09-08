@@ -1,6 +1,7 @@
 """文件服务核心：files 表 → 绝对路径、Range 解析、防穿越、MIME 白名单。"""
 from __future__ import annotations
 
+import hmac
 from pathlib import Path
 
 from fastapi import Request
@@ -31,7 +32,9 @@ def abs_path(f: File) -> Path:
     """相对路径 → 绝对路径；resolve 后必须仍在 data/audio 下（防穿越）。"""
     p = (settings.audio_path / f.path).resolve()
     root = settings.audio_path.resolve()
-    if not str(p).startswith(str(root)):
+    # 安审计 L-1：is_relative_to 做路径边界判定——startswith 会放过
+    # /data/audio-evil 这类同前缀目录（纵深防御，当前无用户可控路径段）
+    if not p.is_relative_to(root):
         raise err_forbidden(tr("非法文件路径", "Illegal file path"))
     if not p.is_file():
         raise err_not_found(tr("文件不存在", "File not found"))
@@ -48,8 +51,13 @@ def check_owner(db: Session, f: File, user: User) -> None:
 
 
 def user_from_request_or_token(db: Session, request: Request,
-                               current_user: User | None) -> User:
-    """文件端点鉴权：Bearer 或 ?st= 短时签名（契约 §9.4）。"""
+                               current_user: User | None,
+                               file_id: str | None = None) -> User:
+    """文件端点鉴权：Bearer 或 ?st= 短时签名（契约 §9.4）。
+
+    st 与单个文件绑定（payload.f）——传入 file_id 时强制比对（安审计 L-3：
+    签名绑定字段此前形同虚设），不匹配即拒绝。
+    """
     if current_user is not None:
         return current_user
     st = request.query_params.get("st")
@@ -58,6 +66,10 @@ def user_from_request_or_token(db: Session, request: Request,
     payload = verify_stream_token(st)
     if not payload:
         raise err_unauthenticated(tr("流地址签名无效或已过期", "Stream URL signature invalid or expired"))
+    if file_id is not None and not hmac.compare_digest(str(payload.get("f") or ""),
+                                                       str(file_id)):
+        raise err_unauthenticated(tr("流地址签名与目标文件不符",
+                                     "Stream URL signature does not match the target file"))
     user = db.get(User, payload.get("u"))
     if user is None:
         raise err_unauthenticated()

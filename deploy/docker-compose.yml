@@ -28,6 +28,10 @@ services:
       PORT: "8000"
       ENV: production
       DATA_DIR: /app/data
+      # 2026-09-09 安审计 H1：限流取信反代注入的客户端 IP（nginx 已以
+      # $remote_addr 覆写 X-Forwarded-For / X-Real-IP，客户端不可伪造）。
+      # 直连部署（无反代）时必须为 false——否则伪造 XFF 可绕过全部 IP 限流
+      TRUST_PROXY: "true"
     # GPU 直通：ACE-Step/MusicGen 本地推理用（本机 nvidia-container-runtime 已
     # 验证可用，RTX 4060 Ti 8GB）。⚠ 若宿主机 GPU 不可用（驱动卸载等），此行
     # 会让 backend 起不来——届时删除 gpus 行重启即可（本地通道受影响，
@@ -41,6 +45,10 @@ services:
       - meloyu-prod-net
     security_opt:
       - no-new-privileges:true
+    # 2026-09-09 安审计 I2：容器内全部进程为非特权用户（appuser，bind 8000/
+    # 读写 /app/data 均不需要 Linux capability），全量摘除
+    cap_drop:
+      - ALL
     logging:
       driver: json-file
       options:
@@ -58,8 +66,9 @@ services:
       backend:
         condition: service_healthy
     ports:
-      # 监听 0.0.0.0：局域网经 http://<本机IP>:8180 访问；要收回仅本机访问改回 "127.0.0.1:8180:80"
-      - "0.0.0.0:8180:80"
+      # 监听 0.0.0.0：局域网经 http://<本机IP>:8180 访问；要收回仅本机访问改回 "127.0.0.1:8180:8080"
+      # （容器内为非特权 nginx，监听 8080）
+      - "0.0.0.0:8180:8080"
     volumes:
       - type: bind
         source: ./nginx.conf
@@ -69,6 +78,9 @@ services:
       - meloyu-prod-net
     security_opt:
       - no-new-privileges:true
+    # 非特权镜像（uid 101，监听 8080>1024）——无需任何 capability
+    cap_drop:
+      - ALL
     logging:
       driver: json-file
       options:

@@ -203,6 +203,27 @@ def is_seeded(db) -> bool:
     return db.execute(select(User.id).where(User.email == DEMO_EMAIL)).fetchone() is not None
 
 
+def disable_seed_demo_accounts() -> int:
+    """生产启动自愈：禁用库中残留的固定密码种子账号（安审计 H-1，2026-09-09）。
+
+    demo/free 种子账号密码硬编码于仓库（开发演示便利）。生产库若复用自 dev
+    （deploy/README 已警示）或历史误播种，任何读过源码的人都能登录 demo
+    管理员账号。生产启动时统一处置：密码置随机不可知值、摘除管理员标志、
+    吊销刷新令牌——账号行保留（作品/账本/任务外键不破坏），只是无法再登录。
+    返回处置的账号数。
+    """
+    import secrets
+    with SessionLocal() as db:
+        rows = db.execute(select(User).where(
+            User.email.in_((DEMO_EMAIL, FREE_EMAIL)))).scalars().all()
+        for u in rows:
+            u.password_hash = hash_password(secrets.token_urlsafe(24))
+            u.is_admin = False
+            u.refresh_token_hash = None
+        db.commit()
+        return len(rows)
+
+
 def ensure_seeded_in_background() -> None:
     """启动时若未灌种子 → 后台线程灌（渲染音频耗时，不阻塞 uvicorn 启动）。"""
     with SessionLocal() as db:

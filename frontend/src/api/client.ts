@@ -4,13 +4,13 @@
  * - 请求自动注入 Authorization: Bearer <token>
  * - 成功解包 {code,message,data} → 直接返回 data
  * - code!==0 / HTTP 4xx/5xx → 抛 ApiError 并统一 toast（401 静默处理）
- * - 40102（access 过期）：有 refresh_token 时静默刷新（单飞防并发重复刷新）
- *   并重放原请求一次；无 refresh_token / 刷新失败 → 清 token 跳登录
+ * - 40102（access 过期）：凭 HttpOnly refresh Cookie 静默刷新（单飞防并发重复
+ *   刷新）并重放原请求一次；刷新失败（Cookie 无/过期）→ 清 token 跳登录
  * - 40101（未认证）→ 直接清 token 跳登录
  * - responseType=blob 的请求（文件流/证书）不解包
  */
 import axios, { AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios'
-import { getToken, getRefreshToken, setToken, setRefreshToken, clearToken } from '../lib/token'
+import { getToken, setToken, clearToken } from '../lib/token'
 import { useToastStore } from '../stores/toast'
 import { t, getLocale } from '../i18n'
 
@@ -57,10 +57,9 @@ interface EnvelopeLike {
   message?: string
 }
 
-/** 刷新接口的 data 形状（契约 v0.7.0：轮换式，旧 refresh 即刻失效） */
+/** 刷新接口的 data 形状（v0.13.0：refresh 在 HttpOnly Cookie 中，body 只有 access） */
 interface RefreshData {
   access_token: string
-  refresh_token: string
 }
 
 /** 拦截器内部标记：已重放过一次 / 刷新请求自身（防递归刷新） */
@@ -69,28 +68,27 @@ interface RetriableConfig extends InternalAxiosRequestConfig {
   _meloyuSkipAuthRefresh?: boolean
 }
 
-/** 单飞刷新：并发多个 40102 共享同一次 /auth/refresh；成功落新 token 对。
- *  注意：句柄清空走 then 微任务而非 IIFE 内 finally —— 无 refresh_token 时 IIFE
- *  同步落定，finally 会在外层赋值之前执行，随后赋值把已落定的 promise 装回句柄，
- *  毒化后续所有刷新（测试抓到的真实缺陷）。 */
+/** 单飞刷新：并发多个 40102 共享同一次 /auth/refresh；成功落新 access。
+ *  refresh 凭据在 HttpOnly Cookie 中（同源请求自动携带，v0.13.0），请求体
+ *  不再传 refresh_token；失败（无会话/过期）由调用方踢登录。
+ *  注意：句柄清空走 then 微任务而非 IIFE 内 finally —— 同步落定时 finally 会在
+ *  外层赋值之前执行，随后赋值把已落定的 promise 装回句柄，毒化后续所有刷新
+ *  （测试抓到的真实缺陷）。 */
 let refreshInFlight: Promise<boolean> | null = null
 
 async function refreshAccessToken(): Promise<boolean> {
   if (refreshInFlight) return refreshInFlight
   const attempt = (async (): Promise<boolean> => {
     try {
-      const refreshToken = getRefreshToken()
-      if (!refreshToken) return false
       // 响应拦截器已解包 envelope，此处拿到的即 data（与 apiPost 同理，类型需断言）
       const res = await instance.post(
         '/auth/refresh',
-        { refresh_token: refreshToken },
+        {},
         { _meloyuSkipAuthRefresh: true } as AxiosRequestConfig,
       )
       const data = res as unknown as RefreshData
-      if (!data?.access_token || !data?.refresh_token) return false
+      if (!data?.access_token) return false
       setToken(data.access_token)
-      setRefreshToken(data.refresh_token)
       return true
     } catch {
       return false

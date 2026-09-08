@@ -182,14 +182,18 @@ def verify_and_parse_webhook(payload: bytes, signature: str) -> dict:
     import stripe
 
     if not stripe_enabled() or not settings.stripe_webhook_secret:
-        raise err_validation(tr("webhook 未配置", "webhook is not configured"))
+        # 安审计 L-3（2026-09-09）：对外错误口径与验签失败一致，不泄露
+        # "支付通道是否已配置"这一内部状态；真实原因只进服务端日志
+        logger.warning("stripe webhook called but not configured "
+                       "(STRIPE_SECRET_KEY/STRIPE_WEBHOOK_SECRET missing)")
+        raise err_validation(tr("webhook 请求被拒绝", "webhook request rejected"))
     stripe.api_key = settings.stripe_secret_key
     try:
         event = stripe.Webhook.construct_event(
             payload, signature or "", settings.stripe_webhook_secret)
     except Exception as e:  # noqa: BLE001
-        raise err_validation(tr("webhook 签名校验失败", "webhook signature verification failed")
-                             ) from e
+        logger.warning(f"stripe webhook signature verification failed: {e.__class__.__name__}")
+        raise err_validation(tr("webhook 请求被拒绝", "webhook request rejected")) from e
     # stripe.Event → dict（后续处理链统一 dict 访问，便于测试与序列化）
     return event.to_dict() if hasattr(event, "to_dict") else event
 

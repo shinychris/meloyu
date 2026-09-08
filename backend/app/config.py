@@ -12,7 +12,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 REPO_DIR = BACKEND_DIR.parent
 
 API_PREFIX = "/api/v1"
-APP_VERSION = "0.12.3"
+APP_VERSION = "0.13.0"
 
 # 模型积分单价（架构 §9.1：v1_pro=12、v1_fast=6）
 MODEL_CREDIT_COST: dict[str, int] = {"v1_pro": 12, "v1_fast": 6}
@@ -58,6 +58,15 @@ class Settings(BaseSettings):
     # 运行环境：dev（默认，本地开发）| production（启用生产断言：弱密钥拒启动、
     # 禁 demo 播种、关闭 /api/docs；见 main.py _assert_production）
     env: str = "dev"
+    # 是否信任反代注入的客户端 IP 头（X-Real-IP / X-Forwarded-For）。
+    # false：限流一律按 TCP 对端地址计数（直连部署防 XFF 伪造绕过）；
+    # true：仅当部署在自有反代（如 deploy/nginx.conf）之后时开启——优先取
+    # X-Real-IP（nginx 以 $remote_addr 覆写，客户端不可伪造），退取 XFF 链尾
+    # （最近一跳可信代理追加的真实 IP），二者皆取链首以外的值，防伪造。
+    trust_proxy: bool = False
+    # dev 环境是否放行非回环来源请求（LAN 联调用；默认拒绝——demo 固定密码
+    # 种子账号/开放 /api/docs 只应本机可达，见 main.py dev 来源守卫）
+    allow_lan_dev: bool = False
     # ---- Stripe 支付（D-2 决策：海外市场 Stripe；未配置时付费档不可订阅）----
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""

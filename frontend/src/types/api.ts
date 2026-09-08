@@ -74,8 +74,9 @@ export interface User {
   created_at: string
 }
 
-/** POST /auth/register 与 POST /auth/login 的 data（v0.7.0 起附带轮换式 refresh token；
- *  旧后端/旧缓存可能缺失，故可选，调用处存在性判断） */
+/** POST /auth/register 与 POST /auth/login 的 data（v0.13.0 起 refresh token 改经
+ *  HttpOnly+SameSite=Strict Cookie 下发，不再出现在响应体；此处可选仅为兼容
+ *  旧后端响应形状的解析，前端不消费） */
 export interface AuthData extends User {
   access_token: string
   token_type: 'Bearer'

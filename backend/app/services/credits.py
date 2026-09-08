@@ -90,7 +90,13 @@ def deduct_refund(db: Session, user: User, amount: int) -> int:
 
 
 def lazy_monthly_grant(db: Session, user: User) -> None:
-    """月度发放惰性触发：next_grant_at 已过则按当前档位发放并顺延。"""
+    """月度发放惰性触发：next_grant_at 已过则按当前档位发放并顺延。
+
+    安审计 L-2（2026-09-09）：check-then-act 在并发下（同时 login+refresh）
+    可能读到同一过期水位而双发。改为先原子占位——UPDATE ... WHERE
+    credit_next_grant_at <= now 仅首个请求能顺延水位（rowcount=0 即并发已
+    发放，直接返回），再入账。
+    """
     if not user.credit_next_grant_at:
         return
     now = utc_now_iso()
@@ -98,12 +104,18 @@ def lazy_monthly_grant(db: Session, user: User) -> None:
         return
     plan = db.get(Plan, user.plan)
     monthly = plan.monthly_credits if plan and plan.monthly_credits else 0
+    next_at = _next_month_first_day()
+    claimed = db.execute(
+        text("UPDATE users SET credit_next_grant_at = :next, credit_monthly_grant = :monthly, "
+             "updated_at = :now WHERE id = :uid AND credit_next_grant_at <= :now"),
+        {"next": next_at, "monthly": monthly, "now": now, "uid": user.id},
+    )
+    if claimed.rowcount == 0:
+        return  # 并发请求已完成本次发放
     if monthly > 0:
         grant(db, user, monthly, "plan_grant", set_carry_over=True)
-    else:
-        user.credit_monthly_grant = 0
+    user.credit_next_grant_at = next_at
     user.credit_monthly_grant = monthly
-    user.credit_next_grant_at = _next_month_first_day()
     db.flush()
 
 

@@ -18,7 +18,7 @@ router = APIRouter(prefix="/files", tags=["files"])
 def stream(file_id: str, request: Request,
            user: User | None = Depends(get_current_user_optional),
            db: Session = Depends(get_db)):
-    u = af.user_from_request_or_token(db, request, user)
+    u = af.user_from_request_or_token(db, request, user, file_id=file_id)
     f = af.resolve_file(db, file_id)
     af.check_owner(db, f, u)
     return af.file_stream_response(request, f)

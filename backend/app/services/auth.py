@@ -54,22 +54,22 @@ def register(db: Session, email: str, password: str, nickname: str,
     db.add(Subscription(user_id=user.id, plan="free", status="active", started_at=now,
                         source="signup", granted_credits=0, created_at=now, updated_at=now))
     credits_svc.grant(db, user, SIGNUP_BONUS_CREDITS, "signup_bonus")
-    out = _with_tokens(user)
+    out, refresh, refresh_ttl = _with_tokens(user)
     db.commit()  # refresh_token_hash 必须随响应落库（否则会话关闭即丢失）
     db.refresh(user)
     mail_svc.consume_code(email)
-    return out
+    return out, refresh, refresh_ttl
 
 
-def login(db: Session, email: str, password: str) -> dict:
+def login(db: Session, email: str, password: str) -> tuple[dict, str, int]:
     user = db.query(User).filter(User.email == email.strip().lower()).first()
     if not user or not verify_password(password, user.password_hash):
         raise err_bad_credentials()
     credits_svc.lazy_monthly_grant(db, user)
-    out = _with_tokens(user)
+    out, refresh, refresh_ttl = _with_tokens(user)
     db.commit()  # refresh_token_hash 必须随响应落库（否则会话关闭即丢失）
     db.refresh(user)
-    return out
+    return out, refresh, refresh_ttl
 
 
 def me(db: Session, user: User) -> dict:
@@ -79,7 +79,7 @@ def me(db: Session, user: User) -> dict:
     return user_to_dict(user)
 
 
-def refresh(db: Session, refresh_token: str) -> dict:
+def refresh(db: Session, refresh_token: str) -> tuple[dict, str, int]:
     """刷新令牌轮换：校验旧 refresh → 签发新 access + 新 refresh（单设备语义）。"""
     import hashlib
     digest = hashlib.sha256(refresh_token.encode("ascii")).hexdigest()
@@ -89,10 +89,10 @@ def refresh(db: Session, refresh_token: str) -> dict:
         raise err_bad_credentials(tr("刷新令牌无效或已过期",
                                      "Refresh token is invalid or expired"))
     credits_svc.lazy_monthly_grant(db, user)
-    out = _with_tokens(user)
+    out, new_refresh, refresh_ttl = _with_tokens(user)
     db.commit()  # 轮换后的新 refresh 必须落库（旧 hash 已被覆写=自动失效）
     db.refresh(user)
-    return out
+    return out, new_refresh, refresh_ttl
 
 
 def logout(db: Session, user: User) -> dict:
@@ -211,12 +211,18 @@ def export_data(db: Session, user: User) -> tuple[str, bytes]:
     return filename, buf.getvalue()
 
 
-def _with_tokens(user: User) -> dict:
+def _with_tokens(user: User) -> tuple[dict, str, int]:
+    """组装登录/注册/刷新响应；返回 (body_data, refresh_token, refresh_ttl)。
+
+    安审计 M-1/M-2（2026-09-09）：refresh token 不再进响应体（localStorage
+    可被任意同源 JS 读取，XSS 后 30 天凭据失窃）——由路由层改经
+    HttpOnly+SameSite=Strict Cookie 下发（api/v1/auth.py）。body 仅保留
+    access_token（24h，XSS 窃取窗口有界；轮换式 refresh 在 HttpOnly 域）。
+    """
     data = user_to_dict(user)
     data["access_token"] = create_access_token(user)
     data["token_type"] = "Bearer"
     refresh, ttl = issue_refresh_token(user)
-    data["refresh_token"] = refresh
     data["expires_in"] = 24 * 3600
     data["refresh_expires_in"] = ttl
-    return data
+    return data, refresh, ttl

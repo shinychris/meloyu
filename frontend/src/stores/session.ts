@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { AuthData, User } from '../types/api'
-import { clearToken, setToken, setRefreshToken } from '../lib/token'
+import { clearToken, setToken } from '../lib/token'
 import { fetchMe } from '../api/auth'
 import { getCreditsBalance } from '../api/account'
 import { useStudioStore } from './studio'
@@ -27,8 +27,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   setAuthenticated(data) {
     setToken(data.access_token)
-    // v0.7.0：轮换式 refresh token 与 access 同存 localStorage，40102 时静默刷新
-    if (data.refresh_token) setRefreshToken(data.refresh_token)
+    // v0.13.0：refresh token 由后端 Set-Cookie（HttpOnly）下发，前端不再经手；
+    // 40102 时 client.ts 凭 Cookie 静默刷新
     set({ user: data, ready: true })
   },
 

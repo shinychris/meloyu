@@ -13,13 +13,16 @@
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import sys
 import time
 import urllib.request
 
 BASE = "http://127.0.0.1:8000/api/v1"
-EMAIL, PASSWORD = "demo@meloyu.local", "Meloyu2026"
+# 凭据可经环境变量覆盖（MELOYU_EMAIL/MELOYU_PASSWORD；默认=dev 种子演示账号）
+EMAIL = os.environ.get("MELOYU_EMAIL", "demo@meloyu.local")
+PASSWORD = os.environ.get("MELOYU_PASSWORD", "Meloyu2026")
 
 
 def call(method: str, path: str, token: str = "", body: dict | None = None) -> tuple[int, dict]:

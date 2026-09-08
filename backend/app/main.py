@@ -1,6 +1,8 @@
 """FastAPI 入口：CORS、locale（i18n）、错误包裹、request_id 中间件、启动建表与自愈。"""
 from __future__ import annotations
 
+import ipaddress
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,6 +38,10 @@ def _assert_production() -> None:
     origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
     if "*" in origins:
         problems.append("CORS_ORIGINS 含 * 且 allow_credentials=True——禁止，请列明来源域名")
+    # 安审计 M-2（2026-09-09）：第三方 API Key 落库加密密钥漏配时静默明文存储
+    if not settings.key_encryption_secret:
+        problems.append("KEY_ENCRYPTION_SECRET 为空——llm_settings 中的第三方 API Key "
+                        "将明文落库；生产必须配置 Fernet 密钥（openssl rand -base64 32）")
     # v0.10.2：APP_BASE_URL 指向 localhost 时 Stripe 回跳/密码重置邮件链接会指到
     # 开发地址（不拒启：反代/本地生产栈可合法回环，但必须可见地告警）
     if "localhost" in settings.app_base_url or "127.0.0.1" in settings.app_base_url:
@@ -68,6 +74,35 @@ if settings.sentry_dsn:
         logger.info("sentry initialized")
     except ImportError:
         logger.warning("SENTRY_DSN configured but sentry-sdk not installed; skipping")
+
+
+# 安审计 H-1（2026-09-09）：dev 形态来源守卫——非回环请求一律拒绝。
+# dev 实例带固定密码 demo 管理员账号、开放 /api/docs，仅应本机可达；绑定地址
+# 无法可靠探测（uvicorn CLI 可脱离 settings.host 传 --host 0.0.0.0），故按
+# 实际到达的客户端来源拦截：LAN 联调需显式配置 ALLOW_LAN_DEV=true 自担风险。
+# 生产栈（ENV=production）不受影响——backend 容器内 nginx 转发来源本就非回环。
+@app.middleware("http")
+async def dev_loopback_guard_middleware(request: Request, call_next):
+    if not _is_production and not settings.allow_lan_dev:
+        client_host = request.client.host if request.client else ""
+        # 仅拦截"真实远程 IP"：非 IP 字面量（如 TestClient 的 "testclient"、
+        # "localhost"）与回环地址放行
+        try:
+            addr = ipaddress.ip_address(client_host)
+        except ValueError:
+            addr = None
+        if addr is not None and not addr.is_loopback:
+            logger.warning(f"dev instance rejecting non-loopback client {client_host} "
+                           f"on {request.url.path} (set ALLOW_LAN_DEV=true to override)")
+            return JSONResponse(
+                status_code=403,
+                content={"code": 40302,
+                         "message": tr("开发实例仅限本机访问（如需局域网联调，配置 ALLOW_LAN_DEV=true）",
+                                       "Dev instance is local-only "
+                                       "(set ALLOW_LAN_DEV=true for LAN debugging)"),
+                         "data": None, "request_id": _request_id.get()},
+            )
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -165,8 +200,21 @@ def _startup() -> None:
     from app.services.works import purge_expired
 
     Base.metadata.create_all(engine)
+    # 安审计 H-1（2026-09-09）：生产库若复用自 dev，固定密码 demo 账号仍可登录
+    # ——启动即禁用（随机密码+摘除 admin+吊销刷新令牌；账号行保留不破坏外键）
+    from app.seed_data import disable_seed_demo_accounts
+    if _is_production:
+        disabled = disable_seed_demo_accounts()
+        if disabled:
+            logger.warning(f"production startup: disabled {disabled} fixed-password "
+                           "seed demo account(s) (dev-DB reuse residue)")
     from app.core.migrations import run as run_migrations
     run_migrations(engine)
+    # 安审计 M-2：配置了加密密钥时，把历史明文 API Key 行升级为密文
+    from app.core.crypto import reencrypt_plaintext_secrets
+    reencrypted = reencrypt_plaintext_secrets()
+    if reencrypted:
+        logger.info(f"startup: re-encrypted {reencrypted} plaintext API key field(s)")
     recovered = recover_zombie_tasks()
     from app.services.model_center import recover_stale_ops
     stale_ops = recover_stale_ops()

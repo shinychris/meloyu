@@ -39,3 +39,41 @@ def decrypt_secret(stored: str) -> str:
         return _fernet().decrypt(stored.encode("ascii")).decode("utf-8")
     except (InvalidToken, ValueError):
         return stored  # 历史明文兼容：原样返回
+
+
+def reencrypt_plaintext_secrets() -> int:
+    """启动自愈：把历史明文密钥字段升级为密文（安审计 M-2，2026-09-09）。
+
+    判定与 decrypt 的兼容口径一致：当前密钥解不开（InvalidToken）即视为
+    明文，重新加密落库——否则存量明文行除非用户重新保存，将永远明文。
+    未配置加密密钥时直接跳过（返回 0）。返回升级的字段数。
+    """
+    if not encryption_enabled():
+        return 0
+    from cryptography.fernet import InvalidToken
+    from sqlalchemy import select
+
+    from app.database import SessionLocal
+    from app.models import LLMSetting
+
+    fields = ("external_api_key", "music_api_key", "replicate_api_token")
+    upgraded = 0
+    with SessionLocal() as db:
+        rows = db.execute(select(LLMSetting)).scalars().all()
+        for row in rows:
+            dirty = False
+            for f in fields:
+                stored = getattr(row, f) or ""
+                if not stored:
+                    continue
+                try:
+                    _fernet().decrypt(stored.encode("ascii"))
+                except (InvalidToken, ValueError):
+                    setattr(row, f, encrypt_secret(stored))
+                    upgraded += 1
+                    dirty = True
+            if dirty:
+                db.add(row)
+        if upgraded:
+            db.commit()
+    return upgraded

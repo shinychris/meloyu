@@ -18,8 +18,6 @@ export const loginEn = {
   'login.submitting': 'Please wait…',
   'login.submit.login': 'Sign in to Studio',
   'login.submit.register': 'Create account · 200 free credits',
-  'login.demo.account': 'Demo account:',
-  'login.demo.fill': 'Autofill',
   'login.demo.note': 'Local demo engine · generated content is auto-registered as proof of creation',
   'login.backToLanding': '← Back to home',
   'login.verify.label': 'Verification code',

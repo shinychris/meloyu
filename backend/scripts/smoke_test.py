@@ -1309,20 +1309,37 @@ def main() -> int:
         for t in b["data"]["items"]))
 
     # ============ 16. v0.7.0 商业化批（账号体系/支付门/证书分流） ============
-    # 16.1 refresh 轮换与吊销
+    # 16.1 refresh 轮换与吊销（v0.13.0：refresh 走 HttpOnly Cookie，body 不再回显；
+    #     从 Set-Cookie 头取值验证 + 请求体通道兼容旧客户端）
+    def _refresh_from_setcookie(resp) -> str:
+        for part in resp.headers.get("set-cookie", "").split(","):
+            kv = part.split(";", 1)[0].strip()
+            if kv.startswith("meloyu_refresh="):
+                return kv[len("meloyu_refresh="):]
+        return ""
+
     r = client.post(f"{API}/auth/login", json={"email": email, "password": password})
-    rt = unwrap(r)["data"]["refresh_token"]
-    check("16.1 login 返回 refresh_token", bool(rt))
-    r = client.post(f"{API}/auth/refresh", json={"refresh_token": rt})
+    rt = _refresh_from_setcookie(r)
+    sc = r.headers.get("set-cookie", "")
+    check("16.1 login 经 Set-Cookie 下发 refresh（HttpOnly+Strict）",
+          bool(rt) and "HttpOnly" in sc and "SameSite=strict" in sc
+          and "Path=/api/v1/auth" in sc)
+    check("16.1 login 响应体不再含 refresh_token",
+          "refresh_token" not in unwrap(r)["data"])
+    r = client.post(f"{API}/auth/refresh", json={})  # Cookie 通道（httpx 自动携带）
     new_pair = unwrap(r)["data"]
-    check("16.1 POST /auth/refresh 轮换", r.status_code == 200
-          and new_pair["refresh_token"] != rt and new_pair["access_token"])
-    r = client.post(f"{API}/auth/refresh", json={"refresh_token": rt})
+    new_rt = _refresh_from_setcookie(r)
+    check("16.1 POST /auth/refresh 轮换（Cookie 通道）", r.status_code == 200
+          and new_pair["access_token"] and bool(new_rt) and new_rt != rt)
+    r = client.post(f"{API}/auth/refresh", json={"refresh_token": rt})  # 旧值（body 兼容）
     check("16.1 旧 refresh 已失效（40103）", r.status_code == 401
           and unwrap(r)["code"] == 40103)
+    r = client.post(f"{API}/auth/refresh", json={"refresh_token": new_rt})  # 新值（body 兼容）
+    newest_rt = _refresh_from_setcookie(r)
+    check("16.1 新 refresh 可用（body 兼容通道）", r.status_code == 200 and bool(newest_rt))
     r = client.post(f"{API}/auth/logout", headers=auth_headers(new_pair["access_token"]))
     check("16.1 POST /auth/logout", r.status_code == 200 and unwrap(r)["data"]["ok"])
-    r = client.post(f"{API}/auth/refresh", json={"refresh_token": new_pair["refresh_token"]})
+    r = client.post(f"{API}/auth/refresh", json={"refresh_token": newest_rt})
     check("16.1 logout 后 refresh 被吊销", r.status_code == 401)
 
     # 16.2 改密/找回（SMTP 未配置口径）——只测错误路径，不实际改密（避免污染主凭据）

@@ -5,14 +5,12 @@ import time
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.config import APP_VERSION, EDIT_OPERATION_CREDIT_COST, MODEL_CREDIT_COST, settings
+from app.config import EDIT_OPERATION_CREDIT_COST, MODEL_CREDIT_COST, settings
 from app.core.i18n import tr
 from app.core.responses import ok
 from app.database import get_db
-from app.models import File, Task
 from app.models.enums import LANGUAGES, SECTIONS, TIME_SIGNATURES, TONICS
 from app.synth.structure import SECTION_ORDER, SECTION_TAG
 
@@ -152,16 +150,11 @@ _INSTRUMENTS = (
 
 @router.get("/health")
 def health(db: Session = Depends(get_db)):
-    tasks_running = db.execute(select(func.count()).select_from(Task)
-                               .where(Task.status == "running")).scalar_one()
-    audio_files = db.execute(select(func.count()).select_from(File)).scalar_one()
+    # 安审计 L-1（2026-09-09）：无鉴权端点不再回显版本号与内部规模统计
+    # （版本指纹/侦察信息收敛）；运维侧版本经镜像 tag / 需登录接口可得
     return ok({
         "status": "ok",
-        "version": APP_VERSION,
-        "uptime_sec": int(time.time() - _STARTED_AT),
         "db": "ok",
-        "tasks_running": tasks_running,
-        "audio_files": audio_files,
         "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     })
 

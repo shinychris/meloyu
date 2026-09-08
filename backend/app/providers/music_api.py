@@ -26,6 +26,7 @@ import httpx
 from app.config import MUSIC_API_TASK_TIMEOUT_SEC
 from app.core.i18n import tr
 from app.core.logging import logger
+from app.core.net_guard import PrivateUrlError, public_stream
 from app.core.seed import candidate_seed
 from app.providers.base import (
     CancelCheck,
@@ -279,7 +280,8 @@ class APIMusicProvider:
         cand_dir.mkdir(parents=True, exist_ok=True)
         path = cand_dir / "preview.mp3"
         try:
-            with httpx.stream("GET", url, timeout=_DOWNLOAD_TIMEOUT, follow_redirects=True) as r:
+            # net_guard：外部网关回传的 URL 下载前逐跳校验公网地址（防 SSRF 二阶）
+            with public_stream(url, _DOWNLOAD_TIMEOUT) as r:
                 if r.status_code != 200:
                     raise MusicAPIError(
                         "protocol",
@@ -288,6 +290,11 @@ class APIMusicProvider:
                 with open(path, "wb") as f:
                     for chunk in r.iter_bytes(1 << 20):
                         f.write(chunk)
+        except PrivateUrlError as e:
+            raise MusicAPIError(
+                "bad_output",
+                tr(f"音频下载地址被拒绝（非公网目标）：{e}",
+                   f"Audio download URL rejected (non-public target): {e}")) from e
         except httpx.HTTPError as e:
             raise MusicAPIError(
                 "unavailable",

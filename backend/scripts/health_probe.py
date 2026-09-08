@@ -51,9 +51,8 @@ def check_health(base: str) -> tuple[bool, str]:
         return False, f"[health] FAIL {url} -> 无法连接（{exc.__class__.__name__}: {exc}）"
     data = body.get("data") or {}
     if resp_status_ok(body) and data.get("status") == "ok":
-        detail = (f"version={data.get('version')} uptime={data.get('uptime_sec')}s "
-                  f"tasks_running={data.get('tasks_running')} audio_files={data.get('audio_files')}")
-        return True, f"[health] OK   {url} -> {detail}"
+        # v0.13.0：health 不再回显 version/uptime/统计（无鉴权端点信息收敛）
+        return True, f"[health] OK   {url} -> status=ok db={data.get('db')}"
     return False, f"[health] FAIL {url} -> 响应异常: {json.dumps(body, ensure_ascii=False)[:200]}"
 
 

@@ -105,7 +105,7 @@ describe('api/client 统一封装', () => {
   })
 })
 
-/* ============ v0.7.0 token 刷新（40102 → /auth/refresh → 重放原请求一次） ============ */
+/* ============ 40102 → /auth/refresh（v0.13.0：凭 HttpOnly Cookie 刷新）→ 重放原请求一次 ============ */
 
 const envelope = (code: number, data: unknown = null, message = 'ok') => ({
   code,
@@ -115,10 +115,9 @@ const envelope = (code: number, data: unknown = null, message = 'ok') => ({
 })
 
 describe('api/client 40102 静默刷新', () => {
-  it('40102 时用 refresh_token 换新 token 并重放原请求（携带新 Bearer）', async () => {
+  it('40102 时凭 Cookie 刷新换新 access 并重放原请求（携带新 Bearer）', async () => {
     const { store } = stubBrowser()
     store.set('meloyu:token', 'old-access')
-    store.set('meloyu:refresh-token', 'old-refresh')
 
     let refreshCalls = 0
     http.defaults.adapter = (config) => {
@@ -126,11 +125,11 @@ describe('api/client 40102 静默刷新', () => {
       const auth = String(config.headers?.Authorization ?? '')
       if (url.includes('/auth/refresh')) {
         refreshCalls += 1
-        expect(config.data).toContain('old-refresh')
+        // v0.13.0：refresh 凭据在 HttpOnly Cookie 中，请求体不再携带
+        expect(config.data).toBe('{}')
         return Promise.resolve({
           data: envelope(0, {
             access_token: 'new-access',
-            refresh_token: 'new-refresh',
             token_type: 'Bearer',
             expires_in: 86400,
           }),
@@ -162,9 +161,9 @@ describe('api/client 40102 静默刷新', () => {
     const data = await apiGet<{ items: string[] }>('/works')
     expect(data).toEqual({ items: ['ok'] })
     expect(refreshCalls).toBe(1)
-    // 新 token 对已落本地
+    // 新 access 已落本地；refresh 不落 localStorage（HttpOnly Cookie 域）
     expect(store.get('meloyu:token')).toBe('new-access')
-    expect(store.get('meloyu:refresh-token')).toBe('new-refresh')
+    expect(store.get('meloyu:refresh-token')).toBeUndefined()
     // 40102 静默处理：不 toast、不踢登录
     expect(useToastStore.getState().toasts.length).toBe(0)
     expect(currentHash()).toBe('')
@@ -173,7 +172,6 @@ describe('api/client 40102 静默刷新', () => {
   it('并发两个 40102 只触发一次 /auth/refresh（单飞）', async () => {
     const { store } = stubBrowser()
     store.set('meloyu:token', 'old-access')
-    store.set('meloyu:refresh-token', 'old-refresh')
 
     let refreshCalls = 0
     http.defaults.adapter = async (config) => {
@@ -184,7 +182,7 @@ describe('api/client 40102 静默刷新', () => {
         // 人为延迟，保证第二个 40102 到来时刷新仍在途
         await new Promise((r) => setTimeout(r, 20))
         return {
-          data: envelope(0, { access_token: 'new-access', refresh_token: 'new-refresh' }),
+          data: envelope(0, { access_token: 'new-access' }),
           status: 200,
           statusText: 'ok',
           headers: {},
@@ -207,14 +205,21 @@ describe('api/client 40102 静默刷新', () => {
     expect(refreshCalls).toBe(1)
   })
 
-  it('无 refresh_token 时 40102 直接踢登录（不刷新、不 toast）', async () => {
+  it('刷新失败（无有效会话 Cookie）时踢登录（不 toast）', async () => {
     const { store } = stubBrowser()
-    store.set('meloyu:token', 'old-access') // 仅 access，无 refresh
+    store.set('meloyu:token', 'old-access')
 
     let refreshCalls = 0
     http.defaults.adapter = (config) => {
       if ((config.url ?? '').includes('/auth/refresh')) {
         refreshCalls += 1
+        return Promise.resolve({
+          data: envelope(40101, null, 'refresh token invalid'),
+          status: 401,
+          statusText: '',
+          headers: {},
+          config,
+        } as AxiosResponse)
       }
       return Promise.resolve({
         data: envelope(40102, null, 'token expired'),
@@ -227,16 +232,15 @@ describe('api/client 40102 静默刷新', () => {
 
     const err = await apiGet('/works').catch((e: unknown) => e)
     expect((err as ApiError).code).toBe(40102)
-    expect(refreshCalls).toBe(0)
+    expect(refreshCalls).toBe(1) // 尝试过一次 Cookie 刷新
     expect(store.get('meloyu:token')).toBeUndefined()
     expect(currentHash()).toBe('#/login')
     expect(useToastStore.getState().toasts.length).toBe(0)
   })
 
-  it('refresh 也失效（40101）时清 token 踢登录，不递归刷新', async () => {
+  it('refresh 也失效（网络/HTTP 错误）时清 token 踢登录，不递归刷新', async () => {
     const { store } = stubBrowser()
     store.set('meloyu:token', 'old-access')
-    store.set('meloyu:refresh-token', 'expired-refresh')
 
     let refreshCalls = 0
     http.defaults.adapter = (config) => {
@@ -272,7 +276,6 @@ describe('api/client 40102 静默刷新', () => {
   it('40101（未认证）不做刷新，直接踢登录', async () => {
     const { store } = stubBrowser()
     store.set('meloyu:token', 'access')
-    store.set('meloyu:refresh-token', 'refresh')
 
     let refreshCalls = 0
     http.defaults.adapter = (config) => {

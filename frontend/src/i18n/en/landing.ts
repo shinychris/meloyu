@@ -286,4 +286,5 @@ export const landingEn = {
   'landing.data.milestone.20.title': 'Full mainstream taxonomy: 15 sections / 47 genres / 30 instruments',
   'landing.data.milestone.21.title': 'Ollama thinking-off speedup & Studio-to-arrange loop',
   'landing.data.milestone.22.title': 'Lyrics creation boost: idea-driven AI / bilingual tag guides / performance marks',
+  'landing.data.milestone.23.title': 'Security hardening: HttpOnly refresh / rate-limit anti-spoof / SSRF guards / CSP',
 } as const

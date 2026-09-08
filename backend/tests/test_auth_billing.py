@@ -57,37 +57,42 @@ class _DBTestCase(unittest.TestCase):
 class TestAuthFlow(_DBTestCase):
     EMAIL = "u1@test.local"
 
-    def _register(self):
-        return auth_svc.register(self.db, self.EMAIL, "Passw0rd123", "tester")
+    def _register(self) -> tuple[dict, str]:
+        """注册并返回 (响应体, refresh token)——v0.13.0 起 refresh 不再进响应体
+        （HttpOnly Cookie 通道，服务层返回 (body, refresh, ttl) 三元组）。"""
+        out, refresh, _ttl = auth_svc.register(self.db, self.EMAIL, "Passw0rd123", "tester")
+        return out, refresh
 
     def test_register_grants_bonus_and_admin_flag(self):
         settings.admin_emails = "u1@test.local"
         try:
-            out = self._register()
+            out, refresh = self._register()
         finally:
             settings.admin_emails = ""
         user = self.db.query(User).filter(User.email == self.EMAIL).one()
         self.assertTrue(user.is_admin)
         self.assertEqual(user.credit_balance, settings and 200)
-        self.assertTrue(out["access_token"] and out["refresh_token"])
+        self.assertTrue(out["access_token"])
+        self.assertTrue(refresh)
+        self.assertNotIn("refresh_token", out, "refresh 必须走 HttpOnly Cookie，不进响应体")
 
     def test_refresh_rotation_and_revocation(self):
-        registered = self._register()
-        stale = registered["refresh_token"]
+        _out, stale = self._register()
         first_hash = self.db.query(User).one().refresh_token_hash
-        out = auth_svc.refresh(self.db, stale)
+        out, new_refresh, _ttl = auth_svc.refresh(self.db, stale)
         user = self.db.query(User).one()
         self.assertNotEqual(user.refresh_token_hash, first_hash, "轮换必须覆写")
         # 轮换后旧 refresh 立即失效
         with self.assertRaises(BizError):
             auth_svc.refresh(self.db, stale)
         # 新 refresh 可用
-        again = auth_svc.refresh(self.db, out["refresh_token"])
+        again, again_refresh, _ = auth_svc.refresh(self.db, new_refresh)
         self.assertTrue(again["access_token"])
+        self.assertTrue(again_refresh)
 
     def _login_refresh(self) -> str:
-        out = auth_svc.login(self.db, self.EMAIL, "Passw0rd123")
-        return out["refresh_token"]
+        out, refresh, _ttl = auth_svc.login(self.db, self.EMAIL, "Passw0rd123")
+        return refresh
 
     def test_logout_revokes(self):
         self._register()

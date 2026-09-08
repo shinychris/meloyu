@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import sys
 import time
 import urllib.request
@@ -33,7 +34,8 @@ def call(method: str, path: str, token: str | None = None, body: dict | None = N
 
 def login() -> str:
     _, b = call("POST", "/auth/login",
-                body={"email": "demo@meloyu.local", "password": "Meloyu2026"})
+                body={"email": os.environ.get("MELOYU_EMAIL", "demo@meloyu.local"),
+                    "password": os.environ.get("MELOYU_PASSWORD", "Meloyu2026")})
     return b["data"]["access_token"]
 
 

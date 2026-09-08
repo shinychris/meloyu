@@ -43,6 +43,21 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
     return user
 
 
+def require_admin_probe(user: User = Depends(get_current_user)) -> User:
+    """连通性测试端点同样需管理员（安审计 M-1，2026-09-09）。
+
+    test-external/test-music 接受调用方任意 base_url 并由服务端发起请求——
+    若登录即可用，构成内网探测/云元数据读取原语（SSRF）；与 PUT /settings
+    同级收权 admin（管理员本就可信配置任意通道地址，含本机推理端点）。
+    """
+    if not user.is_admin:
+        raise err_forbidden(tr(
+            "模型中心连通性测试需管理员权限（测试将用您填写的地址发起服务端请求）",
+            "Model center connectivity tests require administrator rights "
+            "(tests make server-side requests to the URL you provide)"))
+    return user
+
+
 @router.get("/runtime")
 def runtime(db: Session = Depends(get_db),
             user: User = Depends(get_current_user)):
@@ -101,21 +116,21 @@ def op(op_id: str, db: Session = Depends(get_db),
 
 @router.post("/test-external")
 def test_external(body: ExternalTestRequest,
-                  user: User = Depends(get_current_user)):
+                  user: User = Depends(require_admin_probe)):
     """外部 API 连通性测试（发 2 token 最小对话，不落库）。"""
     return ok(svc.test_external(body.base_url, body.api_key, body.model))
 
 
 @router.post("/test-music")
 def test_music(body: MusicTestRequest,
-               user: User = Depends(get_current_user)):
+               user: User = Depends(require_admin_probe)):
     """外部歌曲生成 API（Suno 兼容）端点探活（get 探针 id，不落库）。"""
     return ok(svc.test_music(body.base_url, body.api_key, body.model))
 
 
 @router.post("/test-replicate")
 def test_replicate(body: ReplicateTestRequest,
-                   user: User = Depends(get_current_user)):
+                   user: User = Depends(require_admin_probe)):
     """Replicate Token 校验（GET /v1/account）+ 可选模型存在性（不落库）。"""
     return ok(svc.test_replicate(body.api_token, body.base_url, body.model))
 
