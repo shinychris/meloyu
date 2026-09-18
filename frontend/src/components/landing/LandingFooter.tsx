@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { CHANNELS, LANDING_VERSION, MILESTONES } from '../../lib/landing-data'
+import { CHANNELS, LANDING_VERSION } from '../../lib/landing-data'
 import { useT, type TranslationKey } from '../../i18n'
 import { scrollToSection } from './LandingNav'
 
@@ -12,7 +12,7 @@ const FOOTER_LINKS: Array<{ id: string; key: TranslationKey }> = [
   { id: 'faq', key: 'landing.nav.faq' },
 ]
 
-/** 尾幅 CTA + 页脚（品牌 / 导航 / 里程碑 / 版本） */
+/** 尾幅 CTA + 页脚（品牌 / 导航 / 版本） */
 export default function LandingFooter() {
   const navigate = useNavigate()
   const t = useT()
@@ -33,7 +33,7 @@ export default function LandingFooter() {
       </section>
 
       {/* 页脚主体 */}
-      <div className="max-w-[1080px] mx-auto px-6 py-14 grid md:grid-cols-[1.4fr_1fr_1.2fr] gap-10">
+      <div className="max-w-[1080px] mx-auto px-6 py-14 grid md:grid-cols-[1.6fr_1fr] gap-10">
         <div>
           <div className="flex items-center gap-2.5">
             <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
@@ -65,19 +65,6 @@ export default function LandingFooter() {
               >
                 {t(l.key)}
               </button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <div className="label">{t('landing.footer.col.milestones')}</div>
-          <div className="mt-4 space-y-2">
-            {MILESTONES.map((m, i) => (
-              <div key={m.ver} className="flex gap-3 text-[11px]">
-                <span className="num font-bold flex-none" style={{ color: i === MILESTONES.length - 1 ? 'var(--acc)' : 'var(--dim)' }}>
-                  {m.ver}
-                </span>
-                <span style={{ color: 'var(--muted)' }}>{t(m.title)}</span>
-              </div>
             ))}
           </div>
         </div>

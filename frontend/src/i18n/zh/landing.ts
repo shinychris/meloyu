@@ -95,7 +95,6 @@ export const landingZh: Record<keyof typeof landingEn, string> = {
   'landing.footer.about': '面向中文创作者与内容团队的 AI 音乐工作台：可控生成、段落级编辑、DAW 级导出、授权留痕。',
   'landing.footer.meta': '{v} · FastAPI + React 单机自部署 · 数据不出你的机器',
   'landing.footer.col.product': '产品',
-  'landing.footer.col.milestones': '里程碑',
   'landing.footer.enterStudio': '进入工作台',
   'landing.footer.copyright': '© 2026 Meloyu 旋律屿 · {n} 通道引擎 · 开源权重许可如实标注',
   // ---- 数据字段（landing-data.ts）----

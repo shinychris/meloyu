@@ -92,7 +92,6 @@ export const landingEn = {
   'landing.footer.about':'The AI music workstation for creators and content teams: controllable generation, section-level editing, DAW-grade export, licensed and traceable.',
   'landing.footer.meta': '{v} · FastAPI + React, self-hosted on one machine · your data never leaves it',
   'landing.footer.col.product': 'Product',
-  'landing.footer.col.milestones': 'Milestones',
   'landing.footer.enterStudio': 'Open the studio',
   'landing.footer.copyright': '© 2026 Meloyu · {n} generation engines · open-weight licenses labeled honestly',
   // ---- 数据字段（landing-data.ts）----
