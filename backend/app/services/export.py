@@ -40,7 +40,19 @@ def create_export(db: Session, user: User, version_id: str, fmt: str,
             tr(f"{fmt.upper()} 导出为 Pro/Studio 档权益；免费档仅支持 MP3 导出",
                f"{fmt.upper()} export is a Pro/Studio benefit; "
                "the free plan exports MP3 only"))
-    # P1-8：存储配额（导出产物同样计入占用）
+    # P1-8：存储配额（导出产物同样计入占用）+ 每用户在途导出上限
+    # （导出 0 积分，无上限可刷满导出池拖慢所有人）
+    from sqlalchemy import func as _func
+    from sqlalchemy import select as _select
+    inflight = db.execute(
+        _select(_func.count()).select_from(Task).where(
+            Task.user_id == user.id, Task.type == "export",
+            Task.status.in_(("queued", "running")))
+    ).scalar_one()
+    if inflight >= 3:
+        raise err_conflict(
+            tr("在途导出任务已达上限（3 个），请等待完成后再提交",
+               "You already have 3 export task(s) running; wait for them to finish first"))
     from app.services.generation import check_storage_quota
     check_storage_quota(db, user)
     version = works_svc.get_version_owned(db, version_id, user)
