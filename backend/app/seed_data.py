@@ -167,14 +167,15 @@ PLANS_ROWS = [
     # 价格口径（P0-5，2026-09-26 商业化审查）：USD 美分（price_monthly=月付，
     # price_yearly=年付折算的月单价），与 Stripe 实收一致；订单金额以 webhook
     # 回填的 Stripe 实收为准（amount_total/currency），本表值仅作展示与提示。
+    # 末两列（P1-8）：在途生成任务上限 / 存储配额 MB。
     ("free", "免费", 0, 0, 5, 0, "mp3", False, True, True, 10,
-     ["每日 5 次生成", "仅 MP3 导出", "非商用 · 指纹登记"]),
+     ["每日 5 次生成", "仅 MP3 导出", "非商用 · 指纹登记"], 1, 2 * 1024),
     ("pro", "个人 Pro", 799, 639, None, 2500, "wav", True, False, True, 20,
-     ["商用授权 + 证书", "WAV 48k/24bit · MIDI · 4 Stems", "每月 2,500 积分可结转"]),
+     ["商用授权 + 证书", "WAV 48k/24bit · MIDI · 4 Stems", "每月 2,500 积分可结转"], 3, 20 * 1024),
     ("studio", "创作人 Studio", 2299, 1839, None, 10000, "wav", True, False, True, 30,
-     ["全部 Pro 权益 + 12 Stems（V1.1）", "专业修调/AI 编曲建议（V2）", "每月 10,000 积分 · 优先队列"]),
+     ["全部 Pro 权益 + 12 Stems（V1.1）", "专业修调/AI 编曲建议（V2）", "每月 10,000 积分 · 优先队列"], 5, 100 * 1024),
     ("team", "团队 / 企业", None, None, None, None, "wav", True, False, False, 40,
-     ["团队空间与协作（V1.1）", "API 按量计费", "专属合规支持"]),
+     ["团队空间与协作（V1.1）", "API 按量计费", "专属合规支持"], 5, 200 * 1024),
 ]
 
 LEDGER = [
@@ -280,7 +281,9 @@ def _seed_all() -> None:
             db.add(Plan(code=row[0], name=row[1], price_monthly=row[2], price_yearly=row[3],
                         daily_generations=row[4], monthly_credits=row[5], max_export=row[6],
                         commercial_license=row[7], watermark=row[8], switchable=row[9],
-                        sort_order=row[10], features=row[11], created_at=ts, updated_at=ts))
+                        sort_order=row[10], features=row[11],
+                        max_concurrent_tasks=row[12], storage_quota_mb=row[13],
+                        created_at=ts, updated_at=ts))
         db.add(User(id=U_DEMO, email=DEMO_EMAIL, password_hash=hash_password(DEMO_PASSWORD),
                     nickname="岛民", plan="studio", is_admin=True, credit_balance=12616,
                     credit_monthly_grant=10000, credit_carried_over=2700,

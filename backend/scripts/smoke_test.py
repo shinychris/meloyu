@@ -19,8 +19,8 @@ import struct
 import sys
 import time
 import uuid
-import zipfile
 import wave
+import zipfile
 from pathlib import Path
 
 import httpx
@@ -1446,7 +1446,6 @@ def main() -> int:
 
     # ============ 17. FR-4 参考音频（v0.8.1） ============
     import io as _io
-    import struct as _struct
     import wave as _wave
 
     def _smoke_ref_wav(bpm: int, sr: int = 22050, dur: float = 20.0) -> bytes:
@@ -1614,8 +1613,9 @@ def main() -> int:
               json.dumps(gtask.get("error", ""))[:150])
         r = client.get(f"{API}/versions/{gtask['version_id']}", headers=auth_headers(token))
         # version 详情不直接暴露 params？改查任务 payload 口径：留痕在 request_payload
-        from app.models import Task as _T, Version as _V  # noqa: F401
         import sqlite3 as _sq
+
+        from app.models import Task as _T  # noqa: F401
         conn = _sq.connect(str(Path(_smoke_data_dir()) / "meloyu.db"))
         row = conn.execute(
             "SELECT request_payload FROM tasks WHERE id=?", (gtask["id"],)).fetchone()
@@ -1931,6 +1931,7 @@ def main() -> int:
     # 25.1 哼唱分析：合成四音（A3→C4→E4→D4）→ 音高轮廓 + 音程保真
     import struct as _st
     import wave as _wav
+
     import numpy as _np
     _sr = 22050
     _x = []

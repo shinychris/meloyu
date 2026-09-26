@@ -23,6 +23,8 @@ from app.synth.mp3_io import encode_mp3
 
 def create_export(db: Session, user: User, version_id: str, fmt: str,
                   platform: str | None = None, meta: dict | None = None) -> dict:
+    from app.services.generation import _check_maintenance
+    _check_maintenance()
     from app.core.disk_guard import ensure_disk_available
     ensure_disk_available()
     # P0-4（2026-09-26 商业化审查）：付费档核心权益后端强制——Plan.max_export
@@ -38,6 +40,9 @@ def create_export(db: Session, user: User, version_id: str, fmt: str,
             tr(f"{fmt.upper()} 导出为 Pro/Studio 档权益；免费档仅支持 MP3 导出",
                f"{fmt.upper()} export is a Pro/Studio benefit; "
                "the free plan exports MP3 only"))
+    # P1-8：存储配额（导出产物同样计入占用）
+    from app.services.generation import check_storage_quota
+    check_storage_quota(db, user)
     version = works_svc.get_version_owned(db, version_id, user)
     if not version.active_candidate_id:
         raise err_conflict(tr("该版本尚未采用候选", "No candidate adopted for this version yet"))

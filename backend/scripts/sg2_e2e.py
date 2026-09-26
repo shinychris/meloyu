@@ -8,8 +8,8 @@ runtime），model server 在 127.0.0.1:42100 运行且已可加载模型。
 from __future__ import annotations
 
 import argparse
-import os
 import json
+import os
 import sys
 import time
 import urllib.request

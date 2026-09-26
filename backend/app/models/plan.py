@@ -33,6 +33,10 @@ class Plan(Base):
     features: Mapped[list] = mapped_column(JSON, nullable=False)
     switchable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
+    # v0.14.0（P1-8/P1-15）：档位配额。NULL=用代码默认（并发 free1/pro3/studio5；
+    # 存储 free 2GB/pro 20GB/studio 100GB/team 200GB）——运营可调表即时生效
+    max_concurrent_tasks: Mapped[int | None] = mapped_column(Integer)
+    storage_quota_mb: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[str] = mapped_column(ISOTimestamp(), nullable=False)
     updated_at: Mapped[str] = mapped_column(ISOTimestamp(), nullable=False)
 

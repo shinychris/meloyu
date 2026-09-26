@@ -21,6 +21,9 @@ services:
     image: meloyu/backend:prod
     container_name: meloyu-backend
     restart: unless-stopped
+    # P1-13：默认 10s 后 SIGKILL 对写库线程太粗暴（可能留脏 WAL）；给足
+    # 优雅退出窗口（uvicorn SIGTERM → 在写事务提交后退出）
+    stop_grace_period: 60s
     env_file: .env.prod
     environment:
       # 容器内固定值（优先级高于 env_file，防误配）

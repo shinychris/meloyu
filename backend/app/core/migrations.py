@@ -48,6 +48,11 @@ _ADD_COLUMNS: list[tuple[str, str, str]] = [
     # M-20260926-c：v0.14.0——subscriptions 记录当前生效 Stripe 订阅 id
     ("subscriptions", "stripe_subscription_id",
      "ALTER TABLE subscriptions ADD COLUMN stripe_subscription_id VARCHAR(120)"),
+    # M-20260926-d：v0.14.0——plans 档位配额（并发任务/存储）
+    ("plans", "max_concurrent_tasks",
+     "ALTER TABLE plans ADD COLUMN max_concurrent_tasks INTEGER"),
+    ("plans", "storage_quota_mb",
+     "ALTER TABLE plans ADD COLUMN storage_quota_mb INTEGER"),
 ]
 
 

@@ -58,6 +58,8 @@ class TestDiskGuard(unittest.TestCase):
         with mock.patch.object(gen, "check_generation_content"), \
              mock.patch.object(gen, "check_free_daily_limit"), \
              mock.patch.object(gen, "check_account_hourly_limit"), \
+             mock.patch.object(gen, "check_inflight_limit"), \
+             mock.patch.object(gen, "check_storage_quota"), \
              mock.patch("app.core.disk_guard.shutil.disk_usage",
                         return_value=_usage(1)):
             with self.assertRaises(BizError) as ctx:

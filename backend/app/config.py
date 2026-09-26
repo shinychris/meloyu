@@ -104,6 +104,9 @@ class Settings(BaseSettings):
     disk_min_free_gb: float = 10.0
     # 账号维度每小时生成任务上限（P1-7：叠加在 IP 限流之上，防付费账号直刷/脚本刷量）
     account_generation_hourly_limit: int = 30
+    # 维护模式（P1-13）：true 时生成/派生/导出提交一律 50301 拒绝（发布窗口防新任务
+    # 进队列被重启杀掉）；.env 置 MAINTENANCE_MODE=true 后 up -d 生效
+    maintenance_mode: bool = False
     # MiniMax-Music3 商用开放开关（义务①署名/②防侵权防护/③AUP 披露已落实，默认开放；
     # 条款修订或营收接近 $20M 门槛时置 false 回退非商用签发）
     mmax_commercial_enabled: bool = True

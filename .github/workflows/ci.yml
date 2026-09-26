@@ -47,3 +47,33 @@ jobs:
 
       - name: Install, typecheck, test, build
         run: cd frontend && npm ci && npm run typecheck && npm test && npm run build
+
+  docker:
+    # P1-14/15（2026-09-26）：镜像可构建性门禁——Dockerfile 与 requirements.lock
+    # 变更若无构建验证，坏掉只会在下次发布时被发现。只 build 不 push。
+    name: docker (build only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./deploy/backend.Dockerfile
+          push: false
+          tags: meloyu/backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./deploy/frontend.Dockerfile
+          push: false
+          tags: meloyu/frontend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

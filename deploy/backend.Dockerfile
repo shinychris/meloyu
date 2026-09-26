@@ -18,10 +18,12 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl fonts-wqy-microhei \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt ./
+# P1-14（2026-09-26）：按 requirements.lock 钉死版本安装——requirements.txt 为
+# >= 开放约束，"没改代码也会变"的镜像不可复现；lock 含全部传递依赖钉死。
 # uv 供容器内部署 ACE-Step 独立 venv（scripts/setup_acestep.py，Linux venv
 # 建在 bind 挂载的 data/acestep/.venv-linux；后端自身运行时不需要它）
-RUN pip install --no-cache-dir -r requirements.txt uv
+COPY requirements.txt requirements.lock ./
+RUN pip install --no-cache-dir -r requirements.lock uv
 
 COPY app ./app
 COPY scripts ./scripts

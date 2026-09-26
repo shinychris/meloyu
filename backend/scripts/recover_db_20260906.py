@@ -11,10 +11,9 @@
 """
 from __future__ import annotations
 
+import sqlite3
 import sys
 from pathlib import Path
-
-import sqlite3
 
 DATA = Path(__file__).resolve().parent.parent / "data"
 SRC = DATA / "meloyu.db"

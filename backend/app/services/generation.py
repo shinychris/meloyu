@@ -178,10 +178,67 @@ def check_account_hourly_limit(db: Session, user: User) -> None:
                f"{settings.account_generation_hourly_limit}); please try again later"))
 
 
+# 档位默认配额（Plan 表 NULL 时回退；运营可在表内覆盖）
+_DEFAULT_CONCURRENT = {"free": 1, "pro": 3, "studio": 5, "team": 5}
+_DEFAULT_STORAGE_MB = {"free": 2 * 1024, "pro": 20 * 1024,
+                       "studio": 100 * 1024, "team": 200 * 1024}
+
+
+def check_inflight_limit(db: Session, user: User) -> None:
+    """P1-8：每用户在途（queued/running）生成任务上限，防单用户堆满队列。"""
+    from app.models import Plan
+    plan_row = db.get(Plan, user.plan)
+    limit = (plan_row.max_concurrent_tasks if plan_row and plan_row.max_concurrent_tasks
+             else _DEFAULT_CONCURRENT.get(user.plan, 2))
+    inflight = db.execute(
+        select(func.count()).select_from(Task).where(
+            Task.user_id == user.id, Task.type == "generation",
+            Task.status.in_(("queued", "running")))
+    ).scalar_one()
+    if inflight >= limit:
+        raise err_conflict(
+            tr(f"在途生成任务已达上限（{limit} 个），请等待完成后再提交",
+               f"You already have {limit} generation task(s) running; "
+               "wait for them to finish first"))
+
+
+def check_storage_quota(db: Session, user: User) -> None:
+    """P1-8：每用户已登记文件总量 vs 档位存储配额（提交生成/导出前校验）。
+
+    只统计 files 表登记字节（未登记的临时文件由孤儿清扫兜底）；命中配额
+    引导清理回收站（30 天后自动物理删除）。
+    """
+    from app.models import File, Plan, Work
+    plan_row = db.get(Plan, user.plan)
+    quota_mb = (plan_row.storage_quota_mb if plan_row and plan_row.storage_quota_mb
+                else _DEFAULT_STORAGE_MB.get(user.plan, 2 * 1024))
+    used = db.execute(
+        select(func.coalesce(func.sum(File.bytes), 0)).join(
+            Work, Work.id == File.work_id).where(Work.user_id == user.id)
+    ).scalar_one()
+    if used >= quota_mb * 1024 * 1024:
+        raise err_conflict(
+            tr(f"存储空间已满（配额 {quota_mb // 1024}GB）：请删除不需要的作品"
+               f"（回收站 30 天后自动清除）或升级档位",
+               f"Storage quota reached ({quota_mb // 1024}GB): delete unneeded works "
+               "(trash auto-purges after 30 days) or upgrade your plan"))
+
+
+def _check_maintenance() -> None:
+    """P1-13：维护模式（发布窗口）拒绝新任务提交，防进队列即被重启杀掉。"""
+    if settings.maintenance_mode:
+        raise err_conflict(
+            tr("系统维护中，请稍后再试（通常几分钟内恢复）",
+               "The system is under maintenance; please try again shortly"))
+
+
 def submit_generation(db: Session, user: User, payload: dict) -> dict:
+    _check_maintenance()
     check_generation_content(payload)
     check_free_daily_limit(db, user)
     check_account_hourly_limit(db, user)
+    check_inflight_limit(db, user)
+    check_storage_quota(db, user)
     from app.core.disk_guard import ensure_disk_available
     ensure_disk_available()
 
@@ -446,6 +503,7 @@ def execute_generation(task_id: str) -> None:
             _refund(db, task_id)
             rollback_empty_current_version(db, task_id)
             db.commit()
+        _cleanup_failed_audio(task_id)
     except TimeoutError as e:
         with SessionLocal() as db:
             _finish_task(db, task_id, "failed", 50002,
@@ -453,6 +511,7 @@ def execute_generation(task_id: str) -> None:
             _refund(db, task_id)
             rollback_empty_current_version(db, task_id)
             db.commit()
+        _cleanup_failed_audio(task_id)
     except Exception as e:  # noqa: BLE001 —— 任务级兜底，退款 + 50002
         logger.exception(f"generation {task_id} failed: {e}")
         with SessionLocal() as db:
@@ -462,6 +521,7 @@ def execute_generation(task_id: str) -> None:
             _refund(db, task_id)
             rollback_empty_current_version(db, task_id)
             db.commit()
+        _cleanup_failed_audio(task_id)
 
 
 def _progress_reporter(task_id: str, t_start: float, timeout_sec: int):
@@ -485,6 +545,29 @@ def _skip_transient_db(task_id: str, what: str, e: Exception) -> None:
     推理被连带判失败。轮询性操作 fail-open，只告警不打断；持续失败仍会在
     落库/收尾处正常抛出。"""
     logger.warning(f"generation {task_id} {what} poll skipped (transient db): {e}")
+
+
+def _cleanup_failed_audio(task_id: str) -> None:
+    """P1-11：任务终态失败/取消后清扫版本目录的孤儿音频。
+
+    失败路径 provider 可能已落盘部分候选文件（如候选 A 成功 B 失败），
+    rollback 只回滚 DB 引用不删盘——长期运行缓慢吃满磁盘。版本已有登记
+    文件（异常发生在 _persist_success 之后的极少场景）则不清理。
+    """
+    try:
+        with SessionLocal() as db:
+            t = db.get(Task, task_id)
+            if t is None or t.work_id is None or t.version_id is None:
+                return
+            registered = db.execute(select(func.count()).select_from(File).where(
+                File.version_id == t.version_id)).scalar_one()
+            if registered:
+                return
+            dest = settings.audio_path / t.work_id / t.version_id
+        if dest.exists():
+            shutil.rmtree(dest, ignore_errors=True)
+    except Exception as e:  # noqa: BLE001 —— 清扫失败不影响任务终态
+        logger.warning(f"generation {task_id} orphan audio cleanup failed: {e}")
 
 
 def _cancel_requested(task_id: str) -> bool:
