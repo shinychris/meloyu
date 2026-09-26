@@ -14,11 +14,11 @@ export const pricingZh: Record<keyof typeof pricingEn, string> = {
   // 套餐卡
   'pricing.popular': '最受欢迎',
   'pricing.customPrice': '定制',
-  'pricing.perMonth': ' ¥/月',
+  'pricing.perMonth': ' $/月',
   'pricing.tag.free': '先玩起来',
   'pricing.tag.proYearly': '按年付 · 积分可结转',
   'pricing.tag.yearlyOnly': '按年付',
-  'pricing.tag.yearlyBetter': '年付 ¥{price}/月 更划算',
+  'pricing.tag.yearlyBetter': '年付 ${price}/月 更划算',
   'pricing.tag.team': '席位 · API · 批量',
   'pricing.monthlyCredits.pre': '· 每月',
   'pricing.monthlyCredits.post': '积分',

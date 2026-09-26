@@ -24,6 +24,8 @@ export const billingZh: Record<keyof typeof billingEn, string> = {
   'billing.return.refresh': '刷新状态',
   'billing.return.refreshing': '刷新中…',
   'billing.return.refreshed': '状态已刷新',
+  'billing.return.planActive': '订阅已生效，正在进入工作台',
+  'billing.return.autoChecking': '自动确认到账中…（约几秒）',
   'billing.return.backPricing': '回到定价页',
   'billing.return.backStudio': '回到工作台',
   'billing.return.cancelTitle': '已取消支付',

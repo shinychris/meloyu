@@ -27,6 +27,8 @@ const ResetPasswordView = lazy(() => import('./views/ResetPasswordView'))
 import { useSessionStore } from './stores/session'
 import { useMetaStore } from './stores/meta'
 import { useUiStore, hasOnboardChoice } from './stores/ui'
+import { useConfirmStore } from './stores/confirm'
+import { useStudioStore } from './stores/studio'
 import { usePlayerStore } from './stores/player'
 import { getToken } from './lib/token'
 import { useT, useI18nStore } from './i18n'
@@ -58,7 +60,7 @@ function RouteFallback() {
 function AppLayout() {
   const location = useLocation()
   const t = useT()
-  const { user, ready, bootstrap } = useSessionStore()
+  const { user, ready, offline, bootstrap } = useSessionStore()
   const loadMeta = useMetaStore((s) => s.load)
   const reloadMeta = useMetaStore((s) => s.reloadForLocale)
   const startAsk = useUiStore((s) => s.startAsk)
@@ -91,10 +93,37 @@ function AppLayout() {
     return () => window.clearTimeout(t)
   }, [ready, user, startAsk])
 
+  // P1-23：工作台表单草稿按用户水合（防误刷新丢失创作内容）
+  useEffect(() => {
+    if (ready && user) void useStudioStore.getState().hydrateDraft(user.id)
+  }, [ready, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!user && !ready) {
     return (
       <div className="h-full flex items-center justify-center" style={{ background: 'var(--bg)' }}>
         <span className="label">{t('app.loading')}</span>
+      </div>
+    )
+  }
+  // P1-25：后端不可达 ≠ 未登录——token 仍在，展示重试而非踢到登录页重输密码
+  if (!user && offline) {
+    return (
+      <div className="h-full flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+        <div className="card p-8 w-[380px] text-center pop">
+          <div className="text-[17px] font-extrabold tracking-tight">{t('app.offline.title')}</div>
+          <div className="text-[12px] mt-3 leading-relaxed" style={{ color: 'var(--muted)' }}>
+            {t('app.offline.desc')}
+          </div>
+          <button
+            className="btn btn-acc !py-2 !px-5 text-[12px] mt-6"
+            onClick={() => {
+              useSessionStore.setState({ ready: false, offline: false })
+              void bootstrap()
+            }}
+          >
+            {t('app.offline.retry')}
+          </button>
+        </div>
       </div>
     )
   }
@@ -120,6 +149,10 @@ function ShortcutHandler() {
   const toggle = usePlayerStore((s) => s.toggle)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // 弹窗（引导/询问/确认框）打开时不切视图，避免视图切走弹窗悬空
+      const ui = useUiStore.getState()
+      if (ui.onboardingOpen || ui.askOpen) return
+      if (useConfirmStore.getState().visible) return
       const target = e.target as HTMLElement | null
       if (
         target &&

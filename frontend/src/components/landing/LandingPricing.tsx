@@ -32,7 +32,7 @@ export default function LandingPricing() {
               {t(p.name)}
             </div>
             <div className="price-num !text-[36px] mt-4">
-              {p.monthly == null ? t('landing.pricing.custom') : `¥${p.yearly}`}
+              {p.monthly == null ? t('landing.pricing.custom') : `$${(p.yearly! / 100).toFixed(2)}`}
               {p.monthly != null && (
                 <span className="text-[13px] font-bold" style={{ color: 'var(--muted)' }}>
                   {' '}
@@ -41,7 +41,7 @@ export default function LandingPricing() {
               )}
             </div>
             <div className="text-[11px] mt-1.5" style={{ color: 'var(--dim)' }}>
-              {p.monthly != null && p.monthly > 0 ? t('landing.pricing.monthly', { p: p.monthly }) : ''}
+              {p.monthly != null && p.monthly > 0 ? t('landing.pricing.monthly', { p: (p.monthly / 100).toFixed(2) }) : ''}
               {t(p.tagline)}
             </div>
             <ul className="mt-5 space-y-2 flex-1">

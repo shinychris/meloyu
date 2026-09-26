@@ -11,9 +11,9 @@ import { useT } from '../i18n'
 
 const PAGE_SIZE = 10
 
-/** 充值积分包口径（与后端 topup SKU 对齐）：$9.99 / 1,000 credits */
-const TOPUP_PRICE_USD = '$9.99'
-const TOPUP_CREDITS = '1,000'
+/** 美分 → $ 展示（P0-5：价格接口下发 USD 分值，单一事实源） */
+const usd = (cents: number | null | undefined): string | null =>
+  cents == null ? null : `$${(cents / 100).toFixed(2)}`
 
 /**
  * 定价与积分：四档卡片（月/年切换）+ 积分流水表。
@@ -23,6 +23,7 @@ const TOPUP_CREDITS = '1,000'
 export default function PricingView() {
   const [plans, setPlans] = useState<PlanInfo[]>([])
   const [salesContact, setSalesContact] = useState('')
+  const [topup, setTopup] = useState<{ amount_usd: number; credits: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [yearly, setYearly] = useState(true)
   const [switching, setSwitching] = useState<string | null>(null)
@@ -40,6 +41,7 @@ export default function PricingView() {
       const res = await getPlans()
       setPlans(res.plans)
       setSalesContact(res.sales_contact ?? '')
+      setTopup(res.topup ?? null)
     } catch {
       /* 拦截器已 toast */
     } finally {
@@ -215,15 +217,15 @@ export default function PricingView() {
                 )}
                 <div className="label" style={popular ? { color: 'var(--acc)' } : undefined}>{planLabel(p.code)}</div>
                 <div className="price-num mt-4">
-                  {price == null ? (p.code === 'team' ? t('pricing.customPrice') : '—') : `¥${price}`}
+                  {price == null ? (p.code === 'team' ? t('pricing.customPrice') : '—') : usd(price)}
                   {price != null && (
                     <span className="text-[16px] font-bold" style={{ color: 'var(--muted)' }}>{t('pricing.perMonth')}</span>
                   )}
                 </div>
                 <div className="text-[11px] mt-1" style={{ color: 'var(--dim)' }}>
                   {p.code === 'free' && t('pricing.tag.free')}
-                  {p.code === 'pro' && (yearly ? t('pricing.tag.proYearly') : t('pricing.tag.yearlyBetter', { price: p.price_yearly ?? '' }))}
-                  {p.code === 'studio' && (yearly ? t('pricing.tag.yearlyOnly') : t('pricing.tag.yearlyBetter', { price: p.price_yearly ?? '' }))}
+                  {p.code === 'pro' && (yearly ? t('pricing.tag.proYearly') : t('pricing.tag.yearlyBetter', { price: usd(p.price_yearly) ?? '' }))}
+                  {p.code === 'studio' && (yearly ? t('pricing.tag.yearlyOnly') : t('pricing.tag.yearlyBetter', { price: usd(p.price_yearly) ?? '' }))}
                   {p.code === 'team' && t('pricing.tag.team')}
                 </div>
                 <ul className="mt-6 space-y-2.5 text-[12px]" style={{ color: 'var(--muted)' }}>
@@ -273,9 +275,9 @@ export default function PricingView() {
         </div>
         <div className="flex items-center gap-6 flex-none">
           <div className="text-right">
-            <span className="num font-extrabold text-[26px] tracking-tight">{TOPUP_PRICE_USD}</span>
+            <span className="num font-extrabold text-[26px] tracking-tight">{topup ? usd(topup.amount_usd) : '$—'}</span>
             <div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
-              <span className="num font-bold" style={{ color: 'var(--acc)' }}>{TOPUP_CREDITS}</span> {t('pricing.monthlyCredits.post')}
+              <span className="num font-bold" style={{ color: 'var(--acc)' }}>{topup ? formatNum(topup.credits) : '—'}</span> {t('pricing.monthlyCredits.post')}
             </div>
           </div>
           <button className="btn btn-acc !py-2.5" disabled={topupBuying} onClick={() => void onTopup()}>

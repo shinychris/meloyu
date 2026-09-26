@@ -145,13 +145,14 @@ export default function StudioView() {
         <div className="border-r px-6 py-5 overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
           <div className="label">{t('studio.mode')}</div>
           <div className="flex gap-1.5 mt-2 flex-wrap">
-            <span className={`chip ${form.mode === 'simple' ? 'on' : ''}`} onClick={() => onMode('simple')}>
+            <button type="button" className={`chip ${form.mode === 'simple' ? 'on' : ''}`} onClick={() => onMode('simple')}>
               {t('studio.mode.simple')}
-            </span>
-            <span className={`chip ${form.mode === 'custom' ? 'on' : ''}`} onClick={() => onMode('custom')}>
+            </button>
+            <button type="button" className={`chip ${form.mode === 'custom' ? 'on' : ''}`} onClick={() => onMode('custom')}>
               {t('studio.mode.custom')}
-            </span>
-            <span
+            </button>
+            <button
+              type="button"
               className={`chip ${referenceTrack || refOpen ? 'on' : ''}`}
               title={t('studio.modeHint.ref')}
               onClick={() => onMode('ref')}
@@ -160,13 +161,13 @@ export default function StudioView() {
               {referenceTrack && (
                 <span className="dot ml-1" style={{ background: 'var(--acc)', display: 'inline-block' }}></span>
               )}
-            </span>
-            <span className={`chip ${form.humMelody ? 'on' : ''}`} onClick={() => setHumOpen(true)}>
+            </button>
+            <button type="button" className={`chip ${form.humMelody ? 'on' : ''}`} onClick={() => setHumOpen(true)}>
               {t('studio.mode.hum')}
               {form.humMelody && (
                 <span className="dot ml-1" style={{ background: 'var(--acc)', display: 'inline-block' }}></span>
               )}
-            </span>
+            </button>
           </div>
 
           {(refOpen || referenceTrack) && (

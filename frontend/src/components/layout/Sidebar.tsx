@@ -85,7 +85,8 @@ export default function Sidebar() {
                   ? location.pathname.startsWith('/library') || location.pathname.startsWith('/works')
                   : location.pathname === item.to
               return (
-                <div
+                <button
+                  type="button"
                   key={item.to}
                   className={`nav-item ${on ? 'on' : ''}`}
                   onClick={() => navigate(item.to)}
@@ -93,7 +94,7 @@ export default function Sidebar() {
                   <span className="dot"></span>
                   {t(item.labelKey)}
                   <span className="kbd">{item.kbd}</span>
-                </div>
+                </button>
               )
             })}
           </div>

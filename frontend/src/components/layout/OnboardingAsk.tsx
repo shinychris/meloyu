@@ -18,6 +18,13 @@ export default function OnboardingAsk() {
       className="fixed inset-0 z-[95] flex items-center justify-center"
       style={{ background: 'rgba(0,0,0,.72)' }}
       onClick={() => choose(false)}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('layout.ob.askTitle')}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') choose(false)
+      }}
+      tabIndex={-1}
     >
       <div
         className="card pop w-[380px] p-6"

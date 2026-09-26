@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useSessionStore } from '../stores/session'
 import { toast } from '../stores/toast'
 import { useT } from '../i18n'
@@ -13,12 +13,47 @@ import LangSwitch from '../components/common/LangSwitch'
  */
 export default function BillingReturnView() {
   const t = useT()
+  const navigate = useNavigate()
   const [params] = useSearchParams()
   // 仅 success 有专属文案；cancel / 未知 status 一律按已取消展示
   const success = params.get('status') === 'success'
   const sessionId = params.get('session_id')
   const refreshUser = useSessionStore((s) => s.refreshUser)
   const [refreshing, setRefreshing] = useState(false)
+  /** 自动确认中（P2-20）：webhook 几秒到账，替用户盯着，付费转化最敏感的时刻 */
+  const [autoChecking, setAutoChecking] = useState(success)
+  const baselinePlanRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!success) return
+    let stopped = false
+    const poll = async (attempt: number) => {
+      if (stopped || attempt > 10) {
+        if (!stopped) setAutoChecking(false)
+        return
+      }
+      try {
+        await refreshUser()
+        const plan = useSessionStore.getState().user?.plan ?? null
+        if (baselinePlanRef.current == null) {
+          baselinePlanRef.current = plan
+        } else if (plan !== baselinePlanRef.current) {
+          stopped = true
+          setAutoChecking(false)
+          toast(t('billing.return.planActive'))
+          navigate('/studio')
+          return
+        }
+      } catch {
+        /* 网络抖动继续下一轮 */
+      }
+      window.setTimeout(() => void poll(attempt + 1), 3000)
+    }
+    void poll(1)
+    return () => {
+      stopped = true
+    }
+  }, [success, refreshUser, navigate, t])
 
   const onRefresh = async () => {
     if (refreshing) return
@@ -67,10 +102,14 @@ export default function BillingReturnView() {
               <div className="flex gap-2 mt-6">
                 <button
                   className="btn btn-acc !py-2 flex-1 text-[12px]"
-                  disabled={refreshing}
+                  disabled={refreshing || autoChecking}
                   onClick={() => void onRefresh()}
                 >
-                  {refreshing ? t('billing.return.refreshing') : t('billing.return.refresh')}
+                  {autoChecking
+                    ? t('billing.return.autoChecking')
+                    : refreshing
+                      ? t('billing.return.refreshing')
+                      : t('billing.return.refresh')}
                 </button>
               </div>
             </>

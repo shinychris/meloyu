@@ -644,6 +644,10 @@ export interface PlansResult {
   plans: PlanInfo[]
   /** 团队版联系邮箱（env SALES_CONTACT_EMAIL；空=未配置不展示） */
   sales_contact?: string
+  /** 价格币种（v0.14.0 起恒 'usd'；prices 为美分，展示侧除以 100） */
+  currency?: string
+  /** 充值积分包 SKU（后端 env 可调，前端不再硬编码） */
+  topup?: { amount_usd: number; credits: number }
 }
 
 /* ============ system/meta ============ */

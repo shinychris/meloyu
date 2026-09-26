@@ -12,11 +12,11 @@ export const pricingEn = {
   // 套餐卡
   'pricing.popular': 'Most popular',
   'pricing.customPrice': 'Custom',
-  'pricing.perMonth': ' ¥/mo',
+  'pricing.perMonth': ' $/mo',
   'pricing.tag.free': 'Jump in for free',
   'pricing.tag.proYearly': 'Billed yearly · credits roll over',
   'pricing.tag.yearlyOnly': 'Billed yearly',
-  'pricing.tag.yearlyBetter': 'Yearly at ¥{price}/mo saves more',
+  'pricing.tag.yearlyBetter': 'Yearly at ${price}/mo saves more',
   'pricing.tag.team': 'Seats · API · Batch',
   'pricing.monthlyCredits.pre': '· Monthly',
   'pricing.monthlyCredits.post': 'credits',

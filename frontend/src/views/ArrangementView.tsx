@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { Candidate, FileRef, Work } from '../types/api'
 import { listWorks } from '../api/works'
@@ -10,7 +10,7 @@ import { getStreamToken } from '../api/files'
 import { apiPost } from '../api/client'
 import { DEFAULT_PARAMS, Mixer, peaksOf, type TrackParams } from '../lib/mixer'
 import { toast } from '../stores/toast'
-import { useT } from '../i18n'
+import { useT, t as tGlobal } from '../i18n'
 import { formatDuration } from '../lib/format'
 
 const STEM_NAMES = ['vocals', 'drums', 'bass', 'other'] as const
@@ -26,6 +26,27 @@ interface Lane {
   file: FileRef
   peaks: number[]
   params: TrackParams
+}
+
+/** 轨道波形：peaks 变化时绘制一次（原 inline ref 回调随每帧重渲染全量重绘） */
+function LaneWaveform({ peaks }: { peaks: number[] }) {
+  const ref = useRef<HTMLCanvasElement | null>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const w = (el.width = el.clientWidth || 600)
+    const h = (el.height = el.clientHeight || 56)
+    const ctx = el.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, w, h)
+    ctx.fillStyle = '#00ff2c'
+    const bw = w / peaks.length
+    peaks.forEach((p, x) => {
+      const hh = Math.max(1, p * h * 0.9)
+      ctx.fillRect(x * bw, (h - hh) / 2, Math.max(1, bw - 0.5), hh)
+    })
+  }, [peaks])
+  return <canvas ref={ref} className="flex-1 h-14" style={{ background: 'var(--bg2)' }} />
 }
 
 /**
@@ -58,12 +79,16 @@ export default function ArrangementView() {
   const [retuneBpm, setRetuneBpm] = useState(96)
   const mixerRef = useRef<Mixer | null>(null)
   const rafRef = useRef<number>(0)
+  const fillRef = useRef<HTMLDivElement | null>(null)
+  const headRef = useRef<HTMLDivElement | null>(null)
+  const lastLabelRef = useRef(-1)
+  const mountedRef = useRef(true)
   /** 装载累积：loadVersion 解码出的 AudioBuffer 轨（Mixer 构建输入） */
   const tracksRef = useRef<{ name: string; buffer: AudioBuffer; params: TrackParams }[]>([])
 
   useEffect(() => {
     listWorks({ page_size: 50 })
-      .then((r) => setWorks(r.items.filter((w) => (w.exported_formats ?? []).length >= 0)))
+      .then((r) => setWorks(r.items))
       .catch(() => {})
   }, [])
 
@@ -103,11 +128,11 @@ export default function ArrangementView() {
         // 音量/EQ/混音回存仍可用；确无音频才提示不可混音
         const full = cand.files.find((f) => f.kind === 'master') ?? cand.files.find((f) => f.kind === 'preview')
         if (!full) {
-          toast(t('editor.toast.noStems'), 'warn')
+          toast(tGlobal('editor.toast.noStems'), 'warn')
           return
         }
         toLoad = [full]
-        toast(t('editor.toast.fullmixLoaded'), 'info')
+        toast(tGlobal('editor.toast.fullmixLoaded'), 'info')
       }
       const loaded: Lane[] = []
       for (const f of toLoad) {
@@ -127,8 +152,7 @@ export default function ArrangementView() {
     } finally {
       setLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t])
+  }, [])
 
   useEffect(() => {
     if (versionId) void loadVersion(versionId)
@@ -151,14 +175,23 @@ export default function ArrangementView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lanes])
 
-  // 时间轴 rAF
+  // 时间轴 rAF（P1-21）：进度条由 rAF 直接改 DOM——每帧 setPosition 会把整个
+  // 视图（含全部轨道卡/滑杆）拖进 60fps 重渲染；时间标签降到 4Hz、playing
+  // 只在变化时 setState
   useEffect(() => {
     const tick = () => {
       const m = mixerRef.current
       if (m) {
-        setPosition(m.currentTime)
-        setPlaying(m.playing)
-        if (m.playing && m.currentTime >= m.duration - 0.05) {
+        const d = m.duration || 0
+        const pct = d > 0 ? Math.min(100, (m.currentTime / d) * 100) : 0
+        if (fillRef.current) fillRef.current.style.width = `${pct}%`
+        if (headRef.current) headRef.current.style.left = `${pct}%`
+        if (Math.abs(m.currentTime - lastLabelRef.current) > 0.25 || !m.playing) {
+          lastLabelRef.current = m.currentTime
+          setPosition(m.currentTime)
+        }
+        setPlaying((prev) => (prev === m.playing ? prev : m.playing))
+        if (m.playing && m.currentTime >= d - 0.05) {
           m.pause()
           m.seek(0)
         }
@@ -167,6 +200,10 @@ export default function ArrangementView() {
     }
     rafRef.current = window.requestAnimationFrame(tick)
     return () => window.cancelAnimationFrame(rafRef.current)
+  }, [])
+
+  useEffect(() => () => {
+    mountedRef.current = false
   }, [])
 
   const duration = lanes.length ? mixerRef.current?.duration ?? 0 : 0
@@ -212,7 +249,7 @@ export default function ArrangementView() {
       toast(t('editor.toast.mixdownSaved', { no: res.version.version_no }))
       navigate(`/works/${res.work.id}`)
     } catch {
-      setSaving(false)
+      /* 拦截器已 toast */
     } finally {
       setSaving(false)
     }
@@ -230,6 +267,7 @@ export default function ArrangementView() {
         bpm: retuneBpm,
       })
       for (let i = 0; i < 200; i++) {
+        if (!mountedRef.current) return
         const tk = await getTask(task.id)
         if (tk.status === 'succeeded') {
           toast(t('editor.toast.retuneDone', { bpm: retuneBpm }))
@@ -259,7 +297,6 @@ export default function ArrangementView() {
     s && STEM_LABEL_KEYS[s] ? t(STEM_LABEL_KEYS[s]) : s ?? t('editor.stem.fullmix')
 
   const timelinePct = duration > 0 ? Math.min(100, (position / duration) * 100) : 0
-  const workOptions = useMemo(() => works, [works])
 
   return (
     <section className="view flex flex-col h-full">
@@ -276,7 +313,7 @@ export default function ArrangementView() {
               className="!text-[12px]"
             >
               <option value="">{t('editor.pick.work')}</option>
-              {workOptions.map((w) => (
+              {works.map((w) => (
                 <option key={w.id} value={w.id}>
                   {w.display_code} · {w.title}
                 </option>
@@ -336,10 +373,12 @@ export default function ArrangementView() {
               data-testid="editor-timeline"
             >
               <div
+                ref={fillRef}
                 className="absolute inset-y-0 left-0"
                 style={{ width: `${timelinePct}%`, background: 'var(--acc-dim)' }}
               />
               <div
+                ref={headRef}
                 className="absolute inset-y-0 w-[2px]"
                 style={{ left: `${timelinePct}%`, background: 'var(--acc)' }}
               />
@@ -355,24 +394,7 @@ export default function ArrangementView() {
               <div key={lane.file.file_id} className="card p-3" data-testid={`editor-lane-${lane.file.stem_name}`}>
                 <div className="flex items-center gap-3">
                   <div className="w-20 text-[12px] font-bold">{stemLabel(lane.file.stem_name)}</div>
-                  <canvas
-                    className="flex-1 h-14"
-                    style={{ background: 'var(--bg2)' }}
-                    ref={(el) => {
-                      if (!el) return
-                      const w = (el.width = el.clientWidth || 600)
-                      const h = (el.height = el.clientHeight || 56)
-                      const ctx = el.getContext('2d')
-                      if (!ctx) return
-                      ctx.clearRect(0, 0, w, h)
-                      ctx.fillStyle = '#00ff2c'
-                      lane.peaks.forEach((p, x) => {
-                        const bw = w / lane.peaks.length
-                        const hh = Math.max(1, p * h * 0.9)
-                        ctx.fillRect(x * bw, (h - hh) / 2, Math.max(1, bw - 0.5), hh)
-                      })
-                    }}
-                  />
+                  <LaneWaveform peaks={lane.peaks} />
                   <button
                     className={`btn !py-1 !px-2 text-[10px] ${lane.params.muted ? 'btn-acc' : 'btn-ghost'}`}
                     onClick={() => setLaneParams(i, { muted: !lane.params.muted })}

@@ -55,7 +55,12 @@ def list_plans(db: Session, user: User) -> dict:
                      if not _is_credit_feature(_feature_label(f))],
     } for p in rows]
     from app.config import settings
-    return {"plans": plans, "sales_contact": settings.sales_contact_email}
+    # P0-5（2026-09-26）：价格单一事实源——前端/落地页只渲染接口下发值；
+    # currency 恒 usd（D-2 海外口径），topup SKU 一并下发（前端不再硬编码 $9.99）
+    return {"plans": plans, "sales_contact": settings.sales_contact_email,
+            "currency": "usd",
+            "topup": {"amount_usd": settings.stripe_topup_amount_usd,
+                      "credits": settings.stripe_topup_credits}}
 
 
 def switch_plan(db: Session, user: User, plan_code: str) -> dict:

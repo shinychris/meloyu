@@ -2,13 +2,20 @@ import { create } from 'zustand'
 import type { AuthData, User } from '../types/api'
 import { clearToken, setToken } from '../lib/token'
 import { fetchMe } from '../api/auth'
+import { ApiError } from '../api/client'
 import { getCreditsBalance } from '../api/account'
 import { useStudioStore } from './studio'
 import { usePlayerStore } from './player'
 
+function isAuthReject(e: unknown): boolean {
+  return e instanceof ApiError && (e.code === 40101 || e.code === 40102)
+}
+
 interface SessionState {
   user: User | null
   ready: boolean
+  /** 后端不可达（网络故障）：token 仍在，不踢登录，展示重试（P1-25） */
+  offline: boolean
   /** 登录/注册成功：存 token + 用户 */
   setAuthenticated: (data: AuthData) => void
   /** 登出：清 token、停轮询、停播放器 */
@@ -24,6 +31,7 @@ interface SessionState {
 export const useSessionStore = create<SessionState>((set, get) => ({
   user: null,
   ready: false,
+  offline: false,
 
   setAuthenticated(data) {
     setToken(data.access_token)
@@ -69,10 +77,18 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         set({
           user: { ...user, credits: { ...user.credits, balance: balance.balance } },
           ready: true,
+          offline: false,
         })
         return
-      } catch {
-        set({ user: null, ready: true })
+      } catch (e) {
+        // P1-25：只有真正的鉴权失效才踢登录；网络抖动/后端暂不可达时保留
+        // token 进入 offline 重试态——否则付费用户 30 秒断网刷新就被要求重输密码
+        if (isAuthReject(e)) {
+          clearToken()
+          set({ user: null, ready: true, offline: false })
+        } else {
+          set({ ready: true, offline: true })
+        }
         return
       }
     }

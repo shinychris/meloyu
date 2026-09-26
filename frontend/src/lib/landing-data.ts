@@ -330,16 +330,16 @@ export const PLANS: Array<{
   {
     code: 'pro',
     name: 'landing.data.plan.pro.name',
-    monthly: 58,
-    yearly: 46,
+    monthly: 799,  // USD 分值（与 seed plans 对齐；落地页展示侧 /100）
+    yearly: 639,
     tagline: 'landing.data.plan.pro.tagline',
     features: ['landing.data.plan.pro.f1', 'landing.data.plan.pro.f2', 'landing.data.plan.pro.f3'],
   },
   {
     code: 'studio',
     name: 'landing.data.plan.studio.name',
-    monthly: 168,
-    yearly: 134,
+    monthly: 2299,
+    yearly: 1839,
     tagline: 'landing.data.plan.studio.tagline',
     features: [
       'landing.data.plan.studio.f1',

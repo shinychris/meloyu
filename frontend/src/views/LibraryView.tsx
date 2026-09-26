@@ -209,9 +209,9 @@ export default function LibraryView() {
             <option value="asc">{t('library.order.asc')}</option>
           </select>
           {(['all', 'draft', 'fav', 'trash'] as Filter[]).map((f) => (
-            <span key={f} className={`chip ${filter === f ? 'on' : ''}`} onClick={() => setFilter(f)}>
+            <button type="button" key={f} className={`chip ${filter === f ? 'on' : ''}`} onClick={() => setFilter(f)}>
               {chipLabel[f]}
-            </span>
+            </button>
           ))}
         </div>
       </header>

@@ -83,14 +83,14 @@ describe('landing-data 落地页数据完整性', () => {
     }
   })
 
-  it('定价四档与 seed_data 口径一致', () => {
+  it('定价四档与 seed_data 口径一致（v0.14.0 起 USD 分值）', () => {
     expect(PLANS.map((p) => p.code)).toEqual(['free', 'pro', 'studio', 'team'])
     const pro = PLANS[1]
-    expect(pro.monthly).toBe(58)
-    expect(pro.yearly).toBe(46)
+    expect(pro.monthly).toBe(799)
+    expect(pro.yearly).toBe(639)
     const studio = PLANS[2]
-    expect(studio.monthly).toBe(168)
-    expect(studio.yearly).toBe(134)
+    expect(studio.monthly).toBe(2299)
+    expect(studio.yearly).toBe(1839)
     expect(studio.popular).toBe(true)
     expect(PLANS[3].monthly).toBeNull()
     for (const p of PLANS) {

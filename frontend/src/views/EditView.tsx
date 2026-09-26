@@ -10,7 +10,7 @@ import {
   type EditOp, nextOpId,
 } from '../lib/audioedit'
 import { toast } from '../stores/toast'
-import { useT } from '../i18n'
+import { useT, t as tGlobal } from '../i18n'
 import { formatDuration } from '../lib/format'
 
 type Tool = 'cut' | 'keep' | 'fadein' | 'fadeout' | 'gainUp' | 'gainDown' | 'normalize'
@@ -34,8 +34,12 @@ export default function EditView() {
   const [versionId, setVersionId] = useState<string>('')
   const [buffer, setBuffer] = useState<AudioBuffer | null>(null)
   const [loading, setLoading] = useState(false)
-  const [ops, setOps] = useState<EditOp[]>([])
-  const [redoStack, setRedoStack] = useState<EditOp[][]>([])
+  // 撤销/重做合并为单一 state（P1-19）：在 setState updater 内嵌套另一个
+  // setState 是 React 禁止的副作用——StrictMode 双调 updater 会把 redoStack
+  // 推入重复快照（redo 一次跳两级），并发重放同样危险
+  const [hist, setHist] = useState<{ ops: EditOp[]; redo: EditOp[][] }>({ ops: [], redo: [] })
+  const ops = hist.ops
+  const redoStack = hist.redo
   const [tool, setTool] = useState<Tool>('cut')
   const [sel, setSel] = useState<{ a: number; b: number } | null>(null)
   const [playing, setPlaying] = useState(false)
@@ -61,8 +65,7 @@ export default function EditView() {
   const loadVersion = useCallback(async (vid: string) => {
     setLoading(true)
     setBuffer(null)
-    setOps([])
-    setRedoStack([])
+    setHist({ ops: [], redo: [] })
     setSel(null)
     try {
       const res = await listCandidates(vid)
@@ -72,7 +75,10 @@ export default function EditView() {
       const preview = cand.files.find((f) => f.kind === 'preview')
       const file: FileRef | undefined = master ?? preview
       if (!file) {
-        toast(t('edit.toast.noAudio'), 'warn')
+        // 用模块级 t（非响应式）：不让 locale 变化重建本回调——否则切语言会
+        // 重放整个加载流程（重新拉 stream-token + fetch 整曲 + decodeAudioData），
+        // 编辑中的 ops/选区全被清空（P1-20）
+        toast(tGlobal('edit.toast.noAudio'), 'warn')
         return
       }
       const { url } = await getStreamToken(file.file_id)
@@ -87,8 +93,7 @@ export default function EditView() {
     } finally {
       setLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t])
+  }, [])
 
   useEffect(() => {
     if (versionId) void loadVersion(versionId)
@@ -161,10 +166,7 @@ export default function EditView() {
   }
 
   const pushOp = (op: EditOp) => {
-    setOps((prev) => {
-      setRedoStack((r) => [...r, prev])
-      return [...prev, op]
-    })
+    setHist((h) => ({ ops: [...h.ops, op], redo: [...h.redo, h.ops] }))
   }
 
   const applyTool = () => {
@@ -189,18 +191,15 @@ export default function EditView() {
   }
 
   const undo = () => {
-    setOps((prev) => {
-      if (prev.length === 0) return prev
-      setRedoStack((r) => [...r, prev])
-      return prev.slice(0, -1)
+    setHist((h) => h.ops.length === 0 ? h : {
+      ops: h.ops.slice(0, -1),
+      redo: [...h.redo, h.ops],
     })
   }
   const redo = () => {
-    setRedoStack((r) => {
-      if (r.length === 0) return r
-      const restored = r[r.length - 1]
-      setOps(restored)
-      return r.slice(0, -1)
+    setHist((h) => h.redo.length === 0 ? h : {
+      ops: h.redo[h.redo.length - 1],
+      redo: h.redo.slice(0, -1),
     })
   }
 
@@ -242,7 +241,7 @@ export default function EditView() {
           params: { notes: t('edit.save.notes', { n: ops.length }) } },
       )
       toast(t('edit.toast.saved', { no: res.version.version_no }))
-      setOps([])
+      setHist({ ops: [], redo: [] })
     } catch {
       /* 拦截器已 toast（时长守卫等） */
     } finally {
@@ -277,9 +276,9 @@ export default function EditView() {
 
       <div className="px-8 mt-3 flex gap-1.5 flex-wrap">
         {(['cut', 'keep', 'fadein', 'fadeout', 'gainUp', 'gainDown', 'normalize'] as Tool[]).map((k) => (
-          <span key={k} className={`chip ${tool === k ? 'on' : ''}`} onClick={() => setTool(k)}>
+          <button type="button" key={k} className={`chip ${tool === k ? 'on' : ''}`} onClick={() => setTool(k)}>
             {t(`edit.tool.${k}` as never)}
-          </span>
+          </button>
         ))}
       </div>
 

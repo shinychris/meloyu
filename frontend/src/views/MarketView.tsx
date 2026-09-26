@@ -5,6 +5,7 @@ import { apiDelete, apiGet, apiPost } from '../api/client'
 import { listWorks } from '../api/works'
 import { useSessionStore } from '../stores/session'
 import { usePlayerStore } from '../stores/player'
+import { useConfirmStore } from '../stores/confirm'
 import { toast } from '../stores/toast'
 import { useT } from '../i18n'
 import { formatNum } from '../lib/format'
@@ -31,23 +32,23 @@ export default function MarketView() {
   const [publishWorkId, setPublishWorkId] = useState('')
   const [price, setPrice] = useState(100)
   const [busy, setBusy] = useState(false)
+  const [loading, setLoading] = useState(true)
   const user = useSessionStore((s) => s.user)
   const refreshUser = useSessionStore((s) => s.refreshUser)
   const playTrack = usePlayerStore((s) => s.playTrack)
 
   const refresh = useCallback(() => {
-    apiGet<{ items: MarketListingInfo[] }>('/market/listings', { page_size: 50 })
-      .then((r) => setListings(r.items))
-      .catch(() => {})
-    apiGet<{ items: MarketListingInfo[] }>('/market/my/listings')
-      .then((r) => setMyListings(r.items))
-      .catch(() => {})
-    apiGet<{ items: MarketOrderInfo[] }>('/market/my/orders')
-      .then((r) => setOrders(r.items))
-      .catch(() => {})
-    listWorks({ page_size: 50 })
-      .then((r) => setMyWorks(r.items))
-      .catch(() => {})
+    setLoading(true)
+    Promise.allSettled([
+      apiGet<{ items: MarketListingInfo[] }>('/market/listings', { page_size: 50 })
+        .then((r) => setListings(r.items)),
+      apiGet<{ items: MarketListingInfo[] }>('/market/my/listings')
+        .then((r) => setMyListings(r.items)),
+      apiGet<{ items: MarketOrderInfo[] }>('/market/my/orders')
+        .then((r) => setOrders(r.items)),
+      listWorks({ page_size: 50 })
+        .then((r) => setMyWorks(r.items)),
+    ]).finally(() => setLoading(false))
   }, [])
   useEffect(refresh, [refresh])
 
@@ -72,7 +73,11 @@ export default function MarketView() {
       toast(t('market.toast.insufficient'), 'warn')
       return
     }
-    if (!window.confirm(t('market.confirm.buy', { title: l.title, n: l.price_credits }))) return
+    const okToBuy = await useConfirmStore.getState().confirm({
+      title: t('market.confirm.buy', { title: l.title, n: l.price_credits }),
+      danger: false,
+    })
+    if (!okToBuy) return
     setBusy(true)
     try {
       const order = await apiPost<MarketOrderInfo>(`/market/listings/${l.id}/purchase`)
@@ -93,7 +98,11 @@ export default function MarketView() {
       toast(t('market.toast.pickWork'), 'warn')
       return
     }
-    if (!window.confirm(t('market.confirm.ack'))) return
+    const okToPublish = await useConfirmStore.getState().confirm({
+      title: t('market.confirm.ack'),
+      danger: false,
+    })
+    if (!okToPublish) return
     setBusy(true)
     try {
       await apiPost('/market/listings', { work_id: publishWorkId, price_credits: price })
@@ -125,14 +134,18 @@ export default function MarketView() {
 
       <div className="px-8 flex gap-1.5 flex-wrap">
         {(['browse', 'mine', 'orders'] as Tab[]).map((k) => (
-          <span key={k} className={`chip ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>
+          <button type="button" key={k} className={`chip ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>
             {t(TAB_KEYS[k])}
-          </span>
+          </button>
         ))}
       </div>
 
       <div className="rule-t flex-1 min-h-0 overflow-y-auto px-8 py-5">
-        {tab === 'browse' && (
+        {loading ? (
+          <div className="text-[12px] py-16 text-center" style={{ color: 'var(--dim)' }}>
+            {t('common.loading')}
+          </div>
+        ) : tab === 'browse' && (
           <>
             <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3" data-testid="market-grid">
               {listings.length === 0 ? (

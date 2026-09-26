@@ -9,6 +9,9 @@ export const appEn = {
   'app.error.title': 'Something went wrong',
   'app.error.desc': 'The interface hit an unexpected error. Reloading the page usually fixes it.',
   'app.error.reload': 'Reload page',
+  'app.offline.title': 'Cannot reach the server',
+  'app.offline.desc': 'The network seems to be down; your session is retained. Retry after the network recovers, or reload the page.',
+  'app.offline.retry': 'Retry connection',
   // Sidebar
   'app.sidebar.tagline': 'Melody Isle · Pro AI Music Studio',
   'app.sidebar.group.create': 'Create',

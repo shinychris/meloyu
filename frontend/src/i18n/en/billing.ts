@@ -26,6 +26,8 @@ export const billingEn = {
   'billing.return.refresh': 'Refresh status',
   'billing.return.refreshing': 'Refreshing…',
   'billing.return.refreshed': 'Status refreshed',
+  'billing.return.planActive': 'Subscription active — entering the studio',
+  'billing.return.autoChecking': 'Auto-confirming payment… (~seconds)',
   'billing.return.backPricing': 'Back to pricing',
   'billing.return.backStudio': 'Back to studio',
   'billing.return.cancelTitle': 'Checkout canceled',

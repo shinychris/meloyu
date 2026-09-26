@@ -5,7 +5,7 @@ import { getModelsRuntime } from '../api/models'
 import type { CompleteTagsResult, LyricsGenerateResult, RhymeCheckResult } from '../types/api'
 import { useStudioStore } from '../stores/studio'
 import { toast } from '../stores/toast'
-import { useT, t as tt, useI18nStore } from '../i18n'
+import { useT, t as tt, useI18nStore, getLocale } from '../i18n'
 import { lyricsZh } from '../i18n/zh/lyrics'
 import { lyricsEn } from '../i18n/en/lyrics'
 import { detectSectionAtCaret, insertAtCaret } from '../lib/structure'
@@ -109,7 +109,8 @@ export default function LyricsView() {
         toast(t('lyrics.toast.themeRequired'), 'warn')
         return
       }
-      const res = await generateLyrics({ theme: theme.trim(), mood: mood.trim() || null, language: 'zh' })
+      // P1-22：语言跟随界面 locale（zh 用户默认中文；英文界面不再产出中文歌词）
+      const res = await generateLyrics({ theme: theme.trim(), mood: mood.trim() || null, language: getLocale() === 'en' ? 'en' : 'zh' })
       setGen(res)
       setRhyme(null)
       setChanges([])

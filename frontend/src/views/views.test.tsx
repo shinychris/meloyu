@@ -111,8 +111,8 @@ describe('views render smoke', () => {
     expect(html).toContain('Pay for your craft, not your anxiety')
     expect(html).toContain('Credit transactions')
     expect(html).toContain('Credit top-up pack')
-    expect(html).toContain('$9.99')
-    expect(html).toContain('Buy 1,000 credits')
+    // v0.14.0：充值包价格/积分数由 /plans 接口下发（SSR 未加载态渲染占位）
+    expect(html).toContain('$—')
     expect(html).toContain('Manage subscription')
   })
 
@@ -123,7 +123,8 @@ describe('views render smoke', () => {
     )
     expect(html).toContain('Payment received')
     expect(html).toContain('activated asynchronously by the payment webhook')
-    expect(html).toContain('Refresh status')
+    // v0.14.0：success 态自动轮询到账（3s×10），按钮先显示自动确认中
+    expect(html).toContain('Auto-confirming payment')
     expect(html).toContain('cs_test_123')
     expect(html).toContain('Back to pricing')
   })

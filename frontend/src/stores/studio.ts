@@ -109,11 +109,39 @@ interface StudioState {
   refreshVersionTree: () => Promise<void>
   resetForNewWork: () => void
   setLyricsFromAssistant: (lyrics: string) => void
+  /** 登录/会话就绪后水合该用户的本地草稿（P1-23） */
+  hydrateDraft: (userId: string) => void
 }
 
 /* 轮询句柄放模块级：视图卸载也持续轮询（契约 §13.2），终态/登出停止 */
 let pollTimer: number | null = null
 let pollErrors = 0
+
+/* P1-23：工作台表单草稿（防误刷新/关标签丢内容）——按用户维度落 localStorage，
+ * 500ms 防抖写入；提交成功不清（用户常基于上次参数迭代）。 */
+const draftKey = (userId: string) => `meloyu:studio-draft:v1:${userId}`
+let draftTimer: number | null = null
+
+function persistDraft(userId: string | null, form: StudioForm): void {
+  if (!userId || typeof localStorage === 'undefined') return
+  if (draftTimer != null) window.clearTimeout(draftTimer)
+  draftTimer = window.setTimeout(() => {
+    try {
+      localStorage.setItem(draftKey(userId), JSON.stringify(form))
+    } catch {
+      /* 配额满等异常静默：草稿是尽力而为的保护 */
+    }
+  }, 500)
+}
+
+function readDraft(userId: string): Partial<StudioForm> | null {
+  try {
+    const raw = localStorage.getItem(draftKey(userId))
+    return raw ? (JSON.parse(raw) as Partial<StudioForm>) : null
+  } catch {
+    return null
+  }
+}
 
 function schedulePoll(getState: () => StudioState, taskId: string, delay = 1500) {
   if (pollTimer != null) window.clearTimeout(pollTimer)
@@ -201,7 +229,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   },
 
   patchForm(patch) {
-    set({ form: { ...get().form, ...patch } })
+    const next = { ...get().form, ...patch }
+    set({ form: next })
+    persistDraft(useSessionStore.getState().user?.id ?? null, next)
   },
 
   setInspire(patch) {
@@ -364,5 +394,12 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   setLyricsFromAssistant(lyrics) {
     get().patchForm({ lyrics })
     get().markStep(2)
+  },
+
+  hydrateDraft(userId) {
+    const draft = readDraft(userId)
+    if (draft && Object.keys(draft).length > 0) {
+      set({ form: { ...DEFAULT_FORM, ...draft } })
+    }
   },
 }))
