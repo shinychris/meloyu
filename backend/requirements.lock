@@ -62,7 +62,7 @@ starlette==1.6.0
 stripe==15.6.1
 sympy==1.14.0
 tokenizers==0.23.1
-torch==2.13.0+cu130
+torch==2.13.0
 tqdm==4.70.0
 transformers==5.16.1
 typer==0.27.2

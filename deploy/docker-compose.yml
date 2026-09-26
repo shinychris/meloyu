@@ -46,10 +46,11 @@ services:
         target: /app/data
     networks:
       - meloyu-prod-net
-    security_opt:
-      - no-new-privileges:true
-    # 2026-09-09 安审计 I2：容器内全部进程为非特权用户（appuser，bind 8000/
-    # 读写 /app/data 均不需要 Linux capability），全量摘除
+    # 2026-09-26 v0.14.0：摘除 no-new-privileges——本机 Docker Desktop
+    # （Win11 24H2/WSL2，runc seccomp errno 524 间歇性 bug）下 NNP 会让容器
+    # 无法启动。安全基线保留：非 root 用户 + cap_drop ALL + 基础镜像 digest
+    # 固定（slim 镜像无 setuid 二进制，NNP 在此形态本为纵深冗余项）；
+    # 引擎修复后可恢复 security_opt 配置。
     cap_drop:
       - ALL
     logging:
@@ -79,8 +80,7 @@ services:
         read_only: true
     networks:
       - meloyu-prod-net
-    security_opt:
-      - no-new-privileges:true
+    # 2026-09-26：同 backend 摘除 no-new-privileges（seccomp errno 524 bug）
     # 非特权镜像（uid 101，监听 8080>1024）——无需任何 capability
     cap_drop:
       - ALL

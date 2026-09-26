@@ -236,6 +236,10 @@ def _startup() -> None:
     # P0-9（2026-09-26）：清扫不再挂列表读路径，改守护线程定时全量触发
     from app.services.works import start_periodic_purge
     start_periodic_purge()
+    # v0.14.0：应用内每日备份（GPU 容器 docker exec 受 seccomp 限制不可用，
+    # 备份必须不依赖 exec；见 services/ops_backup.py）
+    from app.services.ops_backup import start_periodic_backup
+    start_periodic_backup()
     if recovered:
         logger.info(f"startup: recovered {recovered} zombie tasks")
     # 首次启动（无 demo 账号）时后台线程灌种子（渲染音频耗时数分钟，不阻塞启动）
