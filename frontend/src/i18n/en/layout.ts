@@ -7,6 +7,11 @@ export const layoutEn = {
   'layout.ob.progress': 'Step {current} / {total}',
   'layout.ob.skip': 'Skip',
   'layout.ob.finished': 'Tour finished · reopen it anytime at the bottom left',
+  'layout.ob.askTitle': 'Take the 4-step tour?',
+  'layout.ob.askDesc':
+    'Welcome! A quick walkthrough covers inspiration → lyrics → generation → arranging. Skip it and you can reopen the tour anytime from the bottom left of the sidebar.',
+  'layout.ob.askStart': 'Start tour',
+  'layout.ob.askSkip': 'Not now',
   'layout.ob.step1.title': 'Describe your inspiration',
   'layout.ob.step1.desc':
     'Pick a scene, mood, style and lead instrument — the system assembles a professional prompt automatically. You can also rewrite the description below yourself.',

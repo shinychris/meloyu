@@ -3,6 +3,7 @@ import { Suspense, lazy, useEffect, useRef } from 'react'
 import Sidebar from './components/layout/Sidebar'
 import TransportBar from './components/layout/TransportBar'
 import Onboarding from './components/layout/Onboarding'
+import OnboardingAsk from './components/layout/OnboardingAsk'
 import ToastHost from './components/common/ToastHost'
 import ConfirmDialog from './components/common/ConfirmDialog'
 import ErrorBoundary from './components/common/ErrorBoundary'
@@ -25,7 +26,7 @@ const BillingReturnView = lazy(() => import('./views/BillingReturnView'))
 const ResetPasswordView = lazy(() => import('./views/ResetPasswordView'))
 import { useSessionStore } from './stores/session'
 import { useMetaStore } from './stores/meta'
-import { useUiStore, hasOnboarded } from './stores/ui'
+import { useUiStore, hasOnboardChoice } from './stores/ui'
 import { usePlayerStore } from './stores/player'
 import { getToken } from './lib/token'
 import { useT, useI18nStore } from './i18n'
@@ -60,7 +61,7 @@ function AppLayout() {
   const { user, ready, bootstrap } = useSessionStore()
   const loadMeta = useMetaStore((s) => s.load)
   const reloadMeta = useMetaStore((s) => s.reloadForLocale)
-  const startOnboarding = useUiStore((s) => s.startOnboarding)
+  const startAsk = useUiStore((s) => s.startAsk)
 
   const bootedRef = useRef(false)
   useEffect(() => {
@@ -81,14 +82,14 @@ function AppLayout() {
     void reloadMeta()
   }, [locale, reloadMeta])
 
-  // 首次登录后自动开启新手引导（600ms，复刻原型）
+  // 仅首次登录弹询问：由用户选择是否开启新手引导（选择结果按用户记录，不再打扰）
   useEffect(() => {
     if (!ready || !user) return
-    if (!hasOnboarded()) {
-      const t = window.setTimeout(() => startOnboarding(), 600)
-      return () => window.clearTimeout(t)
-    }
-  }, [ready, user, startOnboarding])
+    if (hasOnboardChoice(user.id)) return
+    if (useUiStore.getState().onboardingOpen) return
+    const t = window.setTimeout(() => startAsk(), 600)
+    return () => window.clearTimeout(t)
+  }, [ready, user, startAsk])
 
   if (!user && !ready) {
     return (
@@ -109,6 +110,7 @@ function AppLayout() {
       </main>
       <TransportBar />
       <Onboarding />
+      <OnboardingAsk />
       <ShortcutHandler />
     </div>
   )

@@ -2,13 +2,17 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-// 代理：浏览器请求 /api/v1/** → http://127.0.0.1:8000/api/v1/**（架构文档 §5.4）
+// 代理：浏览器请求 /api/v1/** → {MELOYU_API_TARGET}/api/v1/**（架构文档 §5.4）
+// 默认 8000；本机 8000 被其他项目占用时以 MELOYU_API_TARGET 覆盖，无需改代码
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
     proxy: {
-      "/api": { target: "http://127.0.0.1:8000", changeOrigin: true },
+      "/api": {
+        target: process.env.MELOYU_API_TARGET ?? "http://127.0.0.1:8000",
+        changeOrigin: true,
+      },
     },
   },
   build: {
