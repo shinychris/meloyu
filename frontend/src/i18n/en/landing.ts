@@ -286,4 +286,5 @@ export const landingEn = {
   'landing.data.milestone.21.title': 'Ollama thinking-off speedup & Studio-to-arrange loop',
   'landing.data.milestone.22.title': 'Lyrics creation boost: idea-driven AI / bilingual tag guides / performance marks',
   'landing.data.milestone.23.title': 'Security hardening: HttpOnly refresh / rate-limit anti-spoof / SSRF guards / CSP',
+  'landing.data.milestone.24.title': 'Commercial-readiness overhaul: payments loop / entitlements / backup & monitoring / frontend stability',
 } as const

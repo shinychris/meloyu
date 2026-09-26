@@ -295,4 +295,5 @@ export const landingZh: Record<keyof typeof landingEn, string> = {
   'landing.data.milestone.21.title': 'Ollama 关思考提速 + 工作台送往编曲闭环',
   'landing.data.milestone.22.title': '歌词创作增强：想法 AI 生成 / 标签中文说明 / 括号表演标记',
   'landing.data.milestone.23.title': '安全加固：HttpOnly 刷新令牌 / 限流防伪造 / SSRF 防护 / CSP',
+  'landing.data.milestone.24.title': '商业化就绪整改：资金闭环 / 权益强制 / 备份监控 / 前端稳定性',
 }
