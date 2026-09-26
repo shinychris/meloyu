@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import shutil
 import time
 from datetime import UTC
 from pathlib import Path
@@ -162,6 +163,8 @@ def check_free_daily_limit(db: Session, user: User) -> None:
 def submit_generation(db: Session, user: User, payload: dict) -> dict:
     check_generation_content(payload)
     check_free_daily_limit(db, user)
+    from app.core.disk_guard import ensure_disk_available
+    ensure_disk_available()
 
     resolved = resolve_generation_request(payload)
     params = resolved["params"]
@@ -523,24 +526,41 @@ def _persist_success(db: Session, task_id: str, user_id: str, output, provider) 
         db.flush()
         if first_cand is None:
             first_cand = cand
+        preview_relpath: str | None = None
+        seen_paths: set[str] = set()
         for fmeta in art.files:
+            rel = fmeta["relpath"]
+            full = f"{work.id}/{version.id}/{rel}"
+            if full in seen_paths:
+                # 同源产物注册多种 kind（外部通道 preview/master 同源整曲）：复制一份
+                # 独立物理文件再登记，避免 files.path UNIQUE 冲突——2026-09-26 商业化
+                # 审查 P0-7：该冲突曾使外部 API 通道每个任务在最后落库步必败并退款
+                new_rel = (f"{Path(rel).parent.as_posix()}/{Path(rel).stem}"
+                           f"_{fmeta['kind']}{Path(rel).suffix}")
+                src = settings.audio_path / full
+                dst = settings.audio_path / work.id / version.id / new_rel
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst)
+                rel, full = new_rel, f"{work.id}/{version.id}/{new_rel}"
+            seen_paths.add(full)
+            if fmeta["kind"] == "preview":
+                preview_relpath = rel
             db.add(File(
                 work_id=work.id, version_id=version.id, candidate_id=cand.id,
                 kind=fmeta["kind"], stem_name=fmeta.get("stem_name"),
                 name=_display_filename(work.display_code, version.version_no, art.label,
                                        fmeta["kind"], fmeta.get("stem_name"),
-                                       Path(fmeta["relpath"]).suffix),
-                path=f"{work.id}/{version.id}/{fmeta['relpath']}",
+                                       Path(rel).suffix),
+                path=full,
                 mime=fmeta["mime"], bytes=fmeta["bytes"],
                 duration_sec=fmeta.get("duration_sec"), sample_rate=fmeta.get("sample_rate"),
                 sha256=fmeta["sha256"], created_at=now, updated_at=now,
             ))
-        preview = next((f for f in art.files if f["kind"] == "preview"), None)
         result_candidates.append({
             "id": cand.id, "label": art.label, "quality_score": art.quality_score,
             "duration_sec": int(round(art.duration_sec)),
             "preview_file_id": None,  # 占位，flush 后回填
-            "_preview_relpath": preview["relpath"] if preview else None,
+            "_preview_relpath": preview_relpath,
         })
     # 回填 preview_file_id（autoflush=False：须先 flush 才能在查询中看到本轮 File 行，
     # 否则末轮加入的候选——如 B——的 preview 永远查不到，本机 MusicGen 真机生成实测命中）

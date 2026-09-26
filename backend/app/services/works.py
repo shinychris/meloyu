@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import TRASH_RETENTION_DAYS, settings
 from app.core.errors import err_conflict, err_forbidden, err_not_found
 from app.core.i18n import tr
+from app.core.logging import logger
 from app.models import EditEvent, Task, User, Version, Work
 from app.models.base import utc_now_iso
 from app.repositories import counters
@@ -73,7 +74,8 @@ def _serialize(db: Session, work: Work, user: User | None = None) -> dict:
 def list_works(db: Session, user: User, *, q: str | None, tag: str | None,
                favorite: bool | None, status: str, sort: str, order: str,
                page: int, page_size: int) -> dict:
-    purge_expired(db, user.id)
+    # 回收站清扫已移至启动+定时（P2-1，2026-09-26）：读接口持写锁（SQLite 单写者）
+    # 与生成进度回写争锁，且"仅该用户再访问才触发"行为不可预期
     conds = [Work.user_id == user.id]
     if status == "active":
         conds.append(Work.status == "active")
@@ -160,19 +162,24 @@ def restore_work(db: Session, work_id: str, user: User) -> dict:
 
 
 def _physical_delete(db: Session, work: Work) -> None:
-    """物理删除：解除自引用外键 → 删磁盘目录 → DELETE 触发级联。"""
+    """物理删除：解除自引用外键 → DELETE+级联提交 → 再删磁盘目录。
+
+    顺序（P2-2，2026-09-26）：先提交 DB 删除后 rmtree——原实现先删盘后提交，
+    commit 失败（busy 超时）即留下指向已删文件的悬空行；改为先提交后删盘后，
+    提交成功而 rmtree 失败只会残留磁盘孤儿目录（由对账清扫兜底，无数据损坏）。
+    """
     work.active_version_id = None
     work.preview_file_id = None
     db.flush()
+    db.execute(text("DELETE FROM works WHERE id = :id"), {"id": work.id})
+    db.commit()
     audio_dir = settings.audio_path / work.id
     if audio_dir.exists():
         shutil.rmtree(audio_dir, ignore_errors=True)
-    db.execute(text("DELETE FROM works WHERE id = :id"), {"id": work.id})
-    db.commit()
 
 
 def purge_expired(db: Session, user_id: str | None = None) -> int:
-    """回收站 30 天清扫（列表查询时顺带触发）。"""
+    """回收站 30 天清扫（启动时+定时触发；v0.14.0 起不再挂在列表读路径）。"""
     from datetime import datetime, timedelta
     cutoff = (datetime.now(UTC) - timedelta(days=TRASH_RETENTION_DAYS)
               ).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -183,6 +190,30 @@ def purge_expired(db: Session, user_id: str | None = None) -> int:
     for w in expired:
         _physical_delete(db, w)
     return len(expired)
+
+
+def start_periodic_purge(interval_sec: int = 6 * 3600) -> None:
+    """回收站定时清扫线程（守护）：无人访问的作品也要按期物理删除释放磁盘。
+
+    短事务逐作品提交（_physical_delete 内 commit），失败只记日志不影响下一轮。
+    """
+    import threading
+    import time
+
+    from app.database import SessionLocal
+
+    def _loop() -> None:
+        while True:
+            time.sleep(interval_sec)
+            try:
+                with SessionLocal() as db:
+                    n = purge_expired(db)
+                if n:
+                    logger.info(f"periodic purge: physically deleted {n} expired work(s)")
+            except Exception as e:  # noqa: BLE001 —— 清扫线程兜底
+                logger.exception(f"periodic purge failed: {e}")
+
+    threading.Thread(target=_loop, daemon=True, name="meloyu-purge").start()
 
 
 def list_events(db: Session, work_id: str, user: User, page: int, page_size: int) -> dict:

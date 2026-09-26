@@ -97,6 +97,8 @@ class Settings(BaseSettings):
     sentry_dsn: str = ""
     # 人声克隆同人校验余弦阈值（FR-5；0=用服务默认 0.55，运营可调）
     voice_verify_threshold: float = 0
+    # 数据盘最低剩余空间（GB）：生成/导出/上传入口的前置水位线（P0-9），低于即拒绝
+    disk_min_free_gb: float = 10.0
     # MiniMax-Music3 商用开放开关（义务①署名/②防侵权防护/③AUP 披露已落实，默认开放；
     # 条款修订或营收接近 $20M 门槛时置 false 回退非商用签发）
     mmax_commercial_enabled: bool = True

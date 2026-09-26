@@ -74,6 +74,8 @@ def create_track(db: Session, user: User, *, filename: str, content: bytes) -> d
         raise err_validation(tr("参考音频超过 50MB 上限", "Reference audio exceeds the 50MB limit"))
     if not content:
         raise err_validation(tr("上传内容为空", "Upload body is empty"))
+    from app.core.disk_guard import ensure_disk_available
+    ensure_disk_available(extra_bytes=len(content))
 
     now = utc_now_iso()
     track = ReferenceTrack(user_id=user.id, name=name,

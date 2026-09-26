@@ -5,10 +5,19 @@ r"""Meloyu 数据备份脚本（P1-8）。
    backend/data/backups/meloyu-YYYYMMDD-HHMMSS.db。
    使用 sqlite3Connection.backup() 页级 API，服务运行中执行安全，
    产出为自包含快照（不依赖 -wal/-shm）。
-2. 音频产物增量复制：backend/data/audio/ → backend/data/backups/audio/。
+2. 快照完整性校验：备份后对新快照执行 PRAGMA integrity_check，
+   校验失败即删除该快照并报错（防"备了个坏的"——P0-8，2026-09-26）。
+3. 音频产物增量复制：backend/data/audio/ → backend/data/backups/audio/。
    仅复制 size 或 mtime 与备份侧不一致的文件（os.walk 递归，保持相对目录结构）。
-3. 轮换：backups/ 下 .db 快照保留最近 N 份（默认 7，--keep 可调）；
+4. 轮换：backups/ 下 .db 快照保留最近 N 份（默认 7，--keep 可调）；
    audio 备份为增量镜像，不参与轮换。
+
+⚠ 执行位置红线（单写入方事故复盘，2026-09-05/06）：8180 生产栈运行期间，
+备份必须在**容器内**执行（docker exec meloyu-backend python scripts/backup.py），
+由宿主机侧另起进程直接打开 WAL 库会跨 bind mount 扰动 -shm 状态——与两次
+库损坏事故同一暴露面。宿主机直跑仅适用于栈完全停机时。
+部署侧包装脚本：deploy/scripts/backup_daily.cmd（容器在跑→docker exec；
+没跑→跳过并留日志）。
 
 用法（在仓库根或任意目录均可，路径基于脚本自身定位）：
     backend/.venv/Scripts/python.exe backend/scripts/backup.py            # 全量（db + audio）
@@ -17,10 +26,10 @@ r"""Meloyu 数据备份脚本（P1-8）。
     backend/.venv/Scripts/python.exe backend/scripts/backup.py --audio-only   # 仅增量复制音频
     backend/.venv/Scripts/python.exe backend/scripts/backup.py --dry-run      # 只统计不落盘
 
-Windows 计划任务（每天 03:30 执行，一行命令）：
-    schtasks /Create /TN "Meloyu Backup" /SC DAILY /ST 03:30 /TR "D:\Codebase\Meloyu\backend\.venv\Scripts\python.exe D:\Codebase\Meloyu\backend\scripts\backup.py"
+Windows 计划任务（每天 03:30，经包装脚本容器内执行）：
+    schtasks /Create /TN "Meloyu Backup" /SC DAILY /ST 03:30 /TR "D:\Codebase\Meloyu\deploy\scripts\backup_daily.cmd"
 
-退出码：0 成功；1 备份过程出错（源库损坏/磁盘不可写等）。
+退出码：0 成功；1 备份过程出错（源库损坏/快照校验失败/磁盘不可写等）。
 """
 from __future__ import annotations
 
@@ -66,8 +75,19 @@ def backup_db(keep: int, dry_run: bool) -> bool:
         print(f"[db] 备份失败：{exc}", file=sys.stderr)
         dest.unlink(missing_ok=True)
         return False
+    # P0-8：快照即校验——integrity_check 不过的快照等于没有备份
+    check = sqlite3.connect(dest)
+    try:
+        result = check.execute("PRAGMA integrity_check").fetchone()
+    finally:
+        check.close()
+    if not result or result[0] != "ok":
+        print(f"[db] 快照完整性校验失败（{result[0] if result else 'no result'}），"
+              f"已删除：{dest.name}", file=sys.stderr)
+        dest.unlink(missing_ok=True)
+        return False
     size_mb = dest.stat().st_size / 1024 / 1024
-    print(f"[db] 已备份 {DB_PATH.name} -> {dest.name}（{size_mb:.1f} MB）")
+    print(f"[db] 已备份 {DB_PATH.name} -> {dest.name}（{size_mb:.1f} MB，integrity ok）")
     rotate_snapshots(keep)
     return True
 

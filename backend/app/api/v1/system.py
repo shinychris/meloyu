@@ -151,10 +151,16 @@ _INSTRUMENTS = (
 @router.get("/health")
 def health(db: Session = Depends(get_db)):
     # 安审计 L-1（2026-09-09）：无鉴权端点不再回显版本号与内部规模统计
-    # （版本指纹/侦察信息收敛）；运维侧版本经镜像 tag / 需登录接口可得
+    # （版本指纹/侦察信息收敛）；运维侧版本经镜像 tag / 需登录接口可得。
+    # P0-9（2026-09-26）：回报数据盘真实水位，低于写入阈值时 degraded——
+    # "healthy 但拒绝一切写"的隐性失效必须能被探针看见
+    from app.core.disk_guard import disk_free_gb
+    from app.config import settings
+    free = disk_free_gb()
     return ok({
-        "status": "ok",
+        "status": "ok" if free >= settings.disk_min_free_gb else "degraded",
         "db": "ok",
+        "disk_free_gb": round(free, 1),
         "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     })
 

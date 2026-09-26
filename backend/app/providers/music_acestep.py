@@ -51,6 +51,9 @@ _INSTALL_HINT_DOCKER_EN = ("In the Docker deployment run from the host: docker e
                            "Linux venv .venv-linux inside the container, independent of "
                            "the host's Windows venv; weights are shared via the bind mount)")
 
+# 单卡 GPU 互斥（generate 内持有，子进程退出即释放；见 generate 处注释）
+_ACESTEP_SEMAPHORE = threading.BoundedSemaphore(1)
+
 # 主模型 4 组件 + 8GB 档 LM（checkpoints 目录下的子目录名，与 acestep 包一致）
 _COMPONENTS = ("acestep-v15-turbo", "vae", "Qwen3-Embedding-0.6B",
                "acestep-5Hz-lm-1.7B", "acestep-5Hz-lm-0.6B")
@@ -397,11 +400,23 @@ class ACEStepLocalProvider:
             progress(_stage_key(pct), max(1, min(99, pct)),
                      message or tr("ACE-Step 生成中", "Generating with ACE-Step"))
 
+        # GPU 单卡互斥（2026-09-26 商业化审查 P1-17）：8GB 显存跑不下两个 ACE-Step
+        # 子进程（batch 2 各自拉 torch），并发必双双 OOM 失败退款——与 musicgen
+        # _GEN_LOCK / selfhosted _AUDIOCPP_SEMAPHORE 同款串行化。等待期间持续上报
+        # 进度与查取消：排队等待计入任务超时预算，防止排到队首时已被超时熔断误杀。
+        while not _ACESTEP_SEMAPHORE.acquire(timeout=5):
+            if should_cancel():
+                raise SynthCancelled()
+            progress("gpu_wait", 1,
+                     tr("等待 GPU 空闲（前一任务生成中）…",
+                        "Waiting for GPU (previous task generating)…"))
+
         try:
             done = _run_runner(
                 ["generate", "--request", str(req_file), "--outdir", str(dest)],
                 on_event, timeout_sec=self.timeout_sec, should_cancel=should_cancel)
         finally:
+            _ACESTEP_SEMAPHORE.release()
             req_file.unlink(missing_ok=True)
 
         candidates: list[CandidateArtifact] = []

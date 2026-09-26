@@ -237,6 +237,8 @@ def submit_sample(db: Session, user: User, profile_id: str, step: int,
         raise err_validation(tr("step 必须为 1 或 2", "step must be 1 or 2"))
     if len(wav) > MAX_SAMPLE_BYTES:
         raise err_validation(tr("采样超过 20MB 上限", "Sample exceeds the 20MB limit"))
+    from app.core.disk_guard import ensure_disk_available
+    ensure_disk_available(extra_bytes=len(wav))
     if step == 1 and p.sample1_path:
         raise err_conflict(tr("样本1已提交，请提交样本2", "Sample 1 already submitted; submit sample 2"))
     if step == 2:

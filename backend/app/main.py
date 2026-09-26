@@ -223,6 +223,9 @@ def _startup() -> None:
     from app.database import SessionLocal
     with SessionLocal() as db:
         purge_expired(db)
+    # P0-9（2026-09-26）：清扫不再挂列表读路径，改守护线程定时全量触发
+    from app.services.works import start_periodic_purge
+    start_periodic_purge()
     if recovered:
         logger.info(f"startup: recovered {recovered} zombie tasks")
     # 首次启动（无 demo 账号）时后台线程灌种子（渲染音频耗时数分钟，不阻塞启动）

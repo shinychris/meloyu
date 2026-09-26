@@ -80,6 +80,8 @@ def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
     """提交派生生成：建子版本 + 任务 + 扣积分，返回 POST /generations 同构响应。"""
     if op not in DERIVED_OPS:
         raise err_validation(tr(f"未知派生操作：{op}", f"Unknown derived operation: {op}"))
+    from app.core.disk_guard import ensure_disk_available
+    ensure_disk_available()
     cand, version, work = _source_context(db, user, candidate_id)
     params = _base_params(version, cand)
     extra = ""
@@ -267,6 +269,8 @@ def submit_mixdown(db: Session, user: User, version_id: str, wav: bytes,
         raise err_conflict(tr("该版本尚未采用候选", "No candidate adopted for this version yet"))
     if len(wav) > 200 * 1024 * 1024:
         raise err_validation(tr("混音文件超过 200MB 上限", "Mixdown exceeds the 200MB limit"))
+    from app.core.disk_guard import ensure_disk_available
+    ensure_disk_available(extra_bytes=len(wav))
     import wave as wav_mod
     import hashlib
     from app.config import settings

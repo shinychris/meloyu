@@ -23,6 +23,8 @@ from app.synth.mp3_io import encode_mp3
 
 def create_export(db: Session, user: User, version_id: str, fmt: str,
                   platform: str | None = None, meta: dict | None = None) -> dict:
+    from app.core.disk_guard import ensure_disk_available
+    ensure_disk_available()
     version = works_svc.get_version_owned(db, version_id, user)
     if not version.active_candidate_id:
         raise err_conflict(tr("该版本尚未采用候选", "No candidate adopted for this version yet"))
