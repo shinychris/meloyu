@@ -42,6 +42,9 @@ SELFHOSTED_PROBE_TIMEOUT_SEC = 2.0
 REPLICATE_API_BASE = "https://api.replicate.com"
 # 免费档回收站清扫天数
 TRASH_RETENTION_DAYS = 30
+# 导出任务软超时（秒）：导出阶段边界检查，超时判失败（P1-10；导出已隔离到
+# 独立单 worker 池，最坏只影响后续导出排队，不拖累生成通道）
+EXPORT_TASK_TIMEOUT_SEC = 600
 # stream-token 有效期（秒）
 STREAM_TOKEN_TTL_SEC = 900
 
@@ -99,6 +102,8 @@ class Settings(BaseSettings):
     voice_verify_threshold: float = 0
     # 数据盘最低剩余空间（GB）：生成/导出/上传入口的前置水位线（P0-9），低于即拒绝
     disk_min_free_gb: float = 10.0
+    # 账号维度每小时生成任务上限（P1-7：叠加在 IP 限流之上，防付费账号直刷/脚本刷量）
+    account_generation_hourly_limit: int = 30
     # MiniMax-Music3 商用开放开关（义务①署名/②防侵权防护/③AUP 披露已落实，默认开放；
     # 条款修订或营收接近 $20M 门槛时置 false 回退非商用签发）
     mmax_commercial_enabled: bool = True

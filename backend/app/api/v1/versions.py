@@ -92,17 +92,17 @@ def version_leadsheet(version_id: str,
 
     仅本地引擎候选（有 MIDI 产物；外部整曲 40901）。读权限（团队 viewer 可读）。
     """
-    from app.services import leadsheet as ls_svc
     from app.core.errors import err_validation
     from app.core.i18n import tr
+    from app.services import leadsheet as ls_svc
     if format not in ("pdf", "json"):
         raise err_validation(tr("format 必须为 pdf/json", "format must be pdf/json"))
     version = works_svc.get_version_owned(db, version_id, user, min_role="viewer")
     if not version.active_candidate_id:
         from app.core.errors import err_conflict
         raise err_conflict(tr("该版本尚未采用候选", "No candidate adopted for this version yet"))
-    from sqlalchemy import select as _select
-    from app.models import Candidate as _C, Work as _W
+    from app.models import Candidate as _C
+    from app.models import Work as _W
     cand = db.get(_C, version.active_candidate_id)
     work = db.get(_W, version.work_id)
     data = ls_svc.build_leadsheet(work, version, cand)

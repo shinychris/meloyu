@@ -91,7 +91,7 @@ def logout(user: User = Depends(get_current_user), db: Session = Depends(get_db)
 @router.post("/send-code")
 def send_code(body: SendCodeRequest, db: Session = Depends(get_db)):
     from app.services import mail as mail_svc
-    mail_svc.send_verification_code(body.email)
+    mail_svc.send_verification_code(db, body.email)
     return ok({"ok": True})
 
 

@@ -96,8 +96,16 @@ def lazy_monthly_grant(db: Session, user: User) -> None:
     可能读到同一过期水位而双发。改为先原子占位——UPDATE ... WHERE
     credit_next_grant_at <= now 仅首个请求能顺延水位（rowcount=0 即并发已
     发放，直接返回），再入账。
+
+    P0-1（2026-09-26 商业化审查）单时钟：Stripe 订阅用户的月度积分只由
+    invoice.paid（续期发票）驱动，本地时钟不参与——激活时本就不武装水位，
+    此处再挡一层历史存量已武装的行（旧库迁移防御），见到即拆除。
     """
     if not user.credit_next_grant_at:
+        return
+    if _has_active_stripe_subscription(db, user.id):
+        user.credit_next_grant_at = None
+        db.flush()
         return
     now = utc_now_iso()
     if user.credit_next_grant_at > now:
@@ -117,6 +125,15 @@ def lazy_monthly_grant(db: Session, user: User) -> None:
     user.credit_next_grant_at = next_at
     user.credit_monthly_grant = monthly
     db.flush()
+
+
+def _has_active_stripe_subscription(db: Session, user_id: str) -> bool:
+    from app.models import Subscription
+    return db.execute(
+        select(Subscription.id).where(
+            Subscription.user_id == user_id, Subscription.status == "active",
+            Subscription.source == "stripe").limit(1)
+    ).first() is not None
 
 
 def _next_month_first_day(offset_months: int = 1) -> str:

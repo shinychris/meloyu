@@ -2,12 +2,14 @@
 from app.models.api_key import ApiKey
 from app.models.base import Base, BaseModel, ISOTimestamp, new_uuid, utc_now_iso
 from app.models.certificate import Certificate
+from app.models.email_code import EmailCode
 from app.models.llm_setting import SETTING_ID, LLMSetting, ModelOp
-from app.models.market import MarketListing, MarketOrder
 from app.models.lyrics import LyricsProject
+from app.models.market import MarketListing, MarketOrder
 from app.models.order import Order
-from app.models.reference import ReferenceTrack
 from app.models.plan import Plan, SequenceCounter, Subscription
+from app.models.reference import ReferenceTrack
+from app.models.stripe_event import StripeEvent
 from app.models.task import File, Task
 from app.models.taste import TasteProfile
 from app.models.team import TeamMember, TeamSpace, WorkComment
@@ -23,4 +25,5 @@ __all__ = [
     "Task", "File", "TeamSpace", "TeamMember", "WorkComment", "TasteProfile",
     "Certificate", "LyricsProject",
     "LLMSetting", "ModelOp", "SETTING_ID", "Order", "MarketListing", "MarketOrder", "ReferenceTrack", "VoiceProfile",
+    "StripeEvent", "EmailCode",
 ]

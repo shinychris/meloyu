@@ -135,20 +135,20 @@ def build_readme(*, platform: str, preset: dict, entries: list[str]) -> str:
     en_note = ("cover.png is a system-generated placeholder (ring mark at center); "
                "replace it with your artwork before uploading.")
     return "\n".join([
-        f"Meloyu 发行导出包 / Meloyu release package",
+        "Meloyu 发行导出包 / Meloyu release package",
         f"平台 / Platform: {preset['name_zh']} / {preset['name_en']}",
         f"音频 / Audio: {preset['audio_desc']}（响度目标 {preset['loudness']}）",
         f"包内文件 / Contents: {', '.join(entries)}",
         "",
         f"[zh] {audio_note}",
-        f"[zh] explicit（ Explicit 标记）为发行方人工勾选结果，请按平台要求如实申报。",
-        f"[zh] 音频已写入 AIGC 生成标识；metadata.json 的 aigc 段为 AI 参与披露，"
-        f"适配流媒体 AI 披露政策（如 Spotify/Apple 对 AI 内容的申报要求）。",
+        "[zh] explicit（ Explicit 标记）为发行方人工勾选结果，请按平台要求如实申报。",
+        "[zh] 音频已写入 AIGC 生成标识；metadata.json 的 aigc 段为 AI 参与披露，"
+        "适配流媒体 AI 披露政策（如 Spotify/Apple 对 AI 内容的申报要求）。",
         "",
         f"[en] {en_note}",
-        f"[en] The explicit flag is the uploader's own declaration; file it truthfully per platform rules.",
-        f"[en] Audio embeds an AIGC disclosure tag; the aigc section of metadata.json "
-        f"documents AI participation for streaming-platform AI disclosure policies.",
+        "[en] The explicit flag is the uploader's own declaration; file it truthfully per platform rules.",
+        "[en] Audio embeds an AIGC disclosure tag; the aigc section of metadata.json "
+        "documents AI participation for streaming-platform AI disclosure policies.",
         "",
     ])
 

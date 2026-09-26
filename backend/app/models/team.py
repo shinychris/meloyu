@@ -15,13 +15,11 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Index,
-    Integer,
     String,
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.types import JSON
+from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import BaseModel, ISOTimestamp, new_uuid, utc_now_iso
 

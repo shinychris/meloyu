@@ -167,13 +167,21 @@ def _physical_delete(db: Session, work: Work) -> None:
     顺序（P2-2，2026-09-26）：先提交 DB 删除后 rmtree——原实现先删盘后提交，
     commit 失败（busy 超时）即留下指向已删文件的悬空行；改为先提交后删盘后，
     提交成功而 rmtree 失败只会残留磁盘孤儿目录（由对账清扫兜底，无数据损坏）。
+    P1-1：同事务联动下架市场条目（market 表无外键，防买家买到已删作品）。
+    注意：id 须在 DELETE 提交前取用（提交后 ORM 实例过期，行已不在）。
     """
+    work_id = work.id
     work.active_version_id = None
     work.preview_file_id = None
     db.flush()
-    db.execute(text("DELETE FROM works WHERE id = :id"), {"id": work.id})
+    from app.services import market as market_svc
+    delisted = market_svc.delist_for_work(db, work_id)
+    if delisted:
+        logger.info(f"physical delete: delisted {delisted} market listing(s) "
+                    f"for work {work_id}")
+    db.execute(text("DELETE FROM works WHERE id = :id"), {"id": work_id})
     db.commit()
-    audio_dir = settings.audio_path / work.id
+    audio_dir = settings.audio_path / work_id
     if audio_dir.exists():
         shutil.rmtree(audio_dir, ignore_errors=True)
 

@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -21,7 +20,7 @@ from app.schemas.auth import GenerationRequest
 from app.services import api_keys as keys_svc
 from app.services import generation as gen_svc
 from app.services import works as works_svc
-from app.services.serializers import file_ref, task_to_dict
+from app.services.serializers import task_to_dict
 
 router = APIRouter(tags=["openapi"])
 keys_router = APIRouter(prefix="/api-keys", tags=["openapi"])
@@ -76,6 +75,7 @@ def public_generate(body: GenerationRequest, request: Request,
 
 def _task_row(db: Session, task_id: str):
     from sqlalchemy.orm import Session as _S  # noqa: F401
+
     from app.models import Task
     return db.get(Task, task_id)
 

@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.config import SIGNUP_BONUS_CREDITS, settings
 from app.core.errors import BizError, err_bad_credentials, err_conflict, err_validation
 from app.core.i18n import tr
+from app.core.logging import logger
 from app.core.security import (
     create_access_token,
     create_reset_token,
@@ -41,7 +42,7 @@ def register(db: Session, email: str, password: str, nickname: str,
     if existing:
         raise err_conflict(tr("该邮箱已注册", "This email is already registered"))
     if settings.email_verification_enabled:
-        if not code or not mail_svc.verify_code(email, code):
+        if not code or not mail_svc.verify_code(db, email, code):
             raise err_validation(tr("邮箱验证码错误或已过期",
                                     "Email verification code is invalid or expired"))
     now = utc_now_iso()
@@ -57,7 +58,7 @@ def register(db: Session, email: str, password: str, nickname: str,
     out, refresh, refresh_ttl = _with_tokens(user)
     db.commit()  # refresh_token_hash 必须随响应落库（否则会话关闭即丢失）
     db.refresh(user)
-    mail_svc.consume_code(email)
+    mail_svc.consume_code(db, email)
     return out, refresh, refresh_ttl
 
 
@@ -144,15 +145,34 @@ def change_password(db: Session, user: User, old_password: str, new_password: st
 
 
 def delete_account(db: Session, user: User, password: str) -> dict:
-    """账号注销（个保法删除权）：密码确认 → 删除全部作品与音频文件 → 用户行匿名化。
+    """账号注销（个保法删除权）：密码确认 → 取消 Stripe 订阅 → 删除全部作品、
+    声纹采样与参考音频（敏感个人信息不留盘）→ 用户行匿名化。
 
+    - Stripe 订阅（P0-6，2026-09-26）：注销前立即取消，否则用户被持续月扣
+      （拒付/投诉/通道风控伤害）。取消失败阻断注销，提示先到门户处理。
     - 账本（credit_transactions）保留：财务合规留存，仅关联匿名化后的用户行；
     - 用户行不物理删除（works/tasks 外键 RESTRICT，且账本需引用）：
       email/nickname 化名、密码置随机、清 refresh/计划字段。
     """
     if not verify_password(password, user.password_hash):
         raise err_bad_credentials(tr("密码错误", "Incorrect password"))
+    _cancel_stripe_subscription_before_delete(db, user)
     import secrets as _secrets
+
+    from app.models import ReferenceTrack, VoiceProfile
+    # 声纹采样与参考音频：敏感个人信息/版权素材，注销必须物理清除（P2-7）
+    voice_dir = settings.audio_path / "voice" / user.id
+    if voice_dir.exists():
+        shutil.rmtree(voice_dir, ignore_errors=True)
+    ref_dir = settings.audio_path / "reference" / user.id
+    if ref_dir.exists():
+        shutil.rmtree(ref_dir, ignore_errors=True)
+    for profile in db.execute(select(VoiceProfile).where(
+            VoiceProfile.user_id == user.id)).scalars().all():
+        db.delete(profile)
+    for track in db.execute(select(ReferenceTrack).where(
+            ReferenceTrack.user_id == user.id)).scalars().all():
+        db.delete(track)
     works = db.execute(select(Work).where(Work.user_id == user.id)).scalars().all()
     removed_works = 0
     for w in works:
@@ -173,6 +193,46 @@ def delete_account(db: Session, user: User, password: str) -> dict:
     user.updated_at = utc_now_iso()
     db.commit()
     return {"ok": True, "works_removed": removed_works}
+
+
+def _cancel_stripe_subscription_before_delete(db: Session, user: User) -> None:
+    """注销前取消活跃 Stripe 订阅（P0-6）。
+
+    有活跃 stripe 订阅且支付通道可用：立即取消（杜绝注销后继续扣款）；
+    取消失败（网络/Stripe 侧异常）：阻断注销并提示先到门户自行处理——
+    宁可多一步用户操作，不可静默留下持续扣款的订阅。
+    """
+    from app.models import Order
+    active_stripe = db.execute(select(Subscription.id).where(
+        Subscription.user_id == user.id, Subscription.status == "active",
+        Subscription.source == "stripe").limit(1)).first()
+    if active_stripe is None:
+        return
+    from app.services import stripe_billing
+    if not stripe_billing.stripe_enabled():
+        return  # 通道未配置（本地形态）无从取消，注销继续；扣款本就不会发生
+    order = db.execute(select(Order).where(
+        Order.user_id == user.id, Order.kind == "subscription", Order.status == "paid",
+        Order.stripe_subscription_id.isnot(None))
+        .order_by(Order.created_at.desc()).limit(1)).scalars().first()
+    if order is None or not order.stripe_subscription_id:
+        return
+    import stripe
+
+    stripe.api_key = settings.stripe_secret_key
+    try:
+        stripe.Subscription.cancel(order.stripe_subscription_id)
+        logger.info(f"cancelled stripe subscription {order.stripe_subscription_id} "
+                    f"on account deletion (user {user.id})")
+    except Exception as e:  # noqa: BLE001 —— 取消失败必须阻断，防注销后持续扣款
+        logger.error(f"failed to cancel stripe subscription for deleting user "
+                     f"{user.id}: {e!r}")
+        raise err_conflict(tr(
+            "注销前需先取消订阅：请到「订阅管理」门户取消订阅后重试，"
+            "或联系支持（避免注销后继续扣款）",
+            "Please cancel your subscription in the billing portal before deleting "
+            "your account, or contact support (to avoid further charges after deletion)"
+        )) from e
 
 
 def export_data(db: Session, user: User) -> tuple[str, bytes]:

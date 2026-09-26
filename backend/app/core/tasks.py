@@ -1,6 +1,20 @@
-"""任务执行基础设施：线程池（max_workers=2）+ 启动僵尸回收。"""
+"""任务执行基础设施：优先级工作线程 + 导出独立池 + 启动僵尸回收。
+
+v0.14.0（2026-09-26 商业化审查 P0-4/P1-10）重构：
+- 原单一 ThreadPoolExecutor(max_workers=2) 无优先级——studio 档「优先队列」
+  承诺无从谈起。改为**双优先级堆队列**：plan 权重（studio/team=0、pro=1、
+  free=2）为主序，提交先后为次序，2 个常驻 worker 线程消费。
+- 生成与导出原共用 2 worker，两个慢导出即占满全站生成通道——导出改走
+  **独立单 worker 池**（meloyu-export），与生成互不挤占；卡死导出最坏只
+  影响后续导出排队。
+- 队列取消：queued 任务被置 canceled 后，worker 取到时 execute_* 开头的
+  状态检查直接跳过（与原 ThreadPoolExecutor 行为一致）。
+"""
 from __future__ import annotations
 
+import heapq
+import itertools
+import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from sqlalchemy import select
@@ -11,28 +25,65 @@ from app.database import SessionLocal
 from app.models import Task
 from app.models.base import utc_now_iso
 
-_executor: ThreadPoolExecutor | None = None
+_heap: list[tuple[int, int, object, tuple]] = []
+_wakeup = threading.Condition()
+_seq = itertools.count()  # 同优先级内 FIFO 稳定序
+_PLAN_PRIORITY = {"studio": 0, "team": 0, "pro": 1, "free": 2}
+_WORKER_COUNT = 2
+_workers_started = False
+_export_executor: ThreadPoolExecutor | None = None
 
 
-def get_executor() -> ThreadPoolExecutor:
-    global _executor
-    if _executor is None:
-        _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="meloyu-task")
-    return _executor
+def _ensure_workers() -> None:
+    global _workers_started
+    if _workers_started:
+        return
+    for i in range(_WORKER_COUNT):
+        threading.Thread(target=_worker_loop, daemon=True,
+                         name=f"meloyu-task-{i}").start()
+    _workers_started = True
 
 
-def schedule_generation(task_id: str) -> None:
+def _worker_loop() -> None:
+    while True:
+        with _wakeup:
+            while not _heap:
+                _wakeup.wait()
+            _priority, _seqno, fn, args = heapq.heappop(_heap)
+        try:
+            fn(*args)
+        except Exception as e:  # noqa: BLE001 —— worker 线程兜底
+            logger.exception(f"task crashed in worker: {e}")
+
+
+def schedule_generation(task_id: str, plan: str = "free") -> None:
     from app.services.generation import execute_generation
-    # ThreadPoolExecutor 不复制 contextvar：捕获提交时 locale，worker 内恢复，
-    # 保证任务进度/错误文案按提交请求语言生成（持久化语义，可接受）
+    _ensure_workers()
+    # 不复制 contextvar：捕获提交时 locale，worker 内恢复，保证任务进度/错误
+    # 文案按提交请求语言生成（持久化语义，可接受）
     locale = current_locale()
-    get_executor().submit(run_with_locale, locale, _safe_run, execute_generation, task_id)
+    with _wakeup:
+        heapq.heappush(_heap, (_PLAN_PRIORITY.get(plan, 2), next(_seq),
+                               run_with_locale, (locale, _safe_run,
+                                                 execute_generation, task_id)))
+        _wakeup.notify()
 
 
 def schedule_export(task_id: str) -> None:
+    """导出走独立单 worker 池：慢/卡导出不再挤占生成通道（P1-10）。"""
+    global _export_executor
     from app.services.export import execute_export
+    if _export_executor is None:
+        _export_executor = ThreadPoolExecutor(max_workers=1,
+                                              thread_name_prefix="meloyu-export")
     locale = current_locale()
-    get_executor().submit(run_with_locale, locale, _safe_run, execute_export, task_id)
+    _export_executor.submit(run_with_locale, locale, _safe_run, execute_export, task_id)
+
+
+def queued_depth() -> int:
+    """当前生成队列深度（监控/health 暴露用）。"""
+    with _wakeup:
+        return len(_heap)
 
 
 def _safe_run(fn, task_id: str) -> None:

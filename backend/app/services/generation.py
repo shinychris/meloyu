@@ -160,9 +160,28 @@ def check_free_daily_limit(db: Session, user: User) -> None:
             tr("今日免费生成次数已用完", "Today's free generations are used up"))
 
 
+def check_account_hourly_limit(db: Session, user: User) -> None:
+    """账号维度每小时生成上限（P1-7：叠加在 IP 限流之上，全部档位生效）。"""
+    from datetime import datetime, timedelta
+    cutoff = (datetime.now(UTC) - timedelta(hours=1)
+              ).strftime("%Y-%m-%dT%H:%M:%SZ")
+    count = db.execute(
+        select(func.count()).select_from(Task).where(
+            Task.user_id == user.id, Task.type == "generation",
+            Task.created_at >= cutoff)
+    ).scalar_one()
+    if count >= settings.account_generation_hourly_limit:
+        raise err_payment_required(
+            tr("生成请求过于频繁（每小时上限 "
+               f"{settings.account_generation_hourly_limit} 次），请稍后再试",
+               "Too many generation requests (hourly limit "
+               f"{settings.account_generation_hourly_limit}); please try again later"))
+
+
 def submit_generation(db: Session, user: User, payload: dict) -> dict:
     check_generation_content(payload)
     check_free_daily_limit(db, user)
+    check_account_hourly_limit(db, user)
     from app.core.disk_guard import ensure_disk_available
     ensure_disk_available()
 
@@ -298,7 +317,7 @@ def submit_generation(db: Session, user: User, payload: dict) -> dict:
     db.refresh(work)
 
     from app.core.tasks import schedule_generation
-    schedule_generation(task.id)
+    schedule_generation(task.id, plan=user.plan)
 
     return {
         "task": task_to_dict(task),
@@ -720,8 +739,12 @@ def cancel_task(db: Session, user: User, task_id: str) -> dict:
     task = get_task_owned(db, task_id, user)
     if task.status in ("succeeded", "failed", "canceled"):
         raise err_conflict(tr("任务已结束，无法取消", "Task already finished; cannot cancel"))
-    if task.type == "export":
-        raise err_conflict(tr("导出任务不支持取消", "Export tasks cannot be canceled"))
+    if task.type == "export" and task.status == "running":
+        # P1-10：排队中的导出可取消（worker 取到时按状态检查跳过）；
+        # 执行中的导出无阶段取消钩子（转码不可中断），只能等其自然终态/软超时
+        raise err_conflict(tr("导出正在执行，暂不支持中断（最多 10 分钟自动结束）",
+                              "Export is running and cannot be interrupted "
+                              "(auto-finishes within 10 minutes)"))
     if task.status == "queued":
         task.status = "canceled"
         task.finished_at = utc_now_iso()

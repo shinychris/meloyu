@@ -9,7 +9,7 @@ import numpy as np
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import settings
+from app.config import EXPORT_TASK_TIMEOUT_SEC, settings
 from app.core.errors import err_conflict, err_not_found, err_validation
 from app.core.i18n import tr
 from app.core.logging import logger
@@ -25,6 +25,19 @@ def create_export(db: Session, user: User, version_id: str, fmt: str,
                   platform: str | None = None, meta: dict | None = None) -> dict:
     from app.core.disk_guard import ensure_disk_available
     ensure_disk_available()
+    # P0-4（2026-09-26 商业化审查）：付费档核心权益后端强制——Plan.max_export
+    # 此前无任何消费点，free 用户可直导 WAV/MIDI/Stems/发行包，付费档价值被架空。
+    # 口径：max_export=="mp3"（free）仅允许 mp3；"wav"（pro/studio）放开全部格式。
+    # 通道物理限制（外部通道候选无分轨/母带为 mp3 等）仍由执行期校验兜底。
+    from app.models import Plan
+    plan_row = db.get(Plan, user.plan)
+    allowed = plan_row.max_export if plan_row else "mp3"
+    if allowed == "mp3" and fmt != "mp3":
+        from app.core.errors import err_payment_required
+        raise err_payment_required(
+            tr(f"{fmt.upper()} 导出为 Pro/Studio 档权益；免费档仅支持 MP3 导出",
+               f"{fmt.upper()} export is a Pro/Studio benefit; "
+               "the free plan exports MP3 only"))
     version = works_svc.get_version_owned(db, version_id, user)
     if not version.active_candidate_id:
         raise err_conflict(tr("该版本尚未采用候选", "No candidate adopted for this version yet"))
@@ -65,9 +78,9 @@ def validate_cover_png(b64: str, preset_size: tuple[int, int] = (3000, 3000)) ->
     import struct as _st
     try:
         data = _b64.b64decode(str(b64), validate=True)
-    except Exception:
+    except Exception as e:
         raise err_validation(tr("cover_png_b64 不是合法 base64",
-                             "cover_png_b64 is not valid base64"))
+                             "cover_png_b64 is not valid base64")) from e
     if not data.startswith(bytes((137, 80, 78, 71, 13, 10, 26, 10))):
         raise err_validation(tr("自定义封面须为 PNG 图片",
                              "Custom cover must be a PNG image"))
@@ -95,6 +108,8 @@ def user_email_prefix(user: User) -> str:
 
 
 def execute_export(task_id: str) -> None:
+    import time as _time
+    deadline = _time.monotonic() + EXPORT_TASK_TIMEOUT_SEC
     with SessionLocal() as db:
         task = db.get(Task, task_id)
         if task is None or task.status != "queued":
@@ -115,7 +130,8 @@ def execute_export(task_id: str) -> None:
             version = db.get(Version, version_id)
             work = db.get(Work, version.work_id)
             cand = db.get(Candidate, version.active_candidate_id)
-            files = _export_artifacts(db, work, version, cand, fmt, payload)
+            files = _export_artifacts(db, work, version, cand, fmt, payload,
+                                      deadline=deadline)
             now = utc_now_iso()
             task_row = db.get(Task, task_id)
             task_row.status = "succeeded"
@@ -132,6 +148,17 @@ def execute_export(task_id: str) -> None:
                                 work_id=work.id, version_id=version.id)
             db.commit()
         logger.info(f"export {task_id} ({fmt}) done")
+    except TimeoutError as e:
+        logger.error(f"export {task_id} timed out after {EXPORT_TASK_TIMEOUT_SEC}s")
+        with SessionLocal() as db:
+            t = db.get(Task, task_id)
+            if t and t.status not in ("succeeded", "canceled"):
+                t.status = "failed"
+                t.error_code = 50002
+                t.error_message = tr("导出失败：超时 ", "Export failed: timeout ") + str(e)
+                t.finished_at = utc_now_iso()
+                t.updated_at = utc_now_iso()
+                db.commit()
     except Exception as e:  # noqa: BLE001
         logger.exception(f"export {task_id} failed: {e}")
         with SessionLocal() as db:
@@ -248,13 +275,22 @@ def _make_export_wav(exports_dir: Path, master: File) -> Path:
     return p
 
 
+def _check_deadline(deadline: float | None) -> None:
+    """导出软超时（P1-10）：阶段边界检查，超时抛 TimeoutError 判失败。"""
+    import time as _time
+    if deadline is not None and _time.monotonic() > deadline:
+        raise TimeoutError(f"exceeded {EXPORT_TASK_TIMEOUT_SEC}s export budget")
+
+
 def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate,
-                      fmt: str, payload: dict | None = None) -> list[dict]:
+                      fmt: str, payload: dict | None = None,
+                      deadline: float | None = None) -> list[dict]:
     # 路径含候选标签：换候选重导出不会撞路径；同候选重导出由 _register 复用记录
     base = f"{work.id}/{version.id}/exports/{cand.label}"
     exports_dir = _abs(base)
     exports_dir.mkdir(parents=True, exist_ok=True)
     out: list[dict] = []
+    _check_deadline(deadline)
 
     # 模型整曲候选（Suno 兼容 API / Replicate / 本机 MusicGen）无分轨与 MIDI；
     # wav 母带是否可导出取决于产物格式（Replicate/MusicGen 有 wav，Suno 网关仅 mp3）
@@ -279,6 +315,7 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
                "only MP3 export is supported"))
 
     if fmt == "mp3":
+        _check_deadline(deadline)
         p, src_rate = _make_export_mp3(exports_dir, master)
         _mark_aigc(p, "mp3", attribution)
         row = _register(db, work, version, kind="export_mp3", relpath=f"{base}/export.mp3",
@@ -288,6 +325,7 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
         out.append(file_ref(row))
 
     elif fmt == "wav":
+        _check_deadline(deadline)
         p = _make_export_wav(exports_dir, master)
         _mark_aigc(p, "wav", attribution)
         row = _register(db, work, version, kind="export_wav", relpath=f"{base}/master.wav",
@@ -303,6 +341,7 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
             src = cand_midi_dir / f"{stem}.mid"
             if not src.exists():
                 raise err_not_found(tr(f"MIDI 文件缺失：{stem}", f"MIDI file missing: {stem}"))
+            _check_deadline(deadline)
             p = exports_dir / f"midi_{stem}.mid"
             p.write_bytes(src.read_bytes())
             row = _register(db, work, version, kind="export_midi",
@@ -325,6 +364,7 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
                         name=f"{work.display_code}_{version.version_no}_export_stems.zip")
         out.append(file_ref(row))
         for stem in ("vocals", "drums", "bass", "other"):
+            _check_deadline(deadline)
             src_row = _candidate_file(db, cand.id, "stem", stem)
             src = _abs(src_row.path)
             p = exports_dir / f"stems_{stem}.wav"
@@ -337,8 +377,13 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
             out.append(file_ref(srow))
     elif fmt == "release":
         # FR-11 发行导出预设（v0.8.0）：平台模板打包（音频+封面占位+metadata+README）
-        from app.services.release_export import (build_metadata, build_readme,
-                                                 preset_of, write_release_zip)
+        _check_deadline(deadline)
+        from app.services.release_export import (
+            build_metadata,
+            build_readme,
+            preset_of,
+            write_release_zip,
+        )
         platform = (payload or {}).get("platform") or "douyin"
         preset = preset_of(platform)
         meta = (payload or {}).get("meta") or {}

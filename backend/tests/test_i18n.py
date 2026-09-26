@@ -280,24 +280,38 @@ class TestEnglishOutputNoChinese(unittest.TestCase):
         self.assertTrue(_has_cjk(captured["system"]))
 
     def test_mail_single_language_per_locale(self):
+        # v0.14.0：验证码落库（send/verify/consume 均带 db），邮件文案口径不变
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
         from unittest.mock import patch
+        from app import models  # noqa: F401
+        from app.models import Base
         from app.services import mail
+        engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+        Base.metadata.create_all(engine)
+        db = sessionmaker(bind=engine)()
         sent: list[tuple[str, str, str]] = []
         with patch.object(mail, "_send", lambda to, subject, body: sent.append((to, subject, body))):
             with patch.object(mail, "smtp_configured", lambda: True):
                 set_locale("en")
-                mail.send_verification_code("u@x.com")
+                mail.send_verification_code(db, "u@x.com")
                 mail.send_password_reset_email("u@x.com", "https://r")
                 set_locale("zh")
-                mail.send_verification_code("u2@x.com")
+                mail.send_verification_code(db, "u2@x.com")
                 mail.send_password_reset_email("u2@x.com", "https://r")
         en_sub, en_body = sent[0][1], sent[0][2]
         self.assertFalse(_has_cjk(en_sub), f"en mail subject has Chinese: {en_sub!r}")
         self.assertFalse(_has_cjk(en_body), f"en mail body has Chinese: {en_body!r}")
         self.assertFalse(_has_cjk(sent[1][1]) or _has_cjk(sent[1][2]))
         self.assertTrue(_has_cjk(sent[2][1]) and _has_cjk(sent[3][2]))
-        mail.consume_code("u@x.com")
-        mail.consume_code("u2@x.com")
+        # 验证码落库可校验（10 分钟内有效）
+        code_row = db.execute(
+            __import__("sqlalchemy").select(
+                __import__("app.models", fromlist=["EmailCode"]).EmailCode)
+        ).scalars().first()
+        self.assertIsNotNone(code_row)
+        mail.consume_code(db, "u@x.com")
+        mail.consume_code(db, "u2@x.com")
 
 
 if __name__ == "__main__":

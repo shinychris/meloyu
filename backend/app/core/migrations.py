@@ -45,6 +45,9 @@ _ADD_COLUMNS: list[tuple[str, str, str]] = [
      "ALTER TABLE certificates ADD COLUMN license_grade VARCHAR(16) NOT NULL DEFAULT ''"),
     # M-20260904-c：v0.8.3 团队空间——works 补共享空间列（FR-13）
     ("works", "space_id", "ALTER TABLE works ADD COLUMN space_id VARCHAR(32)"),
+    # M-20260926-c：v0.14.0——subscriptions 记录当前生效 Stripe 订阅 id
+    ("subscriptions", "stripe_subscription_id",
+     "ALTER TABLE subscriptions ADD COLUMN stripe_subscription_id VARCHAR(120)"),
 ]
 
 
@@ -157,6 +160,27 @@ def run(engine: Engine) -> list[str]:
         if ddl and "'market_purchase'" not in ddl:
             _rebuild_table(conn, "credit_transactions", "credit_transactions__v102")
             applied.append("credit_transactions.reason 增加 market_purchase 枚举")
+
+        # M-20260926-b：v0.14.0——edit_events.action 补支付生命周期枚举
+        # （payment_failed / subscription_past_due，dunning 留痕）
+        ddl = conn.execute(
+            text("SELECT sql FROM sqlite_master WHERE type='table' AND name='edit_events'")
+        ).scalar_one_or_none()
+        if ddl and "'payment_failed'" not in ddl:
+            _rebuild_table(conn, "edit_events", "edit_events__v014")
+            applied.append("edit_events.action 增加 payment_failed/past_due 枚举")
+
+        # M-20260926-a：v0.14.0 币种统一 USD（P0-5）——存量库 plans 价格从人民币
+        # 口径一次性迁到 USD 分值；仅匹配旧值行（运营已自定义改价的行不动），
+        # 新库由 seed 直接写 USD。幂等：迁移后再次执行匹配 0 行。
+        n1 = conn.execute(text(
+            "UPDATE plans SET price_monthly = 799, price_yearly = 639, updated_at = '2026-09-26T00:00:00Z' "
+            "WHERE code = 'pro' AND price_monthly = 58")).rowcount
+        n2 = conn.execute(text(
+            "UPDATE plans SET price_monthly = 2299, price_yearly = 1839, updated_at = '2026-09-26T00:00:00Z' "
+            "WHERE code = 'studio' AND price_monthly = 168")).rowcount
+        if n1 or n2:
+            applied.append(f"plans 价格口径 ¥ → USD 分值（pro x{n1}, studio x{n2}）")
     if applied:
         logger.info(f"sqlite migrations applied: {', '.join(applied)}")
     return applied
@@ -169,14 +193,15 @@ def _rebuild_table(conn, table_name: str, tmp_name: str) -> None:
     from app.models.plan import Subscription
     from app.models.task import File, Task
     from app.models.user import CreditTransaction
-    from app.models.work import Candidate, Version, Work
+    from app.models.work import Candidate, EditEvent, Version, Work
 
     tables = {"candidates": Candidate.__table__, "tasks": Task.__table__,
               "credit_transactions": CreditTransaction.__table__,
               "subscriptions": Subscription.__table__,
               "files": File.__table__,
               "versions": Version.__table__,
-              "works": Work.__table__}
+              "works": Work.__table__,
+              "edit_events": EditEvent.__table__}
     table = tables[table_name]
 
     conn.execute(text("PRAGMA foreign_keys=OFF"))

@@ -7,15 +7,20 @@
 """
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.errors import err_conflict, err_forbidden, err_not_found, err_validation
+from app.core.errors import (
+    err_conflict,
+    err_forbidden,
+    err_not_found,
+    err_payment_required,
+    err_validation,
+)
 from app.core.i18n import tr
 from app.models import MarketOrder, TeamMember, TeamSpace, User, Work, WorkComment
 from app.models.base import utc_now_iso
 from app.models.team import ROLE_RANK, TEAM_ROLES
-
 
 # ---- 判权 ----
 
@@ -84,10 +89,45 @@ def require_space_owner(db: Session, user: User, space_id: str) -> TeamSpace:
     return sp
 
 
+def _seat_gate(db: Session, user: User) -> tuple[int, int]:
+    """P1-3（2026-09-26）：团队席位与档位挂钩。
+
+    free 档：1 个空间 × 3 席位（体验协作）；pro：3 空间 × 8 席位；
+    studio/team/admin：不受限（team 档走联系销售的企业口径）。
+    返回 (空间上限, 席位上限)。
+    """
+    if getattr(user, "is_admin", False) or user.plan in ("studio", "team"):
+        return 10**6, 10**6
+    return (1, 3) if user.plan == "free" else (3, 8)
+
+
+def _check_space_quota(db: Session, user: User) -> None:
+    max_spaces, _ = _seat_gate(db, user)
+    owned = db.execute(select(func.count()).select_from(TeamSpace).where(
+        TeamSpace.owner_user_id == user.id)).scalar_one()
+    if owned >= max_spaces:
+        raise err_payment_required(tr(
+            f"当前档位最多创建 {max_spaces} 个团队空间，升级或联系销售解锁更多",
+            f"Your plan allows up to {max_spaces} team space(s); upgrade or contact "
+            "sales for more"))
+
+
+def _check_seat_quota(db: Session, user: User, sp: TeamSpace) -> None:
+    _, max_seats = _seat_gate(db, user)
+    members = db.execute(select(func.count()).select_from(TeamMember).where(
+        TeamMember.space_id == sp.id)).scalar_one()
+    if members >= max_seats:
+        raise err_payment_required(tr(
+            f"当前档位团队空间最多 {max_seats} 个席位（含所有者），升级解锁更多席位",
+            f"Your plan allows up to {max_seats} seats per space (owner included); "
+            "upgrade for more seats"))
+
+
 def create_space(db: Session, user: User, name: str) -> dict:
     name = (name or "").strip()
     if not 1 <= len(name) <= 60:
         raise err_validation(tr("空间名须为 1~60 字符", "Space name must be 1-60 chars"))
+    _check_space_quota(db, user)
     now = utc_now_iso()
     sp = TeamSpace(name=name, owner_user_id=user.id, created_at=now, updated_at=now)
     db.add(sp)
@@ -120,6 +160,7 @@ def add_member(db: Session, user: User, space_id: str, email: str, role: str) ->
         TeamMember.space_id == sp.id, TeamMember.user_id == target.id)).scalars().first()
     if exists:
         raise err_conflict(tr("该用户已是空间成员", "User is already a member"))
+    _check_seat_quota(db, user, sp)
     db.add(TeamMember(space_id=sp.id, user_id=target.id, role=role,
                       invited_by=user.id, created_at=utc_now_iso()))
     sp.updated_at = utc_now_iso()

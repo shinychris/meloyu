@@ -131,9 +131,9 @@ def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
         for e in edits:
             try:
                 beat, semi = float(e["beat"]), int(e["semi"])
-            except (KeyError, TypeError, ValueError):
+            except (KeyError, TypeError, ValueError) as e:
                 raise err_validation(tr("每条编辑须为 {beat, semi}",
-                                     "Each edit must be {beat, semi}"))
+                                     "Each edit must be {beat, semi}")) from e
             if not 0 <= beat <= 10000 or not -12 <= semi <= 12:
                 raise err_validation(tr("beat 须 0~10000、semi 须 -12~12",
                                      "beat must be 0-10000 and semi must be -12 to 12"))
@@ -218,7 +218,7 @@ def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
     db.refresh(work)
 
     from app.core.tasks import schedule_generation
-    schedule_generation(task.id)
+    schedule_generation(task.id, plan=user.plan)
 
     return {
         "task": task_to_dict(task),
@@ -271,8 +271,9 @@ def submit_mixdown(db: Session, user: User, version_id: str, wav: bytes,
         raise err_validation(tr("混音文件超过 200MB 上限", "Mixdown exceeds the 200MB limit"))
     from app.core.disk_guard import ensure_disk_available
     ensure_disk_available(extra_bytes=len(wav))
-    import wave as wav_mod
     import hashlib
+    import wave as wav_mod
+
     from app.config import settings
     from app.models import File as FileRow
     work = db.get(Work, version.work_id)
@@ -324,8 +325,8 @@ def submit_mixdown(db: Session, user: User, version_id: str, wav: bytes,
 
     dest = settings.audio_path / work.id / child.id / "candidates" / "A"
     dest.mkdir(parents=True, exist_ok=True)
-    from app.synth.wav_io import write_wav
     from app.synth.mp3_io import encode_mp3
+    from app.synth.wav_io import write_wav
     m = dest / "master.wav"
     size = write_wav(m, [left, right], bits=24)
     sha = hashlib.sha256(m.read_bytes()).hexdigest()

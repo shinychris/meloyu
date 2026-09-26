@@ -12,8 +12,13 @@ from app.core.responses import ok
 from app.core.security import get_current_user, get_current_user_optional
 from app.database import get_db
 from app.models import File, User
-from app.schemas.auth import (ExtendRequest, PitchEditRequest, RegenSectionRequest,
-                              RetuneRequest, VariantRequest)
+from app.schemas.auth import (
+    ExtendRequest,
+    PitchEditRequest,
+    RegenSectionRequest,
+    RetuneRequest,
+    VariantRequest,
+)
 from app.services import editing as edit_svc
 from app.services import generation as gen_svc
 from app.services.serializers import candidate_to_dict

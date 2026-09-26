@@ -15,7 +15,7 @@ from pathlib import Path
 import mido
 
 from app.config import settings
-from app.core.errors import err_conflict, err_not_found
+from app.core.errors import err_conflict
 from app.core.i18n import tr
 from app.models import Candidate, Version, Work
 from app.synth.midi_out import TICKS_PER_BEAT
@@ -34,8 +34,8 @@ def _midi_dir(work: Work, version: Version, cand: Candidate) -> Path:
 
 def _note_track_of(mid) -> int:
     """Type-1 布局：tracks[0]=meta（tempo/拍号），音符在后续轨——取首个含 note_on 的轨。"""
-    for i, tr in enumerate(mid.tracks):
-        if any(m.type == "note_on" and m.velocity > 0 for m in tr):
+    for i, track in enumerate(mid.tracks):
+        if any(m.type == "note_on" and m.velocity > 0 for m in track):
             return i
     return 1
 
@@ -210,7 +210,7 @@ def build_leadsheet(work: Work, version: Version, cand: Candidate) -> dict:
                  "beats_per_bar": beats_per_bar},
         "sections": sections,
         "bars": bars_out,
-        "lyrics_lines": [{"section": s, "line": l} for s, l, _ in lines],
+        "lyrics_lines": [{"section": s, "line": line} for s, line, _ in lines],
         "stats": {"note_count": len(note_items), "bar_count": len(bars_out),
                   "syllables_aligned": used},
         "aigc": {"ai_generated": True,
@@ -226,8 +226,7 @@ def render_leadsheet_pdf(ls: dict) -> bytes:
     """结构化词谱 → A4 PDF（标题/调号拍速、逐小节和弦+简谱+歌词、AI 披露脚注）。"""
     from fpdf import FPDF
 
-    from app.services.certificate import (_PDF_CREATION_DATE, _find_cjk_font,
-                                          _pdf_safe)
+    from app.services.certificate import _PDF_CREATION_DATE, _find_cjk_font, _pdf_safe
 
     pdf = FPDF(format="A4")
     pdf.set_creation_date(_PDF_CREATION_DATE)
@@ -293,7 +292,6 @@ def render_leadsheet_pdf(ls: dict) -> bytes:
 
 def _flush_row(pdf, row: list[dict], col_w: float, family: str, t) -> None:
     """渲染一行小节格：和弦行 / 简谱行（音级+八度点+时值下划线）/ 歌词行。"""
-    from fpdf.enums import XPos, YPos
 
     from app.services.certificate import _pdf_safe
 

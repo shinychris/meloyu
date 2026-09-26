@@ -54,9 +54,9 @@ def _decode_wav(raw: bytes) -> tuple[np.ndarray, int]:
             if ch > 1:
                 x = x.reshape(-1, ch).mean(axis=1)
             return x, int(sr)
-    except Exception:
+    except Exception as e:
         raise err_validation(tr("哼唱音频须为 WAV（PCM 16/24bit 或 float32）",
-                            "Hum audio must be WAV (PCM 16/24-bit or float32)"))
+                            "Hum audio must be WAV (PCM 16/24-bit or float32)")) from e
 
 
 def _frame_f0(x: np.ndarray, sr: int, rms_peak: float) -> tuple[np.ndarray, np.ndarray]:
@@ -161,7 +161,8 @@ def analyze_hum(raw: bytes) -> dict:
 
     # bpm 提示：音符起点间隔中位数 ≈ 半拍/一拍假设下取 [60,174] 内最近值
     starts = [n["start"] for n in notes]
-    gaps = [b - a for a, b in zip(starts, starts[1:]) if 0.15 < b - a < 2.5]
+    gaps = [b - a for a, b in zip(starts, starts[1:], strict=False)
+            if 0.15 < b - a < 2.5]
     bpm_hint = 90
     if gaps:
         med_gap = sorted(gaps)[len(gaps) // 2]
@@ -171,7 +172,6 @@ def analyze_hum(raw: bytes) -> dict:
                 bpm_hint = int(round(bpm))
                 break
 
-    total_beats = sum(max(0.25, round(n["end"] - n["start"], 2) * bpm_hint / 60.0) for n in notes)
     # 置信度 = 有声帧占比与音符平均时长的加权（如实展示给用户决定是否采用）
     conf = min(1.0, 0.6 * voiced + 0.4 * min(1.0, MIN_NOTE_SEC * 10 / max(
         1e-9, sum(n["end"] - n["start"] for n in notes) / len(notes))))

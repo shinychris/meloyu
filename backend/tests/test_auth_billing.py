@@ -10,6 +10,7 @@ import hmac
 import json
 import time
 import unittest
+from unittest import mock
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -17,7 +18,7 @@ from sqlalchemy.orm import sessionmaker
 from app import models  # noqa: F401 —— 注册全部表
 from app.config import settings
 from app.core.errors import BizError
-from app.models import Base, CreditTransaction, Order, Plan, Subscription, User
+from app.models import Base, CreditTransaction, Order, Plan, StripeEvent, Subscription, User
 from app.models.base import utc_now_iso
 from app.services import auth as auth_svc
 from app.services import billing as billing_svc
@@ -209,7 +210,7 @@ class TestStripeWebhook(_DBTestCase):
         self._old_wh = settings.stripe_webhook_secret
         settings.stripe_secret_key = "sk_test_dummy"
         settings.stripe_webhook_secret = self.SECRET
-        stripe_billing._seen_events.clear()
+        # v0.14.0 起幂等去重走 stripe_events 表（持久层），无进程内缓存可清
         ts = utc_now_iso()
         self.user = User(email="pay@t.local", password_hash="x" * 60, nickname="p",
                          plan="free", created_at=ts, updated_at=ts)
@@ -319,6 +320,178 @@ class TestStripeWebhook(_DBTestCase):
         self.db.refresh(order)
         self.assertEqual(order.status, "refunded")
         self.assertEqual(self.user.credit_balance, 0, "余额不足扣至 0，不为负")
+
+
+class TestFundingLoopP0(_DBTestCase):
+    """v0.14.0 资金闭环修复回归（P0-1/2/3/5 + P1-4/5）。
+
+    - P0-2：事件表持久幂等 + 异常不吞（异常不落标记，可重试）
+    - P0-1：单时钟——invoice.paid 只在续期发票发放；stripe 订阅用户本地水位不武装
+    - P0-3：payment_failed / subscription.updated(past_due / 换档 / canceled)
+    - P1-5：订阅退款降级+追回
+    - P0-5：checkout 完成回填实收金额/币种
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._old_secret = settings.stripe_secret_key
+        settings.stripe_secret_key = "sk_test_dummy"
+        ts = utc_now_iso()
+        self.user = User(email="loop@t.local", password_hash="x" * 60, nickname="l",
+                         plan="free", credit_balance=0, created_at=ts, updated_at=ts)
+        self.db.add(self.user)
+        self.db.commit()
+
+    def tearDown(self):
+        settings.stripe_secret_key = self._old_secret
+        super().tearDown()
+
+    def _emit(self, etype: str, obj: dict, event_id: str) -> dict:
+        return stripe_billing.handle_webhook_event(self.db, {"id": event_id,
+                                                             "type": etype,
+                                                             "data": {"object": obj}})
+
+    def _activate_via_checkout(self, sub_id: str = "sub_L1", plan: str = "pro") -> Order:
+        order = Order(user_id=self.user.id, kind="subscription", plan=plan,
+                      interval="monthly", credits=0, amount_usd=799, currency="usd",
+                      status="pending", stripe_checkout_id=f"cs_{sub_id}",
+                      created_at=utc_now_iso(), updated_at=utc_now_iso())
+        self.db.add(order)
+        self.db.commit()
+        with mock.patch.object(stripe_billing, "_cancel_other_stripe_subscriptions"):
+            self._emit("checkout.session.completed", {
+                "id": f"cs_{sub_id}", "customer": "cus_L", "subscription": sub_id,
+                "amount_total": 799, "currency": "usd",
+                "metadata": {"order_id": order.id, "user_id": self.user.id,
+                             "kind": "subscription", "plan": plan},
+            }, f"evt_co_{sub_id}")
+        self.db.refresh(order)
+        self.db.refresh(self.user)
+        return order
+
+    # ---- P0-2 ----
+
+    def test_event_idempotent_via_table_and_exception_not_marked(self):
+        order = Order(user_id=self.user.id, kind="topup", credits=500,
+                      amount_usd=999, status="pending", stripe_checkout_id="cs_E1",
+                      created_at=utc_now_iso(), updated_at=utc_now_iso())
+        self.db.add(order)
+        self.db.commit()
+        ev = {"id": "evt_E1", "type": "checkout.session.completed",
+              "data": {"object": {"id": "cs_E1", "amount_total": 999,
+                                  "metadata": {"order_id": order.id}}}}
+        out = stripe_billing.handle_webhook_event(self.db, ev)
+        self.assertTrue(out["received"])
+        self.db.refresh(order)
+        self.assertEqual(order.status, "paid")
+        self.assertEqual(order.amount_usd, 999)  # P0-5：回填 Stripe 实收
+        self.assertEqual(order.currency, "usd")
+        # 重放（进程"重启"后查表）→ duplicate，不重复发放
+        out2 = stripe_billing.handle_webhook_event(self.db, ev)
+        self.assertTrue(out2.get("duplicate"))
+        # 异常路径：handler 抛错 → 事件不落表 + 异常上抛（5xx → Stripe 重试）
+        ev_bad = {"id": "evt_E2", "type": "checkout.session.completed",
+                  "data": {"object": {"id": "cs_MISSING",
+                                      "metadata": {"order_id": order.id}}}}
+        with mock.patch.object(stripe_billing, "_on_checkout_completed",
+                               side_effect=RuntimeError("db down")):
+            with self.assertRaises(RuntimeError):
+                stripe_billing.handle_webhook_event(self.db, ev_bad)
+        self.assertIsNone(self.db.get(StripeEvent, "evt_E2"),
+                          "异常事件绝不能落表（否则 Stripe 重试被吞）")
+        self.assertIsNotNone(self.db.get(StripeEvent, "evt_E1"))
+
+    # ---- P0-1 单时钟 ----
+
+    def test_single_clock_activation_disarms_and_invoice_filters_reason(self):
+        self._activate_via_checkout()
+        self.assertEqual(self.user.plan, "pro")
+        self.assertEqual(self.user.credit_balance, 2500)  # 首期激活发放
+        self.assertIsNone(self.user.credit_next_grant_at, "stripe 订阅本地水位不武装")
+        # 首期发票（subscription_create）到达：不得再发（原双发路径之一）
+        self._emit("invoice.paid", {"subscription": "sub_L1",
+                                    "billing_reason": "subscription_create"},
+                   "evt_inv_create")
+        self.assertEqual(self.user.credit_balance, 2500)
+        # 续期发票（subscription_cycle）：发放当月
+        self._emit("invoice.paid", {"subscription": "sub_L1",
+                                    "billing_reason": "subscription_cycle"},
+                   "evt_inv_cycle")
+        self.db.refresh(self.user)
+        self.assertEqual(self.user.credit_balance, 5000)
+        # 同一续期事件重放：不重复
+        self._emit("invoice.paid", {"subscription": "sub_L1",
+                                    "billing_reason": "subscription_cycle"},
+                   "evt_inv_cycle")
+        self.db.refresh(self.user)
+        self.assertEqual(self.user.credit_balance, 5000)
+
+    def test_lazy_grant_skips_stripe_subscriber(self):
+        # 存量库防御：stripe 订阅 + 历史已武装的本地水位 → 惰性发放拆除水位且不发
+        from app.services import credits as credits_svc
+        self._activate_via_checkout()
+        self.user.credit_next_grant_at = "2000-01-01T00:00:00Z"  # 模拟旧双发路径
+        self.db.commit()
+        credits_svc.lazy_monthly_grant(self.db, self.user)
+        self.db.refresh(self.user)
+        self.assertIsNone(self.user.credit_next_grant_at)
+        self.assertEqual(self.user.credit_balance, 2500, "不双发")
+
+    # ---- P0-3 dunning / P1-4 换档 ----
+
+    def test_payment_failed_and_past_due_leave_no_grant(self):
+        self._activate_via_checkout()
+        base = self.user.credit_balance
+        self._emit("invoice.payment_failed", {"subscription": "sub_L1",
+                                              "attempt_count": 1}, "evt_pf1")
+        self._emit("customer.subscription.updated", {"id": "sub_L1",
+                                                     "status": "past_due"}, "evt_pd1")
+        self.db.refresh(self.user)
+        self.assertEqual(self.user.credit_balance, base, "dunning 期不再发积分")
+        self.assertEqual(self.user.plan, "pro", "宽限期内保留权益（Stripe 重试中）")
+
+    def test_subscription_updated_canceled_downgrades(self):
+        self._activate_via_checkout()
+        self._emit("customer.subscription.updated", {"id": "sub_L1",
+                                                     "status": "canceled"}, "evt_uc")
+        self.db.refresh(self.user)
+        self.assertEqual(self.user.plan, "free")
+
+    def test_subscription_updated_plan_change_activates_new_plan(self):
+        self._activate_via_checkout(plan="pro")  # +2500
+        old_prices = (settings.stripe_price_pro_monthly,
+                      settings.stripe_price_studio_monthly)
+        settings.stripe_price_pro_monthly = "price_pro_m"
+        settings.stripe_price_studio_monthly = "price_studio_m"
+        try:
+            self._emit("customer.subscription.updated", {
+                "id": "sub_L1", "status": "active",
+                "items": {"data": [{"price": {"id": "price_studio_m"}}]},
+            }, "evt_upgrade")
+        finally:
+            settings.stripe_price_pro_monthly, settings.stripe_price_studio_monthly = old_prices
+        self.db.refresh(self.user)
+        self.assertEqual(self.user.plan, "studio", "Portal 换档同步到本地")
+        self.assertEqual(self.user.credit_balance, 2500 + 10000, "换档一次性发放新档位积分")
+
+    def test_old_subscription_deleted_does_not_downgrade_new(self):
+        self._activate_via_checkout(sub_id="sub_old", plan="pro")
+        self._activate_via_checkout(sub_id="sub_new", plan="studio")
+        self._emit("customer.subscription.deleted", {"id": "sub_old"}, "evt_del_old")
+        self.db.refresh(self.user)
+        self.assertEqual(self.user.plan, "studio", "旧订阅删除不降级新订阅")
+
+    # ---- P1-5 订阅退款 ----
+
+    def test_subscription_refund_downgrades_and_claws_back(self):
+        order = self._activate_via_checkout(plan="pro")  # +2500
+        self._emit("charge.refunded", {
+            "amount_refunded": 799,
+            "metadata": {"order_id": order.id},
+        }, "evt_sub_refund")
+        self.db.refresh(self.user)
+        self.assertEqual(self.user.plan, "free", "订阅退款降级")
+        self.assertEqual(self.user.credit_balance, 0, "追回当期已发积分（扣至 0）")
 
 
 if __name__ == "__main__":

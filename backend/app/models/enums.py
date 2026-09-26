@@ -48,6 +48,8 @@ CREDIT_REASONS = ("signup_bonus", "generation", "refund", "plan_grant", "plan_sw
 EVENT_ACTIONS = (
     "generate", "adopt", "update", "export",
     "trash", "restore", "certificate", "plan_switch",
+    # v0.14.0 支付生命周期留痕（dunning/降级）
+    "payment_failed", "subscription_past_due",
 )
 EVENT_ACTORS = ("human", "ai", "system")
 

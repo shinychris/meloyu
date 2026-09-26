@@ -374,7 +374,6 @@ class LocalSynthProvider:
         素材（和声/编曲/人声音色/歌词对齐）与原曲一致；仅旋律音符的音高/起点
         按编辑变化。edits 以词谱绝对拍号（beat）为键（±0.05s 容差匹配）。
         """
-        from dataclasses import replace as dc_replace
         _stage(progress, should_cancel, "structure", 10)
         base_ir = editing_mod.rebuild_ir(base_req, base_req.seed)
         if not editing_mod.structure_matches(base_ir, spec.get("base_structure") or []):

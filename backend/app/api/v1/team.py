@@ -1,7 +1,7 @@
 """团队空间与协作评论路由（FR-13，v0.8.3）。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends, Query
+from fastapi import APIRouter, Body, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 

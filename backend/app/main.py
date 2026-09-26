@@ -47,6 +47,16 @@ def _assert_production() -> None:
     if "localhost" in settings.app_base_url or "127.0.0.1" in settings.app_base_url:
         logger.warning(f"APP_BASE_URL 指向本机地址（{settings.app_base_url}）——"
                        "对外部署时 Stripe 回跳与密码重置链接将不可达，请在 .env 配置对外域名")
+    # v0.13.0 审计 M-2 延伸（2026-09-26 P2-13）：支付/邮件"半配置"静默通过是
+    # 公网配置期的高危窗口——Stripe 只配了 secret 没配 webhook 时，用户支付
+    # 成功、验签全拒、积分不入账（资金事故）；开了邮箱验证没配 SMTP 时注册
+    # 入口直接不可用。一律 fail-fast。
+    if settings.stripe_secret_key and not settings.stripe_webhook_secret:
+        problems.append("STRIPE_SECRET_KEY 已配置但 STRIPE_WEBHOOK_SECRET 为空——"
+                        "支付回调无法验签（用户付款后不入账），必须成对配置")
+    if settings.email_verification_enabled and not settings.smtp_host:
+        problems.append("EMAIL_VERIFICATION_ENABLED=true 但 SMTP_HOST 为空——"
+                        "注册验证码发不出，注册入口不可用；请配置 SMTP 或关闭验证")
     if problems:
         raise RuntimeError("production startup assertions failed:\n- " + "\n- ".join(problems))
 

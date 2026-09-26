@@ -164,11 +164,14 @@ WORK_SPECS = {
 }
 
 PLANS_ROWS = [
+    # 价格口径（P0-5，2026-09-26 商业化审查）：USD 美分（price_monthly=月付，
+    # price_yearly=年付折算的月单价），与 Stripe 实收一致；订单金额以 webhook
+    # 回填的 Stripe 实收为准（amount_total/currency），本表值仅作展示与提示。
     ("free", "免费", 0, 0, 5, 0, "mp3", False, True, True, 10,
      ["每日 5 次生成", "仅 MP3 导出", "非商用 · 指纹登记"]),
-    ("pro", "个人 Pro", 58, 46, None, 2500, "wav", True, False, True, 20,
+    ("pro", "个人 Pro", 799, 639, None, 2500, "wav", True, False, True, 20,
      ["商用授权 + 证书", "WAV 48k/24bit · MIDI · 4 Stems", "每月 2,500 积分可结转"]),
-    ("studio", "创作人 Studio", 168, 134, None, 10000, "wav", True, False, True, 30,
+    ("studio", "创作人 Studio", 2299, 1839, None, 10000, "wav", True, False, True, 30,
      ["全部 Pro 权益 + 12 Stems（V1.1）", "专业修调/AI 编曲建议（V2）", "每月 10,000 积分 · 优先队列"]),
     ("team", "团队 / 企业", None, None, None, None, "wav", True, False, False, 40,
      ["团队空间与协作（V1.1）", "API 按量计费", "专属合规支持"]),

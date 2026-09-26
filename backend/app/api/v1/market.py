@@ -64,3 +64,14 @@ def my_listings(user: User = Depends(get_current_user), db: Session = Depends(ge
 @router.get("/my/orders")
 def my_orders(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return ok(market_svc.my_orders(db, user))
+
+
+@router.post("/admin/listings/{listing_id}/delist")
+def admin_delist(listing_id: str, body: AdminDelistRequest,
+                 user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """平台治理下架（admin；P1-2 违规/投诉处置入口）。"""
+    return ok(market_svc.admin_delist(db, user, listing_id, body.reason))
+
+
+class AdminDelistRequest(BaseModel):
+    reason: str = Field(min_length=2, max_length=200)

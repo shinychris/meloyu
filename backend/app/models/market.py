@@ -9,8 +9,8 @@ AIGC 署名随产物保留）；上架须属主确认持有该作品的商用授
 from __future__ import annotations
 
 from sqlalchemy import Boolean, CheckConstraint, Index, Integer, String
-from sqlalchemy.types import JSON
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.types import JSON
 
 from .base import BaseModel, ISOTimestamp, new_uuid, utc_now_iso
 

@@ -65,6 +65,9 @@ class Subscription(BaseModel):
     ended_at: Mapped[str | None] = mapped_column(ISOTimestamp())
     source: Mapped[str] = mapped_column(String(10), nullable=False)
     granted_credits: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # v0.14.0：当前生效订阅对应的 Stripe 订阅 id（确定性判断"删的是不是当前订阅"，
+    # 秒级 created_at + 随机 uuid 的订单序不可靠；NULL=历史行，走订单序启发式回退）
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String(120))
 
     user: Mapped[User] = relationship(back_populates="subscriptions")
 
