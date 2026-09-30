@@ -25,8 +25,11 @@ class User(BaseModel):
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # P0-6：注册邮箱验证（email_verification_enabled 开启时必须先验证）
     email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    # P1-3：刷新令牌（随机串的 sha256；轮换即覆写=单设备会话，登出/改密/注销置空）
-    refresh_token_hash: Mapped[str | None] = mapped_column(String(64))
+    # P1-3：刷新令牌（随机串的 sha256；轮换即覆写=单设备会话，登出/改密/注销置空）。
+    # 实际存储 "expires_iso|sha256hex" = 20+1+64 = 85 字符——v0.15.0 切 PG 暴露
+    # 原 String(64) 过窄（SQLite 不校验长度静默收下，PG 直接拒写→刷新令牌必炸），
+    # 放宽到 96
+    refresh_token_hash: Mapped[str | None] = mapped_column(String(96))
     plan: Mapped[str] = mapped_column(
         String(10), ForeignKey("plans.code", ondelete="RESTRICT"),
         nullable=False, default="free",

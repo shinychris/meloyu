@@ -11,6 +11,7 @@ from __future__ import annotations
 import unittest
 
 from sqlalchemy import create_engine, text
+from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401
@@ -18,7 +19,6 @@ from app.core import migrations
 from app.models import Base, Candidate, User, Version, Work
 from app.models.base import utc_now_iso
 from app.services.generation import adopt_candidate
-
 
 def _mk(db, wid: str, uid: str, work_duration: int):
     ts = utc_now_iso()
@@ -31,13 +31,13 @@ def _mk(db, wid: str, uid: str, work_duration: int):
                 created_at=ts, updated_at=ts))
     db.flush()
 
-
 class TestAdoptShortCandidate(unittest.TestCase):
     def setUp(self):
-        self.engine = create_engine("sqlite:///:memory:",
-                                    connect_args={"check_same_thread": False})
-        Base.metadata.create_all(self.engine)
+        self.engine = new_test_engine()
+        reset_db(self.engine)
         self.db = sessionmaker(bind=self.engine)()
+        # PG 方言门禁：播种档位行（users.plan → plans.code 外键）
+        seed_plans(self.db)
         _mk(self.db, "w" * 32, "u" * 32, 30)
         ts = utc_now_iso()
         self.db.add(Version(id="v" * 32, work_id="w" * 32, version_no="v1",
@@ -78,7 +78,6 @@ class TestAdoptShortCandidate(unittest.TestCase):
             with self.assertRaises(IntegrityError):
                 self.db.commit()
             self.db.rollback()
-
 
 class TestWorksMigration(unittest.TestCase):
     def test_old_constraint_rebuilt(self):
@@ -130,7 +129,6 @@ class TestWorksMigration(unittest.TestCase):
             conn.execute(text("UPDATE works SET duration_sec = 25 WHERE id='w1'"))
             # 幂等：重跑不再触发 works 重建
             self.assertNotIn("works.duration CHECK 放宽 25~300", migrations.run(engine))
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -14,7 +14,7 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from sqlalchemy import create_engine
+from tests.db import new_test_engine, reset_db
 from sqlalchemy.orm import Session, sessionmaker
 
 from app import models  # noqa: F401 —— 注册全部表
@@ -22,12 +22,10 @@ from app.models import SETTING_ID, Base, LLMSetting
 from app.providers.llm.ollama_client import OllamaClient, _norm_host
 from app.services import model_center as mc
 
-
 def _db() -> Session:
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
+    engine = new_test_engine()
+    reset_db(engine)
     return sessionmaker(bind=engine)()
-
 
 class _FakeDockerPath:
     """music_selfhosted 模块内的 Path 替身：仅 /.dockerenv 报存在。"""
@@ -37,7 +35,6 @@ class _FakeDockerPath:
 
     def exists(self) -> bool:
         return self._p == "/.dockerenv"
-
 
 class TestNormHost(unittest.TestCase):
     def test_v1_suffix_stripped(self):
@@ -51,7 +48,6 @@ class TestNormHost(unittest.TestCase):
         self.assertEqual(_norm_host("ollama-svc:11434"), "http://ollama-svc:11434")
         self.assertEqual(_norm_host(""), "http://localhost:11434")
         self.assertEqual(OllamaClient("http://h:11434/v1").base, "http://h:11434")
-
 
 class TestOllamaClientDockerFallback(unittest.TestCase):
     def test_loopback_replaced_and_persisted_in_docker(self):
@@ -98,7 +94,6 @@ class TestOllamaClientDockerFallback(unittest.TestCase):
         self.assertFalse(rt["ollama"]["running"])
         self.assertIn("OLLAMA_HOST=0.0.0.0", rt["ollama"]["install_hint"])
 
-
 class TestPresetsAndSelfhosted(unittest.TestCase):
     def test_ollama_gateway_preset_env_aware(self):
         with mock.patch.object(mc, "_in_docker", return_value=True):
@@ -120,7 +115,6 @@ class TestPresetsAndSelfhosted(unittest.TestCase):
                              "http://x:1")
         # 非容器环境保持 127.0.0.1 默认
         self.assertEqual(sh.service_host("mmax_local", None), "http://127.0.0.1:8300")
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1613,14 +1613,16 @@ def main() -> int:
               json.dumps(gtask.get("error", ""))[:150])
         r = client.get(f"{API}/versions/{gtask['version_id']}", headers=auth_headers(token))
         # version 详情不直接暴露 params？改查任务 payload 口径：留痕在 request_payload
-        import sqlite3 as _sq
+        # v0.15.0：经应用 SessionLocal 查询（PG/SQLite 双方言；冒烟目标库由
+        # DATA_DIR/DATABASE_URL 指向被测环境）
+        from sqlalchemy import select as _sel
 
-        from app.models import Task as _T  # noqa: F401
-        conn = _sq.connect(str(Path(_smoke_data_dir()) / "meloyu.db"))
-        row = conn.execute(
-            "SELECT request_payload FROM tasks WHERE id=?", (gtask["id"],)).fetchone()
-        conn.close()
-        snap = json.loads(row[0]) if row else {}
+        from app.database import SessionLocal as _SL
+        from app.models import Task as _T
+        with _SL() as _db:
+            _row = _db.execute(_sel(_T.request_payload).where(
+                _T.id == gtask["id"])).first()
+        snap = json.loads(_row[0]) if _row else {}
         check("18.4 voice 留痕（voice_clone=true + profile/活体口径）",
               snap.get("voice", {}).get("voice_clone") is True
               and snap["voice"]["voice_profile_id"] == vp["id"]

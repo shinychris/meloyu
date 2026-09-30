@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
@@ -26,8 +35,11 @@ class Certificate(BaseModel):
     )
     provider: Mapped[str] = mapped_column(String(16), nullable=False)
     provider_display: Mapped[str] = mapped_column(String(32), nullable=False)
-    model: Mapped[str] = mapped_column(String(8), nullable=False)
-    seed: Mapped[int] = mapped_column(Integer, nullable=False)
+    # 外部通道证书落真实模型名（实测最长 minimax-music-3=15）：原 String(8)
+    # 在 PG 拒写（SQLite 不校验长度无感）——v0.15.0 放宽
+    model: Mapped[str] = mapped_column(String(24), nullable=False)
+    # 同 tasks/candidates.seed：derive_seed 无符号 32 位取值，PG 需 BigInteger
+    seed: Mapped[int] = mapped_column(BigInteger, nullable=False)
     generated_at: Mapped[str] = mapped_column(ISOTimestamp(), nullable=False)
     license_type: Mapped[str] = mapped_column(String(16), nullable=False)
     # P0-1 分流判定等级（allowed/nc/conditional/tos/unverified/free_plan），审计留痕

@@ -20,23 +20,19 @@ from unittest import mock
 from app.config import settings
 from app.providers import music_acestep as mas
 
-
 def _mk(p: Path) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_bytes(b"")
-
 
 def _make_win_venv(root: Path) -> None:
     _mk(root / ".venv" / "Scripts" / "python.exe")
     (root / ".venv" / "Lib" / "site-packages" / "acestep").mkdir(parents=True,
                                                                  exist_ok=True)
 
-
 def _make_linux_venv(root: Path) -> None:
     _mk(root / ".venv-linux" / "bin" / "python")
     (root / ".venv-linux" / "lib" / "python3.12" / "site-packages"
      / "acestep").mkdir(parents=True, exist_ok=True)
-
 
 class _PlatformCase(unittest.TestCase):
     """把 acestep_home 指到临时目录并把 sys.platform 切到指定平台。"""
@@ -48,7 +44,6 @@ class _PlatformCase(unittest.TestCase):
         p2.start()
         self.addCleanup(p1.stop)
         self.addCleanup(p2.stop)
-
 
 class TestVenvPlatformPaths(_PlatformCase):
     def test_windows_layout(self):
@@ -64,7 +59,6 @@ class TestVenvPlatformPaths(_PlatformCase):
             self.assertEqual(mas._venv_dir(), Path(td) / ".venv-linux")
             self.assertEqual(mas._venv_python(),
                              Path(td) / ".venv-linux" / "bin" / "python")
-
 
 class TestDepsInstalledPlatformAware(_PlatformCase):
     def test_linux_sees_only_windows_venv_not_installed(self):
@@ -100,7 +94,6 @@ class TestDepsInstalledPlatformAware(_PlatformCase):
             self.patched(tmp, "linux")
             self.assertFalse(mas.acestep_deps_installed())
 
-
 class TestInstallHintInDocker(unittest.TestCase):
     def test_hint_appends_docker_line(self):
         with mock.patch.object(mas, "_in_docker", return_value=True):
@@ -108,7 +101,6 @@ class TestInstallHintInDocker(unittest.TestCase):
                           mas.acestep_install_hint())
         with mock.patch.object(mas, "_in_docker", return_value=False):
             self.assertNotIn("docker exec", mas.acestep_install_hint())
-
 
 if __name__ == "__main__":
     unittest.main()

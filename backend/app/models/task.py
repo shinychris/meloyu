@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     Float,
@@ -48,7 +49,8 @@ class Task(BaseModel):
     status: Mapped[str] = mapped_column(String(10), nullable=False, default="queued")
     progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     stage_key: Mapped[str] = mapped_column(String(16), nullable=False, default="queued")
-    stage_label: Mapped[str] = mapped_column(String(32), nullable=False, default="排队中")
+    # 运行期阶段文案含通道细节（实测最长 90 字符）：原 String(32) 在 PG 拒写
+    stage_label: Mapped[str] = mapped_column(String(120), nullable=False, default="排队中")
     error_code: Mapped[int | None] = mapped_column(Integer)
     error_message: Mapped[str | None] = mapped_column(Text)
     work_id: Mapped[str | None] = mapped_column(
@@ -59,7 +61,9 @@ class Task(BaseModel):
     )
     format: Mapped[str | None] = mapped_column(String(10))  # release=7字符（FR-11）
     provider: Mapped[str | None] = mapped_column(String(16))
-    seed: Mapped[int | None] = mapped_column(Integer)
+    # derive_seed 产 0~4294967295（无符号 32 位）：PG Integer 为有符号
+    # 32 位，半数取值溢出（SQLite 动态类型无感）——v0.15.0 切 PG 改 BigInteger
+    seed: Mapped[int | None] = mapped_column(BigInteger)
     cost_credits: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     request_payload: Mapped[dict | None] = mapped_column(JSON)
     result: Mapped[dict | None] = mapped_column(JSON)
@@ -95,7 +99,9 @@ class File(BaseModel):
     candidate_id: Mapped[str | None] = mapped_column(
         String(32), ForeignKey("candidates.id", ondelete="CASCADE")
     )
-    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    # export_release_zip=18 字符：原 String(16) 在 PG 拒写（发行导出必炸），
+    # SQLite 不校验长度无感——v0.15.0 放宽
+    kind: Mapped[str] = mapped_column(String(24), nullable=False)
     stem_name: Mapped[str | None] = mapped_column(String(8))
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     path: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)

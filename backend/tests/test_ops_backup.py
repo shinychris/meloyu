@@ -14,13 +14,11 @@ from unittest import mock
 from app.config import settings
 from app.services import ops_backup
 
-
 def _freeze(when: datetime):
     """冻结 ops_backup.datetime.now（built-in 类不可 patch，替换模块级引用）"""
     fake = mock.MagicMock(wraps=datetime)
     fake.now.return_value = when
     return mock.patch("app.services.ops_backup.datetime", fake)
-
 
 class TestBackupSchedule(unittest.TestCase):
     def setUp(self):
@@ -51,7 +49,6 @@ class TestBackupSchedule(unittest.TestCase):
         nxt = at + timedelta(days=1)
         with _freeze(nxt):
             self.assertTrue(ops_backup._due_now())
-
 
 if __name__ == "__main__":
     unittest.main()

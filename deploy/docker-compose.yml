@@ -8,12 +8,50 @@
 # - 后端不发布任何宿主机端口，仅经 nginx 反代对外；
 # - 出网不受限（MiniMax / Stripe / SMTP 等云端通道正常）。
 #
-# 数据策略：bind 挂载仓库 backend/data → /app/data（SQLite + 音频 + 日志），
-# 延续既有数据。⚠ 宿主机 dev uvicorn（--port 8000）必须停用后才能启动本栈
-# （SQLite WAL 多写入方并发有损坏风险），见 README.md。
+# 数据策略（v0.15.0 起）：
+# - PostgreSQL 为主库：postgres 服务 + 命名卷 meloyu-pgdata（WSL ext4，勿用
+#   Windows bind mount——NTFS 上 PG 的 fsync/权限语义不可靠）；连接串在
+#   .env.prod 的 DATABASE_URL 配置（生产启动断言强制 PG）。
+# - backend/data 仍 bind 挂载 → /app/data（音频产物 + 日志 + backups/；
+#   应用内每日 03:30 PG COPY 转储与音频增量镜像都落这里）。
+# - 旧 SQLite 单写入方红线（dev uvicorn 与本栈不得同时写 meloyu.db）随切库
+#   解除：PG 为 MVCC 多写入方模型，dev 起本地实例不受影响（仍应指向独立
+#   dev 库避免数据混淆）。
+# - Supabase 云库替代方案：注释掉本服务与 backend 的 depends_on.postgres，
+#   .env.prod 的 DATABASE_URL 指向 Supabase 连接串（见 docs/postgres-supabase.md）。
 name: meloyu
 
 services:
+  postgres:
+    # digest 固定（与 backend.Dockerfile 同一约定：tag 可被上游移动）
+    # 基础镜像走 daocloud 加速源（本机 Docker Hub 直连不可达）
+    image: docker.m.daocloud.io/library/postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+    container_name: meloyu-postgres
+    restart: unless-stopped
+    # POSTGRES_USER/DB 固定；POSTGRES_PASSWORD 经 env_file 从 .env.prod 注入
+    env_file: .env.prod
+    environment:
+      POSTGRES_USER: meloyu
+      POSTGRES_DB: meloyu
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      # 宿主机侧管理/迁移入口（仅本机回环；迁移脚本与 psql/pgAdmin 用）
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meloyu -d meloyu"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - meloyu-prod-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   backend:
     build:
       context: ../backend
@@ -21,6 +59,9 @@ services:
     image: meloyu/backend:prod
     container_name: meloyu-backend
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     # P1-13：默认 10s 后 SIGKILL 对写库线程太粗暴（可能留脏 WAL）；给足
     # 优雅退出窗口（uvicorn SIGTERM → 在写事务提交后退出）
     stop_grace_period: 60s
@@ -94,3 +135,7 @@ networks:
   meloyu-prod-net:
     name: meloyu-prod-net
     driver: bridge
+
+volumes:
+  pgdata:
+    name: meloyu-pgdata

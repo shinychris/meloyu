@@ -16,20 +16,17 @@ from unittest import mock
 
 from app.providers.llm.openai_compat import OpenAICompatClient, looks_like_ollama
 
-
 def _ok_response(content: str = "hello") -> mock.MagicMock:
     r = mock.MagicMock()
     r.status_code = 200
     r.json.return_value = {"choices": [{"message": {"content": content}}]}
     return r
 
-
 def _bad_response(text: str) -> mock.MagicMock:
     r = mock.MagicMock()
     r.status_code = 400
     r.text = text
     return r
-
 
 class TestLooksLikeOllama(unittest.TestCase):
     def test_default_port_and_hostname(self):
@@ -38,7 +35,6 @@ class TestLooksLikeOllama(unittest.TestCase):
         self.assertFalse(looks_like_ollama("https://api.openai.com/v1/chat/completions"))
         self.assertFalse(looks_like_ollama("https://api.deepseek.com/chat/completions"))
         self.assertFalse(looks_like_ollama(""))
-
 
 class TestChatReasoningEffort(unittest.TestCase):
     def test_ollama_endpoint_sends_none(self):
@@ -76,7 +72,6 @@ class TestChatReasoningEffort(unittest.TestCase):
             from app.providers.llm.base import LLMError
             with self.assertRaises(LLMError):
                 client.chat(system="s", prompt="p")
-
 
 if __name__ == "__main__":
     unittest.main()

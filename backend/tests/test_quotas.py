@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from sqlalchemy import create_engine
+from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401
@@ -20,13 +20,13 @@ from app.models import Base, File, Plan, Task, User, Version, Work
 from app.models.base import utc_now_iso
 from app.services import generation as gen
 
-
 class _QuotaTestCase(unittest.TestCase):
     def setUp(self):
-        self.engine = create_engine("sqlite:///:memory:",
-                                    connect_args={"check_same_thread": False})
-        Base.metadata.create_all(self.engine)
+        self.engine = new_test_engine()
+        reset_db(self.engine)
         self.db = sessionmaker(bind=self.engine)()
+        # PG 方言门禁：补齐夹具未自带的档位行（users.plan 外键）
+        seed_plans(self.db, skip={'free', 'pro'})
         ts = utc_now_iso()
         self.db.add_all([
             Plan(code="free", name="Free", price_monthly=None, price_yearly=None,
@@ -49,7 +49,6 @@ class _QuotaTestCase(unittest.TestCase):
     def tearDown(self):
         self.db.close()
 
-
 class TestInflightLimit(_QuotaTestCase):
     _seq = 0
 
@@ -70,7 +69,11 @@ class TestInflightLimit(_QuotaTestCase):
                     stage_label="q", work_id=work.id, version_id=version.id,
                     provider="localsynth", seed=1, cost_credits=12,
                     request_payload={}, created_at=ts, updated_at=ts)
-        self.db.add_all([work, version, task])
+        # 裸 FK 列不进 unit-of-work 依赖图（Task↔Work/Version 无 relationship）：
+        # 先 flush 父行，PG 才不会先插 tasks 撞外键
+        self.db.add_all([work, version])
+        self.db.flush()
+        self.db.add(task)
         self.db.commit()
         return task
 
@@ -94,7 +97,6 @@ class TestInflightLimit(_QuotaTestCase):
         for s in ("succeeded", "failed", "canceled"):
             self._mk_task(s)
         gen.check_inflight_limit(self.db, self.user)
-
 
 class TestStorageQuota(_QuotaTestCase):
     def test_quota_blocks_when_full(self):
@@ -124,15 +126,14 @@ class TestStorageQuota(_QuotaTestCase):
         self.db.commit()
         gen.check_storage_quota(self.db, other)
 
-
 class TestFailedAudioCleanup(unittest.TestCase):
     def test_cleanup_removes_unregistered_version_dir(self):
         with tempfile.TemporaryDirectory() as tmp:
             with mock.patch.object(settings, "data_dir", tmp):
-                engine = create_engine("sqlite:///:memory:",
-                                       connect_args={"check_same_thread": False})
-                Base.metadata.create_all(engine)
+                engine = new_test_engine()
+                reset_db(engine)
                 db = sessionmaker(bind=engine)()
+                seed_plans(db)  # PG 方言门禁：默认 plan=free 的用户需档位行存在
                 ts = utc_now_iso()
                 user = User(id="c" * 32, email="c@t.local", password_hash="x",
                             nickname="c", created_at=ts, updated_at=ts)
@@ -150,7 +151,11 @@ class TestFailedAudioCleanup(unittest.TestCase):
                             version_id=version.id, provider="localsynth", seed=1,
                             cost_credits=12, request_payload={},
                             created_at=ts, updated_at=ts)
-                db.add_all([user, work, version, task])
+                db.add(user)
+                db.flush()  # 裸 FK 列不进 unit-of-work 依赖图：逐层落地父行
+                db.add_all([work, version])
+                db.flush()
+                db.add(task)
                 db.commit()
                 dest = settings.audio_path / work.id / version.id
                 dest.mkdir(parents=True)
@@ -175,7 +180,6 @@ class TestFailedAudioCleanup(unittest.TestCase):
                 self.assertTrue(dest.exists(), "已有登记文件的目录不得清理")
                 db.close()
 
-
 class _SessionCtx:
     def __init__(self, db):
         self._db = db
@@ -185,7 +189,6 @@ class _SessionCtx:
 
     def __exit__(self, *exc):
         return False
-
 
 if __name__ == "__main__":
     unittest.main()

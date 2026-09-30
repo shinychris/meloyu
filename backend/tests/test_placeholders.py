@@ -10,7 +10,8 @@ import wave as wav_mod
 from unittest import mock
 
 import numpy as np
-from sqlalchemy import create_engine
+
+from tests.db import new_test_engine, reset_db
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401
@@ -21,7 +22,6 @@ from app.services import editing as edit_svc
 from app.services import hum as hum_svc
 from app.synth.ir import Note, SongIR, SongRequest
 from app.synth.melody import apply_hum_melody
-
 
 def _hum_wav(freqs: list[float], sec_each: float = 0.5, sr: int = 22050) -> bytes:
     x = []
@@ -39,7 +39,6 @@ def _hum_wav(freqs: list[float], sec_each: float = 0.5, sr: int = 22050) -> byte
         wf.setframerate(sr)
         wf.writeframes((x * 32767).astype("<i2").tobytes())
     return buf.getvalue()
-
 
 class TestHumAnalysis(unittest.TestCase):
     def test_pitch_contour_intervals(self):
@@ -70,7 +69,6 @@ class TestHumAnalysis(unittest.TestCase):
         with self.assertRaises(BizError):
             hum_svc.analyze_hum(buf.getvalue())
 
-
 class TestApplyHumMelody(unittest.TestCase):
     def _ir(self, vocal="female_air"):
         req = SongRequest(style_prompt="x", negative_prompt="", model="v1_pro",
@@ -97,7 +95,6 @@ class TestApplyHumMelody(unittest.TestCase):
         self.assertEqual(apply_hum_melody(ir2, None), 0)
         self.assertEqual(apply_hum_melody(ir2, []), 0)
 
-
 class TestPitchEditSubmit(unittest.TestCase):
     def setUp(self):
         import tempfile
@@ -105,9 +102,8 @@ class TestPitchEditSubmit(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self._old_data = settings.data_dir
         settings.data_dir = self.tmp.name
-        self.engine = create_engine("sqlite:///:memory:",
-                                    connect_args={"check_same_thread": False})
-        Base.metadata.create_all(self.engine)
+        self.engine = new_test_engine()
+        reset_db(self.engine)
         self.db = sessionmaker(bind=self.engine)()
         ts = utc_now_iso()
         self.user = User(id="u" * 32, email="pe@test.local", password_hash="x",
@@ -143,11 +139,11 @@ class TestPitchEditSubmit(unittest.TestCase):
                                          {"section": "chorus", "bars": 4,
                                           "start_sec": 15, "end_sec": 30}],
                               created_at=ts2, updated_at=ts2)
-        self.version.active_candidate_id = self.cand.id
-        self.work.active_version_id = self.version.id
         from app.models.task import File as FileRow
         ts3 = utc_now_iso()
-        rows = [FileRow(id=("f%03d" % i) + "f" * 29, work_id=self.work.id,
+        # id 4+28=32 字符：id String(32)，PG 校验长度（SQLite 无感）
+        rows = [FileRow(id=("f%03d" % i) + "f" * 28,
+                        work_id=self.work.id,
                         version_id=self.version.id, candidate_id=self.cand.id,
                         kind=kind, stem_name=stem, name=f"{kind}.x",
                         path=f"{self.work.id}/{self.version.id}/"
@@ -159,6 +155,11 @@ class TestPitchEditSubmit(unittest.TestCase):
                     [("master", None), ("preview", None), ("stem", "vocals"),
                      ("stem", "drums"), ("stem", "bass"), ("stem", "other")])]
         self.db.add_all([self.work, self.version, self.cand] + rows)
+        # 循环外键（use_alter）的裸列赋值不走 post_update 延迟：SQLite 无外键
+        # 强制时先插后指可行，PG 必须二段式（先落地行，再回写指向）
+        self.db.flush()
+        self.version.active_candidate_id = self.cand.id
+        self.work.active_version_id = self.version.id
         self.db.commit()
         # 磁盘产物占位（_source_context 校验存在性；本用例不执行渲染）
         from app.config import settings as _st
@@ -205,7 +206,6 @@ class TestPitchEditSubmit(unittest.TestCase):
                 edit_svc.submit_pitch_edit(self.db, self.user, self.cand.id,
                                            [{"beat": 0, "semi": 1}], quantize="32")
 
-
 class TestGenerationParamsHum(unittest.TestCase):
     def test_hum_melody_validation(self):
         from app.schemas.auth import GenerationParams
@@ -218,7 +218,6 @@ class TestGenerationParamsHum(unittest.TestCase):
         with self.assertRaises(Exception):
             GenerationParams(hum_melody=[[0, 9], [0, 1]])    # 拍长越界
         self.assertIsNone(GenerationParams().hum_melody)
-
 
 if __name__ == "__main__":
     unittest.main()

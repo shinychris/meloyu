@@ -6,19 +6,16 @@ from sqlalchemy.orm import Session
 
 
 def next_counter(db: Session, key: str) -> int:
-    """事务内自增取号（SQLite 写锁保证串行）。"""
+    """事务内自增取号（upsert 单语句，SQLite 与 PostgreSQL 方言兼容；
+    PG MVCC 下并发首插不再产生主键冲突）。"""
     row = db.execute(
-        text("UPDATE sequence_counters SET value = value + 1, updated_at = :now "
-             "WHERE key = :k RETURNING value"),
+        text("INSERT INTO sequence_counters (key, value, created_at, updated_at) "
+             "VALUES (:k, 1, :now, :now) "
+             "ON CONFLICT (key) DO UPDATE "
+             "SET value = sequence_counters.value + 1, updated_at = :now "
+             "RETURNING value"),
         {"k": key, "now": _now()},
     ).fetchone()
-    if row is None:
-        db.execute(
-            text("INSERT INTO sequence_counters (key, value, created_at, updated_at) "
-                 "VALUES (:k, 1, :now, :now)"),
-            {"k": key, "now": _now()},
-        )
-        return 1
     return int(row[0])
 
 

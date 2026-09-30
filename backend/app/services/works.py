@@ -4,7 +4,7 @@ from __future__ import annotations
 import shutil
 from datetime import UTC
 
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import String, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.config import TRASH_RETENTION_DAYS, settings
@@ -84,13 +84,15 @@ def list_works(db: Session, user: User, *, q: str | None, tag: str | None,
     if favorite is not None and favorite:
         conds.append(Work.favorite.is_(True))
     if tag:
-        # SQLite JSON 列以文本落库：精确匹配一个标签用引号包裹的 LIKE（参数化）
-        conds.append(Work.tags.like(f'%"{tag}"%'))
+        # JSON 列以文本落库（SQLite TEXT / PG json）：精确匹配一个标签用引号包裹的
+        # 模糊匹配（参数化）。PG 上 json 无 ILIKE 操作符，先 CAST 为文本；ilike
+        # 保持两种方言下 ASCII 大小写不敏感语义一致
+        conds.append(Work.tags.cast(String).ilike(f'%"{tag}"%'))
     if q:
         like = f"%{q}%"
-        title_cond = Work.title.like(like)
+        title_cond = Work.title.ilike(like)
         lyrics_cond = select(Version.id).where(
-            Version.work_id == Work.id, Version.lyrics.like(like)).exists()
+            Version.work_id == Work.id, Version.lyrics.ilike(like)).exists()
         conds.append(or_(title_cond, lyrics_cond))
     base = select(Work).where(*conds)
     total = db.execute(select(func.count()).select_from(base.subquery())).scalar_one()

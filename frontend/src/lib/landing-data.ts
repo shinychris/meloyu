@@ -12,7 +12,7 @@
  */
 import type { TranslationKey } from '../i18n'
 
-export const LANDING_VERSION = 'v0.14.0'
+export const LANDING_VERSION = 'v0.15.0'
 
 /** Hero 指标条 */
 export const LANDING_METRICS: Array<{ value: string; label: TranslationKey }> = [
@@ -407,4 +407,5 @@ export const MILESTONES: Array<{ ver: string; date: string; title: TranslationKe
   { ver: 'v0.12.3', date: '2026-09', title: 'landing.data.milestone.22.title' },
   { ver: 'v0.13.0', date: '2026-09', title: 'landing.data.milestone.23.title' },
   { ver: 'v0.14.0', date: '2026-09', title: 'landing.data.milestone.24.title' },
+  { ver: 'v0.15.0', date: '2026-09', title: 'landing.data.milestone.25.title' },
 ]

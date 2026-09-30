@@ -21,7 +21,6 @@ REPO = Path(__file__).resolve().parent.parent.parent
 CHANGELOG = REPO / "CHANGELOG.md"
 PACKAGE_JSON = REPO / "frontend" / "package.json"
 
-
 class TestVersionConsistency(unittest.TestCase):
     def test_backend_frontend_changelog_aligned(self):
         pkg = json.loads(PACKAGE_JSON.read_text(encoding="utf-8"))
@@ -37,7 +36,6 @@ class TestVersionConsistency(unittest.TestCase):
         self.assertIsNotNone(m, f"CHANGELOG 首个版本条目无法解析：{first!r}")
         self.assertEqual(m.group(1), APP_VERSION,
                          f"CHANGELOG 最新条目({m.group(1)}) 与 APP_VERSION({APP_VERSION}) 不一致")
-
 
 if __name__ == "__main__":
     unittest.main()

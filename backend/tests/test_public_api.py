@@ -10,7 +10,8 @@ import unittest
 from unittest import mock
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+
+from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import sessionmaker
 
@@ -22,18 +23,17 @@ from app.models import Base, Plan, User
 from app.models.base import utc_now_iso
 from app.services import api_keys as keys_svc
 
-
 class _ApiTestCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self._old = settings.data_dir
         settings.data_dir = self.tmp.name
         # StaticPool：TestClient 工作线程与本线程共享同一内存连接（否则各自空库）
-        self.engine = create_engine("sqlite:///:memory:",
-                                    connect_args={"check_same_thread": False},
-                                    poolclass=StaticPool)
-        Base.metadata.create_all(self.engine)
+        self.engine = new_test_engine()
+        reset_db(self.engine)
         self.db = sessionmaker(bind=self.engine)()
+        # PG 方言门禁：补齐夹具未自带的档位行（users.plan 外键）
+        seed_plans(self.db, skip={'studio'})
         ts = utc_now_iso()
         self.user = User(id="u" * 32, email="api@test.local", password_hash="x",
                          nickname="dev", plan="studio", credit_balance=10000,
@@ -72,7 +72,6 @@ class _ApiTestCase(unittest.TestCase):
         from app.core.security import create_access_token
         return {"Authorization": f"Bearer {create_access_token(self.user)}"}
 
-
 class TestKeyLifecycle(_ApiTestCase):
     def test_issue_list_revoke(self):
         r = self.client.post("/api/v1/api-keys", json={"name": "prod"},
@@ -104,7 +103,6 @@ class TestKeyLifecycle(_ApiTestCase):
         r = self.client.post("/api/v1/api-keys", json={"name": "6th"},
                              headers=self._auth())
         self.assertEqual(r.status_code, 409)
-
 
 class TestPublicApi(_ApiTestCase):
     def _key(self) -> str:
@@ -163,7 +161,6 @@ class TestPublicApi(_ApiTestCase):
         # 我的 key 查他人的任务 → 40301（get_task_owned 对非属主拒绝）
         r = self.client.get(f"/api/v1/public/tasks/{tid}", headers={"X-API-Key": key})
         self.assertEqual(r.status_code, 403)
-
 
 if __name__ == "__main__":
     unittest.main()

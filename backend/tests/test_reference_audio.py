@@ -11,7 +11,8 @@ from pathlib import Path
 from unittest import mock
 
 import numpy as np
-from sqlalchemy import create_engine
+
+from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401 —— 注册全部表
@@ -22,7 +23,6 @@ from app.models.base import utc_now_iso
 from app.services import reference as reference_svc
 from app.services import reference_analysis
 from app.services.generation import submit_generation
-
 
 def synth_click_wav(path: Path, bpm: int, sr: int = 22050, dur: float = 30.0,
                     noise: float = 0.02) -> None:
@@ -40,7 +40,6 @@ def synth_click_wav(path: Path, bpm: int, sr: int = 22050, dur: float = 30.0,
         wf.setsampwidth(2)
         wf.setframerate(sr)
         wf.writeframes(x.tobytes())
-
 
 class TestAnalysis(unittest.TestCase):
     """分析器：BPM 拍点轨（谱通量+先验）、调性三和弦、能量/亮度边界。"""
@@ -97,16 +96,16 @@ class TestAnalysis(unittest.TestCase):
             x, sr = reference_analysis.read_wav_mono(p)
             self.assertEqual(reference_analysis.detect_key(x, sr), (tonic, mode))
 
-
 class _RefTestCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self._old = settings.data_dir
         settings.data_dir = self.tmp.name
-        self.engine = create_engine("sqlite:///:memory:",
-                                    connect_args={"check_same_thread": False})
-        Base.metadata.create_all(self.engine)
+        self.engine = new_test_engine()
+        reset_db(self.engine)
         self.db = sessionmaker(bind=self.engine)()
+        # PG 方言门禁：播种档位行（users.plan → plans.code 外键）
+        seed_plans(self.db)
         ts = utc_now_iso()
         self.user = User(id="u" * 32, email="ref@test.local",
                          password_hash="x", nickname="ref",
@@ -124,7 +123,6 @@ class _RefTestCase(unittest.TestCase):
         p = Path(self.tmp.name) / "tmp.wav"
         synth_click_wav(p, bpm, dur=20.0)
         return p.read_bytes()
-
 
 class TestTrackCrud(_RefTestCase):
     def test_create_wav_analyzed_immediately(self):
@@ -184,7 +182,6 @@ class TestTrackCrud(_RefTestCase):
         with self.assertRaises(BizError):
             reference_svc.get_owned(self.db, self.user, a["id"])
 
-
 class TestApplyToParams(unittest.TestCase):
     def test_overrides_bpm_key_density_with_clamp(self):
         out = reference_svc.apply_to_params(
@@ -205,18 +202,9 @@ class TestApplyToParams(unittest.TestCase):
         self.assertEqual(out["bpm"], 60)      # 折进下限
         self.assertEqual(out["instrument_density"], 100)
 
-
 class TestGenerationIntegration(_RefTestCase):
     def test_submit_applies_reference_params(self):
-        # plan 行（免费额度检查依赖）
-        ts = utc_now_iso()
-        self.db.add(Plan(code="studio", name="Studio", price_monthly=168,
-                         price_yearly=134, daily_generations=None,
-                         monthly_credits=10000, max_export="wav",
-                         commercial_license=True, watermark=False, features=[],
-                         switchable=True, sort_order=2,
-                         created_at=ts, updated_at=ts))
-        self.db.commit()
+        # plan 行由基类 seed_plans 提供（studio 等 4 档齐备）
         track = reference_svc.create_track(self.db, self.user, filename="r.wav",
                                            content=self._wav_bytes(96))
         payload = {
@@ -243,7 +231,6 @@ class TestGenerationIntegration(_RefTestCase):
         self.assertEqual(version.params["bpm"], track["analysis"]["bpm"])
         # 积分照扣
         self.assertEqual(row.cost_credits, 12)
-
 
 if __name__ == "__main__":
     unittest.main()

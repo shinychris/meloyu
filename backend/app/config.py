@@ -12,7 +12,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 REPO_DIR = BACKEND_DIR.parent
 
 API_PREFIX = "/api/v1"
-APP_VERSION = "0.14.0"
+APP_VERSION = "0.15.0"
 
 # 模型积分单价（架构 §9.1：v1_pro=12、v1_fast=6）
 MODEL_CREDIT_COST: dict[str, int] = {"v1_pro": 12, "v1_fast": 6}
@@ -55,6 +55,15 @@ class Settings(BaseSettings):
     jwt_secret: str = "meloyu-dev-secret-do-not-use-in-production"
     server_nonce: str = "meloyu-local-nonce-v1"
     data_dir: str = ""
+    # 主数据库连接串（v0.15.0 起生产环境为 PostgreSQL）：
+    #   本地 Docker 栈：postgresql+psycopg2://meloyu:<密码>@postgres:5432/meloyu
+    #   Supabase（事务池化端口 6543，走 pgBouncer；psycopg2 无服务端预编译语句，
+    #   与 transaction mode 兼容）：
+    #     postgresql+psycopg2://postgres.<ref>:<密码>@aws-0-<region>.pooler.supabase.com:6543/postgres?sslmode=require
+    #   Supabase（直连 5432，仅迁移/一次性作业用）：
+    #     postgresql+psycopg2://postgres.<ref>:<密码>@db.<ref>.supabase.co:5432/postgres?sslmode=require
+    # 空 = 回退 SQLite 文件（data_path/meloyu.db，仅限本机开发/测试；生产启动断言强制 PG）
+    database_url: str = ""
     host: str = "127.0.0.1"
     port: int = 8000
     cors_origins: str = "http://localhost:5173"

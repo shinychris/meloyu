@@ -57,7 +57,15 @@ _ADD_COLUMNS: list[tuple[str, str, str]] = [
 
 
 def run(engine: Engine) -> list[str]:
-    """执行全部未应用的迁移，返回应用清单（供启动日志与冒烟观测）。"""
+    """执行全部未应用的迁移，返回应用清单（供启动日志与冒烟观测）。
+
+    v0.15.0 起：本文件的全部条目均针对存量 SQLite 库的增量演进，PostgreSQL
+    侧 schema 由 Base.metadata.create_all 直接产出终态（模型已包含全部历史
+    迁移结果），数据口径要么随 sqlite_to_pg 迁移带入、要么由种子写入——
+    PG 引擎直接跳过。
+    """
+    if engine.dialect.name != "sqlite":
+        return []
     applied: list[str] = []
     with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
         table_cols: dict[str, set[str]] = {}

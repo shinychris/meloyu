@@ -1,39 +1,38 @@
-r"""Meloyu 数据备份脚本（P1-8）。
+r"""Meloyu 数据备份脚本（P1-8；v0.15.0 增 PostgreSQL 通道）。
 
 功能：
-1. SQLite 在线备份：backend/data/meloyu.db（WAL 模式）→
-   backend/data/backups/meloyu-YYYYMMDD-HHMMSS.db。
-   使用 sqlite3Connection.backup() 页级 API，服务运行中执行安全，
-   产出为自包含快照（不依赖 -wal/-shm）。
-2. 快照完整性校验：备份后对新快照执行 PRAGMA integrity_check，
-   校验失败即删除该快照并报错（防"备了个坏的"——P0-8，2026-09-26）。
+1a. PostgreSQL 备份（DATABASE_URL 已配置时的主通道）：逐表 COPY ... TO STDOUT
+    （text 格式，NULL 转义无歧义）→ gzip → backups/pg-meloyu-YYYYMMDD-HHMMSS/
+    目录（manifest.json 记录表清单/行数/顺序 + 每表 NNN-表名.copy.gz）。
+    纯 Python 实现，不依赖 pg_dump 二进制与 docker exec——GPU 容器在 Docker
+    Desktop/Win11 下 exec 受 seccomp errno 524 限制（见 services/ops_backup.py），
+    且远端托管 PG（Supabase）同样可用。服务运行中执行安全（MVCC 快照）。
+    恢复用配套脚本 scripts/restore_pg.py。
+1b. SQLite 在线备份（无 DATABASE_URL 的开发回退）：backend/data/meloyu.db
+    （WAL 模式）→ backend/data/backups/meloyu-YYYYMMDD-HHMMSS.db，
+    sqlite3Connection.backup() 页级 API，服务运行中执行安全。
+2. 快照完整性校验：SQLite 快照执行 PRAGMA integrity_check；PG 转储逐表
+    回读行数与 manifest 比对（gzip CRC 保证传输完整）。校验失败即删除并
+    报错（防"备了个坏的"——P0-8，2026-09-26）。
 3. 音频产物增量复制：backend/data/audio/ → backend/data/backups/audio/。
    仅复制 size 或 mtime 与备份侧不一致的文件（os.walk 递归，保持相对目录结构）。
-4. 轮换：backups/ 下 .db 快照保留最近 N 份（默认 7，--keep 可调）；
+4. 轮换：db 产物（.db 快照或 pg-* 目录）保留最近 N 份（默认 7，--keep 可调）；
    audio 备份为增量镜像，不参与轮换。
-
-⚠ 执行位置红线（单写入方事故复盘，2026-09-05/06）：8180 生产栈运行期间，
-备份必须在**容器内**执行（docker exec meloyu-backend python scripts/backup.py），
-由宿主机侧另起进程直接打开 WAL 库会跨 bind mount 扰动 -shm 状态——与两次
-库损坏事故同一暴露面。宿主机直跑仅适用于栈完全停机时。
-部署侧包装脚本：deploy/scripts/backup_daily.cmd（容器在跑→docker exec；
-没跑→跳过并留日志）。
 
 用法（在仓库根或任意目录均可，路径基于脚本自身定位）：
     backend/.venv/Scripts/python.exe backend/scripts/backup.py            # 全量（db + audio）
-    backend/.venv/Scripts/python.exe backend/scripts/backup.py --keep 14  # 保留 14 份 db 快照
+    backend/.venv/Scripts/python.exe backend/scripts/backup.py --keep 14  # 保留 14 份 db 产物
     backend/.venv/Scripts/python.exe backend/scripts/backup.py --db-only      # 仅备份数据库
     backend/.venv/Scripts/python.exe backend/scripts/backup.py --audio-only   # 仅增量复制音频
     backend/.venv/Scripts/python.exe backend/scripts/backup.py --dry-run      # 只统计不落盘
-
-Windows 计划任务（每天 03:30，经包装脚本容器内执行）：
-    schtasks /Create /TN "Meloyu Backup" /SC DAILY /ST 03:30 /TR "D:\Codebase\Meloyu\deploy\scripts\backup_daily.cmd"
 
 退出码：0 成功；1 备份过程出错（源库损坏/快照校验失败/磁盘不可写等）。
 """
 from __future__ import annotations
 
 import argparse
+import gzip
+import json
 import os
 import shutil
 import sqlite3
@@ -48,10 +47,99 @@ BACKUP_DIR = DATA_DIR / "backups"
 AUDIO_SRC = DATA_DIR / "audio"
 AUDIO_DST = BACKUP_DIR / "audio"
 SNAPSHOT_GLOB = "meloyu-*.db"
+PG_DUMP_GLOB = "pg-meloyu-*"
+
+
+def _pg_database_url() -> str:
+    """配置了 PG 连接串则返回（app.config），否则空串（= SQLite 回退）。"""
+    sys.path.insert(0, str(BACKEND_DIR))
+    from app.config import settings
+    return settings.database_url
+
+
+def _pg_tables() -> list[str]:
+    """全部表名，FK 依赖序（父表在前；Base.metadata.sorted_tables）。"""
+    from app import models  # noqa: F401 —— 注册全部模型
+    from app.models import Base
+    return [t.name for t in Base.metadata.sorted_tables]
+
+
+def backup_postgres(keep: int, dry_run: bool) -> bool:
+    """PG 逐表 COPY 转储（text 格式 + gzip）+ 清单 + 轮换。返回是否成功。"""
+    url = _pg_database_url()
+    tables = _pg_tables()
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    dest_dir = BACKUP_DIR / f"pg-meloyu-{stamp}"
+    if dry_run:
+        print(f"[db] dry-run：将转储 {len(tables)} 张表 -> {dest_dir}")
+        return True
+    from sqlalchemy import create_engine, text
+    engine = create_engine(url, pool_pre_ping=True)
+    manifest: dict[str, object] = {"format": "pg-copy-text", "created": stamp,
+                                   "dialect": "postgresql", "tables": []}
+    try:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            raw = conn.connection.dbapi_connection  # type: ignore[attr-defined]
+            total_rows = 0
+            for i, table in enumerate(tables, 1):
+                qtable = f'"{table}"'
+                rows = conn.execute(text(f"SELECT count(*) FROM {qtable}")).scalar_one()
+                part = dest_dir / f"{i:03d}-{table}.copy.gz"
+                with gzip.open(part, "wb") as gz, raw.cursor() as cur:
+                    cur.copy_expert(f"COPY {qtable} TO STDOUT", gz)
+                manifest["tables"].append({"table": table, "rows": rows, "file": part.name})
+                total_rows += rows
+            manifest["total_rows"] = total_rows
+    except Exception as exc:  # noqa: BLE001 —— 转储失败整体作废
+        print(f"[db] PG 转储失败：{exc}", file=sys.stderr)
+        shutil.rmtree(dest_dir, ignore_errors=True)
+        return False
+    finally:
+        engine.dispose()
+    # P0-8：转储即校验——逐文件 gzip 解压回读（CRC）+ 行数与 manifest 比对
+    for entry in manifest["tables"]:
+        part = dest_dir / entry["file"]
+        try:
+            with gzip.open(part, "rb") as gz:
+                n = sum(1 for _ in gz)
+        except (OSError, EOFError) as exc:
+            print(f"[db] 转储校验失败（{part.name}：{exc}），已删除整个目录", file=sys.stderr)
+            shutil.rmtree(dest_dir, ignore_errors=True)
+            return False
+        if n != entry["rows"]:
+            print(f"[db] 转储校验失败（{entry['table']}：转储 {n} 行 != 库内 "
+                  f"{entry['rows']} 行），已删除整个目录", file=sys.stderr)
+            shutil.rmtree(dest_dir, ignore_errors=True)
+            return False
+    (dest_dir / "manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    size_mb = sum(p.stat().st_size for p in dest_dir.iterdir()) / 1024 / 1024
+    print(f"[db] 已转储 {len(tables)} 表 / {total_rows} 行 -> {dest_dir.name}"
+          f"（{size_mb:.1f} MB，行数校验 ok）")
+    rotate_pg_dumps(keep)
+    return True
+
+
+def rotate_pg_dumps(keep: int) -> int:
+    """删除超出保留份数的旧 pg-* 转储目录（名字典序 = 时间序），返回删除数。"""
+    dumps = sorted(p for p in BACKUP_DIR.glob(PG_DUMP_GLOB) if p.is_dir())
+    doomed = dumps[:-keep] if keep > 0 else dumps
+    for old in doomed:
+        shutil.rmtree(old)
+        print(f"[db] 轮换：删除旧转储目录 {old.name}")
+    return len(doomed)
 
 
 def backup_db(keep: int, dry_run: bool) -> bool:
-    """SQLite 在线备份 + 轮换。返回是否成功。"""
+    """数据库备份入口：按配置分流 PG 转储 / SQLite 快照。返回是否成功。"""
+    if _pg_database_url():
+        return backup_postgres(keep, dry_run)
+    return backup_sqlite(keep, dry_run)
+
+
+def backup_sqlite(keep: int, dry_run: bool) -> bool:
+    """SQLite 在线备份 + 轮换（开发回退路径）。返回是否成功。"""
     if not DB_PATH.is_file():
         print(f"[db] 源库不存在，跳过：{DB_PATH}")
         return True
@@ -133,9 +221,10 @@ def backup_audio(dry_run: bool) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Meloyu 备份：SQLite 在线快照 + 音频增量复制")
+    parser = argparse.ArgumentParser(
+        description="Meloyu 备份：PostgreSQL COPY 转储（或 SQLite 在线快照）+ 音频增量复制")
     parser.add_argument("--keep", type=int, default=7, metavar="N",
-                        help="保留最近 N 份 .db 快照（默认 7；audio 不轮换）")
+                        help="保留最近 N 份 db 备份产物（默认 7；audio 不轮换）")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--db-only", action="store_true", help="仅备份数据库")
     mode.add_argument("--audio-only", action="store_true", help="仅增量复制音频")

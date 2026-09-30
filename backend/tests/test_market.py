@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import unittest
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
+from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401
@@ -16,13 +17,13 @@ from app.models.work import Candidate, Version
 from app.services import market as market_svc
 from app.services.team import role_for_work
 
-
 class TestMarket(unittest.TestCase):
     def setUp(self):
-        self.engine = create_engine("sqlite:///:memory:",
-                                    connect_args={"check_same_thread": False})
-        Base.metadata.create_all(self.engine)
+        self.engine = new_test_engine()
+        reset_db(self.engine)
         self.db = sessionmaker(bind=self.engine)()
+        # PG 方言门禁：播种档位行（users.plan → plans.code 外键）
+        seed_plans(self.db)
         ts = utc_now_iso()
 
         def mk(i, email, bal):
@@ -154,15 +155,15 @@ class TestMarket(unittest.TestCase):
         with self.assertRaises(BizError):
             market_svc.listing_preview(self.db, "x" * 32, None)
 
-
 class TestMarketGovernance(unittest.TestCase):
     """v0.14.0 市场治理回归（P1-1/P1-2）。"""
 
     def setUp(self):
-        self.engine = create_engine("sqlite:///:memory:",
-                                    connect_args={"check_same_thread": False})
-        Base.metadata.create_all(self.engine)
+        self.engine = new_test_engine()
+        reset_db(self.engine)
         self.db = sessionmaker(bind=self.engine)()
+        # PG 方言门禁：播种档位行（users.plan → plans.code 外键）
+        seed_plans(self.db)
         ts = utc_now_iso()
         self.seller = User(id="s" * 32, email="s@g.local", password_hash="x",
                            nickname="s", plan="studio", credit_balance=100,
@@ -262,7 +263,6 @@ class TestMarketGovernance(unittest.TestCase):
         self.db.commit()
         out = market_svc.admin_delist(self.db, self.seller, l["id"], "violation test")
         self.assertEqual(out["status"], "delisted")
-
 
 if __name__ == "__main__":
     unittest.main()

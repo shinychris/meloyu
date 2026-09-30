@@ -11,7 +11,8 @@ import wave as wav_mod
 from unittest import mock
 
 import numpy as np
-from sqlalchemy import create_engine
+
+from tests.db import new_test_engine, reset_db
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401
@@ -20,7 +21,6 @@ from app.core.errors import BizError
 from app.models import Base, Candidate, File, Plan, User, Version, Work
 from app.models.base import utc_now_iso
 from app.services import editing as edit_svc
-
 
 def _tone_wav(seconds: float = 8.0, sr: int = 48000) -> bytes:
     t = np.arange(int(seconds * sr)) / sr
@@ -34,15 +34,13 @@ def _tone_wav(seconds: float = 8.0, sr: int = 48000) -> bytes:
         wf.writeframes(np.repeat(pcm, 2).tobytes())
     return buf.getvalue()
 
-
 class _EditorTestCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self._old = settings.data_dir
         settings.data_dir = self.tmp.name
-        self.engine = create_engine("sqlite:///:memory:",
-                                    connect_args={"check_same_thread": False})
-        Base.metadata.create_all(self.engine)
+        self.engine = new_test_engine()
+        reset_db(self.engine)
         self.db = sessionmaker(bind=self.engine)()
         ts = utc_now_iso()
         self.user = User(id="u" * 32, email="ed@test.local", password_hash="x",
@@ -77,9 +75,12 @@ class _EditorTestCase(unittest.TestCase):
                                          {"section": "chorus", "bars": 16,
                                           "start_sec": 60, "end_sec": 120}],
                               created_at=ts2, updated_at=ts2)
+        self.db.add_all([self.work, self.version, self.cand])
+        # 循环外键（use_alter）的裸列赋值不走 post_update 延迟：SQLite 无外键
+        # 强制时先插后指可行，PG 必须二段式（先落地行，再回写指向）
+        self.db.flush()
         self.version.active_candidate_id = self.cand.id
         self.work.active_version_id = self.version.id
-        self.db.add_all([self.work, self.version, self.cand])
         # 产物文件（master/preview/4 stems 落盘登记）
         base = settings.audio_path / self.work.id / self.version.id / "candidates/A"
         (base / "stems").mkdir(parents=True, exist_ok=True)
@@ -109,7 +110,6 @@ class _EditorTestCase(unittest.TestCase):
         self.db.close()
         settings.data_dir = self._old
         self.tmp.cleanup()
-
 
 class TestRetune(_EditorTestCase):
     def test_submit_validation_and_task(self):
@@ -143,7 +143,6 @@ class TestRetune(_EditorTestCase):
         self.assertEqual(child.params["bpm"], 96)  # bpm 保持
         self.assertEqual(child.params["key"]["tonic"], "E")
 
-
 class TestMixdown(_EditorTestCase):
     def test_upload_creates_child_version_with_files_and_event(self):
         out = edit_svc.submit_mixdown(self.db, self.user, self.version.id,
@@ -175,7 +174,6 @@ class TestMixdown(_EditorTestCase):
             edit_svc.submit_mixdown(self.db, self.user, self.version.id, b"not wav")
         with self.assertRaises(BizError):
             edit_svc.submit_mixdown(self.db, self.user, self.version.id, _tone_wav(3.0))
-
 
 if __name__ == "__main__":
     unittest.main()

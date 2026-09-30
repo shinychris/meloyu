@@ -12,7 +12,8 @@ from pathlib import Path
 from unittest import mock
 
 import numpy as np
-from sqlalchemy import create_engine
+
+from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401 —— 注册全部表
@@ -21,7 +22,6 @@ from app.core.errors import BizError
 from app.models import Base, Plan, User
 from app.models.base import utc_now_iso
 from app.services import voice as voice_svc
-
 
 def _speaker_wav(path: Path, *, f0: float, formant: float, sr: int = 22050,
                  dur: float = 4.0, seed: int = 7) -> bytes:
@@ -44,7 +44,6 @@ def _speaker_wav(path: Path, *, f0: float, formant: float, sr: int = 22050,
         wf.setframerate(sr)
         wf.writeframes(x.tobytes())
     return path.read_bytes()
-
 
 class TestSimilarity(unittest.TestCase):
     """声纹一致性：同人多文本显著高于不同人。"""
@@ -71,7 +70,6 @@ class TestSimilarity(unittest.TestCase):
         self.assertLess(similarity(a, b), voice_svc.verify_threshold(),
                         f"不同人应低于阈值：{similarity(a, b):.3f}")
 
-
 class TestTimbreMapping(unittest.TestCase):
     def test_timbre_fields_and_clamps(self):
         timbre = voice_svc.timbre_from_features(
@@ -84,16 +82,16 @@ class TestTimbreMapping(unittest.TestCase):
         self.assertTrue(0.8 <= timbre["f1_scale"] <= 1.25)
         self.assertTrue(0.8 <= timbre["f2_scale"] <= 1.25)
 
-
 class _VoiceTestCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self._old = settings.data_dir
         settings.data_dir = self.tmp.name
-        self.engine = create_engine("sqlite:///:memory:",
-                                    connect_args={"check_same_thread": False})
-        Base.metadata.create_all(self.engine)
+        self.engine = new_test_engine()
+        reset_db(self.engine)
         self.db = sessionmaker(bind=self.engine)()
+        # PG 方言门禁：播种档位行（users.plan → plans.code 外键）
+        seed_plans(self.db)
         ts = utc_now_iso()
         self.user = User(id="u" * 32, email="voice@test.local", password_hash="x",
                          nickname="v", plan="studio", credit_balance=10000,
@@ -109,7 +107,6 @@ class _VoiceTestCase(unittest.TestCase):
     def _sample(self, f0: float, formant: float, seed: int = 1) -> bytes:
         return _speaker_wav(Path(self.tmp.name) / f"s{f0}_{formant}_{seed}.wav",
                             f0=f0, formant=formant, seed=seed)
-
 
 class TestEnrollFlow(_VoiceTestCase):
     def test_two_phrase_liveness(self):
@@ -177,17 +174,10 @@ class TestEnrollFlow(_VoiceTestCase):
         with self.assertRaises(BizError):
             voice_svc.get_owned(self.db, self.user, p["id"])
 
-
 class TestGenerationGate(_VoiceTestCase):
     def test_voice_clone_requires_verified_profile(self):
         from app.services.generation import submit_generation
-        self.db.add(Plan(code="studio", name="Studio", price_monthly=168,
-                         price_yearly=134, daily_generations=None,
-                         monthly_credits=10000, max_export="wav",
-                         commercial_license=True, watermark=False, features=[],
-                         switchable=True, sort_order=2, created_at=utc_now_iso(),
-                         updated_at=utc_now_iso()))
-        self.db.commit()
+        # plan 行由基类 seed_plans 提供（studio 等 4 档齐备）
         # 1) 缺 voice_profile_id → 40001
         with self.assertRaises(BizError) as cm:
             with mock.patch("app.core.tasks.schedule_generation"):
@@ -224,7 +214,6 @@ class TestGenerationGate(_VoiceTestCase):
         version = self.db.get(Version, row.version_id)
         self.assertEqual(version.params["voice_timbre"], p2["timbre"])
         self.assertEqual(version.params["vocal"], "voice_clone")
-
 
 if __name__ == "__main__":
     unittest.main()

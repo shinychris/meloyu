@@ -9,7 +9,6 @@ import unittest
 
 from app.services import licensing
 
-
 class TestGrades(unittest.TestCase):
     def test_allowed_channels(self):
         self.assertEqual(licensing.commercial_grade("localsynth"), "allowed")
@@ -42,7 +41,6 @@ class TestGrades(unittest.TestCase):
             {m["id"] for m in MUSIC_CATALOG}, set(licensing.COMMERCIAL_USE),
             "目录每个模型都必须有 commercial_use 判定")
 
-
 class TestLicenseForGeneration(unittest.TestCase):
     def test_free_plan_always_non_commercial(self):
         lic = licensing.license_for_generation("free", "acestep_local", "ace-step")
@@ -69,7 +67,6 @@ class TestLicenseForGeneration(unittest.TestCase):
         self.assertEqual(lic["grade"], "conditional")
         self.assertIn("2000", lic["basis_zh"])
         self.assertIn("$20 million", lic["basis_en"])
-
 
 if __name__ == "__main__":
     unittest.main()

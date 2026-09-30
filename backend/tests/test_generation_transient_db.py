@@ -17,11 +17,9 @@ from sqlalchemy.exc import OperationalError
 
 from app.services import generation as gen
 
-
 def _op_err() -> OperationalError:
     return OperationalError("PRAGMA journal_mode=WAL", {},
                             Exception("unable to open database file"))
-
 
 class _RaisingSessionCtx:
     """替身 SessionLocal：进 with 即抛瞬时库错误。"""
@@ -32,11 +30,9 @@ class _RaisingSessionCtx:
     def __exit__(self, *exc):
         return False
 
-
 class _FakeTask:
     def __init__(self, cancel_requested: bool) -> None:
         self.cancel_requested = cancel_requested
-
 
 class _FakeSessionCtx:
     def __init__(self, task) -> None:
@@ -47,7 +43,6 @@ class _FakeSessionCtx:
 
     def __exit__(self, *exc):
         return False
-
 
 class TestCancelRequestedFailOpen(unittest.TestCase):
     def test_transient_db_error_returns_false(self):
@@ -62,7 +57,6 @@ class TestCancelRequestedFailOpen(unittest.TestCase):
             self.assertFalse(gen._cancel_requested("t1"))
         with mock.patch.object(gen, "SessionLocal", lambda: _FakeSessionCtx(None)):
             self.assertFalse(gen._cancel_requested("t1"))
-
 
 class TestProgressReporterFailOpen(unittest.TestCase):
     def test_transient_db_error_swallowed(self):
@@ -82,7 +76,6 @@ class TestProgressReporterFailOpen(unittest.TestCase):
                                side_effect=ValueError("real bug")):
             with self.assertRaises(ValueError):
                 progress("model_sample", 70, "Generating music...")
-
 
 if __name__ == "__main__":
     unittest.main()

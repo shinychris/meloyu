@@ -11,7 +11,8 @@ import tempfile
 import unittest
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+
+from tests.db import new_test_engine, reset_db
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -26,7 +27,6 @@ from app.services.leadsheet import _syllable_lines
 from app.synth.structure import (SECTION_ALIASES, SECTION_BASE_BARS,
                                  SECTION_ENERGY, SECTION_ORDER, SECTION_TAG,
                                  parse_lyrics, plan_sections)
-
 
 class SectionRegistryTest(unittest.TestCase):
     """段落注册表一致性：新增段落必须四处同步（别名表/枚举/映射/权重）。"""
@@ -97,7 +97,6 @@ class SectionRegistryTest(unittest.TestCase):
         self.assertLessEqual(total_sec, 180 * 1.05)
         self.assertGreaterEqual(total_sec, 180 * 0.95)
 
-
 class LyricsEngineSectionsTest(unittest.TestCase):
     """本地歌词引擎：新段落组装（[Rap] 标签 / 器乐段不出歌词行）。"""
 
@@ -125,14 +124,12 @@ class LyricsEngineSectionsTest(unittest.TestCase):
         secs = [d["section"] for d in out["detected"]]
         self.assertEqual(secs, ["verse", "drop"])
 
-
 class LeadsheetSectionsTest(unittest.TestCase):
     """词谱 _syllable_lines：新段落标签归一化复用统一别名表。"""
 
     def test_new_tags_normalized(self):
         rows = _syllable_lines("[Rap]\n说一行\n[器乐段]\n独奏无词\n[后副歌]\n再来一句")
         self.assertEqual([r[0] for r in rows], ["rap", "solo", "post_chorus"])
-
 
 class SystemMetaSectionsTest(unittest.TestCase):
     """/system/meta：15 段结构标签 + 扩全灵感词表（zh 默认 locale）。"""
@@ -141,10 +138,8 @@ class SystemMetaSectionsTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self._old = settings.data_dir
         settings.data_dir = self.tmp.name
-        self.engine = create_engine("sqlite:///:memory:",
-                                    connect_args={"check_same_thread": False},
-                                    poolclass=StaticPool)
-        Base.metadata.create_all(self.engine)
+        self.engine = new_test_engine()
+        reset_db(self.engine)
 
         def _test_db():
             session = sessionmaker(bind=self.engine)()
@@ -186,7 +181,6 @@ class SystemMetaSectionsTest(unittest.TestCase):
             self.assertIn(word, insp["genres"], word)
         for word in ("钢琴", "吉他", "弦乐", "古筝", "合成器", "808", "唢呐", "手碟"):
             self.assertIn(word, insp["instruments"], word)
-
 
 if __name__ == "__main__":
     unittest.main()

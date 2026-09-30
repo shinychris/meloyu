@@ -13,7 +13,6 @@ import wave as wav_mod
 from app.core.ratelimit import _RULES, _hit, _match_rule
 from app.synth.id3 import AIGC_MARK_TEXT, id3v2_tag, mark_mp3, mark_wav
 
-
 class TestAigcMp3Marking(unittest.TestCase):
     def test_tag_structure_and_payload_preserved(self):
         raw = b"\xff\xfb\x90\x00" + b"\x00" * 100
@@ -37,7 +36,6 @@ class TestAigcMp3Marking(unittest.TestCase):
 
     def test_deterministic(self):
         self.assertEqual(id3v2_tag(), id3v2_tag())
-
 
 class TestAigcWavMarking(unittest.TestCase):
     def _tiny_wav(self) -> bytes:
@@ -67,7 +65,6 @@ class TestAigcWavMarking(unittest.TestCase):
     def test_non_riff_passthrough(self):
         junk = b"not a wav at all"
         self.assertEqual(mark_wav(junk), junk)
-
 
 class TestRateLimit(unittest.TestCase):
     def test_rule_matching_longest_prefix_first(self):
@@ -101,7 +98,6 @@ class TestRateLimit(unittest.TestCase):
         ratelimit._hits["recover-key"] = __import__("collections").deque(
             [now - 61, now - 61, now - 61])
         self.assertTrue(_hit("recover-key", 60, 3))
-
 
 if __name__ == "__main__":
     unittest.main()

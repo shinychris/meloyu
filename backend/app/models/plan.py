@@ -55,6 +55,7 @@ class Subscription(BaseModel):
         Index(
             "uq_subs_one_active", "user_id", unique=True,
             sqlite_where=text("status = 'active'"),
+            postgresql_where=text("status = 'active'"),
         ),
     )
 

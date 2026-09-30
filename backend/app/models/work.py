@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     ForeignKey,
@@ -159,7 +160,8 @@ class Candidate(BaseModel):
     )
     label: Mapped[str] = mapped_column(String(2), nullable=False)
     adopted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    seed: Mapped[int] = mapped_column(Integer, nullable=False)
+    # 同 tasks.seed：derive_seed 无符号 32 位，PG 需 BigInteger
+    seed: Mapped[int] = mapped_column(BigInteger, nullable=False)
     # V1.3 起允许空：外部模型候选不产出 AI 质量分（不造假分）；本地引擎候选保留确定性启发分
     quality_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     duration_sec: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -205,7 +207,9 @@ class EditEvent(BaseModel):
     version_id: Mapped[str | None] = mapped_column(
         String(32), ForeignKey("versions.id", ondelete="CASCADE")
     )
-    action: Mapped[str] = mapped_column(String(16), nullable=False)
+    # v0.14.0 支付生命周期枚举（subscription_past_due=20 字符）：原 String(16)
+    # 在 PG 拒写（dunning 留痕必炸），SQLite 不校验无感——v0.15.0 放宽
+    action: Mapped[str] = mapped_column(String(24), nullable=False)
     actor: Mapped[str] = mapped_column(String(8), nullable=False)
     detail: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import unittest
 
+from tests.db import new_test_engine, reset_db
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -22,7 +24,6 @@ from app.core.i18n import (
 from app.providers.base import stage_label
 from app.providers.music_catalog import MUSIC_CATALOG, localized_entry
 
-
 class TestParseAcceptLanguage(unittest.TestCase):
     def test_zh_variants(self):
         for header in ("zh", "zh-CN", "zh-CN,zh;q=0.9,en;q=0.8", "ZH-TW", "zh-Hans"):
@@ -31,7 +32,6 @@ class TestParseAcceptLanguage(unittest.TestCase):
     def test_en_and_misc(self):
         for header in ("en", "en-US,en;q=0.9", "fr-CH", "ja", "*", "", None):
             self.assertEqual(parse_accept_language(header), "en")
-
 
 class TestTr(unittest.TestCase):
     def tearDown(self):
@@ -49,7 +49,6 @@ class TestTr(unittest.TestCase):
         set_locale("fr")
         self.assertEqual(current_locale(), "en")
         self.assertEqual(tr("中文", "English"), "English")
-
 
 class TestLocaleMiddleware(unittest.TestCase):
     """纯 ASGI 中间件：Accept-Language → contextvar → 下游（含同步端点线程池）。"""
@@ -78,7 +77,6 @@ class TestLocaleMiddleware(unittest.TestCase):
         body = self._client().get("/echo").json()
         self.assertEqual(body["locale"], "en")
 
-
 class TestRunWithLocale(unittest.TestCase):
     def test_restores_previous_locale(self):
         set_locale("zh")
@@ -95,10 +93,8 @@ class TestRunWithLocale(unittest.TestCase):
     def test_invalid_locale_falls_back_en(self):
         run_with_locale("jp", lambda: None)  # 不抛错
 
-
 def _has_cjk(s: str) -> bool:
     return any("\u4e00" <= c <= "\u9fff" for c in str(s or ""))
-
 
 class TestCatalogLocalization(unittest.TestCase):
     def test_en_has_no_chinese_display_fields(self):
@@ -140,7 +136,6 @@ class TestCatalogLocalization(unittest.TestCase):
         finally:
             set_locale("en")
 
-
 class TestStageLabels(unittest.TestCase):
     def test_bilingual(self):
         set_locale("en")
@@ -149,7 +144,6 @@ class TestStageLabels(unittest.TestCase):
         set_locale("zh")
         self.assertEqual(stage_label("vocal"), "人声合成")
         set_locale("en")
-
 
 class TestTrEnglishHalvesSweep(unittest.TestCase):
     """静态扫描全部 tr(zh, en) 调用：英文侧（含 f-string 字面部分）不得出现中文。
@@ -186,7 +180,6 @@ class TestTrEnglishHalvesSweep(unittest.TestCase):
         self.assertTrue(checked > 50, f"sweep unexpectedly scanned only {checked} calls")
         self.assertEqual(problems, [], "tr() English halves contain Chinese:\n"
                          + "\n".join(problems))
-
 
 class TestEnglishOutputNoChinese(unittest.TestCase):
     """v0.7.2 i18n 收口回归：英文 locale 下各输出面零中文。"""
@@ -281,14 +274,14 @@ class TestEnglishOutputNoChinese(unittest.TestCase):
 
     def test_mail_single_language_per_locale(self):
         # v0.14.0：验证码落库（send/verify/consume 均带 db），邮件文案口径不变
-        from sqlalchemy import create_engine
+        
         from sqlalchemy.orm import sessionmaker
         from unittest.mock import patch
         from app import models  # noqa: F401
         from app.models import Base
         from app.services import mail
-        engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
-        Base.metadata.create_all(engine)
+        engine = new_test_engine()
+        reset_db(engine)
         db = sessionmaker(bind=engine)()
         sent: list[tuple[str, str, str]] = []
         with patch.object(mail, "_send", lambda to, subject, body: sent.append((to, subject, body))):
@@ -312,7 +305,6 @@ class TestEnglishOutputNoChinese(unittest.TestCase):
         self.assertIsNotNone(code_row)
         mail.consume_code(db, "u@x.com")
         mail.consume_code(db, "u2@x.com")
-
 
 if __name__ == "__main__":
     unittest.main()

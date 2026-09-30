@@ -1,6 +1,8 @@
 """种子脚本 CLI 入口：python scripts/seed_data.py [--reset]
 
---reset：停止后端后执行；删除 data/meloyu.db 与 data/audio/ 整目录后重建灌库。
+--reset：停止后端后执行；清空数据库（v0.15.0：PG=drop_all+create_all 重建
+schema，SQLite=删 data/meloyu.db 文件）与 data/audio/ 整目录后重建灌库。
+目标库由 DATABASE_URL / .env 决定。
 """
 import sys
 from pathlib import Path

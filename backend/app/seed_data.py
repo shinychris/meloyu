@@ -49,15 +49,15 @@ def _id(letter: str, num: int, width: int) -> str:
 
 
 # ---- 固定 ID 常量 ----
-U_DEMO = "e" + "0" * 31 + "1"
-U_FREE = "e" + "0" * 31 + "2"
+U_DEMO = "e" + "0" * 30 + "1"  # 1+30+1=32：id String(32)
+U_FREE = "e" + "0" * 30 + "2"
 W = {n: _id("a", n, 2) for n in range(41, 47)}          # W1..W6 → 41..46
 V = {n: _id("b", n, 3) for n in range(351, 359)}        # V1..V8 → 351..358
 C = {n: _id("c", n, 3) for n in
      (301, 302, 303, 304, 331, 332, 307, 308, 309, 310, 311, 312, 313, 314)}
 T = {n: _id("d", n, 2) for n in range(81, 89)}          # T1..T8
 E = {n: _id("d", n, 2) for n in range(91, 95)}          # E1..E4
-CERT_ID = "f" + "0" * 31 + "1"
+CERT_ID = "f" + "0" * 30 + "1"  # 32 字符
 
 SEED_LYRICS = {
     351: "[Verse]\n雨停在凌晨三点的窗台\n霓虹把影子拉得好白\n[Chorus]\n我们把未来说得太轻\n像风穿过无人的街心",
@@ -245,19 +245,24 @@ def _seed_guarded() -> None:
 
 
 def run_seed(reset: bool = False) -> bool:
-    """灌库（幂等）。reset=True 时先删库与音频目录。返回是否实际灌入。"""
+    """灌库（幂等）。reset=True 时先清库与音频目录。返回是否实际灌入。"""
     if reset:
-        db_file = settings.db_path
         engine.dispose()
-        if db_file.exists():
-            db_file.unlink()
-            for suffix in ("-wal", "-shm"):
-                p = Path(str(db_file) + suffix)
-                if p.exists():
-                    p.unlink()
+        if engine.dialect.name == "postgresql":
+            # PG：drop_all + create_all 重建 schema（清空全部数据）
+            Base.metadata.drop_all(engine)
+            Base.metadata.create_all(engine)
+        else:
+            db_file = settings.db_path
+            if db_file.exists():
+                db_file.unlink()
+                for suffix in ("-wal", "-shm"):
+                    p = Path(str(db_file) + suffix)
+                    if p.exists():
+                        p.unlink()
+            Base.metadata.create_all(engine)
         if settings.audio_path.exists():
             shutil.rmtree(settings.audio_path)
-        Base.metadata.create_all(engine)
 
     with SessionLocal() as db:
         if is_seeded(db):

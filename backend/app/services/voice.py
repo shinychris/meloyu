@@ -141,7 +141,10 @@ def similarity(fa: dict, fb: dict) -> float:
     corr = float(va @ vb / denom) if denom > 1e-9 else 0.0
     f0a, f0b = max(fa["f0"], 1.0), max(fb["f0"], 1.0)
     prox = max(0.0, 1.0 - abs(np.log2(f0a / f0b)) / 0.5)
-    return round(0.6 * corr + 0.4 * prox, 4)
+    # numpy 标量显式回落 Python float：psycopg2 对未知类型按 repr 字面渲染进
+    # SQL（PG 实测把 np.float64(...) 当标识符解析）；SQLite 的 str() 绑定
+    # 静默可用——v0.15.0 PG 方言门禁暴露
+    return float(round(0.6 * corr + 0.4 * prox, 4))
 
 
 def timbre_from_features(f: dict) -> dict:

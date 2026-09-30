@@ -149,7 +149,7 @@ def _owned_listing(db: Session, user: User, listing_id: str) -> MarketListing:
 def browse(db: Session, page: int = 1, page_size: int = 20, q: str | None = None) -> dict:
     cond = [MarketListing.status == "active"]
     if q:
-        cond.append(MarketListing.title.like(f"%{q}%"))
+        cond.append(MarketListing.title.ilike(f"%{q}%"))
     rows = db.execute(select(MarketListing).where(*cond)
                       .order_by(MarketListing.created_at.desc())
                       .offset((page - 1) * page_size).limit(page_size)).scalars().all()

@@ -8,7 +8,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 
-from sqlalchemy import create_engine
+from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401
@@ -20,7 +20,6 @@ from app.services import leadsheet as ls_svc
 from app.synth.midi_out import TICKS_PER_BEAT
 
 import mido
-
 
 def _write_test_midi(melody_path, chords_path, bpm: int = 96) -> None:
     """两小节 C 大调旋律（C4 D4 E4 G4 | A4 G4 E4 D4）+ C/Am 和弦。"""
@@ -50,16 +49,16 @@ def _write_test_midi(melody_path, chords_path, bpm: int = 96) -> None:
               (4 * beat, True, 45, 80), (8 * beat - 10, False, 45, 0)]
     build(chords, chords_path)
 
-
 class TestLeadsheet(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self._old = settings.data_dir
         settings.data_dir = self.tmp.name
-        self.engine = create_engine("sqlite:///:memory:",
-                                    connect_args={"check_same_thread": False})
-        Base.metadata.create_all(self.engine)
+        self.engine = new_test_engine()
+        reset_db(self.engine)
         self.db = sessionmaker(bind=self.engine)()
+        # PG 方言门禁：播种档位行（users.plan → plans.code 外键）
+        seed_plans(self.db)
         ts = utc_now_iso()
         self.user = User(id="u" * 32, email="ls@test.local", password_hash="x",
                          nickname="ls", plan="studio", credit_balance=100,
@@ -83,9 +82,12 @@ class TestLeadsheet(unittest.TestCase):
                                          {"section": "chorus", "bars": 1,
                                           "start_sec": 2.5, "end_sec": 5.0}],
                               created_at=ts, updated_at=ts)
+        self.db.add_all([self.work, self.version, self.cand])
+        # 循环外键（use_alter）的裸列赋值不走 post_update 延迟：SQLite 无外键
+        # 强制时先插后指可行，PG 必须二段式（先落地行，再回写指向）
+        self.db.flush()
         self.version.active_candidate_id = self.cand.id
         self.work.active_version_id = self.version.id
-        self.db.add_all([self.work, self.version, self.cand])
         self.db.commit()
         midi_dir = (settings.audio_path / self.work.id / self.version.id
                     / "candidates" / "A" / "midi")
@@ -137,7 +139,6 @@ class TestLeadsheet(unittest.TestCase):
          / "midi" / "melody.mid").unlink()
         with self.assertRaises(BizError):
             ls_svc.build_leadsheet(self.work, self.version, self.cand)
-
 
 if __name__ == "__main__":
     unittest.main()

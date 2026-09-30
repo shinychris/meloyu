@@ -47,6 +47,12 @@ def _assert_production() -> None:
     if "localhost" in settings.app_base_url or "127.0.0.1" in settings.app_base_url:
         logger.warning(f"APP_BASE_URL 指向本机地址（{settings.app_base_url}）——"
                        "对外部署时 Stripe 回跳与密码重置链接将不可达，请在 .env 配置对外域名")
+    # v0.15.0：生产数据库必须为 PostgreSQL（SQLite 单写入方约束与两次库损坏
+    # 事故的根治项；SQLite 回退仅限本机开发）——DATABASE_URL 未配置或非 PG 拒启
+    if engine.dialect.name != "postgresql":
+        problems.append("DATABASE_URL 未配置 PostgreSQL 连接串——v0.15.0 起生产强制 "
+                        "PostgreSQL（本地栈由 compose 的 postgres 服务提供，云端可用 "
+                        "Supabase；SQLite 仅限本机开发回退）")
     # v0.13.0 审计 M-2 延伸（2026-09-26 P2-13）：支付/邮件"半配置"静默通过是
     # 公网配置期的高危窗口——Stripe 只配了 secret 没配 webhook 时，用户支付
     # 成功、验签全拒、积分不入账（资金事故）；开了邮箱验证没配 SMTP 时注册

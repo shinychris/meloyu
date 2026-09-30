@@ -14,22 +14,21 @@ import zipfile
 from pathlib import Path
 
 from pydantic import ValidationError
-from sqlalchemy import create_engine
+
+from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401 —— 注册全部表
 from app.config import settings
 from app.core.errors import BizError
-from app.models import Base, Candidate, File, Version, Work
+from app.models import Base, Candidate, File, User, Version, Work
 from app.models.base import utc_now_iso
 from app.schemas.auth import ExportRequest
 from app.services import export as export_svc
 from app.services.release_export import cover_png, preset_of
 
-
 def _png_size(data: bytes) -> tuple[int, int]:
     return struct.unpack(">II", data[16:24])
-
 
 class TestExportRequestSchema(unittest.TestCase):
     def test_release_requires_platform(self):
@@ -60,7 +59,6 @@ class TestExportRequestSchema(unittest.TestCase):
         for fmt in ("mp3", "wav", "midi", "stems"):
             ExportRequest(version_id="a" * 32, format=fmt)
 
-
 class TestCoverPng(unittest.TestCase):
     def test_deterministic_and_size(self):
         a = cover_png((200, 200), "#234523")
@@ -73,7 +71,6 @@ class TestCoverPng(unittest.TestCase):
         a = cover_png((100, 100), "not-a-color")
         self.assertEqual(_png_size(a), (100, 100))
 
-
 class _ReleaseExportTestCase(unittest.TestCase):
     """构造 work/version/candidate/master 最小闭环，直调 _export_artifacts。"""
 
@@ -81,9 +78,8 @@ class _ReleaseExportTestCase(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self._old_data_dir = settings.data_dir
         settings.data_dir = self.tmp.name  # audio_path / db 路径全部切到临时目录
-        self.engine = create_engine("sqlite:///:memory:",
-                                     connect_args={"check_same_thread": False})
-        Base.metadata.create_all(self.engine)
+        self.engine = new_test_engine()
+        reset_db(self.engine)
         self.db = sessionmaker(bind=self.engine)()
         self._seed()
 
@@ -94,6 +90,12 @@ class _ReleaseExportTestCase(unittest.TestCase):
 
     def _seed(self, master_mime: str = "audio/wav"):
         ts = utc_now_iso()
+        # PG 方言门禁：user_id="u"*32 此前是无主外键（SQLite 不强制）；补建用户与档位行
+        seed_plans(self.db)
+        self.db.add(User(id="u" * 32, email="rel@test.local", password_hash="x",
+                         nickname="rel", plan="studio", credit_balance=10000,
+                         created_at=ts, updated_at=ts))
+        self.db.flush()
         self.work = Work(id="w" * 32, user_id="u" * 32, display_code="ML-0001",
                          title="雨夜航班", tags=["pop"], bpm=96, key_tonic="A",
                          key_mode="minor", duration_sec=120, model="v1_pro",
@@ -108,9 +110,12 @@ class _ReleaseExportTestCase(unittest.TestCase):
                               vocal="female_air", language="zh",
                               style_tags=["pop"], structure=[],
                               created_at=ts, updated_at=ts)
+        self.db.add_all([self.work, self.version, self.cand])
+        # 循环外键（use_alter）的裸列赋值不走 post_update 延迟：SQLite 无外键
+        # 强制时先插后指可行，PG 必须二段式（先落地行，再回写指向）
+        self.db.flush()
         self.version.active_candidate_id = self.cand.id
         self.work.active_version_id = self.version.id
-        self.db.add_all([self.work, self.version, self.cand])
         self.db.commit()
 
         # 母带：1 秒 48k 立体声 16bit 正弦（非静音，保证编码器有内容可压）
@@ -148,7 +153,6 @@ class _ReleaseExportTestCase(unittest.TestCase):
             payload = {name: zf.read(name) for name in zf.namelist()}
         return files, payload
 
-
 class TestDouyinRelease(_ReleaseExportTestCase):
     def test_zip_contents_and_metadata(self):
         files, zf = self._run("douyin", {"title": "雨夜航班", "artist": "chris",
@@ -175,7 +179,6 @@ class TestDouyinRelease(_ReleaseExportTestCase):
         self.assertTrue(zf["audio.mp3"][:3] == b"ID3"
                         or zf["audio.mp3"][:2] == b"\xff\xfb")
 
-
 class TestStreamingRelease(_ReleaseExportTestCase):
     def test_wav_audio_and_3000_cover(self):
         files, zf = self._run("streaming", {"title": "t", "artist": "a"})
@@ -194,7 +197,6 @@ class TestStreamingRelease(_ReleaseExportTestCase):
         self.assertEqual(meta["track"]["title"], "雨夜航班")  # build_metadata 以 work.title 兜底
         self.assertFalse(meta["track"]["explicit"])
 
-
 class TestStreamingMp3MasterBlocked(_ReleaseExportTestCase):
     def _seed(self):
         super()._seed(master_mime="audio/mpeg")
@@ -210,7 +212,6 @@ class TestStreamingMp3MasterBlocked(_ReleaseExportTestCase):
         files, zf = self._run("douyin")
         self.assertIn("audio.mp3", zf)
 
-
 class TestPresetOf(unittest.TestCase):
     def test_unknown_platform(self):
         with self.assertRaises(BizError):
@@ -220,7 +221,6 @@ class TestPresetOf(unittest.TestCase):
         for key, preset in preset_of.__globals__["RELEASE_PRESETS"].items():  # type: ignore[index]
             self.assertIn(preset["audio"], ("mp3", "wav"))
             self.assertTrue(preset["cover_size"][0] >= 1000)
-
 
 if __name__ == "__main__":
     unittest.main()

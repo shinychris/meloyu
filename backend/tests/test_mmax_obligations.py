@@ -18,7 +18,6 @@ from app.services import licensing
 from app.services.certificate import provider_attribution
 from app.synth.id3 import mark_mp3, mark_wav
 
-
 class TestObligation1Attribution(unittest.TestCase):
     """义务①：MiniMax 产出在证书与导出标识中显著署名 "MiniMax-Music3"。"""
 
@@ -33,7 +32,6 @@ class TestObligation1Attribution(unittest.TestCase):
 
     def test_unknown_channel_falls_back(self):
         self.assertEqual(provider_attribution("mystery_channel"), "mystery_channel")
-
 
 class TestObligation2IpProtection(unittest.TestCase):
     """义务②：在世艺术家名义/声音冒用拦截（服务端强制、无开关）。"""
@@ -70,7 +68,6 @@ class TestObligation2IpProtection(unittest.TestCase):
         artists = ip._all_artists()
         self.assertIn("taylor swift", artists)
 
-
 class TestObligation3Disclosure(unittest.TestCase):
     """义务③：导出产物 AIGC 标识带引擎署名（AUP 第 11 条机器生成内容披露）。"""
 
@@ -99,7 +96,6 @@ class TestObligation3Disclosure(unittest.TestCase):
         raw = b"\xff\xfb\x00\x00" + b"\x00" * 8
         marked = mark_mp3(raw, "MiniMax-Music3（中文注释）")
         self.assertTrue(marked.startswith(b"ID3"))
-
 
 class TestMmaxCommercialOpen(unittest.TestCase):
     """义务落实后的商用开放：conditional + 开关 → commercial + 门槛 basis。"""
@@ -151,7 +147,6 @@ class TestMmaxCommercialOpen(unittest.TestCase):
                                                "stable-audio-open")
         self.assertEqual(lic["type"], "non_commercial")
         self.assertEqual(lic["grade"], "conditional")
-
 
 if __name__ == "__main__":
     unittest.main()

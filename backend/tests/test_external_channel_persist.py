@@ -16,7 +16,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
+from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401 —— 注册全部表
@@ -25,7 +26,6 @@ from app.models import Base, File, Task, User, Version, Work
 from app.models.base import utc_now_iso
 from app.providers.base import CandidateArtifact, GenerationOutput
 from app.services import generation as gen
-
 
 def _mk_artifact(label: str, relpath: str) -> CandidateArtifact:
     fmeta = dict(relpath=relpath, kind="preview", stem_name=None, mime="audio/mpeg",
@@ -36,7 +36,6 @@ def _mk_artifact(label: str, relpath: str) -> CandidateArtifact:
         time_signature="4/4", vocal="female_air", language="zh",
         files=[fmeta, {**fmeta, "kind": "master"}])
 
-
 class TestSamePathDedupPersist(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -46,10 +45,11 @@ class TestSamePathDedupPersist(unittest.TestCase):
         self._patch.start()
         self.addCleanup(self._patch.stop)
 
-        self.engine = create_engine("sqlite:///:memory:",
-                                    connect_args={"check_same_thread": False})
-        Base.metadata.create_all(self.engine)
+        self.engine = new_test_engine()
+        reset_db(self.engine)
         self.db = sessionmaker(bind=self.engine)()
+        # PG 方言门禁：播种档位行（users.plan → plans.code 外键）
+        seed_plans(self.db)
         ts = utc_now_iso()
         self.db.add(User(id="u" * 32, email="a@test.local", password_hash="x",
                          nickname="a", plan="pro", credit_balance=100,
@@ -66,7 +66,10 @@ class TestSamePathDedupPersist(unittest.TestCase):
                     stage_label="s", work_id=work.id, version_id=version.id,
                     provider="api", seed=1, cost_credits=12, request_payload={},
                     created_at=ts, updated_at=ts)
-        self.db.add_all([work, version, task])
+        # 裸 FK 列不进 unit-of-work 依赖图：先落地父行（PG 方言门禁）
+        self.db.add_all([work, version])
+        self.db.flush()
+        self.db.add(task)
         self.db.commit()
         # provider 已落盘的同源整曲（外部通道：preview 与 master 同一物理文件）
         rel = Path(self._tmp.name) / "audio" / work.id / version.id / "candidates/A/preview.mp3"
@@ -108,7 +111,6 @@ class TestSamePathDedupPersist(unittest.TestCase):
         row = self.db.execute(select(File).where(
             File.kind == "master", File.version_id == "v" * 32)).scalars().one()
         self.assertTrue((Path(self._tmp.name) / "audio" / row.path).exists())
-
 
 if __name__ == "__main__":
     unittest.main()

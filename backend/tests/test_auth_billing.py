@@ -12,7 +12,7 @@ import time
 import unittest
 from unittest import mock
 
-from sqlalchemy import create_engine
+from tests.db import new_test_engine, reset_db
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401 —— 注册全部表
@@ -24,14 +24,12 @@ from app.services import auth as auth_svc
 from app.services import billing as billing_svc
 from app.services import stripe_billing
 
-
 class _DBTestCase(unittest.TestCase):
     """每个用例独立内存库。"""
 
     def setUp(self):
-        self.engine = create_engine("sqlite:///:memory:",
-                                    connect_args={"check_same_thread": False})
-        Base.metadata.create_all(self.engine)
+        self.engine = new_test_engine()
+        reset_db(self.engine)
         self.db = sessionmaker(bind=self.engine)()
         # 三个订阅档位（外键与限额依赖）
         ts = utc_now_iso()
@@ -53,7 +51,6 @@ class _DBTestCase(unittest.TestCase):
 
     def tearDown(self):
         self.db.close()
-
 
 class TestAuthFlow(_DBTestCase):
     EMAIL = "u1@test.local"
@@ -153,7 +150,6 @@ class TestAuthFlow(_DBTestCase):
             data = json.loads(zf.read("meloyu-data-export.json"))
         self.assertEqual(data["profile"]["email"], self.EMAIL)
 
-
 class TestSwitchPlanHardening(_DBTestCase):
     """P0-4：付费档不可白拿（无论 Stripe 是否配置，switch 都不发付费档）。"""
 
@@ -197,7 +193,6 @@ class TestSwitchPlanHardening(_DBTestCase):
         user = self._user(plan="free")
         out = billing_svc.switch_plan(self.db, user, "free")
         self.assertEqual(out["plan"], "free")
-
 
 class TestStripeWebhook(_DBTestCase):
     """webhook 验签 + 事件处理（不发起真实 Stripe 调用）。"""
@@ -320,7 +315,6 @@ class TestStripeWebhook(_DBTestCase):
         self.db.refresh(order)
         self.assertEqual(order.status, "refunded")
         self.assertEqual(self.user.credit_balance, 0, "余额不足扣至 0，不为负")
-
 
 class TestFundingLoopP0(_DBTestCase):
     """v0.14.0 资金闭环修复回归（P0-1/2/3/5 + P1-4/5）。
@@ -492,7 +486,6 @@ class TestFundingLoopP0(_DBTestCase):
         self.db.refresh(self.user)
         self.assertEqual(self.user.plan, "free", "订阅退款降级")
         self.assertEqual(self.user.credit_balance, 0, "追回当期已发积分（扣至 0）")
-
 
 if __name__ == "__main__":
     unittest.main()

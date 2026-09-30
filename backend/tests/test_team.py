@@ -7,7 +7,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 
-from sqlalchemy import create_engine
+from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401
@@ -18,16 +18,16 @@ from app.models.base import utc_now_iso
 from app.services import team as team_svc
 from app.services import works as works_svc
 
-
 class _TeamTestCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self._old = settings.data_dir
         settings.data_dir = self.tmp.name
-        self.engine = create_engine("sqlite:///:memory:",
-                                    connect_args={"check_same_thread": False})
-        Base.metadata.create_all(self.engine)
+        self.engine = new_test_engine()
+        reset_db(self.engine)
         self.db = sessionmaker(bind=self.engine)()
+        # PG 方言门禁：播种档位行（users.plan → plans.code 外键）
+        seed_plans(self.db)
         ts = utc_now_iso()
 
         def mk_user(i: int, email: str) -> User:
@@ -54,7 +54,6 @@ class _TeamTestCase(unittest.TestCase):
         self.db.close()
         settings.data_dir = self._old
         self.tmp.cleanup()
-
 
 class TestSpaceCrud(_TeamTestCase):
     def test_create_and_members(self):
@@ -88,7 +87,6 @@ class TestSpaceCrud(_TeamTestCase):
         self.assertEqual(team_svc.list_spaces(self.db, self.alice)["total"], 1)
         self.assertEqual(team_svc.list_spaces(self.db, self.bob)["total"], 1)
         self.assertEqual(team_svc.list_spaces(self.db, self.eve)["total"], 0)
-
 
 class TestShareAndRoles(_TeamTestCase):
     def setUp(self):
@@ -136,7 +134,6 @@ class TestShareAndRoles(_TeamTestCase):
         items = team_svc.list_space_works(self.db, self.dave, self.sp["id"])["items"]
         self.assertEqual([w["id"] for w in items], [self.work.id])
 
-
 class TestComments(_TeamTestCase):
     def setUp(self):
         super().setUp()
@@ -182,7 +179,6 @@ class TestComments(_TeamTestCase):
         with self.assertRaises(BizError):
             team_svc.delete_comment(self.db, self.dave, c["id"])
         self.assertEqual(team_svc.delete_comment(self.db, self.alice, c2["id"]), {"ok": True})
-
 
 if __name__ == "__main__":
     unittest.main()

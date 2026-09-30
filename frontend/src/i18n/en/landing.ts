@@ -287,4 +287,5 @@ export const landingEn = {
   'landing.data.milestone.22.title': 'Lyrics creation boost: idea-driven AI / bilingual tag guides / performance marks',
   'landing.data.milestone.23.title': 'Security hardening: HttpOnly refresh / rate-limit anti-spoof / SSRF guards / CSP',
   'landing.data.milestone.24.title': 'Commercial-readiness overhaul: payments loop / entitlements / backup & monitoring / frontend stability',
+  'landing.data.milestone.25.title': 'PostgreSQL migration: concurrent multi-writer / Supabase cloud hosting / backup & restore drills',
 } as const

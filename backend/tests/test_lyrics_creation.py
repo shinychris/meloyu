@@ -13,7 +13,8 @@ import tempfile
 import unittest
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+
+from tests.db import new_test_engine, reset_db
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -26,7 +27,6 @@ from app.models.enums import SECTIONS
 from app.providers.lyrics_llm import LLMLyricsProvider
 from app.schemas.auth import LyricGenerateRequest
 from app.synth.structure import parse_lyrics, plan_sections, strip_paren_marks
-
 
 class StripParenMarksTest(unittest.TestCase):
     """括号表演标记剥离：中英括号、独立行、行内、行尾。"""
@@ -70,7 +70,6 @@ class StripParenMarksTest(unittest.TestCase):
         self.assertFalse(inferred)
         self.assertEqual([p.section for p in plans], ["intro", "verse", "outro"])
 
-
 class _CapturedChat:
     """捕获 system/prompt 的假 chat；按构造时响应序列返回。"""
 
@@ -82,13 +81,11 @@ class _CapturedChat:
         self.calls.append((system, prompt))
         return self._replies.pop(0)
 
-
 SAMPLE_LYRICS = (
     "[Verse]\n（钢琴渐入）\n雨停在凌晨三点的窗台\n霓虹把影子拉得好白\n"
     "便利店的灯还亮着\n像没说完的对白\n[Chorus]\n（轻声吟唱）我们把未来说得太轻\n"
     "像风穿过无人的街心\n承诺若只剩回音\n至少今夜还有雨声"
 )
-
 
 class LLMPromptTest(unittest.TestCase):
     """LLM Provider：生成提示词含想法驱动与括号标记指令；带标记歌词全链路可用。"""
@@ -131,7 +128,6 @@ class LLMPromptTest(unittest.TestCase):
         self.assertIn("括号表演标记", prompt)
         self.assertFalse(out["fallback"])
 
-
 class ThemeSchemaTest(unittest.TestCase):
     """LyricGenerateRequest.theme：1~600 字（v0.12.3 想法输入）。"""
 
@@ -149,7 +145,6 @@ class ThemeSchemaTest(unittest.TestCase):
         with self.assertRaises(ValidationError):
             LyricGenerateRequest(theme="")
 
-
 class MetaLyricsCreationTest(unittest.TestCase):
     """/system/meta：段落 desc 说明 + performance_marks 词表（zh 默认 locale）。"""
 
@@ -157,10 +152,8 @@ class MetaLyricsCreationTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self._old = settings.data_dir
         settings.data_dir = self.tmp.name
-        self.engine = create_engine("sqlite:///:memory:",
-                                    connect_args={"check_same_thread": False},
-                                    poolclass=StaticPool)
-        Base.metadata.create_all(self.engine)
+        self.engine = new_test_engine()
+        reset_db(self.engine)
 
         def _test_db():
             session = sessionmaker(bind=self.engine)()
@@ -202,7 +195,6 @@ class MetaLyricsCreationTest(unittest.TestCase):
         for m in marks:
             parsed, _ = parse_lyrics(f"[Verse]\n{m['mark']}行一")
             self.assertEqual(parsed[0][1], ["行一"], m["mark"])
-
 
 if __name__ == "__main__":
     unittest.main()

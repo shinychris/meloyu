@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import unittest
 
-from sqlalchemy import create_engine
+from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401
@@ -11,13 +11,13 @@ from app.models import Base, Candidate, User, Version, Work
 from app.models.base import utc_now_iso
 from app.services import taste as taste_svc
 
-
 class TestTaste(unittest.TestCase):
     def setUp(self):
-        self.engine = create_engine("sqlite:///:memory:",
-                                    connect_args={"check_same_thread": False})
-        Base.metadata.create_all(self.engine)
+        self.engine = new_test_engine()
+        reset_db(self.engine)
         self.db = sessionmaker(bind=self.engine)()
+        # PG 方言门禁：播种档位行（users.plan → plans.code 外键）
+        seed_plans(self.db)
         ts = utc_now_iso()
         self.user = User(id="u" * 32, email="taste@test.local", password_hash="x",
                          nickname="t", plan="studio", credit_balance=100,
@@ -39,9 +39,11 @@ class TestTaste(unittest.TestCase):
                           vocal="female_air" if i < 2 else "male_clear",
                           language="zh", style_tags=["pop"] if i < 2 else ["电子"],
                           structure=[], created_at=ts, updated_at=ts)
+            # 循环外键（use_alter）裸列赋值不走 post_update 延迟：PG 需二段式回写
+            self.db.add_all([w, v, c])
+            self.db.flush()
             v.active_candidate_id = c.id
             w.active_version_id = v.id
-            self.db.add_all([w, v, c])
         self.db.commit()
 
     def tearDown(self):
@@ -72,7 +74,6 @@ class TestTaste(unittest.TestCase):
         out = taste_svc.rebuild(self.db, u2)
         self.assertEqual(out["sample_count"], 0)
         self.assertIsNone(out["profile"]["bpm"])
-
 
 if __name__ == "__main__":
     unittest.main()
