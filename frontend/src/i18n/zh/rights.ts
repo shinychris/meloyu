@@ -12,7 +12,7 @@ export const rightsZh: Record<keyof typeof rightsEn, string> = {
   'rights.cert.loading': '读取证书…',
   'rights.cert.viewHint': '点击查看并签发授权证书',
   'rights.cert.realtimeNote':
-    '证书按契约 §8.4 实时签发：每次查看都会生成一条新的签发记录与留痕事件，并固化当前版本的 SHA-256 指纹；本次会话内同一版本不会重复签发。',
+    '证书实时签发：每次查看都会生成一条新的签发记录与留痕事件，并固化当前版本的 SHA-256 指纹；本次会话内同一版本不会重复签发。',
   'rights.cert.errorNotAdopted': '该版本尚未采用候选，暂无法签发证书',
   'rights.cert.errorHint': '在作品详情页对候选点「采用定稿」后，即可签发授权证书。',
   'rights.cert.view': '查看证书',
@@ -46,5 +46,5 @@ export const rightsZh: Record<keyof typeof rightsEn, string> = {
   'rights.licenseNotes.nonCommercial': '非商用：MusicGen（CC-BY-NC 权重）· SongGeneration（腾讯学术许可）',
   'rights.licenseNotes.conditional': '有条件商用：MiniMax / Stable Audio —— 需满足其社区许可的收入门槛',
   'rights.settingsNote':
-    '证书由系统按契约 §8.4 签发：AI 披露、人类参与留痕与 SHA-256 指纹随作品版本固化。PDF 版证书将在 V1.1 提供。',
+    '证书由系统签发：AI 披露、人类参与留痕与 SHA-256 指纹随作品版本固化。PDF 版证书将在 V1.1 提供。',
 }

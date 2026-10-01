@@ -10,7 +10,7 @@ export const rightsEn = {
   'rights.cert.loading': 'Loading certificate…',
   'rights.cert.viewHint': 'Click to view and issue the license certificate',
   'rights.cert.realtimeNote':
-    'Certificates are issued in real time per contract §8.4: each view creates a new issuance record and audit-trail event, and freezes the SHA-256 fingerprint of the current version; the same version is not issued twice within this session.',
+    'Certificates are issued in real time: each view creates a new issuance record and audit-trail event, and freezes the SHA-256 fingerprint of the current version; the same version is not issued twice within this session.',
   'rights.cert.errorNotAdopted': 'This version has no adopted candidate yet, so no certificate can be issued',
   'rights.cert.errorHint':
     'Adopt a candidate as the final version on the work detail page, then the license certificate can be issued.',
@@ -46,5 +46,5 @@ export const rightsEn = {
   'rights.licenseNotes.nonCommercial': 'Non-commercial: MusicGen (CC-BY-NC weights) · SongGeneration (Tencent academic license)',
   'rights.licenseNotes.conditional': 'Conditional: MiniMax / Stable Audio — subject to the revenue threshold in their community licenses',
   'rights.settingsNote':
-    'Certificates are issued by the system per contract §8.4: AI disclosure, human participation audit trail and SHA-256 fingerprint are frozen with each work version. PDF certificates arrive in V1.1.',
+    'Certificates are issued by the system: AI disclosure, human participation audit trail and SHA-256 fingerprint are frozen with each work version. PDF certificates arrive in V1.1.',
 } as const

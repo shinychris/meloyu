@@ -4,6 +4,7 @@ import { resetPassword } from '../api/auth'
 import { toast } from '../stores/toast'
 import { useT } from '../i18n'
 import LangSwitch from '../components/common/LangSwitch'
+import { Logo } from '../components/common/Logo'
 
 /** 新密码规则：8+ 位字母 + 数字（与注册口径一致） */
 function isValidPassword(v: string): boolean {
@@ -52,14 +53,10 @@ export default function ResetPasswordView() {
       </div>
       <div className="w-[380px] pop">
         <div className="flex items-center gap-2 justify-center mb-8">
-          <svg width="26" height="26" viewBox="0 0 22 22" fill="none">
-            <rect x="1" y="1" width="20" height="20" stroke="#00ff2c" strokeWidth="2" />
-            <rect x="6" y="9" width="3" height="7" fill="#fff" />
-            <rect x="11" y="5" width="3" height="11" fill="#00ff2c" />
-          </svg>
+          <Logo size={26} />
           <div>
-            <div className="text-[17px] font-extrabold tracking-tight leading-none">MELOYU</div>
-            <div className="text-[10px] mt-1" style={{ color: 'var(--dim)' }}>
+            <div className="text-lg font-extrabold tracking-tight leading-none">MELOYU</div>
+            <div className="text-2xs mt-1 text-dim">
               {t('login.tagline')}
             </div>
           </div>
@@ -69,29 +66,29 @@ export default function ResetPasswordView() {
           {!token ? (
             // 链接缺 token：不可提交，引导回登录页重新发起
             <>
-              <div className="text-[16px] font-bold">{t('auth.reset.title')}</div>
-              <div className="text-[12px] mt-3 leading-relaxed" style={{ color: 'var(--warn)' }}>
+              <div className="text-lg font-bold">{t('auth.reset.title')}</div>
+              <div className="text-sm mt-3 leading-relaxed text-warn">
                 {t('auth.reset.invalidToken')}
               </div>
-              <Link to="/login" className="block mt-5 text-[12px] font-bold" style={{ color: 'var(--acc)' }}>
+              <Link to="/login" className="block mt-5 text-sm font-bold text-acc">
                 {t('auth.reset.backLogin')}
               </Link>
             </>
           ) : done ? (
             <>
-              <div className="text-[16px] font-bold">{t('auth.reset.done')}</div>
-              <Link to="/login" className="block mt-5 text-[12px] font-bold" style={{ color: 'var(--acc)' }}>
+              <div className="text-lg font-bold">{t('auth.reset.done')}</div>
+              <Link to="/login" className="block mt-5 text-sm font-bold text-acc">
                 {t('auth.reset.backLogin')}
               </Link>
             </>
           ) : (
             <form onSubmit={submit} className="space-y-3">
-              <div className="text-[16px] font-bold">{t('auth.reset.title')}</div>
-              <div className="text-[11px] leading-relaxed" style={{ color: 'var(--dim)' }}>
+              <div className="text-lg font-bold">{t('auth.reset.title')}</div>
+              <div className="text-xs leading-relaxed text-dim">
                 {t('auth.reset.desc')}
               </div>
               <div>
-                <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>
+                <div className="text-2xs mb-1 text-dim">
                   {t('auth.reset.label')}
                 </div>
                 <input
@@ -104,14 +101,14 @@ export default function ResetPasswordView() {
                 />
               </div>
               {error && (
-                <div className="text-[11px] leading-relaxed" style={{ color: 'var(--bad)' }}>
+                <div className="text-xs leading-relaxed text-bad">
                   {error}
                 </div>
               )}
-              <button type="submit" className="btn btn-acc w-full !py-3 text-[13px] font-bold" disabled={busy}>
+              <button type="submit" className="btn btn-acc btn-lg w-full font-bold" disabled={busy}>
                 {busy ? t('auth.reset.submitting') : t('auth.reset.submit')}
               </button>
-              <Link to="/login" className="block text-[11px] font-bold" style={{ color: 'var(--muted)' }}>
+              <Link to="/login" className="block text-xs font-bold text-muted">
                 {t('auth.reset.backLogin')}
               </Link>
             </form>

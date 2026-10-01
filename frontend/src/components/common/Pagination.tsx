@@ -19,7 +19,7 @@ export default function Pagination({ page, totalPages, onChange }: PaginationPro
 
   return (
     <div className="pager">
-      <span className="text-[10px] num mr-2" style={{ color: 'var(--dim)' }}>
+      <span className="text-2xs num mr-2 text-dim">
         {t('layout.pagination.status', { page, total: totalPages })}
       </span>
       <button className="pnum-btn" disabled={page <= 1} onClick={() => onChange(page - 1)}>

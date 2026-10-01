@@ -51,7 +51,7 @@ const SHORTCUT_ROUTES: Record<string, string> = {
 function RouteFallback() {
   const t = useT()
   return (
-    <div className="h-full flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+    <div className="h-full flex items-center justify-center bg-bg">
       <span className="label">{t('app.loading')}</span>
     </div>
   )
@@ -100,7 +100,7 @@ function AppLayout() {
 
   if (!user && !ready) {
     return (
-      <div className="h-full flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+      <div className="h-full flex items-center justify-center bg-bg">
         <span className="label">{t('app.loading')}</span>
       </div>
     )
@@ -108,14 +108,14 @@ function AppLayout() {
   // P1-25：后端不可达 ≠ 未登录——token 仍在，展示重试而非踢到登录页重输密码
   if (!user && offline) {
     return (
-      <div className="h-full flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+      <div className="h-full flex items-center justify-center bg-bg">
         <div className="card p-8 w-[380px] text-center pop">
-          <div className="text-[17px] font-extrabold tracking-tight">{t('app.offline.title')}</div>
-          <div className="text-[12px] mt-3 leading-relaxed" style={{ color: 'var(--muted)' }}>
+          <div className="text-lg font-extrabold tracking-tight">{t('app.offline.title')}</div>
+          <div className="text-sm mt-3 leading-relaxed text-muted">
             {t('app.offline.desc')}
           </div>
           <button
-            className="btn btn-acc !py-2 !px-5 text-[12px] mt-6"
+            className="btn btn-acc btn-md mt-6"
             onClick={() => {
               useSessionStore.setState({ ready: false, offline: false })
               void bootstrap()

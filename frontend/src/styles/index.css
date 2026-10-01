@@ -1,14 +1,64 @@
 @import "tailwindcss";
 
-/* ============ Meloyu · 设计令牌（与原型 styles.css 逐项一致） ============ */
-:root {
-  --bg: #0e0e0e; --bg2: #191919; --bg3: #222222; --bg4: #2a2a2a;
-  --line: #2c2c2c; --line2: #383838;
-  --txt: #ffffff; --muted: #9a9a9a; --dim: #8a8a8a;
-  --acc: #00ff2c; --acc-dim: rgba(0, 255, 44, .14); --acc-glow: rgba(0, 255, 44, .35);
-  --warn: #ffb02c; --bad: #ff4d4d;
-  --trk-vox: #ff5c8a; --trk-drm: #ffb02c; --trk-bas: #b07cff; --trk-key: #4da6ff; --trk-str: #4dd0a6; --trk-fx: #8a8a8a;
+/* ============ Meloyu · 设计令牌（Tailwind 4 @theme：utility 可直接消费） ============ */
+/* 全站唯一颜色/字号/阴影来源；组件内用 text-dim / bg-bg-2 / border-line / text-2xs 等 utility。 */
+@theme {
+  /* 色彩：中性阶 */
+  --color-bg: #0e0e0e;
+  --color-bg-2: #191919;
+  --color-bg-3: #222222;
+  --color-bg-4: #2a2a2a;
+  --color-line: #2c2c2c;
+  --color-line-2: #383838;
+  --color-txt: #ffffff;
+  --color-muted: #9a9a9a;
+  --color-dim: #8a8a8a;
+  /* 色彩：品牌/语义 */
+  --color-acc: #00ff2c;
+  --color-warn: #ffb02c;
+  --color-bad: #ff4d4d;
+  /* 色彩：音轨六色 */
+  --color-trk-vox: #ff5c8a;
+  --color-trk-drm: #ffb02c;
+  --color-trk-bas: #b07cff;
+  --color-trk-key: #4da6ff;
+  --color-trk-str: #4dd0a6;
+  --color-trk-fx: #8a8a8a;
+  /* 品牌 alpha 变体与遮罩 */
+  --color-acc-dim: rgba(0, 255, 44, .14);
+  --color-acc-line: rgba(0, 255, 44, .4);
+  --color-acc-glow: rgba(0, 255, 44, .35);
+  --color-mask: rgba(0, 0, 0, .72);
+  /* 字阶（覆盖默认刻度；最小 10px，中文可读下限） */
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-2xl: 26px;
+  --text-3xl: 28px;
+  --text-4xl: 32px;
+  --text-5xl: 40px;
+  --text-hero: 56px;
+  /* 阴影 */
+  --shadow-glow: 0 0 24px rgba(0, 255, 44, .18);
+  --shadow-shot: 0 0 60px rgba(0, 255, 44, .06), 0 24px 48px rgba(0, 0, 0, .5);
 }
+
+/* 旧变量名 → 令牌别名：存量手写 CSS 与少数动态场景零改动兼容 */
+:root {
+  color-scheme: dark;
+  --bg: var(--color-bg); --bg2: var(--color-bg-2); --bg3: var(--color-bg-3); --bg4: var(--color-bg-4);
+  --line: var(--color-line); --line2: var(--color-line-2);
+  --txt: var(--color-txt); --muted: var(--color-muted); --dim: var(--color-dim);
+  --acc: var(--color-acc); --acc-dim: var(--color-acc-dim); --acc-glow: var(--color-acc-glow); --acc-line: var(--color-acc-line);
+  --warn: var(--color-warn); --bad: var(--color-bad);
+  --trk-vox: var(--color-trk-vox); --trk-drm: var(--color-trk-drm); --trk-bas: var(--color-trk-bas);
+  --trk-key: var(--color-trk-key); --trk-str: var(--color-trk-str); --trk-fx: var(--color-trk-fx);
+}
+
 * { box-sizing: border-box }
 html, body, #root { height: 100% }
 body {
@@ -20,29 +70,48 @@ body {
 .label { font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--dim); font-weight: 700 }
 .rule-t { border-top: 1px solid var(--line) }
 
+/* ---------- 焦点可达性 / 原生控件暗色化 ---------- */
+:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px }
+input[type=checkbox], input[type=radio] { accent-color: var(--acc) }
+::selection { background: var(--acc); color: #000 }
+
 /* ---------- chips / buttons ---------- */
-.chip { border: 1px solid var(--line); padding: 4px 10px; font-size: 11px; font-family: inherit; text-align: inherit; color: var(--muted); cursor: pointer; transition: all .15s ease; user-select: none; white-space: nowrap; background: transparent }
+.chip { border: 1px solid var(--line); padding: 4px 10px; font-size: 11px; font-family: inherit; font-weight: inherit; line-height: inherit; text-align: inherit; color: var(--muted); cursor: pointer; transition: color .15s ease, background-color .15s ease, border-color .15s ease, opacity .15s ease; user-select: none; white-space: nowrap; background: transparent }
 .chip:hover { border-color: var(--txt); color: var(--txt) }
 .chip.on { background: var(--acc); border-color: var(--acc); color: #000; font-weight: 700 }
 .chip.acc-on { border-color: var(--acc); color: var(--acc) }
 .chip[disabled], .chip.disabled { opacity: .35; pointer-events: none }
-.btn { border: 1px solid var(--line); background: transparent; color: var(--txt); font-size: 12px; font-weight: 600; padding: 9px 16px; cursor: pointer; transition: all .15s ease; position: relative; overflow: hidden }
+.btn { border: 1px solid var(--line); background: transparent; color: var(--txt); font-size: 12px; font-weight: 600; padding: 9px 16px; cursor: pointer; transition: color .15s ease, background-color .15s ease, border-color .15s ease, box-shadow .15s ease, opacity .15s ease; position: relative; overflow: hidden }
 .btn:hover { border-color: var(--txt) }
 .btn-acc { background: var(--acc); border-color: var(--acc); color: #000 }
-.btn-acc:hover { background: #4dff6e; border-color: #4dff6e }
+.btn-acc:hover { background: #4dff6e; border-color: #4dff6e; box-shadow: 0 0 20px var(--acc-glow) }
 .btn-ghost:hover { background: var(--txt); color: #000 }
 .btn[disabled] { opacity: .4; pointer-events: none }
-.iconbtn { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); background: transparent; color: var(--txt); cursor: pointer; transition: all .15s ease; flex: none }
+/* 按钮尺寸族：替代散落的 !py/!px/!text-[..] 覆盖（置于 .btn 之后，同特异性按源序覆盖） */
+.btn-sm { padding: 5px 10px; font-size: 11px }
+.btn-md { padding: 7px 14px; font-size: 12px }
+.btn-lg { padding: 12px 28px; font-size: 13px }
+.iconbtn { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); background: transparent; color: var(--txt); cursor: pointer; transition: color .15s ease, background-color .15s ease, border-color .15s ease; flex: none }
 .iconbtn:hover { background: var(--txt); color: #000 }
 .iconbtn.on { background: var(--acc); border-color: var(--acc); color: #000 }
 .iconbtn svg { width: 14px; height: 14px }
 
+/* ---------- 徽章 ---------- */
+.badge { --badge-bg: var(--bg3); --badge-fg: var(--muted); display: inline-flex; align-items: center; gap: 4px; font-size: 10px; line-height: 1.4; padding: 2px 6px; font-weight: 700; background: var(--badge-bg); color: var(--badge-fg); white-space: nowrap }
+.badge-acc { --badge-bg: var(--acc-dim); --badge-fg: var(--acc) }
+.badge-solid { --badge-bg: var(--acc); --badge-fg: #000 }
+.badge-warn { --badge-bg: rgba(255, 176, 44, .14); --badge-fg: var(--warn) }
+.badge-bad { --badge-bg: rgba(255, 77, 77, .14); --badge-fg: var(--bad) }
+
+/* ---------- 弹窗遮罩 ---------- */
+.modal-overlay { position: fixed; inset: 0; z-index: 95; display: flex; align-items: center; justify-content: center; background: var(--color-mask) }
+
 /* ---------- nav ---------- */
-.nav-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 18px; font-size: 13px; font-family: inherit; text-align: inherit; color: var(--muted); cursor: pointer; border: none; border-left: 2px solid transparent; background: transparent; transition: all .15s ease }
+.nav-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 18px; font-size: 13px; font-family: inherit; text-align: inherit; color: var(--muted); cursor: pointer; border: none; border-left: 2px solid transparent; background: transparent; transition: color .15s ease, background-color .15s ease, border-color .15s ease }
 .nav-item:hover { color: var(--txt); background: var(--bg2) }
 .nav-item.on { color: var(--txt); border-left-color: var(--acc); background: var(--bg2) }
 .nav-item.on .dot { background: var(--acc) }
-.nav-item .kbd { margin-left: auto; font-size: 9px; color: var(--dim); border: 1px solid var(--line); padding: 1px 4px }
+.nav-item .kbd { margin-left: auto; font-size: 10px; color: var(--dim); border: 1px solid var(--line); padding: 1px 4px }
 .dot { width: 5px; height: 5px; background: var(--dim); flex: none }
 .view { animation: fadein .25s ease }
 @keyframes fadein { from { opacity: 0; transform: translateY(5px) } to { opacity: 1; transform: none } }
@@ -59,11 +128,13 @@ textarea, input[type=text], input[type=email], input[type=password], select {
   font-size: 13px; padding: 10px 12px; width: 100%; outline: none;
   transition: border-color .15s; font-family: inherit;
 }
-textarea:focus, input:focus, select:focus { border-color: var(--muted) }
+textarea:focus, input:focus, select:focus { border-color: var(--acc) }
 textarea { resize: vertical; line-height: 1.8 }
-input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 2px; background: var(--line); outline: none; cursor: pointer }
-input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: var(--acc); cursor: pointer }
-input[type=range]::-moz-range-thumb { width: 12px; height: 12px; background: var(--acc); border: none; border-radius: 0; cursor: pointer }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; background: var(--line); outline: none; cursor: pointer }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: var(--acc); cursor: pointer }
+input[type=range]::-moz-range-thumb { width: 16px; height: 16px; background: var(--acc); border: none; border-radius: 0; cursor: pointer }
+input[type=range]:hover::-webkit-slider-thumb { background: #4dff6e }
+input[type=range]:hover::-moz-range-thumb { background: #4dff6e }
 select {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6'%3E%3Cpath d='M0 0l4 6 4-6z' fill='%239a9a9a'/%3E%3C/svg%3E");
@@ -73,7 +144,7 @@ select {
 
 /* ---------- studio steps guide ---------- */
 .stepbar { display: flex; align-items: center; gap: 0 }
-.step { display: flex; align-items: center; gap: 8px; padding: 7px 14px; border: 1px solid var(--line); font-size: 11px; color: var(--dim); cursor: pointer; transition: all .15s; background: var(--bg) }
+.step { display: flex; align-items: center; gap: 8px; padding: 7px 14px; border: 1px solid var(--line); font-size: 11px; color: var(--dim); cursor: pointer; transition: color .15s ease, background-color .15s ease, border-color .15s ease; background: var(--bg) }
 .step b { font-weight: 800; font-size: 12px }
 .step:hover { border-color: var(--muted); color: var(--muted) }
 .step.on { border-color: var(--acc); color: var(--txt) }
@@ -82,7 +153,7 @@ select {
 .step-arrow { width: 18px; height: 1px; background: var(--line2); flex: none }
 
 /* ---------- candidates ---------- */
-.segmini { height: 26px; border: 1px solid var(--line2); font-size: 9px; display: flex; align-items: center; justify-content: center; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; flex: none }
+.segmini { height: 26px; border: 1px solid var(--line2); font-size: 10px; display: flex; align-items: center; justify-content: center; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; flex: none }
 
 /* ---------- toast / overlay ---------- */
 .toast-stack { position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none }
@@ -90,24 +161,27 @@ select {
 .toast-item.warn { background: var(--warn) }
 .toast-item.bad { background: var(--bad); color: #fff }
 @keyframes toastup { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
-.ob-mask { position: fixed; inset: 0; background: rgba(0, 0, 0, .72); z-index: 90 }
-.ob-spot { position: fixed; z-index: 91; box-shadow: 0 0 0 2px var(--acc), 0 0 0 4000px rgba(0, 0, 0, .72); transition: all .35s ease; pointer-events: none; display: none }
+.ob-mask { position: fixed; inset: 0; background: var(--color-mask); z-index: 90 }
+.ob-spot { position: fixed; z-index: 91; box-shadow: 0 0 0 2px var(--acc), 0 0 0 4000px var(--color-mask); transition: left .35s ease, top .35s ease, width .35s ease, height .35s ease, box-shadow .35s ease; pointer-events: none; display: none }
 .ob-tip { position: fixed; z-index: 92; width: 300px; background: var(--bg2); border: 1px solid var(--acc); padding: 16px; display: none }
 .ob-tip.on { display: block; animation: pop .25s ease }
 
 /* ---------- scrollbars ---------- */
 ::-webkit-scrollbar { width: 8px; height: 8px }
 ::-webkit-scrollbar-thumb { background: var(--bg3) }
+::-webkit-scrollbar-thumb:hover { background: var(--line2) }
 ::-webkit-scrollbar-track { background: transparent }
 
 /* ---------- misc ---------- */
-.toggle { width: 38px; height: 20px; background: var(--bg3); position: relative; cursor: pointer; flex: none; transition: background .2s; border: none; padding: 0 }
-.toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; background: var(--muted); transition: all .2s }
+.toggle { width: 40px; height: 22px; background: var(--bg3); position: relative; cursor: pointer; flex: none; transition: background .2s; border: none; padding: 0 }
+.toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; background: var(--muted); transition: left .2s ease, background .2s ease }
 .toggle.on { background: var(--acc) }
 .toggle.on::after { left: 21px; background: #000 }
-.price-num { font-size: 44px; font-weight: 800; letter-spacing: -.03em; line-height: 1 }
-.row { display: grid; grid-template-columns: 72px 52px 1fr 84px 56px 118px 104px 76px; gap: 12px; align-items: center; padding: 12px 18px; border-top: 1px solid var(--line); transition: background .12s; cursor: pointer }
+.price-num { font-size: 40px; font-weight: 800; letter-spacing: -.03em; line-height: 1 }
+.row { display: grid; gap: 12px; align-items: center; padding: 12px 18px; border-top: 1px solid var(--line); transition: background .12s; cursor: pointer }
 .row:hover { background: var(--bg2) }
+/* 曲库 8 列行模板（.row 不再内置默认列模板，见 v0.16.0 视觉整改） */
+.row-works { grid-template-columns: 72px 52px 1fr 84px 56px 118px 104px 76px }
 .cover { width: 40px; height: 40px; flex: none }
 .vnode { display: flex; align-items: center; gap: 8px; padding: 7px 0; font-size: 12px; color: var(--muted); cursor: pointer }
 .vnode:hover { color: var(--txt) }
@@ -118,7 +192,7 @@ select {
 .marquee span { display: inline-block }
 .playing .marquee span { animation: mq 8s linear infinite }
 @keyframes mq { from { transform: translateX(0) } to { transform: translateX(-50%) } }
-.kbd-hint { font-size: 9px; color: var(--dim); border: 1px solid var(--line); padding: 1px 5px }
+.kbd-hint { font-size: 10px; color: var(--dim); border: 1px solid var(--line); padding: 1px 5px }
 
 /* ---------- 登录页（原型未含，同风格扩展） ---------- */
 .login-bg { background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0, 255, 44, .06), transparent 60%), var(--bg) }
@@ -128,7 +202,7 @@ select {
 .star-btn.on { color: var(--acc) }
 .star-btn svg { width: 16px; height: 16px }
 .pager { display: flex; align-items: center; gap: 6px; justify-content: flex-end; padding: 14px 18px }
-.pager .pnum-btn { min-width: 26px; height: 26px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0 6px }
+.pager .pnum-btn { min-width: 32px; height: 32px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0 6px }
 .pager .pnum-btn:hover:not([disabled]) { border-color: var(--txt); color: var(--txt) }
 .pager .pnum-btn.on { background: var(--acc); border-color: var(--acc); color: #000; font-weight: 700 }
 .pager .pnum-btn[disabled] { opacity: .35; cursor: default }
@@ -149,7 +223,7 @@ details.faq[open] .faq-plus { transform: rotate(45deg) }
 
 /* ---------- 账号菜单（Sidebar 底部弹出，v0.7.0） ---------- */
 .accmenu { position: absolute; bottom: 100%; left: 0; right: 0; margin-bottom: 6px; background: var(--bg2); border: 1px solid var(--line2); z-index: 60; animation: pop .2s ease both }
-.accmenu-item { display: block; width: 100%; text-align: left; padding: 9px 12px; font-size: 12px; color: var(--muted); cursor: pointer; border: none; background: transparent; font-family: inherit; transition: all .15s ease }
+.accmenu-item { display: block; width: 100%; text-align: left; padding: 9px 12px; font-size: 12px; color: var(--muted); cursor: pointer; border: none; background: transparent; font-family: inherit; transition: color .15s ease, background-color .15s ease }
 .accmenu-item:hover { color: var(--txt); background: var(--bg3) }
 .accmenu-item.danger { color: var(--bad) }
 .accmenu-item.danger:hover { background: var(--bad); color: #fff }
@@ -157,21 +231,13 @@ details.faq[open] .faq-plus { transform: rotate(45deg) }
 /* ---------- 语言切换下拉（LangSwitch，v0.7.2：按钮组改下拉；令牌随 accmenu） ---------- */
 .langmenu { position: absolute; top: 100%; left: 0; min-width: 158px; margin-top: 6px; background: var(--bg2); border: 1px solid var(--line2); z-index: 70; animation: pop .2s ease both }
 .langmenu.up { top: auto; bottom: 100%; margin-top: 0; margin-bottom: 6px }
-.langmenu-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; padding: 8px 12px; font-size: 12px; color: var(--muted); cursor: pointer; border: none; background: transparent; font-family: inherit; transition: all .15s ease }
+.langmenu-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; padding: 8px 12px; font-size: 12px; color: var(--muted); cursor: pointer; border: none; background: transparent; font-family: inherit; transition: color .15s ease, background-color .15s ease }
 .langmenu-item:hover { color: var(--txt); background: var(--bg3) }
 .langmenu-item.on { color: var(--acc) }
 
-/* ---------- 响应式基础（v0.7.0：窄窗口可用不破版，不求完美移动端） ----------
- * 本节规则不进 @layer，优先于 tailwind utilities 生效；按档收窄：
- * ≤1280 工作台三栏收窄 / ≤1024 侧栏图标化 / ≤768 主要视图单列、落地页网格 1 列 */
-@media (max-width: 1280px) {
-  .grid-cols-\[360px_1fr_200px\] { grid-template-columns: 300px minmax(0,1fr) 180px }
-  .grid-cols-\[1fr_320px\] { grid-template-columns: minmax(0,1fr) 260px }
-  .grid-cols-\[1fr_300px\] { grid-template-columns: minmax(0,1fr) 260px }
-  .grid-cols-\[220px_1fr\] { grid-template-columns: 180px minmax(0,1fr) }
-  .grid-cols-4 { grid-template-columns: repeat(2, minmax(0,1fr)) }
-}
-
+/* ---------- 响应式基础（v0.16.0：网格断点已迁移为组件内 Tailwind 响应式类） ----------
+ * 仅保留结构性规则：≤1024 侧栏图标化与堆叠视图滚动放平；窄屏固定宽表格行横向滚动。
+ * 网格列数一律用组件里的 grid-cols-1 / md: / lg: / xl: 表达，不再写转义选择器 hack。 */
 @media (max-width: 1024px) {
   /* 侧栏折叠为图标列：logo 方块 + 导航圆点；分组标题/文字/快捷键隐藏 */
   .sidebar { width: 48px }
@@ -190,23 +256,13 @@ details.faq[open] .faq-plus { transform: rotate(45deg) }
   .acc-plan { display: none }
   .acc-trigger { font-size: 0 }
   .acc-trigger::after { content: '···'; font-size: 11px }
+  /* 多栏塌成堆叠后，栏内滚动改为整页滚动 */
+  .view .grid > div { overflow: visible }
 }
 
 @media (max-width: 768px) {
-  /* 工作台/详情/合规等主要视图单列堆叠；表单小网格与落地页网格一并 1 列 */
-  .grid-cols-\[360px_1fr_200px\],
-  .grid-cols-\[1fr_320px\],
-  .grid-cols-\[1fr_300px\],
-  .grid-cols-\[220px_1fr\],
-  .grid-cols-2,
-  .grid-cols-3,
-  .grid-cols-4 { grid-template-columns: minmax(0,1fr) }
-  .sm\:grid-cols-2 { grid-template-columns: minmax(0,1fr) }
-  .md\:grid-cols-2 { grid-template-columns: minmax(0,1fr) }
   /* 固定列宽的表格行（曲库 8 列 / 积分流水 5 列）：容器横向滚动，行保持最小可读宽度 */
   .list-scroll, .tx-rows { overflow-x: auto }
   .list-scroll .row { min-width: 760px }
   .tx-rows .row { min-width: 580px }
-  /* 三栏塌成一列后，中栏滚动改为整页滚动 */
-  .view .grid > div { overflow: visible }
 }

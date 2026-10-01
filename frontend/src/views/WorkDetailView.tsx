@@ -12,6 +12,7 @@ import { formatDuration, keyLabel, sectionLabel, versionSourceLabel } from '../l
 import ExportPanel from '../components/work/ExportPanel'
 import CommentsPanel from '../components/work/CommentsPanel'
 import TeamPanel from '../components/work/TeamPanel'
+import { EmptyState } from '../components/common/EmptyState'
 
 function depthOf(nodes: VersionTreeNode[], node: VersionTreeNode): number {
   const map = new Map(nodes.map((n) => [n.id, n]))
@@ -197,7 +198,7 @@ export default function WorkDetailView() {
 
   if (loading) {
     return (
-      <div className="py-20 text-center text-[12px]" style={{ color: 'var(--dim)' }}>
+      <div className="py-20 text-center text-sm text-dim">
         {t('common.loading')}
       </div>
     )
@@ -205,8 +206,8 @@ export default function WorkDetailView() {
   if (!work) {
     return (
       <div className="py-20 text-center">
-        <div className="text-[13px]" style={{ color: 'var(--muted)' }}>{t('work.notFound')}</div>
-        <button className="btn btn-ghost text-[11px] mt-4" onClick={() => navigate('/library')}>{t('work.backLibrary')}</button>
+        <div className="text-base text-muted">{t('work.notFound')}</div>
+        <button className="btn btn-ghost btn-sm mt-4" onClick={() => navigate('/library')}>{t('work.backLibrary')}</button>
       </div>
     )
   }
@@ -224,7 +225,7 @@ export default function WorkDetailView() {
                 maxLength={50}
                 placeholder={t('work.edit.titlePlaceholder')}
                 onChange={(e) => setTitleDraft(e.target.value)}
-                className="!text-[14px]"
+                className="!text-md"
                 autoFocus
               />
               <input
@@ -232,13 +233,13 @@ export default function WorkDetailView() {
                 value={tagsDraft}
                 placeholder={t('work.edit.tagsPlaceholder')}
                 onChange={(e) => setTagsDraft(e.target.value)}
-                className="!text-[12px]"
+                className="!text-sm"
               />
               <div className="flex gap-2">
-                <button className="btn btn-acc !py-1.5 !px-3 text-[11px]" disabled={saving} onClick={() => void saveEdit()}>
+                <button className="btn btn-acc btn-sm" disabled={saving} onClick={() => void saveEdit()}>
                   {saving ? t('work.edit.saving') : t('common.save')}
                 </button>
-                <button className="btn btn-ghost !py-1.5 !px-3 text-[11px]" disabled={saving} onClick={() => setEditing(false)}>
+                <button className="btn btn-ghost btn-sm" disabled={saving} onClick={() => setEditing(false)}>
                   {t('common.cancel')}
                 </button>
               </div>
@@ -246,7 +247,7 @@ export default function WorkDetailView() {
           ) : (
             <>
               <div className="flex items-center gap-2 mt-1">
-                <h1 className="text-[28px] font-extrabold tracking-tight truncate">{work.title}</h1>
+                <h1 className="text-3xl font-extrabold tracking-tight truncate">{work.title}</h1>
                 <button className="iconbtn shrink-0" title={t('work.edit.titleButton')} onClick={startEdit}>
                   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
                     <path d="M11.3 1.7l3 3L5.5 13.5l-3.7.7.7-3.7zM10 3l3 3" />
@@ -256,13 +257,13 @@ export default function WorkDetailView() {
               {work.tags.length > 0 && (
                 <div className="flex gap-1 mt-1.5 flex-wrap">
                   {work.tags.map((tg) => (
-                    <span key={tg} className="text-[10px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>
+                    <span key={tg} className="badge">
                       {tg}
                     </span>
                   ))}
                 </div>
               )}
-              <div className="flex items-center gap-3 text-[11px] mt-2" style={{ color: 'var(--muted)' }}>
+              <div className="flex items-center gap-3 text-xs mt-2 text-muted">
                 <span className="num">{keyLabel(work.key)}</span>
                 <span className="num">{work.bpm} BPM</span>
                 <span className="num">{formatDuration(work.duration_sec)}</span>
@@ -272,14 +273,14 @@ export default function WorkDetailView() {
             </>
           )}
         </div>
-        <button className="btn btn-ghost !py-1.5 !px-3 text-[11px]" onClick={() => navigate('/library')}>
+        <button className="btn btn-ghost btn-sm" onClick={() => navigate('/library')}>
           {t('work.backLibraryArrow')}
         </button>
       </header>
 
-      <div className="grid grid-cols-[220px_1fr] rule-t flex-1 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-[180px_1fr] xl:grid-cols-[220px_1fr] rule-t flex-1 min-h-0">
         {/* 版本树 */}
-        <div className="border-r px-5 py-5 overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
+        <div className="lg:border-r border-line px-5 py-5 overflow-y-auto">
           <div className="label">{t('work.tree')}</div>
           <div className="vtree mt-3">
             {nodes.map((n) => (
@@ -293,7 +294,7 @@ export default function WorkDetailView() {
                 <span className="dot"></span>
                 {n.version_no} · {versionSourceLabel(n.source)}
                 {n.id === currentVersionId && (
-                  <span className="text-[9px] ml-1 px-1 font-bold" style={{ background: 'var(--acc-dim)', color: 'var(--acc)' }}>
+                  <span className="badge badge-acc ml-1">
                     {t('work.tree.current')}
                   </span>
                 )}
@@ -306,20 +307,20 @@ export default function WorkDetailView() {
                 <div className="label">{t('share.title')}</div>
                 {work.space_id ? (
                   <div className="mt-2">
-                    <div className="text-[10px]" style={{ color: 'var(--muted)' }}>{t('share.sharedTo')}</div>
-                    <button className="btn btn-ghost w-full mt-1.5 !py-1 text-[10px]" onClick={() => void doUnshare()}>
+                    <div className="text-2xs text-muted">{t('share.sharedTo')}</div>
+                    <button className="btn btn-ghost btn-sm w-full mt-1.5" onClick={() => void doUnshare()}>
                       {t('share.unshare')}
                     </button>
                   </div>
                 ) : (
                   <div className="mt-2 space-y-1">
                     {spaces.length === 0 ? (
-                      <div className="text-[9px]" style={{ color: 'var(--dim)' }}>{t('share.noSpaces')}</div>
+                      <div className="text-2xs text-dim">{t('share.noSpaces')}</div>
                     ) : (
                       spaces.map((sp) => (
                         <button
                           key={sp.id}
-                          className="btn btn-ghost w-full !py-1 text-[10px] text-left"
+                          className="btn btn-ghost btn-sm w-full text-left"
                           onClick={() => void doShare(sp.id)}
                         >
                           {t('share.to', { name: sp.name })}
@@ -358,49 +359,47 @@ export default function WorkDetailView() {
         <div className="px-6 py-5 overflow-y-auto">
           <div className="flex items-center justify-between">
             <div className="label">{t('work.candidates')}</div>
-            <div className="text-[11px]" style={{ color: 'var(--dim)' }}>{t('work.candidates.hint')}</div>
+            <div className="text-xs text-dim">{t('work.candidates.hint')}</div>
           </div>
           {candidates.length === 0 ? (
-            <div className="border border-dashed mt-3 py-16 text-center text-[12px]" style={{ borderColor: 'var(--line)', color: 'var(--dim)' }}>
-              {t('work.candidates.empty')}
-            </div>
+            <EmptyState compact className="mt-3" title={t('work.candidates.empty')} />
           ) : (
             <div className="mt-3 space-y-3">
               {candidates.map((c, i) => (
                 <div className="card pop" key={c.id} style={{ animationDelay: `${i * 0.1}s` }}>
                   <div className="flex items-center gap-4 px-4 py-3">
-                    <div className="cover flex items-center justify-center cursor-pointer" style={{ background: i ? '#1c2b1f' : '#232323', border: '1px solid var(--line)' }} onClick={() => onPlay(c)} title={t('work.action.preview')}>
+                    <div className={`cover flex items-center justify-center cursor-pointer border border-line ${i ? 'bg-acc-dim' : 'bg-bg-3'}`} onClick={() => onPlay(c)} title={t('work.action.preview')}>
                       <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--acc)">
                         <path d="M5 3l8 5-8 5z" />
                       </svg>
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-[13px] font-semibold">{t('work.candidate.name', { label: c.label })}</span>
-                        <span className="text-[9px] px-1.5 py-0.5 font-bold num" style={{ background: 'var(--acc-dim)', color: 'var(--acc)' }}>
+                        <span className="text-base font-semibold">{t('work.candidate.name', { label: c.label })}</span>
+                        <span className="badge badge-acc num">
                           {c.quality_score == null ? (engineDisplay || t('work.candidate.external')) : t('work.candidate.quality', { n: c.quality_score })}
                         </span>
                         {engineDisplay && (
-                          <span className="text-[9px] px-1.5 py-0.5" style={{ background: 'var(--panel-2, #1a1a1a)', border: '1px solid var(--line)', color: 'var(--muted, #9a9a9a)' }} title={t('work.candidate.engine')}>
+                          <span className="text-2xs px-1.5 py-0.5 badge" title={t('work.candidate.engine')}>
                             {engineDisplay}
                           </span>
                         )}
                         {c.adopted && (
-                          <span className="text-[9px] px-1.5 py-0.5 font-bold" style={{ background: 'var(--acc)', color: '#000' }}>{t('work.candidate.adopted')}</span>
+                          <span className="badge badge-solid">{t('work.candidate.adopted')}</span>
                         )}
                       </div>
                       <div className="flex gap-1.5 mt-1.5 flex-wrap">
                         {c.style_tags.slice(0, 5).map((tg) => (
-                          <span key={tg} className="text-[10px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>{tg}</span>
+                          <span key={tg} className="badge">{tg}</span>
                         ))}
                       </div>
                     </div>
-                    <span className="text-[11px] num" style={{ color: 'var(--dim)' }}>{formatDuration(c.duration_sec)}</span>
+                    <span className="text-xs num text-dim">{formatDuration(c.duration_sec)}</span>
                     <button className="iconbtn" title={t('work.action.preview')} onClick={() => onPlay(c)}>
                       <svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l8 5-8 5z" /></svg>
                     </button>
                     {!c.adopted && (
-                      <button className="btn btn-ghost !py-1 !px-2.5 text-[11px]" onClick={() => void onAdopt(c)}>{t('work.candidate.adopt')}</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => void onAdopt(c)}>{t('work.candidate.adopt')}</button>
                     )}
                   </div>
                   <div className="flex gap-1 px-4 pb-3">

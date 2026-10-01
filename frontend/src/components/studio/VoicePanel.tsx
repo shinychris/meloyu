@@ -117,7 +117,7 @@ export default function VoicePanel() {
   return (
     <div className="mt-3 card p-3" data-testid="voice-panel">
       <div className="label">{t('studio.voice.title')}</div>
-      <div className="text-[9px] mt-1 leading-relaxed" style={{ color: 'var(--dim)' }}>
+      <div className="text-2xs mt-1 leading-relaxed text-dim">
         {t('studio.voice.hint')}
       </div>
 
@@ -126,7 +126,7 @@ export default function VoicePanel() {
           {verified.map((p) => (
             <div key={p.id} className="flex items-center gap-2">
               <button
-                className={`btn !py-1 !px-2 text-[10px] ${form.voiceProfileId === p.id ? 'btn-acc' : 'btn-ghost'}`}
+                className={`btn btn-sm ${form.voiceProfileId === p.id ? 'btn-acc' : 'btn-ghost'}`}
                 onClick={() => useProfile(p)}
               >
                 {p.name}
@@ -148,28 +148,28 @@ export default function VoicePanel() {
 
       {active ? (
         <div className="mt-2">
-          <div className="text-[10px]" style={{ color: 'var(--muted)' }}>
+          <div className="text-2xs text-muted">
             {sampleStep === 2 ? t('studio.voice.step2') : t('studio.voice.step1')}
           </div>
-          <div className="text-[14px] font-bold mt-1.5 leading-snug" data-testid="voice-phrase">
+          <div className="text-md font-bold mt-1.5 leading-snug" data-testid="voice-phrase">
             “{phrase}”
           </div>
           <div className="flex gap-2 mt-2">
             {!recording ? (
-              <button className="btn btn-acc !py-1.5 !px-3 text-[11px]" disabled={submitting} onClick={() => void beginRecording()}>
+              <button className="btn btn-acc btn-sm" disabled={submitting} onClick={() => void beginRecording()}>
                 {t('studio.voice.record')}
               </button>
             ) : (
-              <button className="btn btn-acc !py-1.5 !px-3 text-[11px]" onClick={() => void finishRecording()}>
+              <button className="btn btn-acc btn-sm" onClick={() => void finishRecording()}>
                 ⏺ {t('studio.voice.stop')}
               </button>
             )}
-            <button className="btn btn-ghost !py-1.5 !px-3 text-[11px]" onClick={() => setActive(null)}>
+            <button className="btn btn-ghost btn-sm" onClick={() => setActive(null)}>
               {t('common.cancel')}
             </button>
           </div>
           {recording && (
-            <div className="text-[9px] mt-1.5" style={{ color: 'var(--acc)' }}>
+            <div className="text-2xs mt-1.5 text-acc">
               {t('studio.voice.recording')}
             </div>
           )}
@@ -178,19 +178,19 @@ export default function VoicePanel() {
         <div className="flex gap-1.5 mt-2">
           <input
             type="text"
-            className="!text-[11px] flex-1"
+            className="!text-xs flex-1"
             maxLength={60}
             placeholder={t('studio.voice.namePlaceholder')}
             value={nameDraft}
             onChange={(e) => setNameDraft(e.target.value)}
           />
-          <button className="btn btn-ghost !py-1.5 !px-3 text-[10px]" onClick={() => void startEnroll()}>
+          <button className="btn btn-ghost btn-sm" onClick={() => void startEnroll()}>
             {t('studio.voice.enroll')}
           </button>
         </div>
       )}
 
-      <div className="text-[9px] mt-1.5 leading-relaxed" style={{ color: 'var(--dim)' }}>
+      <div className="text-2xs mt-1.5 leading-relaxed text-dim">
         {t('studio.voice.compliance')}
       </div>
     </div>

@@ -38,11 +38,8 @@ export default function LangSwitch({ up = false }: { up?: boolean }) {
   return (
     <div className="relative" ref={wrapRef}>
       <button
-        className="inline-flex items-center gap-1.5 rounded-full overflow-hidden px-2.5 py-[3px] text-[10px] font-bold leading-none transition-colors"
-        style={{
-          border: '1px solid var(--line)',
-          color: open ? 'var(--acc)' : 'var(--dim)',
-        }}
+        className="chip inline-flex items-center gap-1.5 font-bold"
+        style={{ color: open ? 'var(--acc)' : 'var(--dim)' }}
         role="combobox"
         aria-haspopup="listbox"
         aria-expanded={open}

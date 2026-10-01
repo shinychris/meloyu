@@ -17,7 +17,7 @@ export const modelsZh: Record<keyof typeof modelsEn, string> = {
   // 概览分区
   'models.overview.envLabel': '运行环境',
   'models.overview.envDocker': 'Docker 容器',
-  'models.overview.envHost': '宿主机（开发）',
+  'models.overview.envHost': '宿主机',
   'models.overview.checkTitle': '生产就绪检查',
   'models.overview.lyricsOk': '已启用真实模型通道，生产就绪',
   'models.overview.lyricsFallback':
@@ -60,7 +60,7 @@ export const modelsZh: Record<keyof typeof modelsEn, string> = {
   'models.backend.localsynth.desc':
     '非 AI 模型 · 模板规则生成 · 仅作离线兜底，生产建议切换真实模型通道',
   'models.backend.ollama.title': '本地开源模型（Ollama）',
-  'models.backend.ollama.desc': '真实大模型 · 数据不出本机 · 速度视模型与硬件',
+  'models.backend.ollama.desc': '真实大模型 · 连接你自建的 Ollama 服务 · 速度视模型与硬件',
   'models.backend.openai_compat.title': '外部 API（OpenAI 兼容）',
   'models.backend.openai_compat.desc': '智谱 / DeepSeek / OpenAI 等云端模型 · 需 API Key',
   // 歌曲引擎通道
@@ -111,7 +111,7 @@ export const modelsZh: Record<keyof typeof modelsEn, string> = {
   // Replicate Token 与开源目录
   'models.catalog.title': '开源歌曲模型目录（按外部测评排序）',
   'models.catalog.sectionDesc':
-    '真实开源模型，支持本机下载或 Replicate 托管——选用后歌曲引擎自动切到对应通道。测评分数为外部公开来源参考值（ADR-015）。',
+    '真实开源模型，支持本机下载或 Replicate 托管——选用后歌曲引擎自动切到对应通道。测评分数为外部公开来源参考值。',
   'models.replicate.tokenPh': 'r8_…（replicate.com 账户获取）',
   'models.replicate.needToken': '请先输入 Replicate API Token（r8_ 开头）',
   'models.replicate.needTokenSave': '请先输入 Replicate API Token',

@@ -88,27 +88,27 @@ export default function ReferencePanel({ onClose }: { onClose: () => void }) {
       {referenceTrack ? (
         <div className="mt-2">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[12px] font-semibold truncate">{referenceTrack.name}</span>
+            <span className="text-sm font-semibold truncate">{referenceTrack.name}</span>
             {referenceTrack.analysis && (
-              <span className="text-[9px] px-1.5 py-0.5 font-bold num" style={{ background: 'var(--acc-dim)', color: 'var(--acc)' }}>
+              <span className="badge badge-acc num">
                 {referenceTrack.analysis.bpm} BPM · {referenceTrack.analysis.key_tonic}{' '}
                 {referenceTrack.analysis.key_mode === 'major' ? t('studio.ref.major') : t('studio.ref.minor')}
               </span>
             )}
-            <button className="btn btn-ghost !py-0.5 !px-2 text-[10px] ml-auto" onClick={() => referenceTrack && applyParams(referenceTrack)}>
+            <button className="btn btn-ghost btn-sm ml-auto" onClick={() => referenceTrack && applyParams(referenceTrack)}>
               {t('studio.ref.applyParams')}
             </button>
           </div>
-          <div className="text-[9px] mt-1.5 leading-relaxed" style={{ color: 'var(--dim)' }}>
+          <div className="text-2xs mt-1.5 leading-relaxed text-dim">
             {t('studio.ref.attachedNote')}
           </div>
-          <button className="btn btn-ghost w-full mt-2 !py-1.5 text-[10px]" onClick={onRemove}>
+          <button className="btn btn-ghost w-full mt-2 btn-sm" onClick={onRemove}>
             {t('studio.ref.remove')}
           </button>
         </div>
       ) : (
         <>
-          <label className="flex items-start gap-1.5 mt-2 text-[10px] cursor-pointer" style={{ color: 'var(--muted)' }}>
+          <label className="flex items-start gap-1.5 mt-2 text-2xs cursor-pointer text-muted">
             <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} className="mt-0.5" />
             <span className="leading-relaxed">{t('studio.ref.ack')}</span>
           </label>
@@ -120,13 +120,13 @@ export default function ReferencePanel({ onClose }: { onClose: () => void }) {
             onChange={(e) => void onPick(e.target.files?.[0])}
           />
           <button
-            className="btn btn-ghost w-full mt-2 !py-2 text-[11px]"
+            className="btn btn-ghost w-full mt-2 btn-md"
             disabled={busy || !ack}
             onClick={() => fileInput.current?.click()}
           >
             {busy ? t('studio.ref.analyzing') : t('studio.ref.pick')}
           </button>
-          <div className="text-[9px] mt-1.5 leading-relaxed" style={{ color: 'var(--dim)' }}>
+          <div className="text-2xs mt-1.5 leading-relaxed text-dim">
             {t('studio.ref.hint')}
           </div>
         </>

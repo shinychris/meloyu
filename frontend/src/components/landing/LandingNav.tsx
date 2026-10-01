@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useT, type TranslationKey } from '../../i18n'
 import LangSwitch from '../common/LangSwitch'
+import { Logo } from '../common/Logo'
 
 const ANCHORS: Array<{ id: string; key: TranslationKey }> = [
   { id: 'features', key: 'landing.nav.features' },
@@ -20,25 +21,18 @@ export default function LandingNav() {
   const navigate = useNavigate()
   const t = useT()
   return (
-    <header
-      className="sticky top-0 z-40 border-b backdrop-blur-sm"
-      style={{ borderColor: 'var(--line)', background: 'rgba(14,14,14,.92)' }}
-    >
+    <header className="sticky top-0 z-40 border-b border-line bg-bg/90 backdrop-blur-md">
       <div className="max-w-[1080px] mx-auto px-6 h-[60px] flex items-center gap-8">
         <div className="flex items-center gap-2.5 flex-none">
-          <svg width="24" height="24" viewBox="0 0 22 22" fill="none">
-            <rect x="1" y="1" width="20" height="20" stroke="#00ff2c" strokeWidth="2" />
-            <rect x="6" y="9" width="3" height="7" fill="#fff" />
-            <rect x="11" y="5" width="3" height="11" fill="#00ff2c" />
-          </svg>
+          <Logo size={24} />
           <div>
-            <div className="text-[15px] font-extrabold tracking-tight leading-none">MELOYU</div>
-            <div className="text-[9px] tracking-[.18em] uppercase mt-0.5" style={{ color: 'var(--dim)' }}>
+            <div className="text-md font-extrabold tracking-tight leading-none">MELOYU</div>
+            <div className="text-2xs tracking-[.18em] uppercase mt-0.5 text-dim">
               {t('landing.nav.brandSub')}
             </div>
           </div>
         </div>
-        <nav className="hidden md:flex items-center gap-6 flex-1 text-[12px]" style={{ color: 'var(--muted)' }}>
+        <nav className="hidden md:flex items-center gap-6 flex-1 text-sm text-muted">
           {ANCHORS.map((a) => (
             <button
               key={a.id}
@@ -52,13 +46,12 @@ export default function LandingNav() {
         <div className="flex items-center gap-3 ml-auto">
           <LangSwitch />
           <button
-            className="hidden sm:block text-[12px] cursor-pointer transition-colors"
-            style={{ color: 'var(--muted)' }}
+            className="hidden sm:block text-sm text-muted cursor-pointer transition-colors"
             onClick={() => navigate('/login')}
           >
             {t('landing.nav.login')}
           </button>
-          <button className="btn btn-acc !py-2" onClick={() => navigate('/login')}>
+          <button className="btn btn-acc btn-sm" onClick={() => navigate('/login')}>
             {t('landing.nav.cta')}
           </button>
         </div>

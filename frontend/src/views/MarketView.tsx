@@ -9,6 +9,8 @@ import { useConfirmStore } from '../stores/confirm'
 import { toast } from '../stores/toast'
 import { useT } from '../i18n'
 import { formatNum } from '../lib/format'
+import { PageHeader } from '../components/common/PageHeader'
+import { EmptyState } from '../components/common/EmptyState'
 
 type Tab = 'browse' | 'mine' | 'orders'
 const TAB_KEYS: Record<Tab, 'market.tab.browse' | 'market.tab.mine' | 'market.tab.orders'> = {
@@ -127,60 +129,51 @@ export default function MarketView() {
 
   return (
     <section className="view flex flex-col h-full">
-      <header className="px-8 pt-6 pb-4">
-        <div className="label">{t('market.view.label')}</div>
-        <h1 className="text-[28px] font-extrabold tracking-tight mt-1">{t('market.view.headline')}</h1>
-      </header>
-
-      <div className="px-8 flex gap-1.5 flex-wrap">
-        {(['browse', 'mine', 'orders'] as Tab[]).map((k) => (
-          <button type="button" key={k} className={`chip ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>
-            {t(TAB_KEYS[k])}
-          </button>
-        ))}
-      </div>
+      <PageHeader label={t('market.view.label')} title={t('market.view.headline')}>
+        <div className="mt-4 flex gap-1.5 flex-wrap">
+          {(['browse', 'mine', 'orders'] as Tab[]).map((k) => (
+            <button type="button" key={k} className={`chip ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>
+              {t(TAB_KEYS[k])}
+            </button>
+          ))}
+        </div>
+      </PageHeader>
 
       <div className="rule-t flex-1 min-h-0 overflow-y-auto px-8 py-5">
         {loading ? (
-          <div className="text-[12px] py-16 text-center" style={{ color: 'var(--dim)' }}>
-            {t('common.loading')}
-          </div>
+          <div className="text-sm py-16 text-center text-dim">{t('common.loading')}</div>
         ) : tab === 'browse' && (
           <>
             <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3" data-testid="market-grid">
               {listings.length === 0 ? (
-                <div className="py-16 text-center text-[12px] col-span-full" style={{ color: 'var(--dim)' }}>
-                  {t('market.empty.browse')}
-                </div>
+                <EmptyState compact className="col-span-full" title={t('market.empty.browse')} />
               ) : (
                 listings.map((l) => (
                   <div key={l.id} className="card p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="text-[13px] font-bold truncate">{l.title}</div>
-                        <div className="text-[10px] mt-0.5" style={{ color: 'var(--dim)' }}>
+                        <div className="text-base font-bold truncate">{l.title}</div>
+                        <div className="text-2xs mt-0.5 text-dim">
                           {t('market.seller')}: {l.seller.nickname} · {t('market.sales', { n: l.sales })}
                         </div>
                       </div>
-                      <span className="text-[12px] num font-bold shrink-0" style={{ color: 'var(--acc)' }}>
-                        {formatNum(l.price_credits)}
-                      </span>
+                      <span className="text-sm num font-bold shrink-0 text-acc">{formatNum(l.price_credits)}</span>
                     </div>
                     {l.tags.length > 0 && (
                       <div className="flex gap-1 mt-2 flex-wrap">
                         {l.tags.slice(0, 4).map((tg) => (
-                          <span key={tg} className="text-[9px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>
+                          <span key={tg} className="badge">
                             {tg}
                           </span>
                         ))}
                       </div>
                     )}
                     <div className="flex gap-2 mt-3">
-                      <button className="btn btn-ghost !py-1 !px-2.5 text-[10px]" onClick={() => onPlay(l)}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => onPlay(l)}>
                         ▶ {t('market.preview')}
                       </button>
                       {user && l.seller.user_id !== user.id && (
-                        <button className="btn btn-acc !py-1 !px-2.5 text-[10px] flex-1" disabled={busy} onClick={() => void onBuy(l)}>
+                        <button className="btn btn-acc btn-sm flex-1" disabled={busy} onClick={() => void onBuy(l)}>
                           {t('market.buy', { n: formatNum(l.price_credits) })}
                         </button>
                       )}
@@ -191,7 +184,7 @@ export default function MarketView() {
             </div>
             <div className="card p-4 mt-4" data-testid="distro-checklist">
               <div className="label mb-2">{t('market.distro.title')}</div>
-              <ul className="text-[11px] leading-relaxed list-disc pl-5 space-y-1" style={{ color: 'var(--muted)' }}>
+              <ul className="text-xs leading-relaxed list-disc pl-5 space-y-1 text-muted">
                 <li>{t('market.distro.step1')}</li>
                 <li>{t('market.distro.step2')}</li>
                 <li>{t('market.distro.step3')}</li>
@@ -204,11 +197,9 @@ export default function MarketView() {
           <>
             <div className="card p-4">
               <div className="label mb-2">{t('market.publish.title')}</div>
-              <div className="text-[10px] mb-2 leading-relaxed" style={{ color: 'var(--dim)' }}>
-                {t('market.publish.ack')}
-              </div>
+              <div className="text-2xs mb-2 leading-relaxed text-dim">{t('market.publish.ack')}</div>
               <div className="flex gap-2 flex-wrap">
-                <select className="!text-[11px]" value={publishWorkId} onChange={(e) => setPublishWorkId(e.target.value)}>
+                <select className="text-xs" value={publishWorkId} onChange={(e) => setPublishWorkId(e.target.value)}>
                   <option value="">{t('market.publish.pick')}</option>
                   {myWorks.map((w) => (
                     <option key={w.id} value={w.id}>
@@ -220,37 +211,35 @@ export default function MarketView() {
                   type="number"
                   min={1}
                   max={100000}
-                  className="!text-[11px] w-24 num"
+                  className="text-xs w-24 num"
                   value={price}
                   onChange={(e) => setPrice(Number(e.target.value))}
                   title={t('market.publish.price')}
                 />
-                <button className="btn btn-acc !py-1.5 !px-3 text-[11px]" disabled={busy} onClick={() => void onPublish()}>
+                <button className="btn btn-acc btn-sm" disabled={busy} onClick={() => void onPublish()}>
                   {t('market.publish.run')}
                 </button>
               </div>
             </div>
             <div className="mt-4 space-y-2">
               {myListings.length === 0 ? (
-                <div className="py-10 text-center text-[12px]" style={{ color: 'var(--dim)' }}>
-                  {t('market.empty.mine')}
-                </div>
+                <EmptyState compact title={t('market.empty.mine')} />
               ) : (
                 myListings.map((l) => (
                   <div key={l.id} className="card p-3 flex items-center gap-3">
                     <div className="min-w-0 flex-1">
-                      <div className="text-[12px] font-semibold truncate">{l.title}</div>
-                      <div className="text-[10px] mt-0.5" style={{ color: 'var(--dim)' }}>
+                      <div className="text-sm font-semibold truncate">{l.title}</div>
+                      <div className="text-2xs mt-0.5 text-dim">
                         {l.status === 'active' ? t('market.status.active') : t('market.status.delisted')} ·{' '}
                         {t('market.sales', { n: l.sales })} · {formatNum(l.price_credits)} {t('market.credits')}
                       </div>
                     </div>
                     {l.status === 'active' && (
-                      <button className="btn btn-ghost !py-1 !px-2 text-[10px]" onClick={() => void onDelist(l.id)}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => void onDelist(l.id)}>
                         {t('market.delist')}
                       </button>
                     )}
-                    <button className="btn btn-ghost !py-1 !px-2 text-[10px]" onClick={() => navigate(`/works/${l.work_id}`)}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/works/${l.work_id}`)}>
                       {t('market.openWork')}
                     </button>
                   </div>
@@ -263,28 +252,22 @@ export default function MarketView() {
         {tab === 'orders' && (
           <div className="space-y-2">
             {orders.length === 0 ? (
-              <div className="py-16 text-center text-[12px]" style={{ color: 'var(--dim)' }}>
-                {t('market.empty.orders')}
-              </div>
+              <EmptyState compact title={t('market.empty.orders')} />
             ) : (
               orders.map((o) => (
                 <div key={o.id} className="card p-3">
                   <div className="flex items-center gap-3">
                     <div className="min-w-0 flex-1">
-                      <div className="text-[12px] font-semibold">
+                      <div className="text-sm font-semibold">
                         {t('market.order.no', { id: o.id.slice(0, 8) })} · {formatNum(o.price_credits)} {t('market.credits')}
                       </div>
-                      <div className="text-[10px] mt-0.5 num" style={{ color: 'var(--dim)' }}>
-                        {o.created_at.slice(0, 16).replace('T', ' ')}
-                      </div>
+                      <div className="text-2xs mt-0.5 num text-dim">{o.created_at.slice(0, 16).replace('T', ' ')}</div>
                     </div>
-                    <button className="btn btn-ghost !py-1 !px-2 text-[10px]" onClick={() => navigate(`/works/${o.work_id}`)}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/works/${o.work_id}`)}>
                       {t('market.openWork')}
                     </button>
                   </div>
-                  <div className="text-[9px] mt-2 leading-relaxed" style={{ color: 'var(--dim)' }}>
-                    {o.license}
-                  </div>
+                  <div className="text-2xs mt-2 leading-relaxed text-dim">{o.license}</div>
                 </div>
               ))
             )}

@@ -31,14 +31,14 @@ export default function AnalysisPanel({ gen, rhyme, tagInfo, changes, onBackStud
   return (
     <div className="px-6 py-5 overflow-y-auto">
       <div className="label">{t('lyrics.panel.structure')}</div>
-      <div className="text-[12px] leading-relaxed mt-2" style={{ color: 'var(--muted)' }}>
+      <div className="text-sm leading-relaxed mt-2 text-muted">
         {gen && gen.structure.length > 0
           ? gen.structure
               .map((s) => t('lyrics.panel.sectionCount', { section: sectionLabel(s.section), n: s.line_count }))
               .join(' · ')
           : t('lyrics.panel.structureDefault')}
         {tagInfo && (
-          <div className="mt-2" style={{ color: 'var(--dim)' }}>
+          <div className="mt-2 text-dim">
             {t('lyrics.panel.tagDetect', {
               tags: tagInfo.detected.map((d) => sectionLabel(d.section)).join(' / ') || t('lyrics.panel.none'),
             })}
@@ -49,13 +49,13 @@ export default function AnalysisPanel({ gen, rhyme, tagInfo, changes, onBackStud
       {changes.length > 0 && (
         <>
           <div className="label mt-6">{t('lyrics.panel.polishLog')}</div>
-          <div className="mt-2 space-y-2 text-[11px] leading-relaxed" style={{ color: 'var(--muted)' }}>
+          <div className="mt-2 space-y-2 text-xs leading-relaxed text-muted">
             {changes.slice(0, 8).map((c) => (
               <div key={c.line_no}>
-                <span className="num" style={{ color: 'var(--dim)' }}>L{c.line_no}</span>{' '}
-                <span style={{ textDecoration: 'line-through', color: 'var(--dim)' }}>{c.before}</span>
+                <span className="num text-dim">L{c.line_no}</span>{' '}
+                <span className="text-dim" style={{ textDecoration: 'line-through' }}>{c.before}</span>
                 {' → '}
-                <span style={{ color: 'var(--txt)' }}>{c.after}</span>
+                <span className="text-txt">{c.after}</span>
               </div>
             ))}
           </div>
@@ -63,11 +63,11 @@ export default function AnalysisPanel({ gen, rhyme, tagInfo, changes, onBackStud
       )}
 
       <div className="label mt-6">{t('lyrics.panel.stress')}</div>
-      <div className="mt-2 space-y-2 text-[12px]">
+      <div className="mt-2 space-y-2 text-sm">
         {stressIssues.length === 0 && otherIssues.length === 0 ? (
           <div className="flex items-center gap-2">
             <span className="dot" style={{ background: rhyme ? 'var(--acc)' : 'var(--dim)' }}></span>
-            <span style={{ color: 'var(--muted)' }}>
+            <span className="text-muted">
               {rhyme ? t('lyrics.panel.stressOk') : t('lyrics.panel.stressPending')}
             </span>
           </div>
@@ -76,13 +76,13 @@ export default function AnalysisPanel({ gen, rhyme, tagInfo, changes, onBackStud
             {stressIssues.map((s, i) => (
               <div key={i} className="flex items-start gap-2">
                 <span className="dot mt-1.5" style={{ background: 'var(--warn)' }}></span>
-                <span style={{ color: 'var(--muted)' }}>{s.message}</span>
+                <span className="text-muted">{s.message}</span>
               </div>
             ))}
             {otherIssues.map((s, i) => (
               <div key={`o${i}`} className="flex items-start gap-2">
                 <span className="dot mt-1.5" style={{ background: 'var(--warn)' }}></span>
-                <span style={{ color: 'var(--muted)' }}>{s.message}</span>
+                <span className="text-muted">{s.message}</span>
               </div>
             ))}
           </>
@@ -104,7 +104,7 @@ export default function AnalysisPanel({ gen, rhyme, tagInfo, changes, onBackStud
           : rhymeChips.map((c, i) => <span key={i} className="chip">{c}</span>)}
       </div>
       <div className="mt-6">
-        <button className="btn btn-ghost text-[11px] w-full" onClick={onBackStudio}>
+        <button className="btn btn-ghost w-full" onClick={onBackStudio}>
           {t('lyrics.panel.backStudio')}
         </button>
       </div>

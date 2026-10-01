@@ -87,21 +87,21 @@ export default function BillingReturnView() {
 
           {success ? (
             <>
-              <div className="text-[19px] font-extrabold tracking-tight">{t('billing.return.successTitle')}</div>
-              <div className="text-[12px] mt-3 leading-relaxed" style={{ color: 'var(--muted)' }}>
+              <div className="text-xl font-extrabold tracking-tight">{t('billing.return.successTitle')}</div>
+              <div className="text-sm mt-3 leading-relaxed text-muted">
                 {t('billing.return.successDesc')}
               </div>
-              <div className="text-[11px] mt-2 leading-relaxed" style={{ color: 'var(--dim)' }}>
+              <div className="text-xs mt-2 leading-relaxed text-dim">
                 {t('billing.return.refreshHint')}
               </div>
               {sessionId && (
-                <div className="text-[10px] num mt-3 truncate" style={{ color: 'var(--dim)' }} title={sessionId}>
+                <div className="text-2xs num mt-3 truncate text-dim" title={sessionId}>
                   session: {sessionId}
                 </div>
               )}
               <div className="flex gap-2 mt-6">
                 <button
-                  className="btn btn-acc !py-2 flex-1 text-[12px]"
+                  className="btn btn-acc btn-md flex-1"
                   disabled={refreshing || autoChecking}
                   onClick={() => void onRefresh()}
                 >
@@ -116,18 +116,18 @@ export default function BillingReturnView() {
           ) : (
             // cancel / 未知 status：按已取消展示（不产生扣款）
             <>
-              <div className="text-[19px] font-extrabold tracking-tight">{t('billing.return.cancelTitle')}</div>
-              <div className="text-[12px] mt-3 leading-relaxed" style={{ color: 'var(--muted)' }}>
+              <div className="text-xl font-extrabold tracking-tight">{t('billing.return.cancelTitle')}</div>
+              <div className="text-sm mt-3 leading-relaxed text-muted">
                 {t('billing.return.cancelDesc')}
               </div>
             </>
           )}
 
-          <div className="mt-6 pt-4 rule-t flex items-center gap-4 text-[12px]">
-            <Link to="/pricing" className="font-bold" style={{ color: 'var(--acc)' }}>
+          <div className="mt-6 pt-4 rule-t flex items-center gap-4 text-sm">
+            <Link to="/pricing" className="font-bold text-acc">
               {t('billing.return.backPricing')}
             </Link>
-            <Link to="/studio" className="font-bold" style={{ color: 'var(--muted)' }}>
+            <Link to="/studio" className="font-bold text-muted">
               {t('billing.return.backStudio')}
             </Link>
           </div>

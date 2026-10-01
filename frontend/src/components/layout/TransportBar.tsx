@@ -75,10 +75,7 @@ export default function TransportBar() {
   }
 
   return (
-    <footer
-      className="fixed bottom-0 left-0 right-0 h-[68px] border-t flex items-center gap-4 px-5 z-50"
-      style={{ background: 'var(--bg)', borderColor: 'var(--line)' }}
-    >
+    <footer className="fixed bottom-0 left-0 right-0 h-[68px] border-t flex items-center gap-4 px-5 z-50 border-line bg-bg">
       <audio ref={audioRef} preload="metadata" />
       <div className="flex items-center gap-2">
         <button className="iconbtn" title={t('layout.player.prev')} onClick={() => void prev()}>
@@ -109,45 +106,40 @@ export default function TransportBar() {
         </button>
       </div>
       <div className={`w-[170px] min-w-0 ${playing ? 'playing' : ''}`} style={{ visibility: current ? 'visible' : 'hidden' }}>
-        <div className="text-[12px] font-semibold truncate marquee">
+        <div className="text-sm font-semibold truncate marquee">
           <span>{current?.title ?? ''}</span>
         </div>
-        <div className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--dim)' }}>
+        <div className="text-2xs mt-0.5 truncate text-dim">
           {current?.subtitle ?? ''}
         </div>
       </div>
       <div className="flex-1 flex items-center gap-3">
-        <span className="text-[10px] num" style={{ color: 'var(--dim)' }}>
+        <span className="text-2xs num text-dim">
           {formatDuration(position)}
         </span>
-        <div
-          className="flex-1 h-[2px] relative cursor-pointer"
-          style={{ background: 'var(--line)' }}
-          onMouseDown={onBarDown}
-        >
+        <div className="flex-1 h-[2px] relative cursor-pointer bg-line" onMouseDown={onBarDown}>
           <div
-            className="absolute left-0 top-0 bottom-0"
-            style={{ width: `${pct}%`, background: 'var(--acc)' }}
+            className="absolute left-0 top-0 bottom-0 bg-acc"
+            style={{ width: `${pct}%` }}
           ></div>
         </div>
-        <span className="text-[10px] num" style={{ color: 'var(--dim)' }}>
+        <span className="text-2xs num text-dim">
           {formatDuration(dur)}
         </span>
       </div>
       <div
-        className="flex items-center gap-2 text-[10px]"
-        style={{ color: 'var(--dim)' }}
+        className="flex items-center gap-2 text-2xs text-dim"
         title={t('layout.player.lufsTitle')}
       >
         <span>{t('layout.player.target')}</span>
-        <span className="num" style={{ color: 'var(--acc)' }}>
+        <span className="num text-acc">
           −14 LUFS
         </span>
         <span>·</span>
         <span className="num">−1.0 dBTP</span>
       </div>
       <button
-        className="btn btn-ghost !py-1.5 !px-3 text-[11px]"
+        className="btn btn-ghost btn-sm"
         title={t('layout.player.exportTitle')}
         onClick={() => navigate('/library')}
       >

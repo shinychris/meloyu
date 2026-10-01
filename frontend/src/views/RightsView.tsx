@@ -4,6 +4,7 @@ import { listWorks, fetchCertificate, downloadCertificate } from '../api/works'
 import { toast } from '../stores/toast'
 import { formatDateTime, planLabel } from '../lib/format'
 import { useT } from '../i18n'
+import { PageHeader } from '../components/common/PageHeader'
 
 function shortSha(sha: string): string {
   return sha.length > 16 ? `${sha.slice(0, 10)}…${sha.slice(-4)}` : sha
@@ -107,12 +108,9 @@ export default function RightsView() {
 
   return (
     <section className="view flex flex-col h-full">
-      <header className="px-8 pt-6 pb-4">
-        <div className="label">{t('rights.label')}</div>
-        <h1 className="text-[28px] font-extrabold tracking-tight mt-1">{t('rights.title')}</h1>
-      </header>
-      <div className="grid grid-cols-[1fr_320px] rule-t flex-1 min-h-0">
-        <div className="px-8 py-5 border-r overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
+      <PageHeader label={t('rights.label')} title={t('rights.title')} />
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] xl:grid-cols-[1fr_320px] rule-t flex-1 min-h-0">
+        <div className="px-8 py-5 lg:border-r border-line overflow-y-auto">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="label">{t('rights.cert.cardTitle')}{cert ? ` · ${cert.work.title} ${cert.version.version_no}` : ''}</div>
             <div className="w-[280px]">
@@ -128,22 +126,18 @@ export default function RightsView() {
           </div>
 
           {loading ? (
-            <div className="card mt-3 p-6 text-center text-[12px]" style={{ color: 'var(--dim)' }}>
-              {t('rights.cert.loading')}
-            </div>
+            <div className="card mt-3 p-6 text-center text-sm text-dim">{t('rights.cert.loading')}</div>
           ) : certError ? (
             <div className="card mt-3 p-6">
-              <div className="text-[12px]" style={{ color: 'var(--warn)' }}>{certError}</div>
-              <div className="text-[11px] mt-2 leading-relaxed" style={{ color: 'var(--dim)' }}>
-                {t('rights.cert.errorHint')}
-              </div>
-              <button className="btn btn-ghost text-[11px] mt-4" onClick={() => void onViewCert()}>
+              <div className="text-sm text-warn">{certError}</div>
+              <div className="text-xs mt-2 leading-relaxed text-dim">{t('rights.cert.errorHint')}</div>
+              <button className="btn btn-ghost text-xs mt-4" onClick={() => void onViewCert()}>
                 {t('common.retry')}
               </button>
             </div>
           ) : cert ? (
             <div className="card mt-3 p-6">
-              <div className="grid grid-cols-2 gap-y-4 text-[12px]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 text-sm">
                 <div>
                   <div className="label mb-1">{t('rights.field.workId')}</div>
                   <span className="num font-semibold">{cert.work.display_code}</span>
@@ -160,56 +154,50 @@ export default function RightsView() {
                 </div>
                 <div>
                   <div className="label mb-1">{t('rights.field.licenseType')}</div>
-                  <span className="font-semibold" style={{ color: cert.license.valid ? 'var(--acc)' : 'var(--warn)' }}>
+                  <span className={`font-semibold ${cert.license.valid ? 'text-acc' : 'text-warn'}`}>
                     {cert.license.type === 'commercial' ? t('rights.license.commercial') : t('rights.license.nonCommercial')} · {planLabel(cert.license.plan)}
                   </span>
                 </div>
-                <div className="col-span-2">
+                <div className="md:col-span-2">
                   <div className="label mb-1">{t('rights.field.humanTrail')}</div>
-                  <span style={{ color: 'var(--muted)' }}>
+                  <span className="text-muted">
                     {t('rights.trail.count', { n: cert.human_participation.edit_events_count })} · {cert.human_participation.summary.join(' · ')}
                   </span>
                 </div>
-                <div className="col-span-2">
+                <div className="md:col-span-2">
                   <div className="label mb-1">{t('rights.field.fingerprint')}</div>
-                  <span className="num" style={{ color: 'var(--muted)' }}>
+                  <span className="num text-muted">
                     {cert.fingerprint.algorithm.toUpperCase()} · master {shortSha(cert.fingerprint.master_wav_sha256)} · preview {shortSha(cert.fingerprint.preview_mp3_sha256)}
                   </span>
                 </div>
               </div>
               <div className="flex gap-2 mt-6">
-                <button className="btn btn-acc text-[11px]" onClick={() => void onDownload()}>
+                <button className="btn btn-acc text-xs" onClick={() => void onDownload()}>
                   {t('rights.cert.download')}
                 </button>
-                <button className="btn btn-ghost text-[11px]" onClick={() => void onCopyLink()}>
+                <button className="btn btn-ghost text-xs" onClick={() => void onCopyLink()}>
                   {t('rights.cert.copyLink')}
                 </button>
               </div>
             </div>
           ) : work ? (
             <div className="card mt-3 p-6">
-              <div className="text-[12px]" style={{ color: 'var(--muted)' }}>
-                {t('rights.cert.viewHint')}
-              </div>
-              <div className="text-[11px] mt-2 leading-relaxed" style={{ color: 'var(--dim)' }}>
-                {t('rights.cert.realtimeNote')}
-              </div>
-              <button className="btn btn-acc text-[11px] mt-4" onClick={() => void onViewCert()}>
+              <div className="text-sm text-muted">{t('rights.cert.viewHint')}</div>
+              <div className="text-xs mt-2 leading-relaxed text-dim">{t('rights.cert.realtimeNote')}</div>
+              <button className="btn btn-acc text-xs mt-4" onClick={() => void onViewCert()}>
                 {t('rights.cert.view')}
               </button>
             </div>
           ) : (
-            <div className="card mt-3 p-6 text-[12px]" style={{ color: 'var(--dim)' }}>
-              {t('rights.empty')}
-            </div>
+            <div className="card mt-3 p-6 text-sm text-dim">{t('rights.empty')}</div>
           )}
 
           <div className="label mt-7">{t('rights.check.title')}</div>
-          <div className="mt-3 space-y-2.5 text-[12px]">
+          <div className="mt-3 space-y-2.5 text-sm">
             {checklist.map((item, i) => (
               <div key={i} className="flex items-center gap-2.5">
                 <span className="dot flex-none" style={{ background: CHECK_TONE[item.tone] }}></span>
-                <span style={{ color: 'var(--muted)' }}>{item.text}</span>
+                <span className="text-muted">{item.text}</span>
               </div>
             ))}
           </div>
@@ -218,15 +206,13 @@ export default function RightsView() {
         {/* v0.7.0：原三个摆设开关整段下架，改为静态授权说明（商用权利跟随通道模型许可） */}
         <div className="px-6 py-5 overflow-y-auto">
           <div className="label">{t('rights.licenseNotes.title')}</div>
-          <div className="mt-4 space-y-3 text-[12px] leading-relaxed" style={{ color: 'var(--muted)' }}>
+          <div className="mt-4 space-y-3 text-sm leading-relaxed text-muted">
             <div>{t('rights.licenseNotes.intro')}</div>
             <div>· {t('rights.licenseNotes.commercial')}</div>
             <div>· {t('rights.licenseNotes.nonCommercial')}</div>
             <div>· {t('rights.licenseNotes.conditional')}</div>
           </div>
-          <div className="text-[10px] mt-8 leading-relaxed" style={{ color: 'var(--dim)' }}>
-            {t('rights.settingsNote')}
-          </div>
+          <div className="text-2xs mt-8 leading-relaxed text-dim">{t('rights.settingsNote')}</div>
         </div>
       </div>
     </section>

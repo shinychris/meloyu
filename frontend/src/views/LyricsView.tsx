@@ -12,6 +12,7 @@ import { detectSectionAtCaret, insertAtCaret } from '../lib/structure'
 import { sectionLabel } from '../lib/format'
 import { useMetaStore } from '../stores/meta'
 import AnalysisPanel from '../components/lyrics/AnalysisPanel'
+import { PageHeader } from '../components/common/PageHeader'
 
 const DRAFT_KEY = 'meloyu:lyric-draft:v1' // 契约 §14 R2：草稿由前端 localStorage 承载
 
@@ -186,26 +187,25 @@ export default function LyricsView() {
 
   return (
     <section className="view flex flex-col h-full">
-      <header className="px-8 pt-6 pb-4">
-        <div className="label">{t('lyrics.header.label')}</div>
-        <div className="flex items-end justify-between">
-          <h1 className="text-[28px] font-extrabold tracking-tight mt-1">{t('lyrics.header.headline')}</h1>
-          {engine && (
+      <PageHeader
+        label={t('lyrics.header.label')}
+        title={t('lyrics.header.headline')}
+        actions={
+          engine ? (
             <span
-              className="text-[10px] font-bold px-2 py-1 cursor-pointer"
-              style={{ background: 'var(--bg2)', border: '1px solid var(--line)', color: 'var(--dim)' }}
+              className="text-2xs font-bold px-2 py-1 cursor-pointer border border-line bg-bg-2 text-dim"
               title={t('lyrics.engine.title')}
               onClick={() => navigate('/models')}
             >
               {t('lyrics.engine.badge', { engine })}
             </span>
-          )}
-        </div>
-      </header>
-      <div className="grid grid-cols-[1fr_300px] rule-t flex-1 min-h-0">
-        <div className="px-8 py-5 border-r overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
+          ) : undefined
+        }
+      />
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] xl:grid-cols-[1fr_300px] rule-t flex-1 min-h-0">
+        <div className="px-8 py-5 border-r border-line overflow-y-auto">
           <div className="mb-3">
-            <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>{t('lyrics.theme.label')}</div>
+            <div className="text-2xs mb-1 text-dim">{t('lyrics.theme.label')}</div>
             <textarea
               rows={3}
               maxLength={600}
@@ -215,7 +215,7 @@ export default function LyricsView() {
             />
           </div>
           <div className="w-1/2 pr-1 mb-3">
-            <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>{t('lyrics.mood.label')}</div>
+            <div className="text-2xs mb-1 text-dim">{t('lyrics.mood.label')}</div>
             <input
               type="text"
               maxLength={20}
@@ -225,23 +225,23 @@ export default function LyricsView() {
             />
           </div>
           <div className="flex gap-2 mb-3 flex-wrap">
-            <button className="btn btn-ghost text-[11px]" disabled={busy !== null} onClick={onGenerate}
+            <button className="btn btn-ghost btn-sm" disabled={busy !== null} onClick={onGenerate}
               title={engine && !LOCAL_RULE_RE.test(engine) ? t('lyrics.action.generateTitle') : undefined}>
               {busy === 'gen'
                 ? engine && !LOCAL_RULE_RE.test(engine) ? t('lyrics.action.generatingLLM') : t('lyrics.action.generating')
                 : t('lyrics.action.generate')}
             </button>
-            <button className="btn btn-ghost text-[11px]" disabled={busy !== null} onClick={onPolish}>
+            <button className="btn btn-ghost btn-sm" disabled={busy !== null} onClick={onPolish}>
               {busy === 'polish' ? t('lyrics.action.polishing') : t('lyrics.action.polish')}
             </button>
-            <button className="btn btn-ghost text-[11px]" disabled={busy !== null} onClick={onRhyme}>
+            <button className="btn btn-ghost btn-sm" disabled={busy !== null} onClick={onRhyme}>
               {busy === 'rhyme' ? t('lyrics.action.checking') : t('lyrics.action.rhyme')}
             </button>
-            <button className="btn btn-ghost text-[11px]" disabled={busy !== null} onClick={onTags}>
+            <button className="btn btn-ghost btn-sm" disabled={busy !== null} onClick={onTags}>
               {t('lyrics.action.tags')}
             </button>
             <button
-              className="btn btn-ghost text-[11px]"
+              className="btn btn-ghost btn-sm"
               style={{ color: 'var(--acc)', borderColor: 'var(--acc)' }}
               onClick={() => {
                 setLyricsFromAssistant(text)
@@ -252,37 +252,38 @@ export default function LyricsView() {
             </button>
           </div>
           <div className="mt-2 mb-3">
-            <div className="text-[10px] mb-1.5" style={{ color: 'var(--dim)' }}>{t('lyrics.chips.tags')}</div>
+            <div className="text-2xs mb-1.5 text-dim">{t('lyrics.chips.tags')}</div>
             <div className="flex gap-1.5 flex-wrap">
               {meta.structure_tags.map((tg) => (
-                <span
+                <button
+                  type="button"
                   key={tg.tag}
                   className="chip"
                   title={tg.desc ?? tg.label}
                   onClick={() => insertSnippet(tg.tag, true)}
                 >
                   {tg.tag} {tg.label}
-                </span>
+                </button>
               ))}
             </div>
           </div>
           <div className="mb-3">
-            <div className="text-[10px] mb-1.5" style={{ color: 'var(--dim)' }}>
+            <div className="text-2xs mb-1.5 text-dim">
               {t('lyrics.chips.marks')}
               <span className="ml-2" title={t('lyrics.chips.marksHint')}>ⓘ</span>
             </div>
             <div className="flex gap-1.5 flex-wrap">
               {vocalMarks.map((m) => (
-                <span key={m.mark} className="chip" onClick={() => insertSnippet(m.mark)}>
+                <button type="button" key={m.mark} className="chip" onClick={() => insertSnippet(m.mark)}>
                   {m.label}
-                </span>
+                </button>
               ))}
             </div>
             <div className="flex gap-1.5 flex-wrap mt-1.5">
               {musicMarks.map((m) => (
-                <span key={m.mark} className="chip" onClick={() => insertSnippet(m.mark, true)}>
+                <button type="button" key={m.mark} className="chip" onClick={() => insertSnippet(m.mark, true)}>
                   {m.label}
-                </span>
+                </button>
               ))}
             </div>
           </div>
@@ -298,7 +299,8 @@ export default function LyricsView() {
               <div className="label mb-2">{t('lyrics.alternatives')}</div>
               <div className="flex gap-1.5 flex-wrap">
                 {gen.alternatives.map((alt, i) => (
-                  <span
+                  <button
+                    type="button"
                     key={i}
                     className="chip"
                     onClick={() => {
@@ -307,7 +309,7 @@ export default function LyricsView() {
                     }}
                   >
                     {t('lyrics.alternative', { n: i + 1 })}
-                  </span>
+                  </button>
                 ))}
               </div>
             </div>

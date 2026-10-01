@@ -92,12 +92,12 @@ const OP_TYPE_LABEL: Record<ModelOpInfo['op_type'], TranslationKey> = {
 }
 
 /** 目录模型的本机状态文案（t 为模块级翻译函数；本组件经 useT 订阅语言变化后重渲染） */
-function localStatusText(m: MusicCatalogModel): { text: string; color: string } {
-  if (m.local_status === 'ready') return { text: t('models.status.ready'), color: 'var(--acc)' }
-  if (m.local_status === 'deps_missing') return { text: t('models.status.depsMissing'), color: 'var(--bad)' }
-  if (m.local_status === 'not_downloaded') return { text: t('models.status.notDownloaded'), color: 'var(--dim)' }
-  if (m.local_status === 'not_running') return { text: t('models.status.notRunning'), color: 'var(--bad)' }
-  return { text: t('models.status.hostedOnly'), color: 'var(--dim)' }
+function localStatusText(m: MusicCatalogModel): { text: string; cls: string } {
+  if (m.local_status === 'ready') return { text: t('models.status.ready'), cls: 'text-acc' }
+  if (m.local_status === 'deps_missing') return { text: t('models.status.depsMissing'), cls: 'text-bad' }
+  if (m.local_status === 'not_downloaded') return { text: t('models.status.notDownloaded'), cls: 'text-dim' }
+  if (m.local_status === 'not_running') return { text: t('models.status.notRunning'), cls: 'text-bad' }
+  return { text: t('models.status.hostedOnly'), cls: 'text-dim' }
 }
 
 /** 模型中心（契约 §5.8）：左侧分类导航 + 概览/歌词引擎/歌曲引擎/开源目录/本地模型库/操作记录 */
@@ -559,51 +559,37 @@ export default function ModelCenterView() {
     on: boolean, onClick: () => void, fallback = false, children?: React.ReactNode,
   ) => (
     <div
-      className={`card p-4 cursor-pointer transition-all ${on ? '' : 'opacity-70 hover:opacity-100'}`}
+      className={`card p-4 cursor-pointer transition-colors ${on ? '' : 'opacity-70 hover:opacity-100'}`}
       style={{
+        // .card 未分层、优先级高于 utility：选中态描边/虚线只能用内联样式覆盖
         ...(on ? { borderColor: 'var(--acc)' } : {}),
         ...(fallback && !on ? { borderStyle: 'dashed' } : {}),
       }}
       onClick={onClick}
     >
       <div className="flex items-center justify-between">
-        <span className="text-[13px] font-bold">{t(title)}</span>
+        <span className="text-base font-bold">{t(title)}</span>
         <span className="flex items-center gap-1.5">
-          {fallback && (
-            <span
-              className="text-[9px] font-bold px-1.5 py-0.5"
-              style={{ background: 'var(--bg3)', color: 'var(--warn)' }}
-            >
-              {t('models.fallbackBadge')}
-            </span>
-          )}
-          <span
-            className="text-[10px] font-bold px-1.5 py-0.5"
-            style={{
-              background: on ? 'var(--acc)' : 'var(--bg3)',
-              color: on ? '#000' : 'var(--dim)',
-            }}
-          >
+          {fallback && <span className="badge badge-warn">{t('models.fallbackBadge')}</span>}
+          <span className={`badge ${on ? 'badge-solid' : ''}`}>
             {on ? t('models.chan.inUse') : t('models.chan.select')}
           </span>
         </span>
       </div>
-      <div className="text-[11px] mt-2" style={{ color: 'var(--dim)' }}>{t(desc)}</div>
+      <div className="text-xs mt-2 text-dim">{t(desc)}</div>
       {children}
     </div>
   )
 
-  const inputStyle = {
-    background: 'var(--bg)', border: '1px solid var(--line)',
-    color: 'var(--txt)', outline: 'none',
-  } as const
+  /** 表单控件 token 类（与 index.css 表单基础规则同值，显式声明防漂移） */
+  const inputCls = 'bg-bg border border-line text-txt outline-none'
 
   return (
     <div className="view h-full overflow-y-auto" ref={scrollRef}>
-      <div className="max-w-[1240px] mx-auto px-10 py-8">
+      <div className="max-w-[1240px] mx-auto px-8 py-8">
         <div className="label">{t('models.label')}</div>
-        <h1 className="text-[22px] font-extrabold tracking-tight mt-2">{t('models.title')}</h1>
-        <p className="text-[12px] mt-2" style={{ color: 'var(--dim)' }}>
+        <h1 className="text-3xl font-extrabold tracking-tight mt-2">{t('models.title')}</h1>
+        <p className="text-sm mt-2 text-dim">
           {t('models.intro')}
         </p>
 
@@ -616,13 +602,9 @@ export default function ModelCenterView() {
                 return (
                   <button
                     key={s.id}
-                    className="w-full text-left px-3 py-2 text-[12px] transition-all flex items-center gap-2"
-                    style={{
-                      color: active ? 'var(--acc)' : 'var(--muted)',
-                      borderLeft: `2px solid ${active ? 'var(--acc)' : 'transparent'}`,
-                      fontWeight: active ? 700 : 400,
-                      background: active ? 'var(--bg2)' : 'transparent',
-                    }}
+                    className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 border-l-2 ${
+                      active ? 'text-acc font-bold bg-bg-2 border-acc' : 'text-muted font-normal border-transparent'
+                    }`}
                     onClick={() => jump(s.id)}
                   >
                     {t(s.labelKey)}
@@ -639,44 +621,38 @@ export default function ModelCenterView() {
 
               {/* 运行时状态 */}
               <div className="card p-5 flex items-center gap-4 flex-wrap">
-                <span
-                  className="gen-dot"
-                  style={{
-                    width: 8, height: 8, borderRadius: '50%', flex: 'none',
-                    background: ollama?.running ? 'var(--acc)' : 'var(--bad)',
-                  }}
-                />
+                <span className={`gen-dot w-2 h-2 rounded-full flex-none ${ollama?.running ? 'bg-acc' : 'bg-bad'}`} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-[13px] font-bold">
+                  <div className="text-base font-bold">
                     Ollama {ollama?.running ? t('models.runtime.running', { version: ollama.version || '?' }) : t('models.runtime.stopped')}
                     {ollama?.running && (
-                      <span className="ml-2 text-[11px] font-normal" style={{ color: 'var(--dim)' }}>
+                      <span className="ml-2 text-xs font-normal text-dim">
                         {ollama.host} · {t('models.runtime.localModels', { n: ollama.models_count })}
                       </span>
                     )}
                   </div>
-                  <div className="text-[11px] mt-1" style={{ color: 'var(--dim)' }}>
+                  <div className="text-xs mt-1 text-dim">
                     {ollama?.running
                       ? local?.error || t('models.runtime.ready')
                       : ollama?.error || '—'}
                   </div>
                 </div>
                 {!ollama?.running && (
-                  <div className="text-[11px] max-w-[360px]" style={{ color: 'var(--dim)' }}>
+                  <div className="text-xs max-w-[360px] text-dim">
                     {ollama?.install_hint}
                   </div>
                 )}
                 <div className="text-right flex-none">
                   <div className="label">{t('models.runtime.lyricsEngine')}</div>
-                  <div className="text-[12px] font-bold mt-1" style={{ color: 'var(--acc)' }}>
+                  <div className="text-sm font-bold mt-1 text-acc">
                     {runtime?.engine || '…'}
                   </div>
                   <div className="label mt-2">{t('models.runtime.songEngine')}</div>
-                  <div className="text-[12px] font-bold mt-1" style={{ color: 'var(--acc)' }}>
+                  <div className="text-sm font-bold mt-1 text-acc">
                     {runtime?.song_engine || '…'}
                   </div>
                   <div className="label mt-2">{t('models.overview.envLabel')}</div>
-                  <div className="text-[11px] font-bold mt-1" style={{ color: 'var(--muted)' }}>
+                  <div className="text-xs font-bold mt-1 text-muted">
                     {runtime ? (runtime.docker ? t('models.overview.envDocker') : t('models.overview.envHost')) : '…'}
                   </div>
                 </div>
@@ -691,22 +667,22 @@ export default function ModelCenterView() {
                     { ready: songReady, engineLabel: 'models.runtime.songEngine', okKey: 'models.overview.songOk', fbKey: 'models.overview.songFallback', target: 'mc-music' },
                   ] as const).map((row) => (
                     <div key={row.target} className="flex items-center gap-3 py-1.5 flex-wrap">
-                      <span className="flex-none" style={{ color: row.ready ? 'var(--acc)' : 'var(--warn)' }}>
+                      <span className={`flex-none ${row.ready ? 'text-acc' : 'text-warn'}`}>
                         {row.ready ? '✓' : '⚠'}
                       </span>
-                      <span className="text-[12px] font-bold flex-none">{t(row.engineLabel)}</span>
-                      <span className="text-[11px] flex-1 min-w-0" style={{ color: row.ready ? 'var(--dim)' : 'var(--warn)' }}>
+                      <span className="text-sm font-bold flex-none">{t(row.engineLabel)}</span>
+                      <span className={`text-xs flex-1 min-w-0 ${row.ready ? 'text-dim' : 'text-warn'}`}>
                         {row.ready ? t(row.okKey) : t(row.fbKey)}
                       </span>
                       {!row.ready && (
-                        <button className="btn !py-1 !px-2.5 text-[11px] flex-none" onClick={() => jump(row.target)}>
+                        <button className="btn btn-sm flex-none" onClick={() => jump(row.target)}>
                           {t('models.overview.goConfigure')}
                         </button>
                       )}
                     </div>
                   ))}
                   {runtime?.docker && (
-                    <div className="text-[10px] mt-3 leading-relaxed" style={{ color: 'var(--dim)' }}>
+                    <div className="text-2xs mt-3 leading-relaxed text-dim">
                       {t('models.overview.dockerHint')}
                     </div>
                   )}
@@ -717,7 +693,7 @@ export default function ModelCenterView() {
             {/* ============ 歌词引擎 ============ */}
             <section id="mc-lyrics" className="mt-10 scroll-mt-4">
               <div className="label mb-1">{t('models.lyrics.title')}</div>
-              <p className="text-[11px] mb-3" style={{ color: 'var(--dim)' }}>
+              <p className="text-xs mb-3 text-dim">
                 {t('models.lyrics.sectionDesc')}
               </p>
 
@@ -726,7 +702,7 @@ export default function ModelCenterView() {
                   <div className="label mb-2" style={g.fallback ? { color: 'var(--warn)' } : undefined}>
                     {t(g.labelKey)}
                   </div>
-                  <div className={g.items.length > 1 ? 'grid grid-cols-2 gap-3' : ''}>
+                  <div className={g.items.length > 1 ? 'grid grid-cols-1 md:grid-cols-2 gap-3' : ''}>
                     {g.items.map((value) => (
                       <Fragment key={value}>
                         {renderChannelCard(
@@ -740,8 +716,7 @@ export default function ModelCenterView() {
                           }, g.fallback,
                           value === 'ollama' && local && local.models.length > 0 ? (
                             <select
-                              className="w-full mt-3 text-[12px] px-2 py-1.5"
-                              style={inputStyle}
+                              className={`w-full mt-3 text-sm px-2 py-1.5 ${inputCls}`}
                               value={pickedModel}
                               onChange={(e) => {
                                 setPickedModel(e.target.value)
@@ -767,7 +742,7 @@ export default function ModelCenterView() {
                   <button className="btn btn-acc" disabled={saving} onClick={() => void saveBackend(backend)}>
                     {saving ? t('models.chan.switching') : t('models.chan.apply')}
                   </button>
-                  <span className="text-[11px]" style={{ color: 'var(--dim)' }}>
+                  <span className="text-xs text-dim">
                     {t('models.chan.lyricsEffect')}
                   </span>
                 </div>
@@ -776,13 +751,12 @@ export default function ModelCenterView() {
               {/* Ollama 服务地址 */}
               <div className="card p-5">
                 <div className="label mb-1">{t('models.ollamaHost.title')}</div>
-                <div className="text-[11px] mb-3" style={{ color: 'var(--dim)' }}>
+                <div className="text-xs mb-3 text-dim">
                   {t('models.ollamaHost.desc')}
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
                   <input
-                    className="flex-1 min-w-[280px] px-3 py-2 text-[12px]"
-                    style={inputStyle}
+                    className={`flex-1 min-w-[280px] px-3 py-2 text-sm ${inputCls}`}
                     placeholder={t('models.ollamaHost.ph')}
                     value={ollamaHostEdit}
                     onChange={(e) => setOllamaHostEdit(e.target.value)}
@@ -794,13 +768,13 @@ export default function ModelCenterView() {
                     {hostSaving ? t('models.saving') : t('models.ollamaHost.save')}
                   </button>
                   {runtime && (
-                    <span className="text-[11px] flex-none" style={{ color: 'var(--dim)' }}>
+                    <span className="text-xs flex-none text-dim">
                       {t('models.ollamaHost.effective', { host: runtime.ollama.host })}
                     </span>
                   )}
                 </div>
                 {runtime?.docker && (
-                  <div className="text-[10px] mt-3 leading-relaxed" style={{ color: 'var(--warn)' }}>
+                  <div className="text-2xs mt-3 leading-relaxed text-warn">
                     {t('models.ollamaHost.dockerHint')}
                   </div>
                 )}
@@ -824,12 +798,11 @@ export default function ModelCenterView() {
                     </span>
                   ))}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="col-span-2">
                     <div className="label mb-1">BASE URL</div>
                     <input
-                      className="w-full px-3 py-2 text-[12px]"
-                      style={inputStyle}
+                      className={`w-full px-3 py-2 text-sm ${inputCls}`}
                       placeholder="https://open.bigmodel.cn/api/paas/v4"
                       value={extBase}
                       onChange={(e) => setExtBase(e.target.value)}
@@ -839,15 +812,14 @@ export default function ModelCenterView() {
                     <div className="label mb-1">
                       API KEY{' '}
                       {settings?.external_api_key.has_key && (
-                        <span style={{ color: 'var(--dim)' }}>
+                        <span className="text-dim">
                           {t('models.keySavedHint', { tail: settings.external_api_key.key_tail })}
                         </span>
                       )}
                     </div>
                     <input
-                      className="w-full px-3 py-2 text-[12px]"
+                      className={`w-full px-3 py-2 text-sm ${inputCls}`}
                       type="password"
-                      style={inputStyle}
                       placeholder={settings?.external_api_key.has_key ? t('models.keyKeepPh') : 'sk-…'}
                       value={extKey}
                       onChange={(e) => setExtKey(e.target.value)}
@@ -856,8 +828,7 @@ export default function ModelCenterView() {
                   <div>
                     <div className="label mb-1">MODEL</div>
                     <input
-                      className="w-full px-3 py-2 text-[12px]"
-                      style={inputStyle}
+                      className={`w-full px-3 py-2 text-sm ${inputCls}`}
                       placeholder="glm-4-flash / deepseek-chat / gpt-4o-mini"
                       value={extModel}
                       onChange={(e) => setExtModel(e.target.value)}
@@ -872,13 +843,13 @@ export default function ModelCenterView() {
                     {saving ? t('models.saving') : t('models.save')}
                   </button>
                   {testResult && (
-                    <span className="text-[11px]" style={{ color: testResult.ok ? 'var(--acc)' : 'var(--bad)' }}>
+                    <span className={`text-xs ${testResult.ok ? 'text-acc' : 'text-bad'}`}>
                       {testResult.ok ? '✓' : '✕'} {testResult.message}
                       {testResult.sample ? t('models.testEcho', { sample: testResult.sample }) : ''}
                     </span>
                   )}
                 </div>
-                <div className="text-[10px] mt-3" style={{ color: 'var(--dim)' }}>
+                <div className="text-2xs mt-3 text-dim">
                   {t('models.ext.note')}
                 </div>
               </div>
@@ -887,7 +858,7 @@ export default function ModelCenterView() {
             {/* ============ 歌曲引擎 ============ */}
             <section id="mc-music" className="mt-10 scroll-mt-4">
               <div className="label mb-1">{t('models.music.title')}</div>
-              <p className="text-[11px] mb-3" style={{ color: 'var(--dim)' }}>
+              <p className="text-xs mb-3 text-dim">
                 {t('models.music.sectionDesc')}
               </p>
 
@@ -896,7 +867,7 @@ export default function ModelCenterView() {
                   <div className="label mb-2" style={g.fallback ? { color: 'var(--warn)' } : undefined}>
                     {t(g.labelKey)}
                   </div>
-                  <div className={g.items.length > 1 ? 'grid grid-cols-2 gap-3' : ''}>
+                  <div className={g.items.length > 1 ? 'grid grid-cols-1 md:grid-cols-2 gap-3' : ''}>
                     {g.items.map((value) => (
                       <Fragment key={value}>
                         {renderChannelCard(
@@ -930,7 +901,7 @@ export default function ModelCenterView() {
                   <button className="btn btn-acc" disabled={musicSaving} onClick={() => void saveMusic(musicBackend)}>
                     {musicSaving ? t('models.chan.switching') : t('models.chan.apply')}
                   </button>
-                  <span className="text-[11px]" style={{ color: 'var(--dim)' }}>
+                  <span className="text-xs text-dim">
                     {t('models.chan.musicEffect')}
                   </span>
                 </div>
@@ -950,12 +921,11 @@ export default function ModelCenterView() {
                     </span>
                   ))}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="col-span-2">
                     <div className="label mb-1">{t('models.musicApi.baseUrl')}</div>
                     <input
-                      className="w-full px-3 py-2 text-[12px]"
-                      style={inputStyle}
+                      className={`w-full px-3 py-2 text-sm ${inputCls}`}
                       placeholder={t('models.musicApi.baseUrlPh')}
                       value={musicBase}
                       onChange={(e) => setMusicBase(e.target.value)}
@@ -965,15 +935,14 @@ export default function ModelCenterView() {
                     <div className="label mb-1">
                       API KEY{' '}
                       {settings?.music_api_key.has_key && (
-                        <span style={{ color: 'var(--dim)' }}>
+                        <span className="text-dim">
                           {t('models.keySavedHint', { tail: settings.music_api_key.key_tail })}
                         </span>
                       )}
                     </div>
                     <input
-                      className="w-full px-3 py-2 text-[12px]"
+                      className={`w-full px-3 py-2 text-sm ${inputCls}`}
                       type="password"
-                      style={inputStyle}
                       placeholder={settings?.music_api_key.has_key ? t('models.keyKeepPh') : 'sk-…'}
                       value={musicKey}
                       onChange={(e) => setMusicKey(e.target.value)}
@@ -982,8 +951,7 @@ export default function ModelCenterView() {
                   <div>
                     <div className="label mb-1">{t('models.musicApi.model')}</div>
                     <input
-                      className="w-full px-3 py-2 text-[12px]"
-                      style={inputStyle}
+                      className={`w-full px-3 py-2 text-sm ${inputCls}`}
                       placeholder={t('models.musicApi.modelPh')}
                       value={musicModel}
                       onChange={(e) => setMusicModel(e.target.value)}
@@ -998,35 +966,31 @@ export default function ModelCenterView() {
                     {musicSaving ? t('models.saving') : t('models.save')}
                   </button>
                   {musicTestResult && (
-                    <span
-                      className="text-[11px]"
-                      style={{ color: musicTestResult.ok ? 'var(--acc)' : 'var(--bad)' }}
-                    >
+                    <span className={`text-xs ${musicTestResult.ok ? 'text-acc' : 'text-bad'}`}>
                       {musicTestResult.ok ? '✓' : '✕'} {musicTestResult.message}
                     </span>
                   )}
                 </div>
-                <div className="text-[10px] mt-3 leading-relaxed" style={{ color: 'var(--dim)' }}>
+                <div className="text-2xs mt-3 leading-relaxed text-dim">
                   {t('models.musicApi.note')}
                 </div>
               </div>
 
               {/* Replicate Token 配置 */}
               <div className="card mt-3 p-5">
-                <div className="grid grid-cols-2 gap-3 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
                   <div>
                     <div className="label mb-1">
                       REPLICATE API TOKEN{' '}
                       {settings?.replicate_api_token.has_key && (
-                        <span style={{ color: 'var(--dim)' }}>
+                        <span className="text-dim">
                           {t('models.keySavedHint', { tail: settings.replicate_api_token.key_tail })}
                         </span>
                       )}
                     </div>
                     <input
-                      className="w-full px-3 py-2 text-[12px]"
+                      className={`w-full px-3 py-2 text-sm ${inputCls}`}
                       type="password"
-                      style={inputStyle}
                       placeholder={settings?.replicate_api_token.has_key ? t('models.keyKeepPh') : t('models.replicate.tokenPh')}
                       value={replicateKey}
                       onChange={(e) => setReplicateKey(e.target.value)}
@@ -1040,10 +1004,7 @@ export default function ModelCenterView() {
                       {replicateSaving ? t('models.saving') : t('models.saveToken')}
                     </button>
                     {replicateTestResult && (
-                      <span
-                        className="text-[11px] truncate"
-                        style={{ color: replicateTestResult.ok ? 'var(--acc)' : 'var(--bad)' }}
-                      >
+                      <span className={`text-xs truncate ${replicateTestResult.ok ? 'text-acc' : 'text-bad'}`}>
                         {replicateTestResult.ok ? '✓' : '✕'} {replicateTestResult.message}
                       </span>
                     )}
@@ -1055,17 +1016,17 @@ export default function ModelCenterView() {
             {/* ============ 开源歌曲模型目录 ============ */}
             <section id="mc-catalog" className="mt-10 scroll-mt-4">
               <div className="label mb-1">{t('models.catalog.title')}</div>
-              <p className="text-[11px] mb-3" style={{ color: 'var(--dim)' }}>
+              <p className="text-xs mb-3 text-dim">
                 {t('models.catalog.sectionDesc')}
               </p>
 
               {catalog && !catalog.machine.musicgen_deps_installed && (
-                <div className="card p-4 text-[11px] leading-relaxed" style={{ color: 'var(--dim)' }}>
+                <div className="card p-4 text-xs leading-relaxed text-dim">
                   {t('models.catalog.musicgenDeps', { hint: catalog.machine.install_hint })}
                 </div>
               )}
               {catalog && !catalog.machine.acestep_deps_installed && (
-                <div className="card p-4 mt-2 text-[11px] leading-relaxed" style={{ color: 'var(--dim)' }}>
+                <div className="card p-4 mt-2 text-xs leading-relaxed text-dim">
                   {t('models.catalog.acestepDeps', { hint: catalog.machine.acestep_install_hint })}
                 </div>
               )}
@@ -1079,64 +1040,53 @@ export default function ModelCenterView() {
                   return (
                     <div key={m.id} className="card p-4" style={m.selected ? { borderColor: 'var(--acc)' } : undefined}>
                       <div className="flex items-start gap-3 flex-wrap">
-                        <span
-                          className="text-[10px] font-bold px-1.5 py-1 num flex-none"
-                          style={{ background: 'var(--bg3)', color: 'var(--muted)' }}
-                          title={t('models.catalog.rankTitle')}
-                        >
+                        <span className="badge num flex-none" title={t('models.catalog.rankTitle')}>
                           #{m.rank}
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[13px] font-bold">{m.name}</span>
+                            <span className="text-base font-bold">{m.name}</span>
                             <span
-                              className="text-[9px] font-bold px-1.5 py-0.5 num"
-                              style={{ background: 'var(--acc-dim)', color: 'var(--acc)' }}
+                              className="badge badge-acc num"
                               title={t('models.catalog.sourceTitle', { source: m.benchmark.source, notes: m.benchmark.notes })}
                             >
                               {t('models.catalog.score', { score: m.benchmark.score.toFixed(1) })}
                             </span>
                             {m.recommended && (
-                              <span
-                                className="text-[9px] font-bold px-1.5 py-0.5"
-                                style={{ background: 'var(--acc)', color: '#000' }}
-                                title={m.recommend_reason}
-                              >
+                              <span className="badge badge-solid" title={m.recommend_reason}>
                                 {t('models.catalog.recommended')}
                               </span>
                             )}
                             {m.selected && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5" style={{ background: 'var(--acc)', color: '#000' }}>
-                                {t('models.chan.inUse')}
-                              </span>
+                              <span className="badge badge-solid">{t('models.chan.inUse')}</span>
                             )}
-                            <span className="text-[10px]" style={{ color: st.color }}>{st.text}</span>
+                            <span className={`text-2xs ${st.cls}`}>{st.text}</span>
                           </div>
-                          <div className="text-[11px] mt-1" style={{ color: 'var(--dim)' }}>
+                          <div className="text-xs mt-1 text-dim">
                             {m.vendor} · {m.params} · {m.license}
                           </div>
                           <div className="flex gap-1.5 mt-2 flex-wrap">
-                            <span className="text-[10px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>
+                            <span className="badge">
                               {m.capabilities.vocals ? t('models.catalog.capVocals') : t('models.catalog.capInstrumental')}
                             </span>
-                            <span className="text-[10px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>
+                            <span className="badge">
                               ≤{m.capabilities.max_duration_sec}s
                             </span>
-                            <span className="text-[10px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>
+                            <span className="badge">
                               {m.capabilities.languages}
                             </span>
-                            <span className="text-[10px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>
+                            <span className="badge">
                               {localChannel ? t('models.catalog.chanLocal') : t('models.catalog.chanReplicate')}
                             </span>
                           </div>
-                          <div className="text-[10px] mt-1.5 leading-relaxed" style={{ color: 'var(--dim)' }}>
+                          <div className="text-2xs mt-1.5 leading-relaxed text-dim">
                             {m.benchmark.notes}{m.local_note ? ` · ${m.local_note}` : ''}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-none flex-wrap">
                           {m.channels.includes('replicate') && (
                             <button
-                              className="btn !py-1 !px-2.5 text-[11px]"
+                              className="btn btn-sm"
                               disabled={catalogBusy || m.selected}
                               onClick={() => void applyCatalogModel(m, 'replicate')}
                             >
@@ -1146,7 +1096,7 @@ export default function ModelCenterView() {
                           {localChannel && !isService && (
                             <>
                               <button
-                                className="btn !py-1 !px-2.5 text-[11px]"
+                                className="btn btn-sm"
                                 disabled={catalogBusy || m.selected}
                                 onClick={() => void applyCatalogModel(m, localChannel)}
                               >
@@ -1154,7 +1104,7 @@ export default function ModelCenterView() {
                               </button>
                               {m.local_status !== 'ready' ? (
                                 <button
-                                  className="btn btn-acc !py-1 !px-2.5 text-[11px]"
+                                  className="btn btn-acc btn-sm"
                                   disabled={catalogBusy || !!activeOp}
                                   onClick={() => void downloadMusicModel(m)}
                                 >
@@ -1162,7 +1112,7 @@ export default function ModelCenterView() {
                                 </button>
                               ) : (
                                 <button
-                                  className="btn !py-1 !px-2.5 text-[11px]"
+                                  className="btn btn-sm"
                                   style={{ color: 'var(--bad)' }}
                                   disabled={catalogBusy}
                                   onClick={() => void removeMusicModel(m)}
@@ -1174,7 +1124,7 @@ export default function ModelCenterView() {
                           )}
                           {isService && localChannel && (
                             <button
-                              className="btn !py-1 !px-2.5 text-[11px]"
+                              className="btn btn-sm"
                               disabled={catalogBusy || m.selected}
                               onClick={() => void applyCatalogModel(m, localChannel)}
                             >
@@ -1185,39 +1135,37 @@ export default function ModelCenterView() {
                       </div>
                       {m.channels.includes('replicate') && (
                         <div className="flex items-center gap-2 mt-3" title={t('models.catalog.slugTitle')}>
-                          <span className="text-[10px] flex-none" style={{ color: 'var(--dim)' }}>slug</span>
+                          <span className="text-2xs flex-none text-dim">slug</span>
                           <input
-                            className="flex-1 px-2 py-1 text-[11px]"
-                            style={inputStyle}
+                            className={`flex-1 px-2 py-1 text-xs ${inputCls}`}
                             placeholder={m.replicate_slug_default || t('models.catalog.slugPh')}
                             value={slugEdits[m.id] ?? ''}
                             onChange={(e) => setSlugEdits((p) => ({ ...p, [m.id]: e.target.value }))}
                           />
                           {m.replicate_slug_overridden && (
-                            <span className="text-[10px] flex-none" style={{ color: 'var(--dim)' }}>{t('models.catalog.overridden')}</span>
+                            <span className="text-2xs flex-none text-dim">{t('models.catalog.overridden')}</span>
                           )}
                         </div>
                       )}
                       {isService && localChannel && (
                         <div className="mt-3" title={t('models.catalog.hostTitle')}>
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] flex-none" style={{ color: 'var(--dim)' }}>{t('models.catalog.endpoint')}</span>
+                            <span className="text-2xs flex-none text-dim">{t('models.catalog.endpoint')}</span>
                             <input
-                              className="flex-1 px-2 py-1 text-[11px]"
-                              style={inputStyle}
+                              className={`flex-1 px-2 py-1 text-xs ${inputCls}`}
                               placeholder={catalog?.machine.services?.[localChannel]?.host || 'http://127.0.0.1:…'}
                               value={hostEdits[localChannel] ?? ''}
                               onChange={(e) => setHostEdits((p) => ({ ...p, [localChannel]: e.target.value }))}
                             />
                             <button
-                              className="btn !py-1 !px-2.5 text-[11px] flex-none"
+                              className="btn btn-sm flex-none"
                               disabled={catalogBusy}
                               onClick={() => void saveHost(localChannel)}
                             >
                               {t('models.catalog.saveEndpoint')}
                             </button>
                           </div>
-                          <div className="text-[10px] mt-1" style={{ color: m.local_status === 'ready' ? 'var(--acc)' : 'var(--dim)' }}>
+                          <div className={`text-2xs mt-1 ${m.local_status === 'ready' ? 'text-acc' : 'text-dim'}`}>
                             {m.service_detail || catalog?.machine.services?.[localChannel]?.detail}
                             {m.local_status !== 'ready' && catalog?.machine.services?.[localChannel]?.hint
                               ? t('models.catalog.hintSuffix', { hint: catalog.machine.services[localChannel].hint }) : ''}
@@ -1232,7 +1180,7 @@ export default function ModelCenterView() {
                 <button className="btn" disabled={catalogBusy} onClick={() => void saveSlugs()}>
                   {t('models.catalog.saveSlugs')}
                 </button>
-                <span className="text-[10px] flex-1" style={{ color: 'var(--dim)' }}>
+                <span className="text-2xs flex-1 text-dim">
                   {catalog?.disclaimer}
                 </span>
               </div>
@@ -1243,9 +1191,9 @@ export default function ModelCenterView() {
               <div className="label mb-3">{t('models.local.title')}</div>
               <div className="card">
                 {local && local.models.length > 0 ? (
-                  <table className="w-full text-[12px]">
+                  <table className="w-full text-sm">
                     <thead>
-                      <tr className="label" style={{ color: 'var(--dim)' }}>
+                      <tr className="label">
                         <th className="text-left px-4 py-2 font-normal">{t('models.local.col.model')}</th>
                         <th className="text-left px-4 py-2 font-normal">{t('models.local.col.params')}</th>
                         <th className="text-left px-4 py-2 font-normal">{t('models.local.col.size')}</th>
@@ -1258,23 +1206,20 @@ export default function ModelCenterView() {
                           <td className="px-4 py-2.5">
                             <span className="font-bold">{m.name}</span>
                             {settings?.lyrics_backend === 'ollama' && local.selected === m.name && (
-                              <span
-                                className="ml-2 text-[9px] font-bold px-1.5 py-0.5"
-                                style={{ background: 'var(--acc)', color: '#000' }}
-                              >
+                              <span className="badge badge-solid ml-2">
                                 {t('models.local.engineInUse')}
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-2.5" style={{ color: 'var(--muted)' }}>
+                          <td className="px-4 py-2.5 text-muted">
                             {m.parameter_size || '—'} · {m.quantization || '—'}
                           </td>
-                          <td className="px-4 py-2.5 num" style={{ color: 'var(--muted)' }}>
+                          <td className="px-4 py-2.5 num text-muted">
                             {fmtSize(m.size_bytes)}
                           </td>
                           <td className="px-4 py-2.5 text-right">
                             <button
-                              className="btn !py-1 !px-2.5 text-[11px] mr-2"
+                              className="btn btn-sm mr-2"
                               disabled={settings?.lyrics_backend === 'ollama' && local.selected === m.name}
                               onClick={() => {
                                 setPickedModel(m.name)
@@ -1284,7 +1229,7 @@ export default function ModelCenterView() {
                               {t('models.local.setEngine')}
                             </button>
                             <button
-                              className="btn !py-1 !px-2.5 text-[11px]"
+                              className="btn btn-sm"
                               style={{ color: 'var(--bad)' }}
                               onClick={() => void removeModel(m.name)}
                             >
@@ -1296,7 +1241,7 @@ export default function ModelCenterView() {
                     </tbody>
                   </table>
                 ) : (
-                  <div className="px-4 py-6 text-[12px]" style={{ color: 'var(--dim)' }}>
+                  <div className="px-4 py-6 text-sm text-dim">
                     {local?.error || t('models.local.empty')}
                   </div>
                 )}
@@ -1319,8 +1264,7 @@ export default function ModelCenterView() {
                 </div>
                 <div className="flex gap-2">
                   <input
-                    className="flex-1 px-3 py-2 text-[12px]"
-                    style={inputStyle}
+                    className={`flex-1 px-3 py-2 text-sm ${inputCls}`}
                     placeholder={t('models.pull.tagPh')}
                     value={pullTag}
                     onChange={(e) => setPullTag(e.target.value)}
@@ -1332,21 +1276,21 @@ export default function ModelCenterView() {
                     {pulling || activeOp ? t('models.pull.downloading') : t('common.download')}
                   </button>
                 </div>
-                <div className="text-[10px] mt-2" style={{ color: 'var(--dim)' }}>
+                <div className="text-2xs mt-2 text-dim">
                   {t('models.pull.note')}
                 </div>
                 {activeOp && (
                   <div className="mt-3">
-                    <div className="flex items-center justify-between text-[11px] mb-1">
+                    <div className="flex items-center justify-between text-xs mb-1">
                       <span className="font-bold">{activeOp.target}</span>
-                      <span className="num" style={{ color: 'var(--acc)' }}>
+                      <span className="num text-acc">
                         {activeOp.progress}% · {activeOp.message}
                       </span>
                     </div>
-                    <div className="h-[4px]" style={{ background: 'var(--bg3)' }}>
+                    <div className="h-[4px] bg-bg-3">
                       <div
-                        className="h-full transition-all"
-                        style={{ width: `${activeOp.progress}%`, background: 'var(--acc)' }}
+                        className="h-full transition-all bg-acc"
+                        style={{ width: `${activeOp.progress}%` }}
                       />
                     </div>
                   </div>
@@ -1360,20 +1304,15 @@ export default function ModelCenterView() {
               {ops.length > 0 ? (
                 <div className="card p-4">
                   {ops.map((op) => (
-                    <div key={op.id} className="flex items-center gap-3 text-[11px] py-1">
-                      <span style={{ color: 'var(--dim)' }} className="num">
+                    <div key={op.id} className="flex items-center gap-3 text-xs py-1">
+                      <span className="num text-dim">
                         {formatDateTime(op.created_at)}
                       </span>
                       <span className="font-bold">{t(OP_TYPE_LABEL[op.op_type])}</span>
                       <span>{op.target}</span>
-                      <span
-                        className="flex-1"
-                        style={{
-                          color: op.status === 'succeeded'
-                            ? 'var(--acc)'
-                            : op.status === 'failed' ? 'var(--bad)' : 'var(--dim)',
-                        }}
-                      >
+                      <span className={`flex-1 ${
+                        op.status === 'succeeded' ? 'text-acc' : op.status === 'failed' ? 'text-bad' : 'text-dim'
+                      }`}>
                         {op.status === 'succeeded' ? t('models.ops.succeeded') : op.status === 'failed'
                           ? t('models.ops.failed', { msg: op.error_message || t('models.ops.unknownError') }) : `${op.progress}% ${op.message}`}
                       </span>
@@ -1381,7 +1320,7 @@ export default function ModelCenterView() {
                   ))}
                 </div>
               ) : (
-                <div className="card p-4 text-[12px]" style={{ color: 'var(--dim)' }}>
+                <div className="card p-4 text-sm text-dim">
                   {t('models.ops.empty')}
                 </div>
               )}

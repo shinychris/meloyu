@@ -14,6 +14,8 @@ import CandidateCard from '../components/studio/CandidateCard'
 import VersionTree from '../components/studio/VersionTree'
 import ReferencePanel from '../components/studio/ReferencePanel'
 import HumDialog from '../components/studio/HumDialog'
+import { PageHeader } from '../components/common/PageHeader'
+import { EmptyState } from '../components/common/EmptyState'
 
 const MODE_HINTS: Record<string, TranslationKey> = {
   simple: 'studio.modeHint.simple',
@@ -114,21 +116,18 @@ export default function StudioView() {
 
   return (
     <section className="view flex flex-col h-full">
-      <header className="px-8 pt-6 pb-4">
-        <div className="flex items-end justify-between flex-wrap gap-3">
-          <div>
-            <div className="label">{t('studio.view.label')}</div>
-            <h1 className="text-[28px] font-extrabold tracking-tight mt-1">{t('studio.view.headline')}</h1>
-          </div>
-          <div className="flex items-center gap-3 text-[11px]" style={{ color: 'var(--muted)' }}>
+      <PageHeader
+        label={t('studio.view.label')}
+        title={t('studio.view.headline')}
+        actions={
+          <div className="flex items-center gap-3 text-xs text-muted">
             <span className="flex items-center gap-2">
               <span className="dot" style={{ background: 'var(--acc)' }}></span>
               {modelLabel} · {t('studio.view.vocalOptimized')}
             </span>
             {songEngine && (
               <span
-                className="text-[10px] font-bold px-2 py-1 cursor-pointer"
-                style={{ background: 'var(--bg2)', border: '1px solid var(--line)', color: 'var(--dim)' }}
+                className="text-2xs font-bold px-2 py-1 cursor-pointer border border-line bg-bg-2 text-dim"
                 title={t('studio.view.songEngineTitle')}
                 onClick={() => navigate('/models')}
               >
@@ -136,13 +135,14 @@ export default function StudioView() {
               </span>
             )}
           </div>
-        </div>
+        }
+      >
         <StepBar />
-      </header>
+      </PageHeader>
 
-      <div className="grid grid-cols-[360px_1fr_200px] rule-t flex-1 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr_180px] xl:grid-cols-[360px_1fr_200px] rule-t flex-1 min-h-0">
         {/* 左：控制列 */}
-        <div className="border-r px-6 py-5 overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
+        <div className="border-r border-line px-6 py-5 overflow-y-auto">
           <div className="label">{t('studio.mode')}</div>
           <div className="flex gap-1.5 mt-2 flex-wrap">
             <button type="button" className={`chip ${form.mode === 'simple' ? 'on' : ''}`} onClick={() => onMode('simple')}>
@@ -197,7 +197,7 @@ export default function StudioView() {
                   markStep(1)
                 }}
               />
-              <div className="text-[10px] mt-1.5 leading-relaxed" style={{ color: 'var(--dim)' }}>
+              <div className="text-2xs mt-1.5 leading-relaxed text-dim">
                 {t('studio.simple.hint')}
               </div>
             </>
@@ -225,33 +225,35 @@ export default function StudioView() {
             <>
               <div className="label mt-4">
                 {t('studio.lyrics.label')}{' '}
-                <span className="normal-case tracking-normal" style={{ color: 'var(--dim)' }}>
+                <span className="normal-case tracking-normal text-dim">
                   {t('studio.lyrics.tagCount', { n: tagCount })}
                   {markCount > 0 ? ` · ${t('studio.lyrics.markCount', { n: markCount })}` : ''}
                 </span>
               </div>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {meta.structure_tags.map((tg) => (
-                  <span
+                  <button
+                    type="button"
                     key={tg.tag}
                     className="chip"
                     title={tg.desc ?? tg.label}
                     onClick={() => insertTag(tg.tag)}
                   >
                     {tg.tag} {tg.label}
-                  </span>
+                  </button>
                 ))}
               </div>
               <div className="flex flex-wrap gap-1.5 mt-2 mb-2">
                 {(meta.performance_marks ?? []).map((m) => (
-                  <span
+                  <button
+                    type="button"
                     key={m.mark}
                     className="chip"
                     title={t('studio.lyrics.markTitle')}
                     onClick={() => insertMark(m.mark, m.group)}
                   >
                     {m.label}
-                  </span>
+                  </button>
                 ))}
               </div>
               <textarea
@@ -263,7 +265,7 @@ export default function StudioView() {
                 onChange={(e) => patchForm({ lyrics: e.target.value })}
               />
               <button
-                className="btn btn-ghost w-full !py-1.5 text-[11px] mt-2"
+                className="btn btn-ghost btn-sm w-full mt-2"
                 onClick={() => {
                   navigate('/lyrics')
                   toast(t('studio.toast.switchedToLyrics'))
@@ -279,13 +281,13 @@ export default function StudioView() {
 
           <button
             id="btnGenerate"
-            className="btn btn-acc w-full mt-5 !py-3 text-[13px] font-bold"
+            className="btn btn-acc btn-lg w-full mt-5 font-bold"
             disabled={generating}
             onClick={() => void submitGeneration()}
           >
             {generating ? t('studio.generate.generating') : t('studio.generate.button', { n: creditCost })}
           </button>
-          <div className="text-[10px] mt-2.5 leading-relaxed" style={{ color: 'var(--dim)' }}>
+          <div className="text-2xs mt-2.5 leading-relaxed text-dim">
             {t('studio.generate.complianceNote')}
           </div>
         </div>
@@ -294,7 +296,7 @@ export default function StudioView() {
         <div className="px-6 py-5 min-h-[560px] overflow-y-auto">
           <div className="flex items-center justify-between">
             <div className="label">{t('studio.candidates.title')}</div>
-            <div className="text-[11px]" style={{ color: 'var(--dim)' }}>
+            <div className="text-xs text-dim">
               {t('studio.candidates.previewNote')}
             </div>
           </div>
@@ -305,28 +307,28 @@ export default function StudioView() {
             <div className="mt-3 card p-5" style={{ borderColor: 'var(--bad)' }}>
               <div className="flex items-center gap-3">
                 <span className="dot" style={{ background: 'var(--bad)' }}></span>
-                <span className="text-[13px] font-semibold" style={{ color: 'var(--bad)' }}>
+                <span className="text-base font-semibold text-bad">
                   {t('studio.failure.title')}
                 </span>
               </div>
-              <div className="text-[12px] mt-3 leading-relaxed" style={{ color: 'var(--muted)' }}>
+              <div className="text-sm mt-3 leading-relaxed text-muted">
                 {failureMessage}
               </div>
               <div className="flex gap-2 mt-4">
                 <button
-                  className="btn btn-acc !py-1.5 !px-3 text-[11px] font-bold"
+                  className="btn btn-acc btn-sm font-bold"
                   onClick={() => void submitGeneration({ simplified: true })}
                 >
                   {t('studio.failure.retrySimplified')}
                 </button>
                 <button
-                  className="btn btn-ghost !py-1.5 !px-3 text-[11px]"
+                  className="btn btn-ghost btn-sm"
                   onClick={() => void submitGeneration()}
                 >
                   {t('studio.failure.retryOriginal')}
                 </button>
               </div>
-              <div className="text-[10px] mt-3" style={{ color: 'var(--dim)' }}>
+              <div className="text-2xs mt-3 text-dim">
                 {t('studio.failure.note')}
               </div>
             </div>
@@ -343,34 +345,22 @@ export default function StudioView() {
               ))}
             </div>
           ) : (
-            <div
-              className="border border-dashed mt-3 py-16 text-center"
-              style={{ borderColor: 'var(--line)' }}
-            >
-              <svg className="mx-auto" width="40" height="40" viewBox="0 0 40 40" fill="none">
-                <rect x="4" y="16" width="4" height="12" fill="#2c2c2c" />
-                <rect x="12" y="10" width="4" height="24" fill="#2c2c2c" />
-                <rect x="20" y="5" width="4" height="30" fill="#00ff2c" />
-                <rect x="28" y="12" width="4" height="20" fill="#2c2c2c" />
-              </svg>
-              <div className="text-[13px] mt-4 font-semibold" style={{ color: 'var(--muted)' }}>
-                {t('studio.empty.title')}
-              </div>
-              <div className="text-[11px] mt-2 leading-relaxed" style={{ color: 'var(--dim)' }}>
-                {t('studio.empty.step1')}
-                <br />
-                {t('studio.empty.step2')}
-              </div>
-              <button
-                className="btn btn-ghost text-[11px] mt-4"
-                onClick={() => {
-                  randomInspire()
-                  toast(t('studio.toast.randomInspired'))
-                }}
-              >
-                {t('studio.empty.random')}
-              </button>
-            </div>
+            <EmptyState
+              className="mt-3"
+              title={t('studio.empty.title')}
+              hint={
+                <>
+                  {t('studio.empty.step1')}
+                  <br />
+                  {t('studio.empty.step2')}
+                </>
+              }
+              actionLabel={t('studio.empty.random')}
+              onAction={() => {
+                randomInspire()
+                toast(t('studio.toast.randomInspired'))
+              }}
+            />
           )}
         </div>
 

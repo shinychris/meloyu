@@ -57,14 +57,14 @@ export default function ParamPanel() {
   return (
     <>
       <div className="flex items-center justify-between mt-2">
-        <span className="text-[10px]" style={{ color: 'var(--dim)' }}>{t('studio.param.label')}</span>
-        <button className="text-[9px] underline" style={{ color: 'var(--dim)' }} onClick={() => void applyTaste()}>
+        <span className="text-2xs text-dim">{t('studio.param.label')}</span>
+        <button className="text-2xs underline text-dim" onClick={() => void applyTaste()}>
           {t('studio.taste.apply')}
         </button>
       </div>
-      <div className="grid grid-cols-2 gap-2.5 mt-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-2">
         <div>
-          <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>{t('studio.param.language')}</div>
+          <div className="text-2xs mb-1 text-dim">{t('studio.param.language')}</div>
           <select value={form.language} onChange={(e) => { patchForm({ language: e.target.value as typeof form.language }); markStep(3) }}>
             {meta.languages.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -72,23 +72,23 @@ export default function ParamPanel() {
           </select>
         </div>
         <div>
-          <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>{t('studio.param.vocal')}</div>
+          <div className="text-2xs mb-1 text-dim">{t('studio.param.vocal')}</div>
           <select value={form.vocal} onChange={(e) => { patchForm({ vocal: e.target.value as typeof form.vocal }); markStep(3) }}>
             {meta.vocal_types.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
           {form.vocal === 'voice_clone' && !form.voiceProfileId && (
-            <div className="text-[9px] mt-1" style={{ color: 'var(--bad)' }}>{t('studio.voice.pickFirst')}</div>
+            <div className="text-2xs mt-1 text-bad">{t('studio.voice.pickFirst')}</div>
           )}
           {form.vocal !== 'voice_clone' && !voiceOpen && (
-            <button className="text-[9px] mt-1 underline" style={{ color: 'var(--dim)' }} onClick={() => setVoiceOpen(true)}>
+            <button className="text-2xs mt-1 underline text-dim" onClick={() => setVoiceOpen(true)}>
               {t('studio.voice.manage')}
             </button>
           )}
         </div>
         <div>
-          <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>{t('studio.param.key')}</div>
+          <div className="text-2xs mb-1 text-dim">{t('studio.param.key')}</div>
           <select value={keyValue} onChange={(e) => onKeyChange(e.target.value)}>
             {meta.keys.map((k) => (
               <option key={`${k.tonic}|${k.mode}`} value={`${k.tonic}|${k.mode}`}>{k.label}</option>
@@ -96,7 +96,7 @@ export default function ParamPanel() {
           </select>
         </div>
         <div>
-          <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>{t('studio.param.timeSignature')}</div>
+          <div className="text-2xs mb-1 text-dim">{t('studio.param.timeSignature')}</div>
           <select value={form.timeSignature} onChange={(e) => { patchForm({ timeSignature: e.target.value as typeof form.timeSignature }); markStep(3) }}>
             {meta.time_signatures.map((ts) => (
               <option key={ts} value={ts}>{ts}</option>
@@ -104,7 +104,7 @@ export default function ParamPanel() {
           </select>
         </div>
         <div>
-          <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>{t('studio.param.duration')}</div>
+          <div className="text-2xs mb-1 text-dim">{t('studio.param.duration')}</div>
           <select
             value={DURATION_PRESETS.some((p) => p.value === form.durationSec) ? form.durationSec : 'custom'}
             onChange={(e) => {
@@ -124,7 +124,7 @@ export default function ParamPanel() {
           </select>
         </div>
         <div>
-          <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>{t('studio.param.model')}</div>
+          <div className="text-2xs mb-1 text-dim">{t('studio.param.model')}</div>
           <select value={form.model} onChange={(e) => { patchForm({ model: e.target.value as typeof form.model }); markStep(3) }}>
             {meta.models.map((m) => (
               <option key={m.value} value={m.value}>{m.label}</option>
@@ -134,7 +134,7 @@ export default function ParamPanel() {
       </div>
 
       <div className="mt-3">
-        <div className="flex justify-between text-[10px] mb-1.5" style={{ color: 'var(--dim)' }}>
+        <div className="flex justify-between text-2xs mb-1.5 text-dim">
           <span>BPM</span>
           <span className="num">{form.bpm}</span>
         </div>
@@ -147,7 +147,7 @@ export default function ParamPanel() {
         />
       </div>
       <div className="mt-2.5">
-        <div className="flex justify-between text-[10px] mb-1.5" style={{ color: 'var(--dim)' }}>
+        <div className="flex justify-between text-2xs mb-1.5 text-dim">
           <span>{t('studio.param.density')}</span>
           <span className="num">{form.density}%</span>
         </div>
@@ -162,7 +162,7 @@ export default function ParamPanel() {
       {(form.vocal === 'voice_clone' || voiceOpen) && <VoicePanel />}
 
       <div className="mt-2.5">
-        <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>{t('studio.param.negative')}</div>
+        <div className="text-2xs mb-1 text-dim">{t('studio.param.negative')}</div>
         <input
           type="text"
           placeholder={t('studio.param.negativePlaceholder')}

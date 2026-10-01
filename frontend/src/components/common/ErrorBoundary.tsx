@@ -5,13 +5,13 @@ import { useT } from '../../i18n'
 function ErrorFallback({ onReload }: { onReload: () => void }) {
   const t = useT()
   return (
-    <div className="h-full flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+    <div className="h-full flex items-center justify-center bg-bg">
       <div className="card p-8 w-[380px] text-center pop">
-        <div className="text-[17px] font-extrabold tracking-tight">{t('app.error.title')}</div>
-        <div className="text-[12px] mt-3 leading-relaxed" style={{ color: 'var(--muted)' }}>
+        <div className="text-lg font-extrabold tracking-tight">{t('app.error.title')}</div>
+        <div className="text-sm mt-3 leading-relaxed text-muted">
           {t('app.error.desc')}
         </div>
-        <button className="btn btn-acc !py-2 !px-5 text-[12px] mt-6" onClick={onReload}>
+        <button className="btn btn-acc btn-md mt-6" onClick={onReload}>
           {t('app.error.reload')}
         </button>
       </div>

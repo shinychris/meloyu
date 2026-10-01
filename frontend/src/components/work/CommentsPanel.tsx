@@ -82,7 +82,7 @@ export default function CommentsPanel({ workId, canComment }: { workId: string; 
     <div className="card p-3" data-testid="comments-panel">
       <div className="flex items-center justify-between">
         <div className="label">{t('comments.title')}</div>
-        <span className="text-[9px]" style={{ color: 'var(--dim)' }}>
+        <span className="text-2xs text-dim">
           {t('comments.count', { n: items.length })}
         </span>
       </div>
@@ -91,17 +91,17 @@ export default function CommentsPanel({ workId, canComment }: { workId: string; 
         <div className="mt-2">
           <textarea
             rows={2}
-            className="!text-[11px]"
+            className="!text-xs"
             maxLength={1000}
             placeholder={t('comments.placeholder', { time: formatDuration(position) })}
             value={body}
             onChange={(e) => setBody(e.target.value)}
           />
           <div className="flex items-center justify-between mt-1">
-            <span className="text-[9px]" style={{ color: 'var(--dim)' }}>
+            <span className="text-2xs text-dim">
               {t('comments.anchorHint', { time: formatDuration(position) })}
             </span>
-            <button className="btn btn-acc !py-1 !px-2.5 text-[10px]" disabled={busy} onClick={() => void submit()}>
+            <button className="btn btn-acc btn-sm" disabled={busy} onClick={() => void submit()}>
               {t('comments.submit')}
             </button>
           </div>
@@ -110,29 +110,28 @@ export default function CommentsPanel({ workId, canComment }: { workId: string; 
 
       <div className="mt-2 space-y-1.5 max-h-64 overflow-y-auto">
         {items.length === 0 ? (
-          <div className="text-[10px] py-3 text-center" style={{ color: 'var(--dim)' }}>
+          <div className="text-2xs py-3 text-center text-dim">
             {t('comments.empty')}
           </div>
         ) : (
           items.map((c) => (
             <div
               key={c.id}
-              className="flex items-start gap-2 px-2 py-1.5"
-              style={{ background: 'var(--bg2)', opacity: c.resolved ? 0.5 : 1 }}
+              className="flex items-start gap-2 px-2 py-1.5 bg-bg-2"
+              style={{ opacity: c.resolved ? 0.5 : 1 }}
             >
               <button
-                className="text-[9px] px-1.5 py-0.5 font-bold num shrink-0"
-                style={{ background: 'var(--acc-dim)', color: 'var(--acc)' }}
+                className="badge badge-acc num shrink-0"
                 title={t('comments.jump')}
                 onClick={() => jump(c.time_sec)}
               >
                 {formatDuration(c.time_sec)}
               </button>
               <div className="min-w-0 flex-1">
-                <div className="text-[10px]" style={{ color: 'var(--muted)', wordBreak: 'break-word' }}>
+                <div className="text-2xs text-muted" style={{ wordBreak: 'break-word' }}>
                   {c.body}
                 </div>
-                <div className="text-[9px] mt-0.5" style={{ color: 'var(--dim)' }}>
+                <div className="text-2xs mt-0.5 text-dim">
                   {c.author_nickname} · {c.created_at.slice(0, 16).replace('T', ' ')}
                 </div>
               </div>

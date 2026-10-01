@@ -118,8 +118,7 @@ export default function CandidateCard({
     <div className="card pop" style={{ animationDelay: `${index * 0.12}s` }}>
       <div className="flex items-center gap-4 px-4 py-3">
         <div
-          className="cover cursor-pointer"
-          style={{ background: index ? '#1c2b1f' : '#232323', border: '1px solid var(--line)' }}
+          className={`cover cursor-pointer border border-line ${index ? 'bg-acc-dim' : 'bg-bg-3'}`}
           onClick={onPlay}
           title={t('studio.card.playTitle')}
         >
@@ -127,10 +126,9 @@ export default function CandidateCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-[13px] font-semibold truncate">{title}</span>
+            <span className="text-base font-semibold truncate">{title}</span>
             <span
-              className="text-[9px] px-1.5 py-0.5 font-bold num"
-              style={{ background: 'var(--acc-dim)', color: 'var(--acc)' }}
+              className="badge badge-acc num"
               title={candidate.quality_score == null ? t('studio.card.externalTitle') : undefined}
             >
               {candidate.quality_score == null
@@ -138,10 +136,7 @@ export default function CandidateCard({
                 : t('studio.card.quality', { n: candidate.quality_score })}
             </span>
             {candidate.adopted && (
-              <span
-                className="text-[9px] px-1.5 py-0.5 font-bold"
-                style={{ background: 'var(--acc)', color: '#000' }}
-              >
+              <span className="badge badge-solid">
                 {t('studio.card.finalized')}
               </span>
             )}
@@ -151,13 +146,13 @@ export default function CandidateCard({
               ? candidate.style_tags
               : [vocalLabel(candidate.vocal), keyLabel(candidate.key), candidate.time_signature]
             ).map((tag) => (
-              <span key={tag} className="text-[10px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>
+              <span key={tag} className="badge">
                 {tag}
               </span>
             ))}
           </div>
         </div>
-        <span className="text-[11px] num" style={{ color: 'var(--dim)' }}>
+        <span className="text-xs num text-dim">
           {formatDuration(candidate.duration_sec)}
         </span>
       </div>
@@ -184,12 +179,12 @@ export default function CandidateCard({
           </svg>
         </button>
         {!candidate.adopted && (
-          <button className="btn btn-ghost !py-1 !px-2.5 text-[11px]" onClick={() => void onAdopt()}>
+          <button className="btn btn-ghost btn-sm" onClick={() => void onAdopt()}>
             {t('studio.card.adopt')}
           </button>
         )}
         <button
-          className="btn btn-ghost !py-1 !px-2.5 text-[11px]"
+          className="btn btn-ghost btn-sm"
           disabled={generating}
           title={generating ? t('studio.card.busyTitle') : t('studio.card.extendTitle')}
           onClick={() => togglePanel('extend')}
@@ -197,7 +192,7 @@ export default function CandidateCard({
           {t('studio.card.extend')}
         </button>
         <button
-          className="btn btn-ghost !py-1 !px-2.5 text-[11px]"
+          className="btn btn-ghost btn-sm"
           disabled={generating}
           title={generating ? t('studio.card.busyTitle') : t('studio.card.variantTitle')}
           onClick={() => togglePanel('variant')}
@@ -205,7 +200,7 @@ export default function CandidateCard({
           {t('studio.card.variant')}
         </button>
         <button
-          className="btn btn-ghost !py-1 !px-2.5 text-[11px]"
+          className="btn btn-ghost btn-sm"
           disabled={generating}
           title={generating ? t('studio.card.busyTitle') : t('studio.card.regenTitle')}
           onClick={() => togglePanel('regen')}
@@ -214,7 +209,7 @@ export default function CandidateCard({
         </button>
         <span style={{ flex: 1 }}></span>
         <button
-          className="btn btn-ghost !py-1 !px-2.5 text-[11px]"
+          className="btn btn-ghost btn-sm"
           style={{ color: 'var(--acc)', borderColor: 'var(--acc)' }}
           onClick={() => {
             // 带上作品/版本/候选上下文：编曲视图按参自动装载该候选的分轨
@@ -230,7 +225,7 @@ export default function CandidateCard({
           {t('studio.card.arrange')}
         </button>
         <button
-          className="btn btn-ghost !py-1 !px-2.5 text-[11px]"
+          className="btn btn-ghost btn-sm"
           onClick={() => (workId ? navigate(`/works/${workId}`) : toast(t('studio.toast.detailPending'), 'warn'))}
           title={t('studio.card.exportTitle')}
         >

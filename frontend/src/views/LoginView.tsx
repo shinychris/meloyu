@@ -6,6 +6,7 @@ import { useMetaStore } from '../stores/meta'
 import { toast } from '../stores/toast'
 import { useT } from '../i18n'
 import LangSwitch from '../components/common/LangSwitch'
+import { Logo } from '../components/common/Logo'
 import type { AuthData } from '../types/api'
 
 type Tab = 'login' | 'register'
@@ -44,10 +45,10 @@ function ForgotPasswordModal({ open, onClose }: { open: boolean; onClose: () => 
   }
 
   return (
-    <div className="fixed inset-0 z-[95] flex items-center justify-center" style={{ background: 'rgba(0,0,0,.72)' }}>
+    <div className="modal-overlay">
       <div className="card pop w-[380px] p-6">
-        <div className="text-[15px] font-bold">{t('auth.forgot.title')}</div>
-        <div className="text-[12px] mt-2 leading-relaxed" style={{ color: 'var(--muted)' }}>
+        <div className="text-md font-bold">{t('auth.forgot.title')}</div>
+        <div className="text-sm mt-2 leading-relaxed text-muted">
           {t('auth.forgot.desc')}
         </div>
         <form onSubmit={submit} className="mt-4 space-y-3">
@@ -59,15 +60,15 @@ function ForgotPasswordModal({ open, onClose }: { open: boolean; onClose: () => 
             autoComplete="email"
           />
           {error && (
-            <div className="text-[11px]" style={{ color: 'var(--bad)' }}>
+            <div className="text-xs text-bad">
               {error}
             </div>
           )}
           <div className="flex gap-2 justify-end">
-            <button type="button" className="btn btn-ghost !py-1.5 !px-4 text-[12px]" onClick={onClose}>
+            <button type="button" className="btn btn-ghost btn-md" onClick={onClose}>
               {t('common.cancel')}
             </button>
-            <button type="submit" className="btn btn-acc !py-1.5 !px-4 text-[12px]" disabled={busy}>
+            <button type="submit" className="btn btn-acc btn-md" disabled={busy}>
               {busy ? t('auth.forgot.sending') : t('auth.forgot.submit')}
             </button>
           </div>
@@ -167,14 +168,10 @@ export default function LoginView() {
       </div>
       <div className="w-[380px] pop">
         <div className="flex items-center gap-2 justify-center mb-8">
-          <svg width="26" height="26" viewBox="0 0 22 22" fill="none">
-            <rect x="1" y="1" width="20" height="20" stroke="#00ff2c" strokeWidth="2" />
-            <rect x="6" y="9" width="3" height="7" fill="#fff" />
-            <rect x="11" y="5" width="3" height="11" fill="#00ff2c" />
-          </svg>
+          <Logo size={26} />
           <div>
-            <div className="text-[17px] font-extrabold tracking-tight leading-none">MELOYU</div>
-            <div className="text-[10px] mt-1" style={{ color: 'var(--dim)' }}>
+            <div className="text-lg font-extrabold tracking-tight leading-none">MELOYU</div>
+            <div className="text-2xs mt-1 text-dim">
               {t('login.tagline')}
             </div>
           </div>
@@ -182,18 +179,18 @@ export default function LoginView() {
 
         <div className="card p-7">
           <div className="flex gap-1.5 mb-5">
-            <span className={`chip ${tab === 'login' ? 'on' : ''}`} onClick={() => setTab('login')}>
+            <button type="button" className={`chip ${tab === 'login' ? 'on' : ''}`} onClick={() => setTab('login')}>
               {t('login.tab.login')}
-            </span>
-            <span className={`chip ${tab === 'register' ? 'on' : ''}`} onClick={() => setTab('register')}>
+            </button>
+            <button type="button" className={`chip ${tab === 'register' ? 'on' : ''}`} onClick={() => setTab('register')}>
               {t('login.tab.register')}
-            </span>
+            </button>
           </div>
 
           <form onSubmit={submit} className="space-y-3">
             {tab === 'register' && (
               <div>
-                <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>
+                <div className="text-2xs mb-1 text-dim">
                   {t('login.nickname.label')}
                 </div>
                 <input
@@ -206,7 +203,7 @@ export default function LoginView() {
               </div>
             )}
             <div>
-              <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>
+              <div className="text-2xs mb-1 text-dim">
                 {t('login.email.label')}
               </div>
               <input
@@ -219,7 +216,7 @@ export default function LoginView() {
             </div>
             {tab === 'register' && verifyEnabled && (
               <div>
-                <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>
+                <div className="text-2xs mb-1 text-dim">
                   {t('login.verify.label')}
                 </div>
                 <div className="flex gap-2">
@@ -234,7 +231,7 @@ export default function LoginView() {
                   />
                   <button
                     type="button"
-                    className="btn btn-ghost !py-1.5 !px-3 text-[11px] shrink-0"
+                    className="btn btn-ghost btn-sm shrink-0"
                     disabled={cooldown > 0 || loading}
                     onClick={() => void onSendCode()}
                   >
@@ -242,20 +239,19 @@ export default function LoginView() {
                   </button>
                 </div>
                 {codeSent && (
-                  <div className="text-[10px] mt-1" style={{ color: 'var(--dim)' }}>
+                  <div className="text-2xs mt-1 text-dim">
                     {t('login.verify.sent')}
                   </div>
                 )}
               </div>
             )}
             <div>
-              <div className="text-[10px] mb-1 flex items-center justify-between" style={{ color: 'var(--dim)' }}>
+              <div className="text-2xs mb-1 flex items-center justify-between text-dim">
                 <span>{t('login.password.label')}</span>
                 {tab === 'login' && (
                   <button
                     type="button"
-                    className="font-bold"
-                    style={{ color: 'var(--acc)' }}
+                    className="font-bold text-acc"
                     onClick={() => setForgotOpen(true)}
                   >
                     {t('auth.forgot.link')}
@@ -272,20 +268,20 @@ export default function LoginView() {
             </div>
 
             {error && (
-              <div className="text-[11px] leading-relaxed" style={{ color: 'var(--bad)' }}>
+              <div className="text-xs leading-relaxed text-bad">
                 {error}
               </div>
             )}
 
-            <button type="submit" className="btn btn-acc w-full !py-3 text-[13px] font-bold" disabled={loading}>
+            <button type="submit" className="btn btn-acc btn-lg w-full font-bold" disabled={loading}>
               {loading ? t('login.submitting') : tab === 'login' ? t('login.submit.login') : t('login.submit.register')}
             </button>
           </form>
 
-          <div className="mt-5 pt-4 rule-t text-[11px] leading-relaxed" style={{ color: 'var(--dim)' }}>
+          <div className="mt-5 pt-4 rule-t text-xs leading-relaxed text-dim">
             {/* 2026-09-09 安审计 L2/M-4：移除 demo 固定凭据提示与自动填充——生产栈
-                启动即禁用种子账号，该凭据已不可用；dev 演示凭据见 backend/README.md */}
-            <div>{t('login.demo.note')}</div>
+                启动即禁用种子账号，该凭据已不可用；dev 演示凭据见 backend/README.md。
+                商业化发布：不再展示 demo 引擎说明文案 */}
             <button
               className="mt-3 flex items-center gap-1 transition-colors hover:text-white"
               type="button"

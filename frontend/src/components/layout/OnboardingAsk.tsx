@@ -15,8 +15,7 @@ export default function OnboardingAsk() {
   }
   return (
     <div
-      className="fixed inset-0 z-[95] flex items-center justify-center"
-      style={{ background: 'rgba(0,0,0,.72)' }}
+      className="modal-overlay"
       onClick={() => choose(false)}
       role="dialog"
       aria-modal="true"
@@ -31,15 +30,15 @@ export default function OnboardingAsk() {
         style={{ borderColor: 'var(--line2)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-[15px] font-bold">{t('layout.ob.askTitle')}</div>
-        <div className="text-[12px] mt-2 leading-relaxed" style={{ color: 'var(--muted)' }}>
+        <div className="text-md font-bold">{t('layout.ob.askTitle')}</div>
+        <div className="text-sm mt-2 leading-relaxed text-muted">
           {t('layout.ob.askDesc')}
         </div>
         <div className="flex gap-2 mt-6 justify-end">
-          <button className="btn btn-ghost !py-1.5 !px-4 text-[12px]" onClick={() => choose(false)}>
+          <button className="btn btn-ghost btn-md" onClick={() => choose(false)}>
             {t('layout.ob.askSkip')}
           </button>
-          <button className="btn btn-acc !py-1.5 !px-4 text-[12px] font-bold" onClick={() => choose(true)}>
+          <button className="btn btn-acc btn-md font-bold" onClick={() => choose(true)}>
             {t('layout.ob.askStart')}
           </button>
         </div>

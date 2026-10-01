@@ -53,7 +53,7 @@ function SearchInputImpl({ onQueryChange, delayMs = 400, maxLength = 50, placeho
         placeholder={placeholder ?? t('layout.search.placeholder')}
         aria-label={t('common.search')}
         onChange={onChange}
-        className="!w-[220px] !text-[12px] !pr-7"
+        className="!w-[220px] !text-sm !pr-7"
         style={{ padding: '6px 10px' }}
       />
       {value !== '' && (
@@ -62,8 +62,7 @@ function SearchInputImpl({ onQueryChange, delayMs = 400, maxLength = 50, placeho
           aria-label={t('layout.search.clear')}
           title={t('layout.search.clear')}
           onClick={onClear}
-          className="absolute right-1.5 w-5 h-5 flex items-center justify-center text-[11px] leading-none"
-          style={{ color: 'var(--dim)' }}
+          className="absolute right-1.5 w-5 h-5 flex items-center justify-center text-xs leading-none text-dim"
         >
           <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.6">
             <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />

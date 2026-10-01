@@ -54,11 +54,11 @@ export default function InspireBox() {
         <div className="label" style={{ color: 'var(--acc)' }}>
           {t('studio.inspire.title')}
         </div>
-        <button className="text-[10px] font-bold" style={{ color: 'var(--acc)' }} onClick={random}>
+        <button className="text-2xs font-bold text-acc" onClick={random}>
           {t('studio.inspire.random')}
         </button>
       </div>
-      <div className="text-[10px] mt-1.5 mb-2" style={{ color: 'var(--dim)' }}>
+      <div className="text-2xs mt-1.5 mb-2 text-dim">
         {t('studio.inspire.hint')}
       </div>
       {GROUPS.map((g) => {
@@ -72,27 +72,29 @@ export default function InspireBox() {
         const hiddenCount = list.length - COLLAPSED_COUNT
         return (
           <div key={g.key}>
-            <div className={`text-[10px] ${g.key === 'scene' ? '' : 'mt-2.5'} mb-1`} style={{ color: 'var(--dim)' }}>
+            <div className={`text-2xs ${g.key === 'scene' ? '' : 'mt-2.5'} mb-1 text-dim`}>
               {t(g.label)}
             </div>
             <div className="flex flex-wrap gap-1.5">
               {shown.map((item) => (
-                <span
+                <button
                   key={item}
+                  type="button"
                   className={`chip ${inspire[g.key] === item ? 'on' : ''}`}
                   onClick={() => pick(g, item)}
                 >
                   {item}
-                </span>
+                </button>
               ))}
               {list.length > COLLAPSED_COUNT && (
-                <span
+                <button
+                  type="button"
                   className="chip"
                   style={{ color: 'var(--acc)' }}
                   onClick={() => setExpanded((s) => ({ ...s, [g.key]: !s[g.key] }))}
                 >
                   {open ? t('studio.inspire.less') : t('studio.inspire.more', { n: hiddenCount })}
-                </span>
+                </button>
               )}
             </div>
           </div>

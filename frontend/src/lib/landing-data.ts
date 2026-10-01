@@ -14,13 +14,13 @@ import type { TranslationKey } from '../i18n'
 
 export const LANDING_VERSION = 'v0.15.0'
 
-/** Hero 指标条 */
+/** Hero 指标条（商业化口径：面向用户的价值指标，非开发过程指标） */
 export const LANDING_METRICS: Array<{ value: string; label: TranslationKey }> = [
   { value: '7', label: 'landing.data.metric.channels' },
   { value: '10', label: 'landing.data.metric.models' },
-  { value: '53', label: 'landing.data.metric.api' },
-  { value: '146', label: 'landing.data.metric.smoke' },
+  { value: '15', label: 'landing.data.metric.sections' },
   { value: '4', label: 'landing.data.metric.langs' },
+  { value: '200', label: 'landing.data.metric.credits' },
 ]
 
 /** 灵感 chips（与 /api/v1/system/meta 枚举一致，纯展示） */
@@ -368,7 +368,7 @@ export const FAQS: Array<{ q: TranslationKey; a: TranslationKey }> = [
   { q: 'landing.data.faq.6.q', a: 'landing.data.faq.6.a' },
 ]
 
-/** 界面一览（真机截图；src 为文件名，按 locale 从 /shots/{en|zh}/ 取图，组件侧拼前缀） */
+/** 界面一览（产品截图；src 为文件名，按 locale 从 /shots/{en|zh}/ 取图，组件侧拼前缀） */
 export const SHOWCASE: Array<{ src: string; title: TranslationKey; desc: TranslationKey }> = [
   {
     src: 'studio.png',
@@ -380,32 +380,4 @@ export const SHOWCASE: Array<{ src: string; title: TranslationKey; desc: Transla
     title: 'landing.data.showcase.2.title',
     desc: 'landing.data.showcase.2.desc',
   },
-]
-
-/** 里程碑（交付报告口径） */
-export const MILESTONES: Array<{ ver: string; date: string; title: TranslationKey }> = [
-  { ver: 'v0.1.0', date: '2026-08', title: 'landing.data.milestone.1.title' },
-  { ver: 'v0.2.0', date: '2026-08', title: 'landing.data.milestone.2.title' },
-  { ver: 'v0.3.0', date: '2026-08', title: 'landing.data.milestone.3.title' },
-  { ver: 'v0.4.0', date: '2026-08', title: 'landing.data.milestone.4.title' },
-  { ver: 'v0.5.0', date: '2026-08', title: 'landing.data.milestone.5.title' },
-  { ver: 'v0.6.0', date: '2026-08', title: 'landing.data.milestone.6.title' },
-  { ver: 'v0.6.1', date: '2026-09', title: 'landing.data.milestone.7.title' },
-  { ver: 'v0.7.0', date: '2026-09', title: 'landing.data.milestone.8.title' },
-  { ver: 'v0.8.0', date: '2026-09', title: 'landing.data.milestone.9.title' },
-  { ver: 'v0.8.1', date: '2026-09', title: 'landing.data.milestone.10.title' },
-  { ver: 'v0.8.2', date: '2026-09', title: 'landing.data.milestone.12.title' },
-  { ver: 'v0.9.0', date: '2026-09', title: 'landing.data.milestone.13.title' },
-  { ver: 'v0.10.0', date: '2026-09', title: 'landing.data.milestone.14.title' },
-  { ver: 'v0.10.1', date: '2026-09', title: 'landing.data.milestone.15.title' },
-  { ver: 'v0.10.2', date: '2026-09', title: 'landing.data.milestone.16.title' },
-  { ver: 'v0.11.0', date: '2026-09', title: 'landing.data.milestone.17.title' },
-  { ver: 'v0.11.1', date: '2026-09', title: 'landing.data.milestone.18.title' },
-  { ver: 'v0.12.0', date: '2026-09', title: 'landing.data.milestone.19.title' },
-  { ver: 'v0.12.1', date: '2026-09', title: 'landing.data.milestone.20.title' },
-  { ver: 'v0.12.2', date: '2026-09', title: 'landing.data.milestone.21.title' },
-  { ver: 'v0.12.3', date: '2026-09', title: 'landing.data.milestone.22.title' },
-  { ver: 'v0.13.0', date: '2026-09', title: 'landing.data.milestone.23.title' },
-  { ver: 'v0.14.0', date: '2026-09', title: 'landing.data.milestone.24.title' },
-  { ver: 'v0.15.0', date: '2026-09', title: 'landing.data.milestone.25.title' },
 ]

@@ -137,20 +137,20 @@ export default function HumDialog({ open, onClose, onApply }: {
     : 0
 
   return (
-    <div className="fixed inset-0 z-[95] flex items-center justify-center" style={{ background: 'rgba(0,0,0,.72)' }}>
+    <div className="modal-overlay">
       <div className="card pop w-[440px] p-6">
-        <div className="text-[15px] font-bold">{t('studio.hum.title')}</div>
-        <div className="text-[12px] mt-2 leading-relaxed" style={{ color: 'var(--muted)' }}>
+        <div className="text-md font-bold">{t('studio.hum.title')}</div>
+        <div className="text-sm mt-2 leading-relaxed text-muted">
           {t('studio.hum.desc')}
         </div>
 
         <div className="flex items-center gap-3 mt-4">
           {!recording ? (
-            <button className="btn btn-acc !py-1.5 !px-4 text-[12px]" onClick={() => void start()} disabled={analyzing}>
+            <button className="btn btn-acc btn-md" onClick={() => void start()} disabled={analyzing}>
               ● {analyzing ? t('studio.hum.analyzing') : t('studio.hum.record')}
             </button>
           ) : (
-            <button className="btn btn-ghost !py-1.5 !px-4 text-[12px]" onClick={stop}>
+            <button className="btn btn-ghost btn-md" onClick={stop}>
               ■ {t('studio.hum.stop')} ({elapsed}s/{MAX_SEC}s)
             </button>
           )}
@@ -158,7 +158,7 @@ export default function HumDialog({ open, onClose, onApply }: {
 
         {result && (
           <div className="mt-4">
-            <div className="text-[11px] num" style={{ color: 'var(--muted)' }}>
+            <div className="text-xs num text-muted">
               {t('studio.hum.result', {
                 n: result.note_count,
                 sec: result.duration_sec,
@@ -174,7 +174,7 @@ export default function HumDialog({ open, onClose, onApply }: {
                 return (
                   <div
                     key={i}
-                    className="flex-1 rounded-sm"
+                    className="flex-1"
                     style={{ height: h, background: 'var(--acc)', opacity: 0.75 }}
                     title={`${n.semi >= 0 ? '+' : ''}${n.semi}`}
                   />
@@ -182,10 +182,10 @@ export default function HumDialog({ open, onClose, onApply }: {
               })}
             </div>
             <div className="flex gap-2 justify-end mt-4">
-              <button className="btn btn-ghost !py-1.5 !px-4 text-[12px]" onClick={onClose}>
+              <button className="btn btn-ghost btn-md" onClick={onClose}>
                 {t('common.cancel')}
               </button>
-              <button className="btn btn-acc !py-1.5 !px-4 text-[12px]" onClick={apply}>
+              <button className="btn btn-acc btn-md" onClick={apply}>
                 {t('studio.hum.apply')}
               </button>
             </div>

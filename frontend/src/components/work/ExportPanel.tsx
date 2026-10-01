@@ -174,18 +174,18 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
   return (
     <div className="card p-4">
       <div className="label mb-3">{t('work.export.title')}</div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {FORMATS.map((f) => {
           const pct = busy[f.code]
           return (
             <button
               key={f.code}
-              className="btn btn-ghost !py-2 text-[11px] text-left"
+              className="btn btn-ghost btn-sm text-left"
               disabled={pct !== undefined}
               onClick={() => void runExport(f.code)}
             >
               <span className="font-bold">{t('work.export.run', { format: f.label })}</span>
-              <span className="block text-[9px] font-normal mt-0.5" style={{ color: 'var(--dim)' }}>
+              <span className="block text-2xs font-normal mt-0.5 text-dim">
                 {pct !== undefined ? t('work.export.processing', { n: pct }) : t(f.noteKey)}
               </span>
             </button>
@@ -194,36 +194,36 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
       </div>
 
       {/* 发行导出预设（FR-11）：平台模板打包 */}
-      <div className="rule-t mt-3 pt-3" style={{ borderColor: 'var(--line)' }}>
+      <div className="rule-t mt-3 pt-3">
         <button
           className="w-full text-left flex items-center justify-between"
           onClick={openRelease}
           disabled={releasePct !== undefined}
         >
-          <span className="text-[11px] font-bold">{t('work.export.release.title')}</span>
+          <span className="text-xs font-bold">{t('work.export.release.title')}</span>
           <span
             aria-hidden="true"
-            className="text-[9px]"
-            style={{ color: 'var(--dim)', transform: releaseOpen ? 'rotate(180deg)' : undefined }}
+            className="text-2xs text-dim"
+            style={{ transform: releaseOpen ? 'rotate(180deg)' : undefined }}
           >
             ▾
           </span>
         </button>
-        <div className="text-[9px] mt-1 leading-relaxed" style={{ color: 'var(--dim)' }}>
+        <div className="text-2xs mt-1 leading-relaxed text-dim">
           {t('work.export.release.sub')}
         </div>
         {releaseOpen && (
           <div className="mt-2">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {PLATFORMS.map((p) => (
                 <button
                   key={p.code}
-                  className={`btn !py-2 text-[11px] text-left ${platform === p.code ? 'btn-acc' : 'btn-ghost'}`}
+                  className={`btn btn-sm text-left ${platform === p.code ? 'btn-acc' : 'btn-ghost'}`}
                   onClick={() => setPlatform(p.code)}
                   disabled={releasePct !== undefined}
                 >
                   <span className="font-bold">{t(p.labelKey)}</span>
-                  <span className="block text-[9px] font-normal mt-0.5" style={{ color: platform === p.code ? '#000' : 'var(--dim)' }}>
+                  <span className="block text-2xs font-normal mt-0.5" style={{ color: platform === p.code ? '#000' : 'var(--dim)' }}>
                     {t(p.noteKey)}
                   </span>
                 </button>
@@ -232,7 +232,7 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
             <div className="mt-2 space-y-1.5">
               <input
                 type="text"
-                className="!text-[11px]"
+                className="!text-xs"
                 maxLength={80}
                 placeholder={t('work.export.release.trackTitle')}
                 value={meta.title}
@@ -241,17 +241,17 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
               />
               <input
                 type="text"
-                className="!text-[11px]"
+                className="!text-xs"
                 maxLength={60}
                 placeholder={t('work.export.release.artist')}
                 value={meta.artist}
                 onChange={(e) => setMeta((m) => ({ ...m, artist: e.target.value }))}
                 disabled={releasePct !== undefined}
               />
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                 <input
                   type="text"
-                  className="!text-[11px]"
+                  className="!text-xs"
                   maxLength={80}
                   placeholder={t('work.export.release.album')}
                   value={meta.album ?? ''}
@@ -260,7 +260,7 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
                 />
                 <input
                   type="text"
-                  className="!text-[11px]"
+                  className="!text-xs"
                   maxLength={30}
                   placeholder={t('work.export.release.genre')}
                   value={meta.genre ?? ''}
@@ -270,13 +270,13 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
               </div>
               <input
                 type="date"
-                className="!text-[11px]"
+                className="!text-xs"
                 value={meta.release_date ?? ''}
                 onChange={(e) => setMeta((m) => ({ ...m, release_date: e.target.value || undefined }))}
                 disabled={releasePct !== undefined}
                 title={t('work.export.release.date')}
               />
-              <label className="flex items-center gap-1.5 text-[10px] cursor-pointer" style={{ color: 'var(--muted)' }}>
+              <label className="flex items-center gap-1.5 text-2xs cursor-pointer text-muted">
                 <input
                   type="checkbox"
                   checked={Boolean(meta.explicit)}
@@ -287,7 +287,7 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
               </label>
             </div>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <label className="btn btn-ghost !py-1 !px-2.5 text-[10px] cursor-pointer">
+              <label className="btn btn-ghost btn-sm cursor-pointer">
                 {coverB64 ? t('work.export.release.coverSet') : t('work.export.release.coverPick')}
                 <input
                   type="file"
@@ -312,14 +312,14 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
                 />
               </label>
               {coverB64 && (
-                <button className="btn btn-ghost !py-1 !px-2 text-[10px]" onClick={() => setCoverB64(null)}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setCoverB64(null)}>
                   {t('work.export.release.coverClear')}
                 </button>
               )}
-              <span className="text-[9px]" style={{ color: 'var(--dim)' }}>{t('work.export.release.coverHint')}</span>
+              <span className="text-2xs text-dim">{t('work.export.release.coverHint')}</span>
             </div>
             <button
-              className="btn btn-ghost w-full mt-2 !py-2 text-[11px] font-bold"
+              className="btn btn-ghost w-full mt-2 btn-sm font-bold"
               disabled={releasePct !== undefined}
               onClick={() => void runRelease()}
             >
@@ -327,25 +327,25 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
                 ? t('work.export.processing', { n: releasePct })
                 : `${t('work.export.release.run')} · ${t(platform === 'douyin' ? 'work.export.release.douyin' : 'work.export.release.streaming')}`}
             </button>
-            <div className="text-[9px] mt-1.5 leading-relaxed" style={{ color: 'var(--dim)' }}>
+            <div className="text-2xs mt-1.5 leading-relaxed text-dim">
               {t('work.export.release.hint')}
             </div>
           </div>
         )}
       </div>
 
-      <button className="btn btn-acc w-full mt-2 !py-2 text-[11px] font-bold" disabled={certBusy} onClick={() => void onCert()}>
+      <button className="btn btn-acc w-full mt-2 btn-sm font-bold" disabled={certBusy} onClick={() => void onCert()}>
         {certBusy ? t('work.export.generating') : t('work.export.certificate')}
       </button>
       <button
-        className="btn btn-ghost w-full mt-1.5 !py-2 text-[11px] font-bold"
+        className="btn btn-ghost w-full mt-1.5 btn-sm font-bold"
         disabled={sheetBusy}
         onClick={() => void onSheet()}
         title={t('work.export.sheetHint')}
       >
         {sheetBusy ? t('work.export.generating') : t('work.export.sheet')}
       </button>
-      <div className="text-[9px] mt-2 leading-relaxed" style={{ color: 'var(--dim)' }}>
+      <div className="text-2xs mt-2 leading-relaxed text-dim">
         {t('work.export.footnote')}
       </div>
     </div>

@@ -7,6 +7,7 @@ import { toast } from '../stores/toast'
 import { creditReasonLabel, formatDateTime, formatNum, planLabel } from '../lib/format'
 import ApiKeysCard from '../components/pricing/ApiKeysCard'
 import Pagination from '../components/common/Pagination'
+import { PageHeader } from '../components/common/PageHeader'
 import { useT } from '../i18n'
 
 const PAGE_SIZE = 10
@@ -160,42 +161,40 @@ export default function PricingView() {
 
   return (
     <section className="view flex flex-col h-full">
-      <header className="px-8 pt-6 pb-4 flex items-end justify-between flex-wrap gap-3">
-        <div>
-          <div className="label">{t('pricing.label')}</div>
-          <h1 className="text-[28px] font-extrabold tracking-tight mt-1">{t('pricing.title')}</h1>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-3 text-[12px]" style={{ color: 'var(--muted)' }}>
-            {t('pricing.monthly')}
-            <button className={`toggle ${yearly ? 'on' : ''}`} onClick={() => setYearly((v) => !v)}></button>
-            {t('pricing.yearly')}
-            <span className="text-[11px] px-1.5 py-0.5 font-bold" style={{ background: 'var(--acc)', color: '#000' }}>
-              {t('pricing.save20')}
-            </span>
+      <PageHeader
+        label={t('pricing.label')}
+        title={t('pricing.title')}
+        actions={
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-3 text-sm text-muted">
+              {t('pricing.monthly')}
+              <button className={`toggle ${yearly ? 'on' : ''}`} onClick={() => setYearly((v) => !v)}></button>
+              {t('pricing.yearly')}
+              <span className="badge badge-solid">{t('pricing.save20')}</span>
+            </div>
+            <button
+              className="btn btn-ghost btn-sm"
+              title={t('billing.manageTitle')}
+              disabled={portalOpening}
+              onClick={() => void onPortal()}
+            >
+              {portalOpening ? t('billing.manageOpening') : t('billing.manage')}
+            </button>
           </div>
-          <button
-            className="btn btn-ghost !py-1.5 !px-3 text-[11px]"
-            title={t('billing.manageTitle')}
-            disabled={portalOpening}
-            onClick={() => void onPortal()}
-          >
-            {portalOpening ? t('billing.manageOpening') : t('billing.manage')}
-          </button>
-        </div>
-      </header>
+        }
+      />
 
       {loading ? (
-        <div className="rule-t py-16 text-center text-[12px]" style={{ color: 'var(--dim)' }}>
+        <div className="rule-t py-16 text-center text-sm text-dim">
           {t('pricing.loading')}
         </div>
       ) : plans.length === 0 ? (
         <div className="rule-t py-16 text-center">
-          <div className="text-[12px]" style={{ color: 'var(--dim)' }}>{t('pricing.loadFailed')}</div>
-          <button className="btn btn-ghost text-[11px] mt-4" onClick={() => void loadPlans()}>{t('common.retry')}</button>
+          <div className="text-sm text-dim">{t('pricing.loadFailed')}</div>
+          <button className="btn btn-ghost mt-4" onClick={() => void loadPlans()}>{t('common.retry')}</button>
         </div>
       ) : (
-        <div className="grid grid-cols-4 rule-t">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 rule-t">
           {plans.map((p) => {
             const popular = p.code === 'studio'
             const price = yearly ? p.price_yearly : p.price_monthly
@@ -203,15 +202,10 @@ export default function PricingView() {
             return (
               <div
                 key={p.code}
-                className={`border-r px-7 py-8 relative ${popular ? '' : ''}`}
-                style={
-                  popular
-                    ? { borderColor: 'var(--acc)', background: 'var(--bg2)' }
-                    : { borderColor: 'var(--line)' }
-                }
+                className={`border-r px-7 py-8 relative ${popular ? 'border-acc bg-bg-2' : 'border-line'}`}
               >
                 {popular && (
-                  <div className="absolute top-0 left-0 text-[10px] font-bold px-2 py-1" style={{ background: 'var(--acc)', color: '#000' }}>
+                  <div className="badge badge-solid absolute top-0 left-0">
                     {t('pricing.popular')}
                   </div>
                 )}
@@ -219,16 +213,16 @@ export default function PricingView() {
                 <div className="price-num mt-4">
                   {price == null ? (p.code === 'team' ? t('pricing.customPrice') : '—') : usd(price)}
                   {price != null && (
-                    <span className="text-[16px] font-bold" style={{ color: 'var(--muted)' }}>{t('pricing.perMonth')}</span>
+                    <span className="text-lg font-bold text-muted">{t('pricing.perMonth')}</span>
                   )}
                 </div>
-                <div className="text-[11px] mt-1" style={{ color: 'var(--dim)' }}>
+                <div className="text-xs mt-1 text-dim">
                   {p.code === 'free' && t('pricing.tag.free')}
                   {p.code === 'pro' && (yearly ? t('pricing.tag.proYearly') : t('pricing.tag.yearlyBetter', { price: usd(p.price_yearly) ?? '' }))}
                   {p.code === 'studio' && (yearly ? t('pricing.tag.yearlyOnly') : t('pricing.tag.yearlyBetter', { price: usd(p.price_yearly) ?? '' }))}
                   {p.code === 'team' && t('pricing.tag.team')}
                 </div>
-                <ul className="mt-6 space-y-2.5 text-[12px]" style={{ color: 'var(--muted)' }}>
+                <ul className="mt-6 space-y-2.5 text-sm text-muted">
                   {p.features.map((f) => (
                     <li key={f}>· {f}</li>
                   ))}
@@ -262,22 +256,19 @@ export default function PricingView() {
       )}
 
       {/* 充值积分包（一次性购买，积分永不过期） */}
-      <div
-        className="rule-t px-8 py-5 flex items-center justify-between gap-6 flex-wrap"
-        style={{ background: 'var(--bg2)' }}
-      >
+      <div className="rule-t px-8 py-5 flex items-center justify-between gap-6 flex-wrap bg-bg-2">
         <div className="min-w-0">
           <div className="label">{t('billing.topup.label')}</div>
-          <div className="text-[14px] font-bold mt-1">{t('billing.topup.title')}</div>
-          <div className="text-[11px] mt-1 leading-relaxed max-w-[640px]" style={{ color: 'var(--dim)' }}>
+          <div className="text-md font-bold mt-1">{t('billing.topup.title')}</div>
+          <div className="text-xs mt-1 leading-relaxed max-w-[640px] text-dim">
             {t('billing.topup.desc')}
           </div>
         </div>
         <div className="flex items-center gap-6 flex-none">
           <div className="text-right">
-            <span className="num font-extrabold text-[26px] tracking-tight">{topup ? usd(topup.amount_usd) : '$—'}</span>
-            <div className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
-              <span className="num font-bold" style={{ color: 'var(--acc)' }}>{topup ? formatNum(topup.credits) : '—'}</span> {t('pricing.monthlyCredits.post')}
+            <span className="num font-extrabold text-2xl tracking-tight">{topup ? usd(topup.amount_usd) : '$—'}</span>
+            <div className="text-xs mt-0.5 text-muted">
+              <span className="num font-bold text-acc">{topup ? formatNum(topup.credits) : '—'}</span> {t('pricing.monthlyCredits.post')}
             </div>
           </div>
           <button className="btn btn-acc !py-2.5" disabled={topupBuying} onClick={() => void onTopup()}>
@@ -286,16 +277,16 @@ export default function PricingView() {
         </div>
       </div>
 
-      <div className="rule-t px-8 py-4 text-[11px]" style={{ color: 'var(--dim)' }}>
+      <div className="rule-t px-8 py-4 text-xs text-dim">
         {t('pricing.footnote')}
-        <span className="num font-bold mx-1" style={{ color: 'var(--acc)' }}>{formatNum(user?.credits.balance ?? 0)}</span>
+        <span className="num font-bold mx-1 text-acc">{formatNum(user?.credits.balance ?? 0)}</span>
         {t('pricing.creditsUnit')}
       </div>
 
       {/* 积分流水 */}
       <div className="rule-t px-8 py-4 tx-rows">
         <div className="label mb-3">{t('pricing.tx.title')}</div>
-        <div className="row !cursor-default" style={{ color: 'var(--dim)', gridTemplateColumns: '170px 90px 110px 100px 1fr' }}>
+        <div className="row !cursor-default text-dim" style={{ gridTemplateColumns: '170px 90px 110px 100px 1fr' }}>
           <span className="label">{t('pricing.tx.time')}</span>
           <span className="label">{t('pricing.tx.change')}</span>
           <span className="label">{t('pricing.tx.reason')}</span>
@@ -303,17 +294,17 @@ export default function PricingView() {
           <span className="label">{t('pricing.tx.task')}</span>
         </div>
         {txs.length === 0 ? (
-          <div className="py-8 text-center text-[11px]" style={{ color: 'var(--dim)' }}>{t('pricing.tx.empty')}</div>
+          <div className="py-8 text-center text-xs text-dim">{t('pricing.tx.empty')}</div>
         ) : (
           txs.map((tx) => (
-            <div key={tx.id} className="row" style={{ cursor: 'default', gridTemplateColumns: '170px 90px 110px 100px 1fr' }}>
-              <span className="text-[11px] num" style={{ color: 'var(--muted)' }}>{formatDateTime(tx.created_at)}</span>
-              <span className="text-[12px] num font-semibold" style={{ color: tx.delta >= 0 ? 'var(--acc)' : 'var(--txt)' }}>
+            <div key={tx.id} className="row !cursor-default" style={{ gridTemplateColumns: '170px 90px 110px 100px 1fr' }}>
+              <span className="text-xs num text-muted">{formatDateTime(tx.created_at)}</span>
+              <span className={`text-sm num font-semibold ${tx.delta >= 0 ? 'text-acc' : 'text-txt'}`}>
                 {tx.delta >= 0 ? `+${tx.delta}` : tx.delta}
               </span>
-              <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{creditReasonLabel(tx.reason)}</span>
-              <span className="text-[11px] num" style={{ color: 'var(--muted)' }}>{formatNum(tx.balance_after)}</span>
-              <span className="text-[10px] num truncate" style={{ color: 'var(--dim)' }}>{tx.ref_task_id ?? '—'}</span>
+              <span className="text-xs text-muted">{creditReasonLabel(tx.reason)}</span>
+              <span className="text-xs num text-muted">{formatNum(tx.balance_after)}</span>
+              <span className="text-2xs num truncate text-dim">{tx.ref_task_id ?? '—'}</span>
             </div>
           ))
         )}

@@ -68,24 +68,22 @@ export default function TeamPanel({ space, onChanged }: { space: TeamSpaceInfo; 
     <div className="card p-3" data-testid="team-panel">
       <div className="flex items-center justify-between">
         <div className="label">{t('team.title')}</div>
-        <span className="text-[9px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>
-          {space.name}
-        </span>
+        <span className="badge">{space.name}</span>
       </div>
 
       <div className="mt-2 space-y-1">
         {space.members.map((m) => (
-          <div key={m.user_id} className="flex items-center gap-1.5 text-[10px]">
-            <span className="w-16 truncate" style={{ color: 'var(--muted)' }}>
+          <div key={m.user_id} className="flex items-center gap-1.5 text-2xs">
+            <span className="w-16 truncate text-muted">
               {m.user_id.slice(0, 8)}…
             </span>
             {m.role === 'owner' ? (
-              <span className="text-[9px] font-bold px-1" style={{ color: 'var(--acc)' }}>
+              <span className="text-2xs font-bold px-1 text-acc">
                 {t('team.role.owner')}
               </span>
             ) : (
               <select
-                className="!text-[10px] !py-0.5 flex-1"
+                className="!text-2xs !py-0.5 flex-1"
                 value={m.role}
                 disabled={!space.is_owner}
                 onChange={(e) => void onRole(m.user_id, e.target.value)}
@@ -110,29 +108,29 @@ export default function TeamPanel({ space, onChanged }: { space: TeamSpaceInfo; 
         <div className="flex gap-1.5 mt-2">
           <input
             type="text"
-            className="!text-[10px] flex-1"
+            className="!text-2xs flex-1"
             placeholder={t('team.emailPlaceholder')}
             value={emailDraft}
             maxLength={120}
             onChange={(e) => setEmailDraft(e.target.value)}
           />
-          <select className="!text-[10px] !py-0.5" value={role} onChange={(e) => setRole(e.target.value)}>
+          <select className="!text-2xs !py-0.5" value={role} onChange={(e) => setRole(e.target.value)}>
             <option value="editor">{t('team.role.editor')}</option>
             <option value="commenter">{t('team.role.commenter')}</option>
             <option value="viewer">{t('team.role.viewer')}</option>
           </select>
-          <button className="btn btn-ghost !py-1 !px-2 text-[10px]" disabled={busy} onClick={() => void onAdd()}>
+          <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void onAdd()}>
             {t('team.addMember')}
           </button>
         </div>
       )}
 
       <div className="flex gap-2 mt-2">
-        <button className="btn btn-ghost w-full !py-1 text-[10px]" onClick={() => void onCreateSpace()}>
+        <button className="btn btn-ghost w-full btn-sm" onClick={() => void onCreateSpace()}>
           {t('team.createSpace')}
         </button>
       </div>
-      <div className="text-[9px] mt-1.5 leading-relaxed" style={{ color: 'var(--dim)' }}>
+      <div className="text-2xs mt-1.5 leading-relaxed text-dim">
         {t('team.roleHint')}
       </div>
     </div>

@@ -55,12 +55,12 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
   }
 
   return (
-    <div className="fixed inset-0 z-[95] flex items-center justify-center" style={{ background: 'rgba(0,0,0,.72)' }}>
+    <div className="modal-overlay">
       <div className="card pop w-[380px] p-6">
-        <div className="text-[15px] font-bold">{t('auth.password.title')}</div>
+        <div className="text-md font-bold">{t('auth.password.title')}</div>
         <form onSubmit={submit} className="mt-4 space-y-3">
           <div>
-            <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>
+            <div className="text-2xs mb-1 text-dim">
               {t('auth.password.old')}
             </div>
             <input
@@ -71,7 +71,7 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
             />
           </div>
           <div>
-            <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>
+            <div className="text-2xs mb-1 text-dim">
               {t('auth.password.new')}
             </div>
             <input
@@ -83,15 +83,15 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
             />
           </div>
           {error && (
-            <div className="text-[11px] leading-relaxed" style={{ color: 'var(--bad)' }}>
+            <div className="text-xs leading-relaxed text-bad">
               {error}
             </div>
           )}
           <div className="flex gap-2 justify-end pt-1">
-            <button type="button" className="btn btn-ghost !py-1.5 !px-4 text-[12px]" onClick={onClose}>
+            <button type="button" className="btn btn-ghost btn-md" onClick={onClose}>
               {t('common.cancel')}
             </button>
-            <button type="submit" className="btn btn-acc !py-1.5 !px-4 text-[12px]" disabled={busy}>
+            <button type="submit" className="btn btn-acc btn-md" disabled={busy}>
               {busy ? t('auth.password.updating') : t('auth.password.submit')}
             </button>
           </div>
@@ -140,17 +140,17 @@ function DeleteAccountModal({ open, onClose }: { open: boolean; onClose: () => v
   }
 
   return (
-    <div className="fixed inset-0 z-[95] flex items-center justify-center" style={{ background: 'rgba(0,0,0,.72)' }}>
+    <div className="modal-overlay">
       <div className="card pop w-[400px] p-6" style={{ borderColor: 'var(--bad)' }}>
-        <div className="text-[15px] font-bold" style={{ color: 'var(--bad)' }}>
+        <div className="text-md font-bold text-bad">
           {t('auth.delete.title')}
         </div>
-        <div className="text-[12px] mt-2 leading-relaxed" style={{ color: 'var(--muted)' }}>
+        <div className="text-sm mt-2 leading-relaxed text-muted">
           {t('auth.delete.warn')}
         </div>
         <form onSubmit={submit} className="mt-4 space-y-3">
           <div>
-            <div className="text-[10px] mb-1" style={{ color: 'var(--dim)' }}>
+            <div className="text-2xs mb-1 text-dim">
               {t('auth.delete.password')}
             </div>
             <input
@@ -161,17 +161,17 @@ function DeleteAccountModal({ open, onClose }: { open: boolean; onClose: () => v
             />
           </div>
           {error && (
-            <div className="text-[11px]" style={{ color: 'var(--bad)' }}>
+            <div className="text-xs text-bad">
               {error}
             </div>
           )}
           <div className="flex gap-2 justify-end pt-1">
-            <button type="button" className="btn btn-ghost !py-1.5 !px-4 text-[12px]" onClick={onClose}>
+            <button type="button" className="btn btn-ghost btn-md" onClick={onClose}>
               {t('common.cancel')}
             </button>
             <button
               type="submit"
-              className="btn !py-1.5 !px-4 text-[12px]"
+              className="btn btn-md"
               style={{ borderColor: 'var(--bad)', color: 'var(--bad)' }}
               disabled={busy}
             >
@@ -262,7 +262,7 @@ export default function AccountMenu() {
 
   return (
     <div className="relative mt-2" ref={wrapRef}>
-      <div className="text-[10px] flex items-center justify-between" style={{ color: 'var(--dim)' }}>
+      <div className="text-2xs flex items-center justify-between text-dim">
         <span className="acc-plan truncate">
           {user ? planLabel(user.plan) : t('app.sidebar.notLoggedIn')} · {t('app.sidebar.transferable')}
         </span>
@@ -287,11 +287,11 @@ export default function AccountMenu() {
           <button className="accmenu-item" onClick={() => void onLogoutAll()}>
             {t('auth.menu.logoutAll')}
           </button>
-          <div className="h-px mx-2" style={{ background: 'var(--line)' }}></div>
+          <div className="h-px mx-2 bg-line"></div>
           <button className="accmenu-item danger" onClick={() => { setOpen(false); setDelOpen(true) }}>
             {t('auth.menu.deleteAccount')}
           </button>
-          <div className="h-px mx-2" style={{ background: 'var(--line)' }}></div>
+          <div className="h-px mx-2 bg-line"></div>
           <button className="accmenu-item" onClick={onLogout}>
             {t('app.sidebar.logout')}
           </button>

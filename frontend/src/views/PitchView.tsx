@@ -5,6 +5,7 @@ import { listCandidates, getTask, pitchEditCandidate } from '../api/generation'
 import { apiGet } from '../api/client'
 import { toast } from '../stores/toast'
 import { useT } from '../i18n'
+import { EmptyState } from '../components/common/EmptyState'
 
 /** 词谱 json（meloyu.leadsheet/1.0）中与本视图相关的子集 */
 interface LeadsheetNote {
@@ -155,7 +156,7 @@ export default function PitchView() {
     if (!ctx) return
     const w = cv.width
     const h = cv.height
-    ctx.fillStyle = '#141414'
+    ctx.fillStyle = '#191919'
     ctx.fillRect(0, 0, w, h)
     const midis = notes.map((n, i) => editedMidi(i, n.midi))
     const lo = Math.min(...midis) - 2
@@ -165,7 +166,7 @@ export default function PitchView() {
     // 调内音阶线
     for (let m = lo; m <= hi; m++) {
       const y = h - ((m - lo) / (hi - lo)) * h
-      ctx.strokeStyle = pcs.has(((m % 12) + 12) % 12) ? 'rgba(63,220,122,.10)' : 'rgba(255,255,255,.03)'
+      ctx.strokeStyle = pcs.has(((m % 12) + 12) % 12) ? 'rgba(0,255,44,.10)' : 'rgba(255,255,255,.03)'
       ctx.beginPath()
       ctx.moveTo(0, y)
       ctx.lineTo(w, y)
@@ -190,7 +191,7 @@ export default function PitchView() {
         const x1 = ((n.beat + n.dur) / totalBeats) * w
         const y = h - ((midi - lo + 0.5) / (hi - lo + 1)) * h
         const edited = (edits[i] ?? 0) !== 0
-        ctx.fillStyle = i === selected ? '#ffffff' : edited ? '#ffb454' : '#3fdc7a'
+        ctx.fillStyle = i === selected ? '#ffffff' : edited ? '#ffb02c' : '#00ff2c'
         ctx.fillRect(x0, y - 3, Math.max(3, x1 - x0 - 1), 6)
         if (n.syllable && x1 - x0 > 14) {
           ctx.fillStyle = 'rgba(255,255,255,.55)'
@@ -272,33 +273,33 @@ export default function PitchView() {
     <section className="view flex flex-col h-full">
       <header className="px-8 pt-6 pb-4">
         <div className="label">{t('pitch.view.label')}</div>
-        <h1 className="text-[28px] font-extrabold tracking-tight mt-1">{t('pitch.view.headline')}</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight mt-1">{t('pitch.view.headline')}</h1>
       </header>
 
       <div className="px-8 flex gap-2 flex-wrap items-center">
-        <select className="!text-[11px] max-w-52" value={workId} onChange={(e) => setWorkId(e.target.value)}>
+        <select className="text-xs max-w-52" value={workId} onChange={(e) => setWorkId(e.target.value)}>
           <option value="">{t('pitch.pick.work')}</option>
           {works.map((w) => (
             <option key={w.id} value={w.id}>{w.display_code} · {w.title}</option>
           ))}
         </select>
         {ls && (
-          <span className="text-[10px] num" style={{ color: 'var(--dim)' }}>
+          <span className="text-2xs num text-dim">
             {ls.meta.key} · {ls.meta.bpm} BPM · {ls.stats.note_count} notes
           </span>
         )}
       </div>
 
       <div className="px-8 mt-3 flex gap-1.5 flex-wrap items-center">
-        <button className="btn btn-ghost !py-1 !px-2.5 text-[10px]" onClick={snapToScale} disabled={!ls}>
+        <button className="btn btn-ghost btn-sm" onClick={snapToScale} disabled={!ls}>
           {t('pitch.snapScale')}
         </button>
-        <select className="!text-[10px]" value={quantize} onChange={(e) => setQuantize(e.target.value as 'off' | '8' | '16')}>
+        <select className="text-2xs" value={quantize} onChange={(e) => setQuantize(e.target.value as 'off' | '8' | '16')}>
           <option value="off">{t('pitch.quantize.off')}</option>
           <option value="8">{t('pitch.quantize.8')}</option>
           <option value="16">{t('pitch.quantize.16')}</option>
         </select>
-        <span className="text-[10px] ml-2" style={{ color: 'var(--dim)' }}>
+        <span className="text-2xs ml-2 text-dim">
           {selected !== null && notes[selected]
             ? t('pitch.selected', {
                 name: midiName(editedMidi(selected, notes[selected].midi)),
@@ -309,23 +310,15 @@ export default function PitchView() {
       </div>
 
       <div className="rule-t flex-1 min-h-0 px-8 py-5 overflow-y-auto">
-        {!ls && (
-          <div className="border border-dashed py-16 text-center text-[12px]" style={{ borderColor: 'var(--line)', color: 'var(--dim)' }}>
-            {t('pitch.empty')}
-          </div>
-        )}
-        {ls && notes.length === 0 && (
-          <div className="border border-dashed py-16 text-center text-[12px]" style={{ borderColor: 'var(--line)', color: 'var(--dim)' }}>
-            {t('pitch.empty.notes')}
-          </div>
-        )}
+        {!ls && <EmptyState title={t('pitch.empty')} />}
+        {ls && notes.length === 0 && <EmptyState title={t('pitch.empty.notes')} />}
         {notes.length > 0 && (
           <canvas
             ref={canvasRef}
             width={1200}
             height={320}
             className="w-full"
-            style={{ background: '#141414', cursor: 'pointer', borderRadius: 6 }}
+            style={{ background: '#191919', cursor: 'pointer' }}
             onClick={onCanvasClick}
             data-testid="pitch-roll"
           />
@@ -333,17 +326,17 @@ export default function PitchView() {
         {notes.length > 0 && (
           <div className="flex items-center gap-3 mt-4">
             <button
-              className="btn btn-acc !py-1.5 !px-4 text-[12px]"
+              className="btn btn-acc btn-md"
               disabled={submitting || (editCount === 0 && quantize === 'off')}
               onClick={() => void submit()}
             >
               {submitting ? t('pitch.submitting') : t('pitch.submit', { n: editCount })}
             </button>
-            <span className="text-[10px]" style={{ color: 'var(--dim)' }}>{t('pitch.submit.hint')}</span>
+            <span className="text-2xs text-dim">{t('pitch.submit.hint')}</span>
           </div>
         )}
       </div>
-      <p className="px-8 pb-3 text-[10px]" style={{ color: 'var(--dim)' }}>{t('pitch.footnote')}</p>
+      <p className="px-8 pb-3 text-2xs text-dim">{t('pitch.footnote')}</p>
     </section>
   )
 }

@@ -46,7 +46,7 @@ function LaneWaveform({ peaks }: { peaks: number[] }) {
       ctx.fillRect(x * bw, (h - hh) / 2, Math.max(1, bw - 0.5), hh)
     })
   }, [peaks])
-  return <canvas ref={ref} className="flex-1 h-14" style={{ background: 'var(--bg2)' }} />
+  return <canvas ref={ref} className="flex-1 h-14 bg-bg-2" />
 }
 
 /**
@@ -304,13 +304,13 @@ export default function ArrangementView() {
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
             <div className="label">{t('editor.view.label')}</div>
-            <h1 className="text-[28px] font-extrabold tracking-tight mt-1">{t('editor.view.headline')}</h1>
+            <h1 className="text-3xl font-extrabold tracking-tight mt-1">{t('editor.view.headline')}</h1>
           </div>
           <div className="flex items-center gap-2">
             <select
               value={workId ?? ''}
               onChange={(e) => setWorkId(e.target.value || null)}
-              className="!text-[12px]"
+              className="text-sm"
             >
               <option value="">{t('editor.pick.work')}</option>
               {works.map((w) => (
@@ -322,7 +322,7 @@ export default function ArrangementView() {
             <select
               value={versionId ?? ''}
               onChange={(e) => setVersionId(e.target.value || null)}
-              className="!text-[12px]"
+              className="text-sm"
               disabled={!workId}
             >
               <option value="">{t('editor.pick.version')}</option>
@@ -339,31 +339,30 @@ export default function ArrangementView() {
       {!workId || !versionId ? (
         <div className="flex-1 grid place-items-center">
           <div className="text-center">
-            <div className="text-[13px]" style={{ color: 'var(--muted)' }}>{t('editor.empty.title')}</div>
-            <div className="text-[11px] mt-2" style={{ color: 'var(--dim)' }}>{t('editor.empty.hint')}</div>
+            <div className="text-base text-muted">{t('editor.empty.title')}</div>
+            <div className="text-xs mt-2 text-dim">{t('editor.empty.hint')}</div>
           </div>
         </div>
       ) : loading ? (
-        <div className="flex-1 grid place-items-center text-[12px]" style={{ color: 'var(--dim)' }}>
+        <div className="flex-1 grid place-items-center text-sm text-dim">
           {t('editor.loading')}
         </div>
       ) : lanes.length === 0 ? (
-        <div className="flex-1 grid place-items-center text-[12px]" style={{ color: 'var(--dim)' }}>
+        <div className="flex-1 grid place-items-center text-sm text-dim">
           {t('editor.toast.noStems')}
         </div>
       ) : (
         <div className="rule-t flex-1 min-h-0 flex flex-col">
           {/* 传输条 */}
-          <div className="px-8 py-3 flex items-center gap-4" style={{ borderBottom: '1px solid var(--line)' }}>
-            <button className="btn btn-acc !py-1.5 !px-4 text-[12px]" onClick={() => void onPlay()}>
+          <div className="px-8 py-3 flex items-center gap-4 border-b border-line">
+            <button className="btn btn-acc btn-md" onClick={() => void onPlay()}>
               {playing ? '⏸' : '▶'} {playing ? t('editor.transport.pause') : t('editor.transport.play')}
             </button>
-            <span className="num text-[11px]" style={{ color: 'var(--muted)' }}>
+            <span className="num text-xs text-muted">
               {formatDuration(position)} / {formatDuration(duration)}
             </span>
             <div
-              className="flex-1 h-6 cursor-pointer relative"
-              style={{ background: 'var(--bg2)' }}
+              className="flex-1 h-6 cursor-pointer relative bg-bg-2"
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect()
                 const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
@@ -374,16 +373,16 @@ export default function ArrangementView() {
             >
               <div
                 ref={fillRef}
-                className="absolute inset-y-0 left-0"
-                style={{ width: `${timelinePct}%`, background: 'var(--acc-dim)' }}
+                className="absolute inset-y-0 left-0 bg-acc-dim"
+                style={{ width: `${timelinePct}%` }}
               />
               <div
                 ref={headRef}
-                className="absolute inset-y-0 w-[2px]"
-                style={{ left: `${timelinePct}%`, background: 'var(--acc)' }}
+                className="absolute inset-y-0 w-[2px] bg-acc"
+                style={{ left: `${timelinePct}%` }}
               />
             </div>
-            <button className="btn btn-ghost !py-1.5 !px-3 text-[11px]" onClick={() => mixerRef.current?.seek(0)}>
+            <button className="btn btn-ghost btn-sm" onClick={() => mixerRef.current?.seek(0)}>
               ⏮ {t('editor.transport.rewind')}
             </button>
           </div>
@@ -393,23 +392,23 @@ export default function ArrangementView() {
             {lanes.map((lane, i) => (
               <div key={lane.file.file_id} className="card p-3" data-testid={`editor-lane-${lane.file.stem_name}`}>
                 <div className="flex items-center gap-3">
-                  <div className="w-20 text-[12px] font-bold">{stemLabel(lane.file.stem_name)}</div>
+                  <div className="w-20 text-sm font-bold">{stemLabel(lane.file.stem_name)}</div>
                   <LaneWaveform peaks={lane.peaks} />
                   <button
-                    className={`btn !py-1 !px-2 text-[10px] ${lane.params.muted ? 'btn-acc' : 'btn-ghost'}`}
+                    className={`btn btn-sm ${lane.params.muted ? 'btn-acc' : 'btn-ghost'}`}
                     onClick={() => setLaneParams(i, { muted: !lane.params.muted })}
                   >
                     M
                   </button>
                   <button
-                    className={`btn !py-1 !px-2 text-[10px] ${lane.params.solo ? 'btn-acc' : 'btn-ghost'}`}
+                    className={`btn btn-sm ${lane.params.solo ? 'btn-acc' : 'btn-ghost'}`}
                     onClick={() => setLaneParams(i, { solo: !lane.params.solo })}
                   >
                     S
                   </button>
                 </div>
                 <div className="flex items-center gap-4 mt-2 flex-wrap">
-                  <label className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--dim)' }}>
+                  <label className="flex items-center gap-1.5 text-2xs text-dim">
                     {t('editor.track.volume')}
                     <input
                       type="range"
@@ -422,7 +421,7 @@ export default function ArrangementView() {
                     <span className="num">{Math.round(lane.params.volume * 100)}%</span>
                   </label>
                   {(['low', 'mid', 'high'] as const).map((band) => (
-                    <label key={band} className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--dim)' }}>
+                    <label key={band} className="flex items-center gap-1.5 text-2xs text-dim">
                       {t(EQ_KEYS[band])}
                       <input
                         type="range"
@@ -449,18 +448,18 @@ export default function ArrangementView() {
               max={174}
               value={retuneBpm}
               onChange={(e) => setRetuneBpm(Number(e.target.value))}
-              className="!text-[12px] w-20 num"
+              className="text-sm w-20 num"
             />
-            <span className="text-[11px]" style={{ color: 'var(--dim)' }}>BPM</span>
-            <button className="btn btn-ghost !py-1.5 !px-3 text-[11px]" disabled={retuning} onClick={() => void doRetune()}>
+            <span className="text-xs text-dim">BPM</span>
+            <button className="btn btn-ghost btn-sm" disabled={retuning} onClick={() => void doRetune()}>
               {retuning ? t('editor.retune.running') : t('editor.retune.run')}
             </button>
             <div className="flex-1" />
-            <button className="btn btn-acc !py-2 !px-4 text-[12px] font-bold" disabled={saving} onClick={() => void saveMixdown()}>
+            <button className="btn btn-acc btn-md font-bold" disabled={saving} onClick={() => void saveMixdown()}>
               {saving ? t('editor.mixdown.saving') : t('editor.mixdown.save')}
             </button>
           </div>
-          <div className="px-8 pb-3 text-[9px] leading-relaxed" style={{ color: 'var(--dim)' }}>
+          <div className="px-8 pb-3 text-2xs leading-relaxed text-dim">
             {t('editor.footnote')}
           </div>
         </div>

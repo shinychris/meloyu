@@ -11,6 +11,8 @@ import { useT } from '../i18n'
 import { formatDuration, keyLabel } from '../lib/format'
 import Pagination from '../components/common/Pagination'
 import SearchInput from '../components/common/SearchInput'
+import { PageHeader } from '../components/common/PageHeader'
+import { EmptyState } from '../components/common/EmptyState'
 
 type Filter = 'all' | 'draft' | 'fav' | 'trash'
 
@@ -180,44 +182,42 @@ export default function LibraryView() {
 
   return (
     <section className="view flex flex-col h-full">
-      <header className="flex items-end justify-between px-8 pt-6 pb-4 flex-wrap gap-3">
-        <div>
-          <div className="label">{t('library.header.label')}</div>
-          <h1 className="text-[28px] font-extrabold tracking-tight mt-1">
-            {filter === 'trash' ? t('library.title.trash') : t('library.title.all')}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <SearchInput onQueryChange={onQueryChange} placeholder={t('library.search.placeholder')} />
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as 'updated_at' | 'created_at' | 'title')}
-            className="!text-[12px]"
-            title={t('library.sort.title')}
-          >
-            <option value="updated_at">{t('library.sort.updated')}</option>
-            <option value="created_at">{t('library.sort.created')}</option>
-            <option value="title">{t('library.col.title')}</option>
-          </select>
-          <select
-            value={order}
-            onChange={(e) => setOrder(e.target.value as 'desc' | 'asc')}
-            className="!text-[12px]"
-            title={t('library.order.title')}
-          >
-            <option value="desc">{t('library.order.desc')}</option>
-            <option value="asc">{t('library.order.asc')}</option>
-          </select>
-          {(['all', 'draft', 'fav', 'trash'] as Filter[]).map((f) => (
-            <button type="button" key={f} className={`chip ${filter === f ? 'on' : ''}`} onClick={() => setFilter(f)}>
-              {chipLabel[f]}
-            </button>
-          ))}
-        </div>
-      </header>
+      <PageHeader
+        label={t('library.header.label')}
+        title={filter === 'trash' ? t('library.title.trash') : t('library.title.all')}
+        actions={
+          <div className="flex items-center gap-2 flex-wrap">
+            <SearchInput onQueryChange={onQueryChange} placeholder={t('library.search.placeholder')} />
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as 'updated_at' | 'created_at' | 'title')}
+              className="text-sm"
+              title={t('library.sort.title')}
+            >
+              <option value="updated_at">{t('library.sort.updated')}</option>
+              <option value="created_at">{t('library.sort.created')}</option>
+              <option value="title">{t('library.col.title')}</option>
+            </select>
+            <select
+              value={order}
+              onChange={(e) => setOrder(e.target.value as 'desc' | 'asc')}
+              className="text-sm"
+              title={t('library.order.title')}
+            >
+              <option value="desc">{t('library.order.desc')}</option>
+              <option value="asc">{t('library.order.asc')}</option>
+            </select>
+            {(['all', 'draft', 'fav', 'trash'] as Filter[]).map((f) => (
+              <button type="button" key={f} className={`chip ${filter === f ? 'on' : ''}`} onClick={() => setFilter(f)}>
+                {chipLabel[f]}
+              </button>
+            ))}
+          </div>
+        }
+      />
       <div className="rule-t flex-1 overflow-y-auto list-scroll">
         {filter !== 'trash' && (
-          <div className="row !cursor-default" style={{ color: 'var(--dim)' }}>
+          <div className="row row-works !cursor-default text-dim">
             <span className="label">{t('library.col.no')}</span>
             <span className="label">{t('library.col.cover')}</span>
             <span className="label">{t('library.col.title')}</span>
@@ -229,41 +229,30 @@ export default function LibraryView() {
           </div>
         )}
         {loading && items.length === 0 ? (
-          <div className="py-16 text-center text-[12px]" style={{ color: 'var(--dim)' }}>
-            {t('common.loading')}
-          </div>
+          <div className="py-16 text-center text-sm text-dim">{t('common.loading')}</div>
         ) : shown.length === 0 ? (
-          <div className="py-16 text-center">
-            <div className="text-[13px] font-semibold" style={{ color: 'var(--muted)' }}>
-              {filter === 'trash' ? t('library.empty.trashTitle') : t('library.empty.title')}
-            </div>
-            <div className="text-[11px] mt-2" style={{ color: 'var(--dim)' }}>
-              {filter === 'trash' ? t('library.empty.trashHint') : t('library.empty.hint')}
-            </div>
-            {filter !== 'trash' && (
-              <button className="btn btn-ghost text-[11px] mt-4" onClick={() => navigate('/studio')}>
-                {t('library.empty.cta')}
-              </button>
-            )}
-          </div>
+          <EmptyState
+            title={filter === 'trash' ? t('library.empty.trashTitle') : t('library.empty.title')}
+            hint={filter === 'trash' ? t('library.empty.trashHint') : t('library.empty.hint')}
+            actionLabel={filter !== 'trash' ? t('library.empty.cta') : undefined}
+            onAction={() => navigate('/studio')}
+          />
         ) : filter === 'trash' ? (
           shown.map((w) => (
-            <div className="row" key={w.id}>
-              <span className="text-[11px] num" style={{ color: 'var(--dim)' }}>{w.display_code}</span>
-              <div className="cover" style={{ background: w.cover_color ?? '#232323', border: '1px solid var(--line)' }}></div>
-              <span className="text-[13px] font-semibold truncate">{w.title}</span>
-              <span className="text-[12px]" style={{ color: 'var(--muted)' }}>{keyLabel(w.key)}</span>
-              <span className="text-[12px] num" style={{ color: 'var(--muted)' }}>{w.bpm}</span>
-              <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{formatDuration(w.duration_sec)}</span>
-              <span className="text-[11px]" style={{ color: 'var(--dim)' }}>
-                {w.trashed_at ? t('library.trashBadge') : ''}
-              </span>
+            <div className="row row-works" key={w.id}>
+              <span className="text-xs num text-dim">{w.display_code}</span>
+              <div className="cover border border-line" style={{ background: w.cover_color ?? 'var(--bg3)' }}></div>
+              <span className="text-base font-semibold truncate">{w.title}</span>
+              <span className="text-sm text-muted">{keyLabel(w.key)}</span>
+              <span className="text-sm num text-muted">{w.bpm}</span>
+              <span className="text-xs text-muted">{formatDuration(w.duration_sec)}</span>
+              <span className="text-xs text-dim">{w.trashed_at ? t('library.trashBadge') : ''}</span>
               <div className="flex gap-1.5 justify-end">
-                <button className="btn btn-ghost !py-1 !px-2.5 text-[11px]" onClick={(e) => void onRestore(e, w)}>
+                <button className="btn btn-ghost btn-sm" onClick={(e) => void onRestore(e, w)}>
                   {t('library.action.restore')}
                 </button>
                 <button
-                  className="btn btn-ghost !py-1 !px-2.5 text-[11px]"
+                  className="btn btn-ghost btn-sm"
                   style={{ borderColor: 'var(--bad)', color: 'var(--bad)' }}
                   onClick={(e) => void onPermanentDelete(e, w)}
                 >
@@ -278,28 +267,26 @@ export default function LibraryView() {
             const badge =
               exports.length > 0 ? [...new Set(exports)].map((f) => f.toUpperCase()).join(' · ') : t('library.export.none')
             return (
-              <div className="row" key={w.id} onClick={() => navigate(`/works/${w.id}`)}>
-                <span className="text-[11px] num" style={{ color: 'var(--dim)' }}>{w.display_code}</span>
-                <div className="cover" style={{ background: w.cover_color ?? '#232323', border: '1px solid var(--line)' }}></div>
+              <div className="row row-works" key={w.id} onClick={() => navigate(`/works/${w.id}`)}>
+                <span className="text-xs num text-dim">{w.display_code}</span>
+                <div className="cover border border-line" style={{ background: w.cover_color ?? 'var(--bg3)' }}></div>
                 <div className="min-w-0">
-                  <div className="text-[13px] font-semibold truncate">{w.title}</div>
+                  <div className="text-base font-semibold truncate">{w.title}</div>
                   {w.tags.length > 0 && (
                     <div className="flex gap-1 mt-1 flex-wrap">
                       {w.tags.slice(0, 4).map((tg) => (
-                        <span key={tg} className="text-[10px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>
+                        <span key={tg} className="badge">
                           {tg}
                         </span>
                       ))}
-                      {w.tags.length > 4 && (
-                        <span className="text-[10px]" style={{ color: 'var(--dim)' }}>+{w.tags.length - 4}</span>
-                      )}
+                      {w.tags.length > 4 && <span className="text-2xs text-dim">+{w.tags.length - 4}</span>}
                     </div>
                   )}
                 </div>
-                <span className="text-[12px]" style={{ color: 'var(--muted)' }}>{keyLabel(w.key)}</span>
-                <span className="text-[12px] num" style={{ color: 'var(--muted)' }}>{w.bpm}</span>
-                <span className="text-[11px]" style={{ color: 'var(--muted)' }}>{badge}</span>
-                <span className="text-[11px]" style={{ color: commercial ? 'var(--acc)' : 'var(--muted)' }}>
+                <span className="text-sm text-muted">{keyLabel(w.key)}</span>
+                <span className="text-sm num text-muted">{w.bpm}</span>
+                <span className="text-xs text-muted">{badge}</span>
+                <span className={`text-xs ${commercial ? 'text-acc' : 'text-muted'}`}>
                   {commercial ? t('library.license.commercial') : t('library.license.nonCommercial')}
                 </span>
                 <div className="flex gap-2 justify-end items-center">

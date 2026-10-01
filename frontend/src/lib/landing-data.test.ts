@@ -8,7 +8,6 @@ import {
   INSPIRE_CHIPS,
   LANDING_METRICS,
   LANDING_VERSION,
-  MILESTONES,
   MODEL_CATALOG,
   PLANS,
   SHOWCASE,
@@ -35,8 +34,6 @@ const en = (k: string) => enMap[k]
 describe('landing-data 落地页数据完整性', () => {
   it('LANDING_VERSION 与 package.json version 严格同步（v + version，防再脱节）', () => {
     expect(LANDING_VERSION).toBe(`v${pkg.version}`)
-    // 里程碑末项即当前版本（既有断言的加强版）
-    expect(MILESTONES[MILESTONES.length - 1].ver).toBe(`v${pkg.version}`)
   })
 
   it('七通道齐备且字段完整（对齐 backend/app/providers/）', () => {
@@ -117,8 +114,6 @@ describe('landing-data 落地页数据完整性', () => {
     expect(FAQS.length).toBeGreaterThanOrEqual(6)
     expect(LANDING_METRICS.length).toBe(5)
     expect(INSPIRE_CHIPS).toHaveLength(12)
-    expect(MILESTONES.length).toBeGreaterThanOrEqual(7)
-    expect(MILESTONES[MILESTONES.length - 1].ver).toBe(LANDING_VERSION)
     // src 为纯文件名，en/zh 双目录都必须有对应截图（英文界面零中文的截图面）
     for (const s of SHOWCASE) {
       expect(s.src).toMatch(/^[a-z]+\.png$/)

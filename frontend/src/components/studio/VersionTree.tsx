@@ -29,13 +29,12 @@ export default function VersionTree() {
   )
 
   return (
-    <div className="border-l px-5 py-5 overflow-y-auto" style={{ borderColor: 'var(--line)' }}>
+    <div className="border-l border-line px-5 py-5 overflow-y-auto">
       <div className="flex items-center justify-between">
         <div className="label">{t('studio.tree.title')}</div>
         {workId && (
           <button
-            className="text-[10px] font-bold"
-            style={{ color: 'var(--acc)' }}
+            className="text-2xs font-bold text-acc"
             onClick={() => resetForNewWork()}
             title={t('studio.tree.newTitle')}
           >
@@ -45,7 +44,7 @@ export default function VersionTree() {
       </div>
       <div className="vtree mt-3">
         {nodes.length === 0 ? (
-          <div className="text-[11px] py-2 leading-relaxed" style={{ color: 'var(--dim)' }}>
+          <div className="text-xs py-2 leading-relaxed text-dim">
             {t('studio.tree.empty')}
           </div>
         ) : (
@@ -67,7 +66,7 @@ export default function VersionTree() {
         )}
       </div>
       <div className="label mt-6">{t('studio.tree.recentOps')}</div>
-      <div className="mt-2 space-y-2 text-[11px]" style={{ color: 'var(--dim)' }}>
+      <div className="mt-2 space-y-2 text-xs text-dim">
         {opLog.map((op, i) => (
           <div key={`${op}-${i}`}>· {op}</div>
         ))}

@@ -18,7 +18,7 @@ export function drawWave(canvas: HTMLCanvasElement, seed: number, color: string)
   const n = Math.max(8, Math.floor(width / 8))
   for (let i = 0; i < n; i++) {
     const bh = (0.22 + rnd() * 0.78) * height * 0.85
-    ctx.fillStyle = i % 7 === 0 ? color : '#3a3a3a'
+    ctx.fillStyle = i % 7 === 0 ? color : '#383838'
     ctx.fillRect(i * 8, (height - bh) / 2, 4, bh)
   }
 }

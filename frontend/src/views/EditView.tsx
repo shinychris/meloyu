@@ -12,6 +12,7 @@ import {
 import { toast } from '../stores/toast'
 import { useT, t as tGlobal } from '../i18n'
 import { formatDuration } from '../lib/format'
+import { EmptyState } from '../components/common/EmptyState'
 
 type Tool = 'cut' | 'keep' | 'fadein' | 'fadeout' | 'gainUp' | 'gainDown' | 'normalize'
 
@@ -114,11 +115,11 @@ export default function EditView() {
     if (!ctx) return
     const w = cv.width
     const h = cv.height
-    ctx.fillStyle = '#141414'
+    ctx.fillStyle = '#191919'
     ctx.fillRect(0, 0, w, h)
     const peaks = peaksOf(toAudioBuffer(rendered), w)
     const mid = h / 2
-    ctx.strokeStyle = '#3fdc7a'
+    ctx.strokeStyle = '#00ff2c'
     ctx.beginPath()
     for (let x = 0; x < w; x++) {
       const p = peaks[x] ?? 0
@@ -130,9 +131,9 @@ export default function EditView() {
     if (sel && renderDuration > 0) {
       const x0 = Math.floor((sel.a / renderDuration) * w)
       const x1 = Math.ceil((sel.b / renderDuration) * w)
-      ctx.fillStyle = 'rgba(63,220,122,.14)'
+      ctx.fillStyle = 'rgba(0,255,44,.14)'
       ctx.fillRect(x0, 0, Math.max(2, x1 - x0), h)
-      ctx.strokeStyle = 'rgba(63,220,122,.8)'
+      ctx.strokeStyle = 'rgba(0,255,44,.8)'
       ctx.beginPath()
       ctx.moveTo(x0 + 0.5, 0); ctx.lineTo(x0 + 0.5, h)
       ctx.moveTo(x1 + 0.5, 0); ctx.lineTo(x1 + 0.5, h)
@@ -253,23 +254,23 @@ export default function EditView() {
     <section className="view flex flex-col h-full">
       <header className="px-8 pt-6 pb-4">
         <div className="label">{t('edit.view.label')}</div>
-        <h1 className="text-[28px] font-extrabold tracking-tight mt-1">{t('edit.view.headline')}</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight mt-1">{t('edit.view.headline')}</h1>
       </header>
 
       <div className="px-8 flex gap-2 flex-wrap items-center">
-        <select className="!text-[11px] max-w-52" value={workId} onChange={(e) => setWorkId(e.target.value)}>
+        <select className="text-xs max-w-52" value={workId} onChange={(e) => setWorkId(e.target.value)}>
           <option value="">{t('edit.pick.work')}</option>
           {works.map((w) => (
             <option key={w.id} value={w.id}>{w.display_code} · {w.title}</option>
           ))}
         </select>
-        <select className="!text-[11px]" value={versionId} onChange={(e) => setVersionId(e.target.value)} disabled={!nodes.length}>
+        <select className="text-xs" value={versionId} onChange={(e) => setVersionId(e.target.value)} disabled={!nodes.length}>
           <option value="">{t('edit.pick.version')}</option>
           {nodes.map((n) => (
             <option key={n.id} value={n.id}>{n.version_no}</option>
           ))}
         </select>
-        <span className="text-[10px] num ml-1" style={{ color: 'var(--dim)' }}>
+        <span className="text-2xs num ml-1 text-dim">
           {renderDuration > 0 && `${formatDuration(renderDuration)} · ${ops.length} ops`}
         </span>
       </div>
@@ -283,19 +284,19 @@ export default function EditView() {
       </div>
 
       <div className="px-8 mt-3 flex gap-2 flex-wrap items-center">
-        <button className="btn btn-acc !py-1.5 !px-3 text-[11px]" disabled={!sel} onClick={applyTool}>
+        <button className="btn btn-acc btn-sm" disabled={!sel} onClick={applyTool}>
           {t('edit.apply')}
         </button>
-        <button className="btn btn-ghost !py-1.5 !px-3 text-[11px]" disabled={!ops.length} onClick={undo}>
+        <button className="btn btn-ghost btn-sm" disabled={!ops.length} onClick={undo}>
           ↩ {t('edit.undo')}
         </button>
-        <button className="btn btn-ghost !py-1.5 !px-3 text-[11px]" disabled={!redoStack.length} onClick={redo}>
+        <button className="btn btn-ghost btn-sm" disabled={!redoStack.length} onClick={redo}>
           ↪ {t('edit.redo')}
         </button>
-        <button className="btn btn-ghost !py-1.5 !px-3 text-[11px]" disabled={!rendered} onClick={playPreview}>
+        <button className="btn btn-ghost btn-sm" disabled={!rendered} onClick={playPreview}>
           {playing ? '⏸' : '▶'} {t('edit.preview')}
         </button>
-        <span className="text-[10px] ml-auto num" style={{ color: 'var(--dim)' }}>
+        <span className="text-2xs ml-auto num text-dim">
           {clipInfo && clipInfo.count > 0 && t('edit.info.clips', { n: clipInfo.count })}
           {clipInfo && clipInfo.count === 0 && t('edit.info.clean')}
           {silenceRatio > 0.05 && ` · ${t('edit.info.silence', { pct: Math.round(silenceRatio * 100) })}`}
@@ -303,11 +304,7 @@ export default function EditView() {
       </div>
 
       <div className="rule-t flex-1 min-h-0 px-8 py-5 overflow-y-auto">
-        {!buffer && (
-          <div className="border border-dashed py-16 text-center text-[12px]" style={{ borderColor: 'var(--line)', color: 'var(--dim)' }}>
-            {loading ? t('edit.loading') : t('edit.empty')}
-          </div>
-        )}
+        {!buffer && <EmptyState title={loading ? t('edit.loading') : t('edit.empty')} />}
         {buffer && (
           <>
             <canvas
@@ -315,27 +312,27 @@ export default function EditView() {
               width={1200}
               height={180}
               className="w-full"
-              style={{ background: '#141414', cursor: 'crosshair', borderRadius: 6 }}
+              style={{ background: '#191919', cursor: 'crosshair' }}
               onMouseDown={onCanvasMouseDown}
               data-testid="edit-waveform"
             />
             <div className="flex items-center gap-3 mt-4">
-              <button className="btn btn-acc !py-1.5 !px-4 text-[12px]" disabled={!ops.length || saving || saveBlocked} onClick={() => void save()}>
+              <button className="btn btn-acc btn-md" disabled={!ops.length || saving || saveBlocked} onClick={() => void save()}>
                 {saving ? t('edit.saving') : t('edit.save')}
               </button>
               {saveBlocked && ops.length > 0 && (
-                <span className="text-[10px]" style={{ color: 'var(--bad)' }}>
+                <span className="text-2xs text-bad">
                   {t('edit.save.rangeWarn', { s: formatDuration(renderDuration) })}
                 </span>
               )}
-              <span className="text-[10px]" style={{ color: 'var(--dim)' }}>{t('edit.save.hint')}</span>
+              <span className="text-2xs text-dim">{t('edit.save.hint')}</span>
             </div>
             {ops.length > 0 && (
               <div className="card p-3 mt-4">
                 <div className="label mb-2">{t('edit.ops.title')}</div>
                 <div className="flex gap-1.5 flex-wrap">
                   {ops.map((op) => (
-                    <span key={op.id} className="text-[9px] px-1.5 py-0.5" style={{ background: 'var(--bg3)', color: 'var(--muted)' }}>
+                    <span key={op.id} className="text-2xs px-1.5 py-0.5 bg-bg-3 text-muted">
                       {t(`edit.tool.${op.type === 'gain' ? (op.db && op.db > 0 ? 'gainUp' : 'gainDown') : op.type}` as never)}
                       {' '}{op.start.toFixed(1)}–{op.end.toFixed(1)}s
                     </span>
@@ -346,7 +343,7 @@ export default function EditView() {
           </>
         )}
       </div>
-      <p className="px-8 pb-3 text-[10px]" style={{ color: 'var(--dim)' }}>{t('edit.footnote')}</p>
+      <p className="px-8 pb-3 text-2xs text-dim">{t('edit.footnote')}</p>
     </section>
   )
 }

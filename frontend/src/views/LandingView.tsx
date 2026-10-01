@@ -26,16 +26,18 @@ export default function LandingView() {
   }, [locale, t])
 
   return (
-    <div className="h-screen overflow-y-auto scroll-smooth view" style={{ background: 'var(--bg)' }}>
+    <div className="h-screen overflow-y-auto scroll-smooth view bg-bg">
       <LandingNav />
       <LandingHero />
-      <div className="max-w-[1080px] mx-auto px-6 space-y-24 py-24">
+      <div className="max-w-[1080px] mx-auto px-6 space-y-20 md:space-y-28 py-24">
         <LandingWorkFlow />
         <LandingCapabilities />
         <LandingChannels />
         <LandingModels />
         <LandingShowcase />
         <LandingAudience />
+        {/* 章节「功能 → 商业化」分隔 */}
+        <div aria-hidden="true" className="border-t border-line" />
         <LandingPricing />
         <LandingFaq />
       </div>

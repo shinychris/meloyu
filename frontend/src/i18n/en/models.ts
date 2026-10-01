@@ -17,7 +17,7 @@ export const modelsEn = {
   // 概览分区
   'models.overview.envLabel': 'Environment',
   'models.overview.envDocker': 'Docker container',
-  'models.overview.envHost': 'Host (dev)',
+  'models.overview.envHost': 'Host',
   'models.overview.checkTitle': 'Production readiness check',
   'models.overview.lyricsOk': 'A real model channel is active — production ready',
   'models.overview.lyricsFallback':
@@ -60,7 +60,7 @@ export const modelsEn = {
   'models.backend.localsynth.desc':
     'Non-AI template/rule-based generation · offline fallback only — switch to a real model channel for production',
   'models.backend.ollama.title': 'Local open-source model (Ollama)',
-  'models.backend.ollama.desc': 'Real LLM · data never leaves your machine · speed depends on model and hardware',
+  'models.backend.ollama.desc': 'Real LLM · connects to your own Ollama service · speed depends on model and hardware',
   'models.backend.openai_compat.title': 'External API (OpenAI-compatible)',
   'models.backend.openai_compat.desc': 'Cloud models like Zhipu / DeepSeek / OpenAI · requires an API key',
   // 歌曲引擎通道
@@ -111,7 +111,7 @@ export const modelsEn = {
   // Replicate Token 与开源目录
   'models.catalog.title': 'Open-source song model catalog (ranked by third-party benchmarks)',
   'models.catalog.sectionDesc':
-    'Real open-source models with local download or Replicate hosting — pick one and the song engine switches to its channel. Benchmark scores are third-party reference values (ADR-015).',
+    'Real open-source models with local download or Replicate hosting — pick one and the song engine switches to its channel. Benchmark scores are third-party reference values.',
   'models.replicate.tokenPh': 'r8_… (from your replicate.com account)',
   'models.replicate.needToken': 'Enter a Replicate API token (starting with r8_) first',
   'models.replicate.needTokenSave': 'Enter a Replicate API token first',

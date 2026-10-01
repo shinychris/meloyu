@@ -4,6 +4,7 @@ import { useUiStore } from '../../stores/ui'
 import { formatNum } from '../../lib/format'
 import { useT } from '../../i18n'
 import LangSwitch from '../common/LangSwitch'
+import { Logo } from '../common/Logo'
 import AccountMenu from './AccountMenu'
 import type { TranslationKey } from '../../i18n'
 
@@ -56,20 +57,13 @@ export default function Sidebar() {
   const barPct = grant > 0 ? Math.min(100, Math.max(4, (balance / grant) * 100)) : 4
 
   return (
-    <aside
-      className="sidebar w-[212px] flex-none border-r flex flex-col"
-      style={{ borderColor: 'var(--line)', background: 'var(--bg)' }}
-    >
+    <aside className="sidebar w-[212px] flex-none border-r flex flex-col border-line bg-bg">
       <div className="sidebar-head px-[18px] pt-6 pb-5">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/studio')}>
-          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-            <rect x="1" y="1" width="20" height="20" stroke="#00ff2c" strokeWidth="2" />
-            <rect x="6" y="9" width="3" height="7" fill="#fff" />
-            <rect x="11" y="5" width="3" height="11" fill="#00ff2c" />
-          </svg>
+          <Logo size={22} />
           <div className="sidebar-head-text">
-            <div className="text-[15px] font-extrabold tracking-tight leading-none">MELOYU</div>
-            <div className="text-[10px] mt-1" style={{ color: 'var(--dim)' }}>
+            <div className="text-md font-extrabold tracking-tight leading-none">MELOYU</div>
+            <div className="text-2xs mt-1 text-dim">
               {t('app.sidebar.tagline')}
             </div>
           </div>
@@ -102,17 +96,17 @@ export default function Sidebar() {
       </nav>
       {/* pb 预留底部固定播放器(68px)的遮挡带，保证积分区与账号菜单可点击 */}
       <div className="sidebar-bottom rule-t px-[18px] pt-[18px] pb-[84px]">
-        <button className="btn btn-ghost w-full !py-1.5 text-[11px] mb-3" onClick={startOnboarding}>
+        <button className="btn btn-ghost w-full btn-sm mb-3" onClick={startOnboarding}>
           {t('app.sidebar.onboarding')}
         </button>
         <div className="flex items-center justify-between">
           <span className="label">{t('app.sidebar.credits')}</span>
-          <span className="text-[11px] font-bold num" style={{ color: 'var(--acc)' }}>
+          <span className="text-xs font-bold num text-acc">
             {formatNum(balance)}
           </span>
         </div>
-        <div className="h-[3px] mt-2" style={{ background: 'var(--bg3)' }}>
-          <div className="h-full" style={{ width: `${barPct}%`, background: 'var(--acc)' }}></div>
+        <div className="h-[3px] mt-2 bg-bg-3">
+          <div className="h-full bg-acc" style={{ width: `${barPct}%` }}></div>
         </div>
         {/* 账号管理区：档位行 + 弹出菜单（改密/导出/登出全部/删号/登出） */}
         <AccountMenu />

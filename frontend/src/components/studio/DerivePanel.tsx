@@ -68,7 +68,7 @@ export default function DerivePanel({
   }
 
   return (
-    <div className="mx-4 mb-3 border p-3 pop" style={{ borderColor: 'var(--line)', background: 'var(--bg3)' }}>
+    <div className="mx-4 mb-3 border p-3 pop border-line bg-bg-3">
       <div className="flex items-center justify-between">
         <div className="label">{t(KIND_TITLE[kind])}</div>
         <button className="iconbtn !w-6 !h-6" title={t('common.close')} onClick={onClose} disabled={busy}>
@@ -80,18 +80,18 @@ export default function DerivePanel({
 
       {kind === 'extend' && (
         <>
-          <div className="text-[11px] mt-2" style={{ color: 'var(--dim)' }}>
+          <div className="text-xs mt-2 text-dim">
             {t('studio.derive.extend.hint')}
           </div>
           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
             {EXTEND_PRESETS.map((s) => (
-              <span key={s} className={`chip ${seconds === s ? 'on' : ''}`} onClick={() => setSeconds(s)}>
+              <button key={s} type="button" className={`chip ${seconds === s ? 'on' : ''}`} onClick={() => setSeconds(s)}>
                 {`+${s}s`}
-              </span>
+              </button>
             ))}
             <span style={{ flex: 1 }}></span>
             <button
-              className="btn btn-acc !py-1 !px-3 text-[11px]"
+              className="btn btn-acc btn-sm"
               disabled={busy}
               onClick={() => onSubmitExtend(seconds)}
             >
@@ -103,7 +103,7 @@ export default function DerivePanel({
 
       {kind === 'variant' && (
         <>
-          <div className="text-[11px] mt-2" style={{ color: 'var(--dim)' }}>
+          <div className="text-xs mt-2 text-dim">
             {t('studio.derive.variant.hint')}
           </div>
           <input
@@ -117,12 +117,12 @@ export default function DerivePanel({
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !busy) onSubmitVariant(stylePrompt.trim())
             }}
-            className="mt-2 w-full !text-[12px]"
+            className="mt-2 w-full !text-sm"
             style={{ padding: '6px 10px' }}
           />
           <div className="flex justify-end mt-2">
             <button
-              className="btn btn-acc !py-1 !px-3 text-[11px]"
+              className="btn btn-acc btn-sm"
               disabled={busy}
               onClick={() => onSubmitVariant(stylePrompt.trim())}
             >
@@ -134,11 +134,11 @@ export default function DerivePanel({
 
       {kind === 'regen' && (
         <>
-          <div className="text-[11px] mt-2" style={{ color: 'var(--dim)' }}>
+          <div className="text-xs mt-2 text-dim">
             {t('studio.derive.regen.hint')}
           </div>
           {candidate.structure.length === 0 ? (
-            <div className="text-[11px] mt-2" style={{ color: 'var(--warn)' }}>
+            <div className="text-xs mt-2 text-warn">
               {t('studio.derive.regen.empty')}
             </div>
           ) : (
@@ -148,8 +148,9 @@ export default function DerivePanel({
                 const occ = occurrenceNo(candidate.structure, i)
                 const selected = selectedSeg === i
                 return (
-                  <span
+                  <button
                     key={i}
+                    type="button"
                     className={`chip ${selected ? 'on' : ''}`}
                     title={t('studio.derive.seg', {
                       section: sectionLabel(seg.section),
@@ -159,17 +160,17 @@ export default function DerivePanel({
                     onClick={() => setSelectedSeg(i)}
                   >
                     {`${sectionLabel(seg.section)}${count > 1 ? `#${occ}` : ''}`}
-                    <span className="num ml-1" style={{ fontSize: 9, color: selected ? undefined : 'var(--dim)' }}>
+                    <span className={`num ml-1 text-2xs ${selected ? '' : 'text-dim'}`}>
                       {`${formatClock(seg.start_sec)}–${formatClock(seg.end_sec)}`}
                     </span>
-                  </span>
+                  </button>
                 )
               })}
             </div>
           )}
           <div className="flex justify-end mt-2">
             <button
-              className="btn btn-acc !py-1 !px-3 text-[11px]"
+              className="btn btn-acc btn-sm"
               disabled={busy || selectedSeg == null}
               title={selectedSeg == null ? t('studio.derive.regen.pickFirst') : undefined}
               onClick={submitRegen}

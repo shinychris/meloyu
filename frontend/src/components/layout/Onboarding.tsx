@@ -113,12 +113,12 @@ export default function Onboarding() {
           <span className="label" style={{ color: 'var(--acc)' }}>
             {t('layout.ob.progress', { current: onboardingStep + 1, total: OB_STEPS.length })}
           </span>
-          <button className="text-[10px]" style={{ color: 'var(--dim)' }} onClick={endOnboarding}>
+          <button className="text-2xs text-dim" onClick={endOnboarding}>
             {t('layout.ob.skip')}
           </button>
         </div>
-        <div className="text-[14px] font-bold mt-2">{t(step.titleKey)}</div>
-        <div className="text-[12px] mt-2 leading-relaxed" style={{ color: 'var(--muted)' }}>
+        <div className="text-md font-bold mt-2">{t(step.titleKey)}</div>
+        <div className="text-sm mt-2 leading-relaxed text-muted">
           {t(step.descKey)}
         </div>
         <div className="flex justify-between items-center mt-4">
@@ -132,7 +132,7 @@ export default function Onboarding() {
             ))}
           </div>
           <button
-            className="btn btn-acc !py-1.5 !px-4 text-[11px] font-bold"
+            className="btn btn-acc btn-sm font-bold"
             onClick={() => {
               if (isLast) {
                 endOnboarding()
