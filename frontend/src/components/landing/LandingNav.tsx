@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useT, type TranslationKey } from '../../i18n'
 import LangSwitch from '../common/LangSwitch'
+import { useSiteMode } from './SiteMode'
 import { Logo } from '../common/Logo'
 
 const ANCHORS: Array<{ id: string; key: TranslationKey }> = [
@@ -20,6 +21,7 @@ export function scrollToSection(id: string) {
 export default function LandingNav() {
   const navigate = useNavigate()
   const t = useT()
+  const site = useSiteMode()
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-bg/90 backdrop-blur-md">
       <div className="max-w-[1080px] mx-auto px-6 h-[60px] flex items-center gap-8">
@@ -45,12 +47,14 @@ export default function LandingNav() {
         </nav>
         <div className="flex items-center gap-3 ml-auto">
           <LangSwitch />
-          <button
-            className="hidden sm:block text-sm text-muted cursor-pointer transition-colors"
-            onClick={() => navigate('/login')}
-          >
-            {t('landing.nav.login')}
-          </button>
+          {!site && (
+            <button
+              className="hidden sm:block text-sm text-muted cursor-pointer transition-colors"
+              onClick={() => navigate('/login')}
+            >
+              {t('landing.nav.login')}
+            </button>
+          )}
           <button className="btn btn-acc btn-sm" onClick={() => scrollToSection('pricing')}>
             {t('landing.nav.cta')}
           </button>

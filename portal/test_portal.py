@@ -86,7 +86,11 @@ class TestPortal(unittest.TestCase):
         self.assertIn(r.json()["reason"], ("invalid_key", "unknown_license"))
 
     def test_marketing_index_and_updates_mount(self):
-        self.assertIn("yours for life", self.client.get("/").text)
+        # F7：dist-landing 已构建 → 首页为落地页 SPA（默认英文营销站）；
+        # 未构建 → 兜底基座页（两句式断言兼容 CI 无前端构建产物的场景）
+        index_html = self.client.get("/").text
+        self.assertTrue("yours for life" in index_html
+                        or "landing-main" in index_html or "/assets/" in index_html)
         self.assertEqual(self.client.get("/updates/").status_code, 404)  # 空目录，挂载存在
 
 

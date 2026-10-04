@@ -7,9 +7,9 @@ import OnboardingAsk from './components/layout/OnboardingAsk'
 import ToastHost from './components/common/ToastHost'
 import ConfirmDialog from './components/common/ConfirmDialog'
 import ErrorBoundary from './components/common/ErrorBoundary'
-// 首屏关键路径直接 import：落地页与登录页
+// 首屏关键路径直接 import：登录页（F7：落地页已迁官网营销站独立构建
+// frontend/dist-landing，由 portal 托管，App 内不再携带）
 import LoginView from './views/LoginView'
-import LandingView from './views/LandingView'
 // 其余视图 lazy（代码分割；React.lazy + Suspense，不引入新依赖）
 const StudioView = lazy(() => import('./views/StudioView'))
 const LyricsView = lazy(() => import('./views/LyricsView'))
@@ -218,9 +218,10 @@ function RootRoutes() {
   const hasToken = useSessionStore((s) => s.user !== null) || Boolean(getToken())
   return (
     <Routes>
-      {/* 产品落地页：对外展示入口。未登录访问 / 直接落地；已登录直达工作台。 /landing 恒定可访问（演示/分享）。 */}
-      <Route path="/landing" element={<LandingView />} />
-      <Route path="/" element={hasToken ? <Navigate to="/studio" replace /> : <LandingView />} />
+      {/* F7：落地页已迁官网（portal 托管 dist-landing）；App 内 / 与旧 /landing
+          一律按登录态分流（旧外链 → 登录页，不 404） */}
+      <Route path="/" element={hasToken ? <Navigate to="/studio" replace /> : <Navigate to="/login" replace />} />
+      <Route path="/landing" element={<Navigate to="/" replace />} />
       <Route path="/login" element={<LoginGuard />} />
       {/* 邮件重置密码（Stripe 回跳页已随 v0.16.0 订阅拆除移除） */}
       <Route path="/reset-password" element={<ResetPasswordView />} />

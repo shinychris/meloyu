@@ -35,3 +35,4 @@ backend/dist-backend/
 backend/build-desktop/
 # License Portal 运行数据（签发库/更新包）
 portal/data/
+dist-landing/

@@ -3,6 +3,7 @@ import { CHANNELS, LANDING_VERSION } from '../../lib/landing-data'
 import { useT, type TranslationKey } from '../../i18n'
 import { Logo } from '../common/Logo'
 import { scrollToSection } from './LandingNav'
+import { useSiteMode } from './SiteMode'
 
 /** 页脚锚点导航（与顶部导航共用文案 key） */
 const FOOTER_LINKS: Array<{ id: string; key: TranslationKey }> = [
@@ -17,6 +18,7 @@ const FOOTER_LINKS: Array<{ id: string; key: TranslationKey }> = [
 export default function LandingFooter() {
   const navigate = useNavigate()
   const t = useT()
+  const site = useSiteMode()
   return (
     <footer>
       {/* 尾幅 CTA */}
@@ -50,9 +52,11 @@ export default function LandingFooter() {
         <div>
           <div className="label">{t('landing.footer.col.product')}</div>
           <div className="mt-4 space-y-2.5">
-            <button className="block text-sm text-muted hover:text-white transition-colors cursor-pointer" onClick={() => navigate('/login')}>
-              {t('landing.footer.enterStudio')}
-            </button>
+            {!site && (
+              <button className="block text-sm text-muted hover:text-white transition-colors cursor-pointer" onClick={() => navigate('/login')}>
+                {t('landing.footer.enterStudio')}
+              </button>
+            )}
             {FOOTER_LINKS.map((l) => (
               <button
                 key={l.id}

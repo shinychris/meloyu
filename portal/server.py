@@ -19,7 +19,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 PORTAL_DIR = Path(__file__).resolve().parent
@@ -248,11 +248,11 @@ word-break:break-all;font-size:12px;line-height:1.6}}</style></head><body>
 app.mount("/updates", StaticFiles(directory=str(DATA_DIR / "updates")), name="updates")
 
 
-# ---------------- 营销站基座（正式版由官网批次细化） ----------------
+# ---------------- 营销站（F7：landing 独立构建 dist-landing；未构建时兜底基座页） ----------------
 
-@app.get("/", response_class=HTMLResponse)
-async def index():
-    return HTMLResponse(f"""<!doctype html><html><head><meta charset="utf-8">
+LANDING_DIR = Path(os.environ.get(
+    "PORTAL_LANDING_DIR", PORTAL_DIR.parent / "frontend" / "dist-landing"))
+_FALLBACK_PAGE = f"""<!doctype html><html><head><meta charset="utf-8">
 <title>Meloyu — AI Music Desktop Studio</title>
 <style>body{{font-family:ui-monospace,Consolas,monospace;background:#0d0f10;
 color:#e8ece9;display:flex;align-items:center;justify-content:center;height:100vh;
@@ -268,9 +268,25 @@ ${PRICE_USD // 100}</span></div>
 <a class="btn" href="/buy">Buy lifetime license</a>
 <div style="color:#5c666b;font-size:13px">Launch offer · macOS &amp; Windows ·
 all future updates included</div>
-</body></html>""")
+</body></html>"""
+
+
+@app.get("/", response_class=HTMLResponse)
+async def index():
+    """营销站首页：dist-landing 已构建则回落地页 SPA（默认 en，zh 可切），
+    否则回兜底基座页（构建指引见 portal/README.md）。"""
+    landing_html = LANDING_DIR / "landing.html"
+    if landing_html.is_file():
+        return FileResponse(landing_html)
+    return HTMLResponse(_FALLBACK_PAGE)
+
 
 
 @app.get("/healthz")
 async def healthz():
     return {"ok": True}
+
+# 营销站静态资源挂载（assets/*）：必须置于全部路由注册之后——
+# Starlette 按注册顺序匹配，"/" 挂载会吞掉其后才注册的 API 路由（测试实测）
+if LANDING_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=str(LANDING_DIR)), name="site")

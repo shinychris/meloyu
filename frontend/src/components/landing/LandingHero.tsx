@@ -2,11 +2,13 @@ import { useNavigate } from 'react-router-dom'
 import { INSPIRE_CHIPS, LANDING_METRICS } from '../../lib/landing-data'
 import { useT, getLocale } from '../../i18n'
 import { scrollToSection } from './LandingNav'
+import { useSiteMode } from './SiteMode'
 
 /** Hero：定位语 + 双 CTA + 灵感 chips + 指标条 */
 export default function LandingHero() {
   const navigate = useNavigate()
   const t = useT()
+  const site = useSiteMode()
   return (
     <section className="landing-hero-bg relative overflow-hidden">
       <div className="landing-grid absolute inset-0 pointer-events-none" />
@@ -30,9 +32,11 @@ export default function LandingHero() {
           <button className="btn btn-acc btn-lg" onClick={() => scrollToSection('pricing')}>
             {t('landing.hero.cta.primary')}
           </button>
-          <button className="btn btn-ghost btn-lg" onClick={() => navigate('/login')}>
-            {t('landing.hero.cta.secondary')}
-          </button>
+          {!site && (
+            <button className="btn btn-ghost btn-lg" onClick={() => navigate('/login')}>
+              {t('landing.hero.cta.secondary')}
+            </button>
+          )}
         </div>
         <div className="flex items-center justify-center gap-2 mt-8 flex-wrap max-w-[720px] mx-auto">
           {INSPIRE_CHIPS.slice(0, 10).map((c, i) => (
@@ -40,7 +44,7 @@ export default function LandingHero() {
               key={c}
               className={`chip ${i === 2 ? 'acc-on' : ''}`}
               title={t('landing.hero.chipHint')}
-              onClick={() => navigate('/login')}
+              onClick={site ? undefined : () => navigate('/login')}
             >
               {t(c)}
             </button>

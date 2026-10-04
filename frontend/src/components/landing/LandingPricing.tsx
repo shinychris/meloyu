@@ -2,11 +2,13 @@ import { useNavigate } from 'react-router-dom'
 import { LICENSE_SKU } from '../../lib/landing-data'
 import { useT } from '../../i18n'
 import { EqMark } from './EqMark'
+import { useSiteMode } from './SiteMode'
 
 /** 定价：单档终身授权买断（D-1 定案：$399 终身、限时首发 $159；无免费层、无订阅） */
 export default function LandingPricing() {
   const navigate = useNavigate()
   const t = useT()
+  const site = useSiteMode()
   return (
     <section id="pricing" className="scroll-mt-20">
       <div className="label flex items-center gap-2"><EqMark />{t('landing.pricing.label')}</div>
@@ -40,9 +42,17 @@ export default function LandingPricing() {
               </li>
             ))}
           </ul>
-          <button className="btn btn-acc w-full mt-6" onClick={() => navigate('/login')}>
-            {t('landing.pricing.cta.buy')}
-          </button>
+          {/* 官网站点直链 /buy（portal → Stripe Payment Link）；App 内过渡期指登录入口，
+              P3 购买通道全量后统一外链 */}
+          {site ? (
+            <a className="btn btn-acc w-full mt-6 block text-center" href="/buy">
+              {t('landing.pricing.cta.buy')}
+            </a>
+          ) : (
+            <button className="btn btn-acc w-full mt-6" onClick={() => navigate('/login')}>
+              {t('landing.pricing.cta.buy')}
+            </button>
+          )}
         </div>
       </div>
       <p className="text-xs mt-4 text-dim">

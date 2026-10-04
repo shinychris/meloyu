@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useI18nStore, useT } from '../i18n'
+import { SiteModeProvider } from '../components/landing/SiteMode'
 import LandingNav from '../components/landing/LandingNav'
 import LandingHero from '../components/landing/LandingHero'
 import LandingWorkFlow from '../components/landing/LandingWorkFlow'
@@ -12,8 +13,9 @@ import LandingPricing from '../components/landing/LandingPricing'
 import LandingFaq from '../components/landing/LandingFaq'
 import LandingFooter from '../components/landing/LandingFooter'
 
-/** 产品落地页（公共路由，登录墙之外）：全套展示信息 + 注册入口 */
-export default function LandingView() {
+/** 产品落地页（F7 双宿主）：App 内默认；site=true 为官网营销站独立构建
+ *  （portal 托管，登录类入口隐藏、购买 CTA 直链 /buy）。 */
+export default function LandingView({ site = false }: { site?: boolean }) {
   const t = useT()
   const locale = useI18nStore((s) => s.locale)
 
@@ -21,11 +23,12 @@ export default function LandingView() {
   useEffect(() => {
     document.title = t('landing.title')
     return () => {
-      document.title = t('app.title')
+      if (!site) document.title = t('app.title')
     }
-  }, [locale, t])
+  }, [locale, t, site])
 
   return (
+    <SiteModeProvider value={site}>
     <div className="h-screen overflow-y-auto scroll-smooth view bg-bg">
       <LandingNav />
       <LandingHero />
@@ -43,5 +46,6 @@ export default function LandingView() {
       </div>
       <LandingFooter />
     </div>
+    </SiteModeProvider>
   )
 }
