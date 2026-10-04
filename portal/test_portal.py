@@ -85,6 +85,14 @@ class TestPortal(unittest.TestCase):
         # 未配置公钥的部署则落到 unknown_license（查库不命中）
         self.assertIn(r.json()["reason"], ("invalid_key", "unknown_license"))
 
+    def test_buy_manual_mode_default(self):
+        # 未配 PAYMENT_LINK_URL（默认零外部依赖模式）：人工签发售卖页 200，
+        # 而非 503 错误页（2026-10-04 用户口径：桌面软件无需 Stripe 支付）
+        r = self.client.get("/buy")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Lifetime License", r.text)
+        self.assertIn("license key", r.text)
+
     def test_marketing_index_and_updates_mount(self):
         # F7：dist-landing 已构建 → 首页为落地页 SPA（默认英文营销站）；
         # 未构建 → 兜底基座页（两句式断言兼容 CI 无前端构建产物的场景）

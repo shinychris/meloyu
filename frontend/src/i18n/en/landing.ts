@@ -74,7 +74,7 @@ export const landingEn = {
   'landing.pricing.desc': 'No subscription, no monthly fees, no credits. Launch offer $159 (regular $399): pay once for a lifetime license that includes all future updates.',
   'landing.pricing.oneTime': 'one-time · lifetime',
   'landing.pricing.cta.buy': 'Get the lifetime license — $159',
-  'landing.pricing.footnote':'One-time payment, processed securely via Stripe. For on-premise deployment and volume licensing, contact sales.',
+  'landing.pricing.footnote':'One-time payment (see the purchase page for options). For on-premise deployment and volume licensing, contact sales.',
   // FAQ
   'landing.faq.label': 'FAQ',
   'landing.faq.title': 'Questions you might have',

@@ -11,7 +11,7 @@ export const pricingEn = {
   'pricing.buy.oneTime': 'one-time · lifetime',
   'pricing.buy.cta': 'Buy at meloyu.com',
   'pricing.buy.note':
-    'One-time payment via Stripe. Includes all future updates; no subscription, no credits.',
+    'One-time payment. Includes all future updates; no subscription, no credits.',
   'pricing.buy.enterprise': 'Need on-premise deployment or team licensing? Contact sales.',
   // 用量说明（license 模式积分=纯计量）
   'pricing.usage.footnote':

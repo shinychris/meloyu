@@ -76,7 +76,7 @@ export const landingZh: Record<keyof typeof landingEn, string> = {
   'landing.pricing.desc': '无订阅、无月费、无积分消耗。限时首发 $159（原价 $399），一次付费获得终身授权，含全部版本更新。',
   'landing.pricing.oneTime': '一次性买断 · 终身',
   'landing.pricing.cta.buy': '立即以 $159 获取终身授权',
-  'landing.pricing.footnote': '一次性付款，经 Stripe 安全处理。企业私有化部署与团队批量授权请联系销售。',
+  'landing.pricing.footnote': '一次性买断付款（购买页见支付方式）。企业私有化部署与团队批量授权请联系销售。',
   // FAQ
   'landing.faq.label': 'FAQ · 常见问题',
   'landing.faq.title': '你可能想问',

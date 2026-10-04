@@ -36,6 +36,8 @@ PRIVATE_KEY = os.environ.get("PORTAL_PRIVATE_KEY", "")
 PUBLIC_KEY = os.environ.get("PORTAL_PUBLIC_KEY", "")
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 PAYMENT_LINK_URL = os.environ.get("PAYMENT_LINK_URL", "")
+# 无在线支付模式（默认）：售卖走人工渠道（邮箱联系 → 人工签发 Key）
+SALES_EMAIL = os.environ.get("PORTAL_SALES_EMAIL", "")
 PRICE_USD = 39900
 SALE_PRICE_USD = 15900
 
@@ -186,10 +188,32 @@ async def activate_report(request: Request):
 
 @app.get("/buy")
 async def buy():
-    if not PAYMENT_LINK_URL:
-        return HTMLResponse("<h3>Purchase is not configured yet "
-                            "(PAYMENT_LINK_URL). Contact support.</h3>", status_code=503)
-    return RedirectResponse(PAYMENT_LINK_URL)
+    """购买入口（双模式）：
+
+    - 在线支付（可选）：配 PAYMENT_LINK_URL → 302 Stripe Payment Link，履约走 /thanks；
+    - 人工签发（默认，零外部依赖）：未配支付链接 → 联系购买页（邮箱/流程说明），
+      管理员经 /api/admin/licenses 人工签发后交付 Key。
+    """
+    if PAYMENT_LINK_URL:
+        return RedirectResponse(PAYMENT_LINK_URL)
+    contact = SALES_EMAIL or "support@meloyu.com"
+    return HTMLResponse(f"""<!doctype html><html><head><meta charset="utf-8">
+<title>Meloyu — Get your license</title>
+<style>body{{font-family:ui-monospace,Consolas,monospace;background:#0d0f10;
+color:#e8ece9;display:flex;align-items:center;justify-content:center;height:100vh;
+margin:0}}.card{{max-width:560px;padding:40px;background:#16191b;border:1px solid #2a2f33}}
+h2{{color:#8be9c0;margin:0 0 12px}}.price{{font-size:40px;font-weight:800;margin:16px 0}}
+a{{color:#8be9c0}}li{{margin:8px 0;color:#9aa3a7;font-size:14px}}</style></head><body>
+<div class="card"><h2>Meloyu Desktop — Lifetime License</h2>
+<div class="price">$159 <span style="font-size:16px;color:#5c666b;text-decoration:line-through">$399</span></div>
+<ol>
+<li>Email <a href="mailto:{contact}">{contact}</a> to purchase (launch-offer $159, one-time, lifetime).</li>
+<li>You receive your license key by email, usually within 24 hours.</li>
+<li>Open Meloyu → Pricing &amp; Activation → paste the key. Done.</li>
+</ol>
+<p style="color:#5c666b;font-size:13px">One-time purchase · up to 3 devices · all future updates included ·
+14-day full-feature trial in the app before you buy.</p>
+</div></body></html>""")
 
 
 @app.get("/thanks")
@@ -198,10 +222,11 @@ async def thanks(session_id: str = ""):
     if not session_id:
         return HTMLResponse("<h3>Missing checkout session.</h3>", status_code=422)
     if not (STRIPE_SECRET_KEY and PRIVATE_KEY):
+        contact = SALES_EMAIL or "support@meloyu.com"
         return HTMLResponse(
-            "<h3>Payment verification is not configured on this portal. "
-            "Forward your receipt to support and your license key will be emailed.</h3>",
-            status_code=503)
+            f"<h3>Online payment verification is not enabled on this portal. "
+            f"Forward your receipt to <a href='mailto:{contact}'>{contact}</a> and your "
+            f"license key will be emailed.</h3>")
     # 幂等：同 session 已签发则直接复现
     with portal_db.conn() as c:
         row = c.execute("SELECT * FROM licenses WHERE stripe_session_id = ?",

@@ -47,16 +47,28 @@ cd desktop && npm run dist:win           # NSIS x64
 cd desktop && npm run dist:mac           # dmg arm64 + x64
 ```
 
-## 签名与公证（GA 前置，P0 证书采购项）
+## 签名与公证（2026-10-04 口径：可零成本起步，**自签证书对分发无意义**）
 
-- **Windows**：`electron-builder.yml` `win.certificateSubjectName` 配 EV 证书主题；
-  PyInstaller 产物误报是已知问题，正式版必须签名 + 提交微软误报申诉。
-  首选 Azure Trusted Signing（无硬件令牌）。
-- **macOS**：`mac.identity = "Developer ID Application: <主体>"` + `notarize: true`；
-  **sidecar 二进制必须与主程序同签**（afterSign 钩子里对
+**先回答"能否自签"**：代码签名证书自签≠免警告——用户机器不信任自建根，
+SmartScreen/Gatekeeper 的提示与不签名完全一样；macOS 公证（notarytool）只认
+Apple 签发的 Developer ID，自签根本走不通。因此签名策略按成本分三档：
+
+| 档 | 做法 | 用户所见 | 成本 |
+|---|---|---|---|
+| 起步（现在） | **不签名分发** | Win：SmartScreen「仍要运行」；mac：右键打开/xattr -cr 绕 Gatekeeper | 0 |
+| Windows 转正 | **Azure Trusted Signing**（无硬件令牌，个人可申） | 无「未知发布者」告警 | $9.99/月 |
+| macOS 转正 | **Apple Developer**（Developer ID + notarize，绕不开） | 双击直开 | $99/年 |
+
+- 起步期缓解：Windows 提交微软误报分析降低 Defender 命中（PyInstaller 产物
+  误报是已知问题）；macOS 可发 zip 并附一行 `xattr -cr` 引导。
+- **更新通道完整性不依赖购买证书**：electron-updater 的 latest.yml 用构建时
+  自生成的 SHA512 密钥签名（`electron-builder` 自动管理），与代码签名证书无关。
+- License 验签同样自管：keypair 由 `backend/scripts/license_tools.py keygen`
+  生成（Ed25519），公钥构建时注入 `LICENSE_PUBLIC_KEY`，私钥离线保管——
+  这部分"自签"是完全正当且零成本的。
+- 转正后配置：Win `win.certificateSubjectName`/Azure；mac `mac.identity` +
+  `notarize: true`，且 **sidecar 二进制必须与主程序同签**（afterSign 钩子对
   `resources/meloyu-backend/**` 逐个 `codesign` 后统一 `notarytool submit`）。
-- 构建机注入 `LICENSE_PUBLIC_KEY`（sidecar 验签公钥，keypair 由
-  `backend/scripts/license_tools.py keygen` 生成；私钥离线保管，用于签发）。
 
 ## 自动更新
 

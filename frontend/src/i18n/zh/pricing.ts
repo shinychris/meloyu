@@ -12,7 +12,7 @@ export const pricingZh: Record<keyof typeof pricingEn, string> = {
   'pricing.buy.badge': '限时首发',
   'pricing.buy.oneTime': '一次性买断 · 终身',
   'pricing.buy.cta': '前往官网购买',
-  'pricing.buy.note': '经 Stripe 一次付清。含全部版本更新；无订阅、无积分。',
+  'pricing.buy.note': '一次付清买断。含全部版本更新；无订阅、无积分。',
   'pricing.buy.enterprise': '需要私有化部署或团队批量授权？请联系销售。',
   // 用量说明（license 模式积分=纯计量）
   'pricing.usage.footnote':

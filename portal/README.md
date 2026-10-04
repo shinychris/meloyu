@@ -5,6 +5,15 @@
 > 复用 backend 的 Ed25519 签名实现（`backend/app/services/license.py`，单一事实源），
 > 运行在 backend venv 上，零新增 Python 依赖。
 
+## 售卖双模式（2026-10-04 口径）
+
+- **人工签发（默认，零外部依赖）**：不配 `PAYMENT_LINK_URL`，`/buy` 展示联系购买页
+  （`PORTAL_SALES_EMAIL` 定制邮箱）；管理员经 `POST /api/admin/licenses` 签发 Key
+  邮件交付。适合起步期/小单量，无任何第三方依赖。
+- **在线支付（可选）**：配 `PAYMENT_LINK_URL`（Stripe Payment Link）+
+  `STRIPE_SECRET_KEY`，`/buy` 302 跳转、`/thanks` 自动履约（见下节）。桌面客户端
+  本身不含任何支付代码。
+
 ## 运行
 
 ```bash
