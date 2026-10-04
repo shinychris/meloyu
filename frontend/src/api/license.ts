@@ -13,7 +13,12 @@ export function getLicenseStatus(): Promise<LicenseStatus> {
   return apiGet<LicenseStatus>('/licenses/status')
 }
 
-/** POST /licenses/activate —— 激活终身授权 */
+/** POST /licenses/activate-online —— 在线激活（账户+激活码，portal 兑换签名密钥） */
+export function activateLicenseOnline(account: string, code: string): Promise<LicenseActivateResult> {
+  return apiPost<LicenseActivateResult>('/licenses/activate-online', { account, code })
+}
+
+/** POST /licenses/activate —— 离线激活（粘贴完整授权密钥，Ed25519 本地验签） */
 export function activateLicense(license_key: string): Promise<LicenseActivateResult> {
   return apiPost<LicenseActivateResult>('/licenses/activate', { license_key })
 }

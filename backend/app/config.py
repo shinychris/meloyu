@@ -99,6 +99,9 @@ class Settings(BaseSettings):
     meloyu_license_key: str = ""
     # 桌面壳托管的 SPA 静态目录（默认 <repo>/frontend/dist；打包时由壳注入）
     desktop_static_dir: str = ""
+    # License Portal（在线激活码兑换端点；激活成功后本地持有签名密钥，离线可用）
+    portal_base_url: str = "https://meloyu.com"
+    portal_activate_timeout_sec: float = 15.0
     # 对外可达基础 URL（密码重置邮件链接用；如 https://www.meloyu.com）
     app_base_url: str = "http://localhost:5173"
     # ---- SMTP 邮件（找回密码/注册验证码；未配置 host 时相关功能禁用）----

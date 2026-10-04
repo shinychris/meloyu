@@ -24,7 +24,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey,
 from sqlalchemy.orm import Session
 
 from app.config import LICENSE_PRICE_USD, LICENSE_SALE_PRICE_USD, LICENSE_TRIAL_DAYS, settings
-from app.core.errors import BizError
+from app.core.errors import BizError, err_conflict
 from app.core.i18n import tr
 from app.models import User
 from app.models.base import utc_now_iso
@@ -153,6 +153,8 @@ def status_dict(db: Session) -> dict:
         "license": ({"license_id": (state.license_payload or {}).get("lid"),
                      "tier": (state.license_payload or {}).get("tier"),
                      "devices": (state.license_payload or {}).get("devices", 1),
+                     "account": ((state.license_payload or {}).get("acct")
+                                 or (state.license_payload or {}).get("note")),
                      "note": (state.license_payload or {}).get("note"),
                      "activated_at": state.activated_at}
                     if activated else None),
@@ -176,6 +178,67 @@ def activate(db: Session, key: str, user: User | None = None) -> dict:
         user.updated_at = utc_now_iso()
     db.commit()
     return status_dict(db)
+
+
+def _unreachable_error() -> BizError:
+    return err_conflict(tr(
+        "无法连接激活服务（{}）——请检查网络后重试，或使用邮件中的完整授权密钥离线激活",
+        "Cannot reach the activation service ({}); check your network and retry, "
+        "or paste the full license key from your email for offline activation"
+    ).format(settings.portal_base_url))
+
+
+def _portal_activate(account: str, code: str, device_id: str) -> dict:
+    """调用 portal 激活码兑换端点；网络/超时抛 40901 引导（离线密钥激活兜底）。"""
+    import httpx
+    url = settings.portal_base_url.rstrip("/") + "/api/activate"
+    try:
+        resp = httpx.post(url, json={"account": account, "code": code,
+                                     "device_id": device_id},
+                          timeout=settings.portal_activate_timeout_sec)
+        return resp.json()
+    except Exception as exc:
+        raise _unreachable_error() from exc
+
+
+_REASONS = {
+    "invalid_code": ("激活码无效（请核对邮件中的账户与激活码）",
+                     "Invalid activation code (check the account and code in your email)"),
+    "account_mismatch": ("激活码与账户不匹配——请使用购买邮箱作为账户",
+                         "Activation code does not match this account; "
+                         "use the email you purchased with"),
+    "revoked": ("该激活码已被吊销——请联系支持",
+                "This activation code has been revoked; contact support"),
+    "device_limit": ("激活设备数已达上限——请在其他设备上解绑后重试",
+                     "Device limit reached; deactivate on another device first"),
+}
+
+
+def activate_online(db: Session, user: User | None, account: str, code: str,
+                    *, _fetch=None) -> dict:
+    """在线激活（2026-10-04 用户口径）：账户+激活码 → portal 兑换完整签名密钥
+    → 本地 Ed25519 验签 → 落激活态。激活后离线持有密钥，不再依赖网络。
+
+    _fetch：单测注入（签名 (account, code, device_id) → portal 响应 dict）。
+    """
+    state = get_state(db)
+    fetch = _fetch or _portal_activate
+    try:
+        resp = fetch(account.strip().lower(), code.strip().upper(), state.device_id)
+    except BizError:
+        raise
+    except Exception as exc:  # 注入/网络层异常统一转 40901 离线激活引导
+        raise _unreachable_error() from exc
+    if not isinstance(resp, dict) or not resp.get("ok"):
+        reason = (resp or {}).get("reason", "invalid_code") if isinstance(resp, dict) else "invalid_code"
+        zh, en = _REASONS.get(reason, _REASONS["invalid_code"])
+        raise err_license_invalid(tr(zh, en))
+    key = resp.get("license_key") or ""
+    payload = verify_license_key(key)  # 签名密钥仍须过本地验签（防服务端异常数据）
+    if payload.get("acct") and payload["acct"] != account.strip().lower():
+        raise err_license_invalid(tr("授权密钥与账户不匹配",
+                                     "License key does not match this account"))
+    return activate(db, key, user=user)
 
 
 def deactivate(db: Session) -> dict:

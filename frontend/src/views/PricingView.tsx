@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { CreditTransaction, PlanInfo } from '../types/api'
 import { getCreditTransactions, getPlans } from '../api/account'
-import { activateLicense, deactivateLicense } from '../api/license'
+import { activateLicense, activateLicenseOnline, deactivateLicense } from '../api/license'
 import { useSessionStore } from '../stores/session'
 import { toast } from '../stores/toast'
 import { creditReasonLabel, formatDateTime, formatNum, planLabel } from '../lib/format'
@@ -34,7 +34,10 @@ export default function PricingView() {
   const [txPage, setTxPage] = useState(1)
   const [txTotalPages, setTxTotalPages] = useState(1)
   const [keyInput, setKeyInput] = useState('')
+  const [accountInput, setAccountInput] = useState('')
+  const [codeInput, setCodeInput] = useState('')
   const [activating, setActivating] = useState(false)
+  const [onlineActivating, setOnlineActivating] = useState(false)
   const [deactivating, setDeactivating] = useState(false)
   const { user, license, refreshLicense } = useSessionStore()
   const t = useT()
@@ -87,6 +90,25 @@ export default function PricingView() {
     }
   }
 
+  /** 在线激活（主流程）：账户+激活码 → portal 兑换 → 本地验签落态。
+   *  失败（40202 无效码/账户不符/设备满额、40901 网络不可达）由拦截器 toast */
+  const onActivateOnline = async () => {
+    if (onlineActivating) return
+    if (!accountInput.trim() || !codeInput.trim()) return
+    setOnlineActivating(true)
+    try {
+      await activateLicenseOnline(accountInput.trim(), codeInput.trim())
+      await refreshLicense()
+      setAccountInput('')
+      setCodeInput('')
+      toast(t('license.online.done'))
+    } catch {
+      /* 拦截器已 toast */
+    } finally {
+      setOnlineActivating(false)
+    }
+  }
+
   /** 解除激活：保留试用记录，到期后闸门接管 */
   const onDeactivate = async () => {
     if (deactivating) return
@@ -130,6 +152,11 @@ export default function PricingView() {
                     {t('pricing.buy.oneTime')}
                   </div>
                   <div className="text-xs mt-2 num text-dim flex gap-6 flex-wrap">
+                    {license.license?.account && (
+                      <span>
+                        {t('license.status.note')}: {license.license.account}
+                      </span>
+                    )}
                     <span>
                       {t('license.status.licenseId')}: {license.license?.license_id?.slice(0, 12) ?? '—'}
                     </span>
@@ -232,25 +259,66 @@ export default function PricingView() {
 
             <div className="p-8">
               <div className="label">{t('license.activate.label')}</div>
-              <div className="text-md font-bold mt-2">{t('license.activate.title')}</div>
+              <div className="text-md font-bold mt-2">{t('license.online.title')}</div>
               <div className="text-xs mt-2 leading-relaxed max-w-[460px] text-dim">
-                {t('license.activate.desc')}
+                {t('license.online.desc')}
               </div>
-              <textarea
-                className="input mt-4 w-full max-w-[460px] num"
-                style={{ minHeight: 88 }}
-                spellCheck={false}
-                value={keyInput}
-                placeholder={t('license.activate.placeholder')}
-                onChange={(e) => setKeyInput(e.target.value)}
-              />
-              <button
-                className="btn btn-acc mt-4"
-                disabled={activating || !keyInput.trim()}
-                onClick={() => void onActivate()}
-              >
-                {activating ? t('license.activate.activating') : t('license.activate.cta')}
-              </button>
+              {/* 在线激活（主流程）：账户 + 激活码 */}
+              <div className="mt-4 max-w-[460px] space-y-3">
+                <div>
+                  <div className="text-2xs mb-1 text-muted">{t('license.online.accountLabel')}</div>
+                  <input
+                    className="input w-full"
+                    type="email"
+                    autoComplete="email"
+                    value={accountInput}
+                    placeholder={t('license.online.accountPlaceholder')}
+                    onChange={(e) => setAccountInput(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <div className="text-2xs mb-1 text-muted">{t('license.online.codeLabel')}</div>
+                  <input
+                    className="input w-full num"
+                    style={{ textTransform: 'uppercase' }}
+                    spellCheck={false}
+                    value={codeInput}
+                    placeholder={t('license.online.codePlaceholder')}
+                    onChange={(e) => setCodeInput(e.target.value)}
+                  />
+                </div>
+                <button
+                  className="btn btn-acc w-full"
+                  disabled={onlineActivating || !accountInput.trim() || !codeInput.trim()}
+                  onClick={() => void onActivateOnline()}
+                >
+                  {onlineActivating ? t('license.online.doing') : t('license.online.cta')}
+                </button>
+              </div>
+              {/* 离线激活（备用）：完整授权密钥 */}
+              <details className="mt-5 max-w-[460px]">
+                <summary className="text-2xs cursor-pointer text-dim hover:text-muted select-none">
+                  {t('license.offline.fold')}
+                </summary>
+                <div className="text-xs mt-2 leading-relaxed text-dim">
+                  {t('license.activate.desc')}
+                </div>
+                <textarea
+                  className="input mt-2 w-full num"
+                  style={{ minHeight: 72 }}
+                  spellCheck={false}
+                  value={keyInput}
+                  placeholder={t('license.activate.placeholder')}
+                  onChange={(e) => setKeyInput(e.target.value)}
+                />
+                <button
+                  className="btn mt-2"
+                  disabled={activating || !keyInput.trim()}
+                  onClick={() => void onActivate()}
+                >
+                  {activating ? t('license.activate.activating') : t('license.activate.cta')}
+                </button>
+              </details>
             </div>
           </div>
 

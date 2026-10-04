@@ -343,6 +343,7 @@ export interface LicenseStatus {
     license_id: string
     tier: 'lifetime' | 'enterprise'
     devices: number
+    account?: string | null
     note: string | null
     activated_at: string | null
   } | null

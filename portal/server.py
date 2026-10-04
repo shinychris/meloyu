@@ -32,6 +32,80 @@ import db as portal_db  # noqa: E402
 
 DATA_DIR = Path(os.environ.get("PORTAL_DATA_DIR", PORTAL_DIR / "data"))
 ADMIN_TOKEN = os.environ.get("PORTAL_ADMIN_TOKEN", "")
+# ---- 激活邮件（2026-10-04 用户口径：下单后自动发送账户+激活码邮件） ----
+SMTP_HOST = os.environ.get("PORTAL_SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("PORTAL_SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("PORTAL_SMTP_USER", "")
+SMTP_PASSWORD = os.environ.get("PORTAL_SMTP_PASSWORD", "")
+SMTP_FROM = os.environ.get("PORTAL_SMTP_FROM", "Meloyu <no-reply@meloyu.com>")
+
+# 激活码字母表：去易混字符（I/L/O/0/1）
+_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def new_activation_code() -> str:
+    import secrets
+    def grp() -> str:
+        return "".join(secrets.choice(_CODE_ALPHABET) for _ in range(8))
+    return f"MELOYU-{grp()}-{grp()}"
+
+
+def send_activation_email(account: str, code: str, tier: str = "lifetime") -> bool:
+    """发送激活邮件（账户+激活码+激活步骤）。SMTP 未配置时返回 False（管理员人工交付兜底）。"""
+    if not SMTP_HOST:
+        print(f"[portal] SMTP not configured; activation email skipped "
+              f"(deliver manually): account={account} code={code}")
+        return False
+    import smtplib
+    from email.message import EmailMessage
+    tier_line = ("Lifetime license · all future updates included"
+                 if tier == "lifetime" else f"{tier} license")
+    msg = EmailMessage()
+    msg["Subject"] = "Your Meloyu activation code"
+    msg["From"] = SMTP_FROM
+    msg["To"] = account
+    msg.set_content(f"""Thank you for buying Meloyu!
+
+Your account : {account}
+Activation code : {code}
+License : {tier_line}
+
+Activate in 3 steps:
+1. Open the Meloyu desktop app (download: https://meloyu.com/updates/)
+2. Go to "Pricing & Activation"
+3. Enter your account and the activation code above
+
+The app works fully offline after activation. If you need help,
+reply to this email.
+
+— Meloyu""")
+    msg.add_alternative(f"""<html><body style="font-family:ui-monospace,Consolas,monospace;
+background:#0d0f10;color:#e8ece9;margin:0;padding:40px 16px">
+<div style="max-width:560px;margin:0 auto;background:#16191b;border:1px solid #2a2f33;padding:32px">
+<h2 style="color:#8be9c0;margin:0 0 8px">Thank you for buying Meloyu</h2>
+<p style="color:#9aa3a7;font-size:14px">{tier_line}</p>
+<table style="margin:16px 0;font-size:14px;color:#e8ece9">
+<tr><td style="color:#9aa3a7;padding:6px 12px 6px 0">Your account</td>
+<td style="font-weight:700">{account}</td></tr>
+<tr><td style="color:#9aa3a7;padding:6px 12px 6px 0">Activation code</td>
+<td style="font-weight:700;color:#8be9c0;font-size:16px;letter-spacing:.06em">{code}</td></tr>
+</table>
+<ol style="color:#9aa3a7;font-size:14px;padding-left:20px">
+<li>Open the Meloyu desktop app (download: <a href="https://meloyu.com/updates/" style="color:#8be9c0">meloyu.com/updates</a>)</li>
+<li>Go to <b style="color:#e8ece9">Pricing &amp; Activation</b></li>
+<li>Enter your account and the activation code above</li>
+</ol>
+<p style="color:#5c666b;font-size:13px">Works fully offline after activation. Questions? Just reply.</p>
+</div></body></html>""", subtype="html")
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as smtp:
+            smtp.starttls()
+            smtp.login(SMTP_USER, SMTP_PASSWORD)
+            smtp.send_message(msg)
+        return True
+    except Exception as exc:  # noqa: BLE001 —— 邮件失败不阻断售卖（管理员人工兜底）
+        print(f"[portal] activation email failed for {account}: {exc!r}")
+        return False
 PRIVATE_KEY = os.environ.get("PORTAL_PRIVATE_KEY", "")
 PUBLIC_KEY = os.environ.get("PORTAL_PUBLIC_KEY", "")
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
@@ -58,24 +132,44 @@ def require_admin(request: Request) -> None:
 
 # ---------------- 签发（人工/履约共用） ----------------
 
-def issue_license(tier: str, note: str, devices: int, seats: int | None,
-                  stripe_session_id: str | None = None) -> dict:
+def issue_license(tier: str, account: str, note: str, devices: int, seats: int | None,
+                  stripe_session_id: str | None = None, send_email: bool = True) -> dict:
+    """签发：完整签名密钥（离线验签）+ 短激活码（在线兑换入口）。
+
+    account = 买家账户（购买邮箱），随激活邮件发送并用于激活时的账户校验。
+    """
     if not PRIVATE_KEY:
         raise HTTPException(503, "issuing disabled: PORTAL_PRIVATE_KEY not configured")
+    account = (account or "").strip().lower() or None
+    code = new_activation_code()
     payload = {
         "lid": uuid.uuid4().hex, "tier": tier,
         "devices": devices if tier == "lifetime" else 1,
         "seats": seats if tier == "enterprise" else None,
-        "iat": int(__import__("time").time()), "note": note,
+        "acct": account, "iat": int(__import__("time").time()), "note": note,
     }
     key = sign_license(payload, PRIVATE_KEY)
     with portal_db.conn() as c:
-        c.execute(
-            "INSERT INTO licenses (lid, key, tier, note, devices, seats, status, "
-            "stripe_session_id, created_at) VALUES (?,?,?,?,?,?, 'active', ?, ?)",
-            (payload["lid"], key, tier, note, payload["devices"], payload["seats"],
-             stripe_session_id, portal_db.now_iso()))
-    return {"license_id": payload["lid"], "tier": tier, "note": note, "license_key": key}
+        for _ in range(5):  # 激活码碰撞重试（8+8 base32 实际不可能命中）
+            try:
+                c.execute(
+                    "INSERT INTO licenses (lid, key, code, tier, account, note, devices, "
+                    "seats, status, stripe_session_id, created_at) "
+                    "VALUES (?,?,?,?,?,?,?,?,'active',?,?)",
+                    (payload["lid"], key, code, tier, account, note,
+                     payload["devices"], payload["seats"],
+                     stripe_session_id, portal_db.now_iso()))
+                break
+            except Exception:
+                code = new_activation_code()
+        else:
+            raise HTTPException(500, "activation code collision (unreachable)")
+    emailed = False
+    if send_email and account:
+        emailed = send_activation_email(account, code, tier)
+    return {"license_id": payload["lid"], "tier": tier, "account": account,
+            "note": note, "activation_code": code, "license_key": key,
+            "email_sent": emailed}
 
 
 def license_row(c, lid: str):
@@ -91,8 +185,9 @@ async def admin_issue(request: Request):
     tier = body.get("tier", "lifetime")
     if tier not in ("lifetime", "enterprise"):
         raise HTTPException(422, "tier must be lifetime|enterprise")
-    return issue_license(tier, body.get("note", ""), int(body.get("devices", 3)),
-                         body.get("seats"))
+    return issue_license(tier, body.get("account", ""), body.get("note", ""),
+                         int(body.get("devices", 3)), body.get("seats"),
+                         send_email=body.get("send_email", True))
 
 
 @app.get("/api/admin/licenses")
@@ -100,7 +195,7 @@ async def admin_list(request: Request):
     require_admin(request)
     with portal_db.conn() as c:
         rows = c.execute(
-            "SELECT lid, tier, note, status, stripe_session_id, created_at, "
+            "SELECT lid, tier, account, note, code, status, stripe_session_id, created_at, "
             "(SELECT COUNT(*) FROM activations a WHERE a.lid = l.lid) AS activations "
             "FROM licenses l ORDER BY created_at DESC").fetchall()
         return [dict(r) for r in rows]
@@ -184,6 +279,45 @@ async def activate_report(request: Request):
         return {"ok": True, "remaining_devices": row["devices"] - count - 1}
 
 
+# ---------------- 桌面端在线激活（账户+激活码 → 兑换完整签名密钥） ----------------
+
+@app.post("/api/activate")
+async def activate(request: Request):
+    """激活码在线兑换（2026-10-04 用户口径）。
+
+    桌面 App 提交 {account, code, device_id} → 校验激活码/账户/吊销/设备数 →
+    返回完整签名密钥（App 侧 Ed25519 验签后离线持有，此后不再依赖本服务）。
+    """
+    body = await request.json()
+    account = (body.get("account") or "").strip().lower()
+    code = (body.get("code") or "").strip().upper()
+    device_id = (body.get("device_id") or "").strip()
+    if not (account and code and device_id):
+        return {"ok": False, "reason": "invalid_request"}
+    with portal_db.conn() as c:
+        row = c.execute("SELECT * FROM licenses WHERE code = ?", (code,)).fetchone()
+        if row is None:
+            return {"ok": False, "reason": "invalid_code"}
+        if row["status"] != "active":
+            return {"ok": False, "reason": "revoked"}
+        if row["account"] and row["account"] != account:
+            return {"ok": False, "reason": "account_mismatch"}
+        existing = c.execute("SELECT id FROM activations WHERE lid = ? AND device_id = ?",
+                             (row["lid"], device_id)).fetchone()
+        now = portal_db.now_iso()
+        if existing:
+            c.execute("UPDATE activations SET last_seen_at = ? WHERE id = ?", (now, existing["id"]))
+        else:
+            count = c.execute("SELECT COUNT(*) FROM activations WHERE lid = ?",
+                              (row["lid"],)).fetchone()[0]
+            if count >= row["devices"]:
+                return {"ok": False, "reason": "device_limit", "devices": row["devices"]}
+            c.execute("INSERT INTO activations (lid, device_id, activated_at, last_seen_at) "
+                      "VALUES (?,?,?,?)", (row["lid"], device_id, now, now))
+        return {"ok": True, "license_key": row["key"], "tier": row["tier"],
+                "license_id": row["lid"], "devices": row["devices"]}
+
+
 # ---------------- 购买：Payment Link 跳转 + 现场履约 ----------------
 
 @app.get("/buy")
@@ -208,8 +342,8 @@ a{{color:#8be9c0}}li{{margin:8px 0;color:#9aa3a7;font-size:14px}}</style></head>
 <div class="price">$159 <span style="font-size:16px;color:#5c666b;text-decoration:line-through">$399</span></div>
 <ol>
 <li>Email <a href="mailto:{contact}">{contact}</a> to purchase (launch-offer $159, one-time, lifetime).</li>
-<li>You receive your license key by email, usually within 24 hours.</li>
-<li>Open Meloyu → Pricing &amp; Activation → paste the key. Done.</li>
+<li>You receive an activation email with your account and activation code (usually within 24 hours).</li>
+<li>Open Meloyu → Pricing &amp; Activation → enter your account + code. Done.</li>
 </ol>
 <p style="color:#5c666b;font-size:13px">One-time purchase · up to 3 devices · all future updates included ·
 14-day full-feature trial in the app before you buy.</p>
@@ -245,13 +379,13 @@ async def thanks(session_id: str = ""):
             return HTMLResponse("<h3>This payment is not completed yet. "
                                 "Refresh after your payment succeeds.</h3>", status_code=402)
         email = ((session.get("customer_details") or {}).get("email") or "")
-        issued = issue_license("lifetime", email, 3, None,
+        issued = issue_license("lifetime", email, "", 3, None,
                                stripe_session_id=session_id)
-        key = issued["license_key"]
+        key = issued["activation_code"]
         note = email
     else:
-        key = row["key"]
-        note = row["note"]
+        key = row["code"] or row["key"]
+        note = row["account"] or row["note"]
     return HTMLResponse(f"""<!doctype html><html><head><meta charset="utf-8">
 <title>Meloyu — Your license key</title>
 <style>body{{font-family:ui-monospace,Consolas,monospace;background:#0d0f10;
@@ -260,11 +394,12 @@ margin:0}}.card{{max-width:640px;padding:40px;background:#16191b;border:1px soli
 h2{{color:#8be9c0;margin:0 0 8px}}.note{{color:#9aa3a7;font-size:13px}}
 .key{{margin:24px 0;padding:16px;background:#0d0f10;border:1px dashed #8be9c0;
 word-break:break-all;font-size:12px;line-height:1.6}}</style></head><body>
-<div class="card"><h2>Payment received — your lifetime license</h2>
+<div class="card"><h2>Payment received — your activation code</h2>
 <div class="note">Licensed to: {note or '—'}</div>
-<div class="note">Copy this key into Meloyu → Pricing &amp; Activation:</div>
+<div class="note">Copy this activation code into Meloyu → Pricing &amp; Activation
+(also emailed to you with your account):</div>
 <div class="key">{key}</div>
-<div class="note">Keep this page or your purchase email. One license covers up to 3 of your devices.</div>
+<div class="note">Keep this page or your activation email. One license covers up to 3 of your devices.</div>
 </div></body></html>""")
 
 

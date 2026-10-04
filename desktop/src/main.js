@@ -49,20 +49,29 @@ if (!gotLock) {
 app.setAsDefaultProtocolClient('meloyu')
 handleDeepLinkArgs(process.argv)
 
-function extractKeyFromArgv(argv) {
+function extractLinkFromArgv(argv) {
   for (const arg of argv) {
-    const m = /^meloyu:\/\/activate\?key=(.+)$/i.exec(arg)
-    if (m) return decodeURIComponent(m[1])
+    const m = /^meloyu:\/\/activate\?(.+)$/i.exec(arg)
+    if (m) return new URLSearchParams(m[1])
   }
   return null
 }
 
+/** 深度链接两种形态（激活邮件可任选其一）：
+ *  meloyu://activate?account=..&code=..  —— 在线激活（主流程）
+ *  meloyu://activate?key=..              —— 离线激活（完整授权密钥） */
 function handleDeepLinkArgs(argv) {
-  const key = extractKeyFromArgv(argv)
-  if (!key || !sidecarBase) return
+  const params = extractLinkFromArgv(argv)
+  if (!params || !sidecarBase) return
+  const account = params.get('account')
+  const code = params.get('code')
+  const key = params.get('key')
+  const path = account && code ? '/api/v1/licenses/activate-online' : '/api/v1/licenses/activate'
+  const body = account && code ? { account, code } : { license_key: key }
+  if (!body.license_key && !(body.account && body.code)) return
   // 主进程代为激活（免手动粘贴），完成后跳「定价与激活」页展示结果
   const req = http.request(
-    `${sidecarBase}/api/v1/licenses/activate`,
+    `${sidecarBase}${path}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' } },
     () => {
       if (mainWindow) mainWindow.loadURL(`${sidecarBase}/#/pricing`).catch(() => {})
@@ -71,7 +80,7 @@ function handleDeepLinkArgs(argv) {
   req.on('error', () => {
     if (mainWindow) mainWindow.loadURL(`${sidecarBase}/#/pricing`).catch(() => {})
   })
-  req.end(JSON.stringify({ license_key: key }))
+  req.end(JSON.stringify(body))
 }
 
 // ---------- 端口探测 ----------

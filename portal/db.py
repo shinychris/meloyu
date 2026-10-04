@@ -29,7 +29,9 @@ def init(db_path: Path) -> None:
         CREATE TABLE IF NOT EXISTS licenses (
             lid            TEXT PRIMARY KEY,
             key            TEXT NOT NULL UNIQUE,
+            code           TEXT UNIQUE,
             tier           TEXT NOT NULL,
+            account        TEXT,
             note           TEXT,
             devices        INTEGER NOT NULL DEFAULT 3,
             seats          INTEGER,
@@ -46,6 +48,13 @@ def init(db_path: Path) -> None:
             UNIQUE(lid, device_id)
         );
         """)
+        # 存量库防御：2026-10-04 激活码批次前建的表补列（列已存在则忽略）
+        for ddl in ("ALTER TABLE licenses ADD COLUMN code TEXT",
+                    "ALTER TABLE licenses ADD COLUMN account TEXT"):
+            try:
+                c.execute(ddl)
+            except sqlite3.OperationalError:
+                pass
 
 
 @contextmanager

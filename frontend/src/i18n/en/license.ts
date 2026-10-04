@@ -11,6 +11,18 @@ export const licenseEn = {
   'license.sidebar.expired': 'Expired',
   // 账号菜单档位行（license 模式）
   'license.menu.planLabel': 'Local profile',
+  // 在线激活（2026-10-04 口径：邮件交付账户+激活码，在线兑换）
+  'license.online.title': 'Activate with your code',
+  'license.online.desc':
+    'Your purchase email contains your account and an activation code (MELOYU-XXXX-XXXX). Enter both below — activation is one-time; the app works fully offline afterwards.',
+  'license.online.accountLabel': 'Account (purchase email)',
+  'license.online.accountPlaceholder': 'you@example.com',
+  'license.online.codeLabel': 'Activation code',
+  'license.online.codePlaceholder': 'MELOYU-XXXXXXXX-XXXXXXXX',
+  'license.online.cta': 'Activate online',
+  'license.online.doing': 'Activating…',
+  'license.online.done': 'Activated — enjoy Meloyu for life',
+  'license.offline.fold': 'Prefer offline activation? Use the full license key',
   // 激活卡片
   'license.activate.label': 'Activate',
   'license.activate.title': 'Activate your lifetime license',

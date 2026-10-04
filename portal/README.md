@@ -36,6 +36,7 @@ set PAYMENT_LINK_URL=https://buy.stripe.com/...   # Dashboard 建 Payment Link �
 | `GET /` | 官网营销站：landing 独立构建（`cd frontend && npm run build:landing` → `dist-landing/`，默认英文、zh 可切、买断定价与购买入口）；未构建时兜底基座页 |
 | `GET /buy` | 302 → Stripe Payment Link |
 | `GET /thanks?session_id=` | 支付完成回跳：直查 Stripe 校验已付 → **幂等签发** → 页面展示 Key |
+| `POST /api/activate` | **桌面端在线激活**：`{account, code, device_id}` → 校验激活码/账户/吊销/设备数 → 返回完整签名密钥（App 兑换后离线持有） |
 | `POST /api/activate-report` | 桌面端可选在线上报：验签/吊销/设备数治理（离线验签不依赖） |
 | `POST /api/admin/licenses` | 人工签发 `{tier: lifetime\|enterprise, note, devices, seats}` |
 | `GET /api/admin/licenses` | 签发列表（含激活数） |
@@ -45,6 +46,13 @@ set PAYMENT_LINK_URL=https://buy.stripe.com/...   # Dashboard 建 Payment Link �
 | `/updates/*` | 更新源静态目录（`data/updates/` 上传 latest.yml + 安装包） |
 
 Admin 端点鉴权：`Authorization: Bearer <PORTAL_ADMIN_TOKEN>`。
+
+## 激活邮件（2026-10-04 口径）
+
+下单/签发即发送（`PORTAL_SMTP_*` 环境变量配置发件箱）：邮件含**用户账户（购买邮箱）
++ 激活码**（`MELOYU-XXXXXXXX-XXXXXXXX`）+ 三步激活指引 + 深度链接。SMTP 未配置时
+跳过发送并在日志打印账户/激活码（管理员人工交付兜底）。桌面端输入账户+激活码在线
+兑换（仅需联网一次），完整授权密钥粘贴激活保留为离线备用。
 
 ## 购买闭环（Stripe Payment Link，无 webhook）
 

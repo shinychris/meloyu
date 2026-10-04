@@ -225,9 +225,18 @@ class TestLicenseLifecycle(_DBTestCase):
         import time
         import uuid
         payload = {"lid": uuid.uuid4().hex, "tier": tier, "devices": 3,
+                   "acct": "buyer@t.local",
                    "iat": int(time.time()), "note": "buyer@t.local"}
         payload.update(extra)
         return license_svc.sign_license(payload, self.priv)
+
+    def _fetch_factory(self, key: str):
+        """模拟 portal /api/activate 响应的单测注入。"""
+        def _fetch(account: str, code: str, device_id: str) -> dict:
+            if code != "MELOYU-GOODCODE-00000000":
+                return {"ok": False, "reason": "invalid_code"}
+            return {"ok": True, "license_key": key, "tier": "lifetime"}
+        return _fetch
 
     def test_keypair_roundtrip(self):
         key = self._issue()
@@ -302,6 +311,41 @@ class TestLicenseLifecycle(_DBTestCase):
         # 桌面客户端无鉴权：凭据登录入口整体关闭（2026-10-04 用户口径）
         with self.assertRaises(BizError) as ctx:
             auth_svc.login(self.db, "whoever@t.local", "Passw0rd123")
+        self.assertEqual(ctx.exception.code, 40901)
+
+    def test_activate_online_success_and_failures(self):
+        # 成功：账户+激活码 → portal 兑换签名密钥 → 本地验签落激活态
+        key = self._issue()
+        out = license_svc.activate_online(
+            self.db, self.user, "buyer@t.local", "meloyu-goodcode-00000000 ",
+            _fetch=self._fetch_factory(key))
+        self.assertTrue(out["activated"])
+        self.db.refresh(self.user)
+        self.assertEqual(self.user.plan, "studio")
+        # 幂等：重复兑换同码
+        out2 = license_svc.activate_online(
+            self.db, self.user, "buyer@t.local", "MELOYU-GOODCODE-00000000",
+            _fetch=self._fetch_factory(key))
+        self.assertTrue(out2["activated"])
+        # 失败：无效激活码 → 40202
+        with self.assertRaises(BizError) as ctx:
+            license_svc.activate_online(
+                self.db, self.user, "buyer@t.local", "MELOYU-WRONG0000-00000000",
+                _fetch=self._fetch_factory(key))
+        self.assertEqual(ctx.exception.code, 40202)
+        # 失败：portal 报账户不符 → 40202 带原因文案
+        def _mismatch(a, c, d):
+            return {"ok": False, "reason": "account_mismatch"}
+        with self.assertRaises(BizError) as ctx:
+            license_svc.activate_online(self.db, self.user, "x@t.local",
+                                        "MELOYU-GOODCODE-00000000", _fetch=_mismatch)
+        self.assertIn("account", ctx.exception.message)
+        # 失败：网络不可达 → 40901 引导离线激活
+        def _net_fail(a, c, d):
+            raise RuntimeError("connection refused")
+        with self.assertRaises(BizError) as ctx:
+            license_svc.activate_online(self.db, self.user, "buyer@t.local",
+                                        "MELOYU-GOODCODE-00000000", _fetch=_net_fail)
         self.assertEqual(ctx.exception.code, 40901)
 
     def test_status_dict_shape(self):

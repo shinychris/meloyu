@@ -10,6 +10,18 @@ export const licenseZh: Record<keyof typeof licenseEn, string> = {
   'license.sidebar.expired': '已到期',
   // 账号菜单档位行（license 模式）
   'license.menu.planLabel': '本地档案',
+  // 在线激活（2026-10-04 口径：邮件交付账户+激活码，在线兑换）
+  'license.online.title': '使用激活码激活',
+  'license.online.desc':
+    '购买邮件中包含你的账户与激活码（MELOYU-XXXX-XXXX 格式），在下方输入即可。激活仅需一次，之后完全离线可用。',
+  'license.online.accountLabel': '账户（购买邮箱）',
+  'license.online.accountPlaceholder': 'you@example.com',
+  'license.online.codeLabel': '激活码',
+  'license.online.codePlaceholder': 'MELOYU-XXXXXXXX-XXXXXXXX',
+  'license.online.cta': '在线激活',
+  'license.online.doing': '激活中…',
+  'license.online.done': '激活成功——终身使用',
+  'license.offline.fold': '离线激活？使用完整授权密钥',
   // 激活卡片
   'license.activate.label': '激活',
   'license.activate.title': '激活终身授权',

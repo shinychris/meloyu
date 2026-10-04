@@ -8,7 +8,7 @@ from app.core.responses import ok
 from app.core.security import get_current_user
 from app.database import get_db
 from app.models import User
-from app.schemas.license import ActivateLicenseRequest
+from app.schemas.license import ActivateLicenseRequest, OnlineActivateRequest
 from app.services import license as license_svc
 
 router = APIRouter(prefix="/licenses", tags=["licenses"])
@@ -24,6 +24,13 @@ def activate(body: ActivateLicenseRequest,
              user: User = Depends(get_current_user),
              db: Session = Depends(get_db)):
     return ok(license_svc.activate(db, body.license_key, user=user))
+
+
+@router.post("/activate-online")
+def activate_online(body: OnlineActivateRequest,
+                    user: User = Depends(get_current_user),
+                    db: Session = Depends(get_db)):
+    return ok(license_svc.activate_online(db, user, body.account, body.code))
 
 
 @router.post("/deactivate")

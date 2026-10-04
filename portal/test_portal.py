@@ -85,13 +85,59 @@ class TestPortal(unittest.TestCase):
         # 未配置公钥的部署则落到 unknown_license（查库不命中）
         self.assertIn(r.json()["reason"], ("invalid_key", "unknown_license"))
 
+    def test_activation_code_online_redeem_flow(self):
+        # 签发（带账户）→ 激活码兑换全链路：成功/账户不符/未知码/吊销/设备满额
+        r = self.client.post("/api/admin/licenses", headers=ADMIN,
+                             json={"tier": "lifetime", "account": "buyer@t.local",
+                                   "devices": 1})
+        self.assertEqual(r.status_code, 200)
+        code = r.json()["activation_code"]
+        self.assertRegex(code, r"^MELOYU-[A-Z2-9]{8}-[A-Z2-9]{8}$")
+        dev = {"device_id": "dev-1"}
+        # 账户不符 → 拒绝
+        bad = self.client.post("/api/activate",
+                               json={"account": "other@t.local", "code": code, **dev})
+        self.assertFalse(bad.json()["ok"])
+        self.assertEqual(bad.json()["reason"], "account_mismatch")
+        # 正确账户 → 兑换出完整签名密钥
+        ok = self.client.post("/api/activate",
+                              json={"account": "buyer@t.local", "code": code, **dev})
+        d = ok.json()
+        self.assertTrue(d["ok"])
+        self.assertTrue(d["license_key"].startswith("v1."))
+        self.assertEqual(d["tier"], "lifetime")
+        # 同设备重复兑换：幂等放行
+        ok2 = self.client.post("/api/activate",
+                               json={"account": "buyer@t.local", "code": code, **dev})
+        self.assertTrue(ok2.json()["ok"])
+        # 第 2 台设备：devices=1 → 满额拒绝
+        full = self.client.post("/api/activate",
+                                json={"account": "buyer@t.local", "code": code,
+                                      "device_id": "dev-2"})
+        self.assertFalse(full.json()["ok"])
+        self.assertEqual(full.json()["reason"], "device_limit")
+        # 未知激活码
+        unknown = self.client.post("/api/activate",
+                                   json={"account": "buyer@t.local",
+                                         "code": "MELOYU-AAAAAAAA-AAAAAAAA", **dev})
+        self.assertEqual(unknown.json()["reason"], "invalid_code")
+        # 吊销后拒绝
+        lid = r.json()["license_id"]
+        self.client.post(f"/api/admin/licenses/{lid}/revoke", headers=ADMIN)
+        revoked = self.client.post("/api/activate",
+                                   json={"account": "buyer@t.local",
+                                         "code": code, "device_id": "dev-3"})
+        self.assertEqual(revoked.json()["reason"], "revoked")
+
     def test_buy_manual_mode_default(self):
         # 未配 PAYMENT_LINK_URL（默认零外部依赖模式）：人工签发售卖页 200，
         # 而非 503 错误页（2026-10-04 用户口径：桌面软件无需 Stripe 支付）
         r = self.client.get("/buy")
         self.assertEqual(r.status_code, 200)
         self.assertIn("Lifetime License", r.text)
-        self.assertIn("license key", r.text)
+        # 2026-10-04 口径：邮件交付账户+激活码
+        self.assertIn("activation email", r.text)
+        self.assertIn("activation code", r.text)
 
     def test_marketing_index_and_updates_mount(self):
         # F7：dist-landing 已构建 → 首页为落地页 SPA（默认英文营销站）；
