@@ -28,3 +28,8 @@ deploy/.env.prod
 
 # 本地测试会话产物（模拟测试工具输出，含临时凭据，不入库）
 reports/sim-sessions/
+
+# Desktop（Electron 壳）构建产物
+desktop/release/
+backend/dist-backend/
+backend/build-desktop/

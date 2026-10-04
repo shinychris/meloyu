@@ -1,0 +1,21 @@
+@echo off
+rem Meloyu sidecar 打包（Windows）：backend venv + PyInstaller --onedir
+rem 产物：backend\dist-backend\meloyu-backend\desktop_runner.exe（壳以 extraResources 携带）
+setlocal
+cd /d "%~dp0..\..\backend"
+if not exist .venv\Scripts\python.exe (
+  echo [ERROR] backend\.venv not found. Create it first: python -m venv .venv ^&^& .venv\Scripts\pip install -r requirements.txt pyinstaller
+  exit /b 1
+)
+.venv\Scripts\pip install -q pyinstaller || exit /b 1
+.venv\Scripts\pyinstaller --noconfirm --clean --onedir --name desktop_runner ^
+  --distpath dist-backend --workpath build-desktop --specpath scripts ^
+  --add-data "app;app" ^
+  --exclude-module psycopg2 --exclude-module torch --exclude-module transformers ^
+  --exclude-module celery --exclude-module redis ^
+  scripts\desktop_runner.py || exit /b 1
+rem PyInstaller 目录名取 --name：规范为 meloyu-backend（与 electron-builder.yml 对齐）
+if exist dist-backend\meloyu-backend rmdir /s /q dist-backend\meloyu-backend
+ren dist-backend\desktop_runner meloyu-backend
+echo [OK] sidecar built: backend\dist-backend\meloyu-backend\
+endlocal

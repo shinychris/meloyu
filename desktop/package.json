@@ -1,0 +1,24 @@
+{
+  "name": "meloyu-desktop",
+  "productName": "Meloyu",
+  "version": "0.16.0",
+  "description": "Meloyu — AI music desktop studio (lifetime license)",
+  "private": true,
+  "main": "src/main.js",
+  "author": "Meloyu",
+  "license": "SEE LICENSE IN ../docs/06-商业化/2026-10-03-定位调整方案-SaaS转桌面买断制.md",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist:all": "electron-builder --win nsis --mac dmg"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "electron-updater": "^6.3.9"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  }
+}

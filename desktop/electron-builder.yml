@@ -1,0 +1,64 @@
+# Meloyu Desktop 打包配置（electron-builder）
+# 前置：sidecar 与前端产物已就位（见 desktop/README.md 构建顺序）：
+#   backend/dist-backend/meloyu-backend/   （PyInstaller --onedir 产物）
+#   frontend/dist/                          （vite build 产物）
+appId: com.meloyu.desktop
+productName: Meloyu
+copyright: © 2026 Meloyu
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - src/**
+  - package.json
+  - "!**/*.md"
+
+# 随包资源（asar 外）：sidecar 二进制目录 + 前端静态文件
+extraResources:
+  - from: ../backend/dist-backend/meloyu-backend
+    to: meloyu-backend
+  - from: ../frontend/dist
+    to: web
+
+# License 公钥等敏感度低的构建期常量经环境注入 sidecar（打包脚本写 .env 时处理）；
+# UPDATE_URL 发布时经 -c.extraMetadata 或环境变量注入
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  # 代码签名（P0 证书采购后启用；未配置时 electron-builder 自动跳过签名）
+  # certificateSubjectName: "Meloyu"
+  artifactName: Meloyu-Setup-${version}-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: Meloyu
+
+mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  category: public.app-category.music
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # Developer ID 签名 + 公证（P0 证书到位后启用）：
+  # identity: "Developer ID Application: <subject>"
+  # notarize: true（配合 afterSign 钩子统一公证主程序+sidecar 二进制）
+  artifactName: Meloyu-${version}-${arch}.${ext}
+
+dmg:
+  title: Meloyu ${version}
+  window: { width: 640, height: 400 }
+
+# 自动更新源（P3 官网更新目录；发布时经 MELOYU_UPDATE_URL 注释解除或 CLI 覆盖）
+# publish:
+#   - provider: generic
+#     url: https://meloyu.com/updates
