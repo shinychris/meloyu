@@ -194,11 +194,14 @@ export default function AccountMenu() {
   const navigate = useNavigate()
   const user = useSessionStore((s) => s.user)
   const logout = useSessionStore((s) => s.logout)
+  const license = useSessionStore((s) => s.license)
   const [open, setOpen] = useState(false)
   const [pwdOpen, setPwdOpen] = useState(false)
   const [delOpen, setDelOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
+  // v0.16.0：desktop 形态免登录（本地档案），账号类菜单项收敛为数据导出
+  const isDesktop = license?.mode === 'desktop'
 
   // 点击菜单外任意处关闭（弹窗在 fixed 层，不受影响）
   useEffect(() => {
@@ -264,19 +267,35 @@ export default function AccountMenu() {
     <div className="relative mt-2" ref={wrapRef}>
       <div className="text-2xs flex items-center justify-between text-dim">
         <span className="acc-plan truncate">
-          {user ? planLabel(user.plan) : t('app.sidebar.notLoggedIn')} · {t('app.sidebar.transferable')}
+          {isDesktop
+            ? t('license.menu.planLabel')
+            : user
+              ? `${planLabel(user.plan)} · ${t('app.sidebar.transferable')}`
+              : `${t('app.sidebar.notLoggedIn')} · ${t('app.sidebar.transferable')}`}
         </span>
-        <button
-          className="acc-trigger font-bold flex-none ml-1"
-          style={{ color: open ? 'var(--acc)' : 'var(--dim)' }}
-          title={t('app.sidebar.logoutTitle')}
-          onClick={() => setOpen((v) => !v)}
-        >
-          {t('app.sidebar.logout')} ▾
-        </button>
+        {!isDesktop && (
+          <button
+            className="acc-trigger font-bold flex-none ml-1"
+            style={{ color: open ? 'var(--acc)' : 'var(--dim)' }}
+            title={t('app.sidebar.logoutTitle')}
+            onClick={() => setOpen((v) => !v)}
+          >
+            {t('app.sidebar.logout')} ▾
+          </button>
+        )}
+        {isDesktop && (
+          <button
+            className="acc-trigger font-bold flex-none ml-1"
+            style={{ color: 'var(--dim)' }}
+            title={t('auth.menu.exportData')}
+            onClick={() => void onExport()}
+          >
+            {exporting ? t('auth.export.preparing') : '⇩'}
+          </button>
+        )}
       </div>
 
-      {open && (
+      {open && !isDesktop && (
         <div className="accmenu">
           <button className="accmenu-item" onClick={() => { setOpen(false); setPwdOpen(true) }}>
             {t('auth.menu.changePassword')}

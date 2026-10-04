@@ -22,7 +22,6 @@ const ArrangementView = lazy(() => import('./views/ArrangementView'))
 const EditView = lazy(() => import('./views/EditView'))
 const PitchView = lazy(() => import('./views/PitchView'))
 const MarketView = lazy(() => import('./views/MarketView'))
-const BillingReturnView = lazy(() => import('./views/BillingReturnView'))
 const ResetPasswordView = lazy(() => import('./views/ResetPasswordView'))
 import { useSessionStore } from './stores/session'
 import { useMetaStore } from './stores/meta'
@@ -179,18 +178,33 @@ function ShortcutHandler() {
   return null
 }
 
-/** 登录页守卫：已登录则跳工作台；本地无 token 则同步清空残留会话（401 后避免回跳循环） */
+/** 登录页守卫：已登录则跳工作台；本地无 token 则同步清空残留会话（401 后避免回跳循环）。
+ *  v0.16.0：desktop 形态免登录（本地档案静默鉴权），登录页不再可达。 */
 function LoginGuard() {
   const user = useSessionStore((s) => s.user)
+  const appMode = useSessionStore((s) => s.license?.mode)
   useEffect(() => {
+    if (appMode === 'desktop') return
     if (!getToken()) {
       useSessionStore.setState({ user: null, ready: true })
     }
-  }, [])
+  }, [appMode])
+  if (appMode === 'desktop') {
+    return <Navigate to="/studio" replace />
+  }
   if (user && getToken()) {
     return <Navigate to="/studio" replace />
   }
   return <LoginView />
+}
+
+/** 市场守卫（D-6）：desktop 形态隐藏作品市场（云社区非本阶段重点）。 */
+function MarketGuard() {
+  const appMode = useSessionStore((s) => s.license?.mode)
+  if (appMode === 'desktop') {
+    return <Navigate to="/studio" replace />
+  }
+  return <MarketView />
 }
 
 /** 编曲路由壳：URL search 变化（工作台再次「送往编曲」）时以 key remount，
@@ -208,17 +222,17 @@ function RootRoutes() {
       <Route path="/landing" element={<LandingView />} />
       <Route path="/" element={hasToken ? <Navigate to="/studio" replace /> : <LandingView />} />
       <Route path="/login" element={<LoginGuard />} />
-      {/* v0.7.0 商业化：Stripe 支付回跳（独立于工作台壳，登录与否都可看）与邮件重置密码 */}
-      <Route path="/billing/return" element={<BillingReturnView />} />
+      {/* 邮件重置密码（Stripe 回跳页已随 v0.16.0 订阅拆除移除） */}
       <Route path="/reset-password" element={<ResetPasswordView />} />
+      <Route path="/billing/return" element={<Navigate to="/pricing" replace />} />
       {hasToken ? (
         <Route element={<AppLayout />}>
           <Route path="/studio" element={<StudioView />} />
           <Route path="/lyrics" element={<LyricsView />} />
-          {/* 编曲视图以 URL search（?work=&version=&candidate=）为装载契约：
+          {/* 编排视图以 URL search（?work=&version=&candidate=）为装载契约：
               参数变化即 remount 重新装载目标，工作台可重复「送往编曲」 */}
           <Route path="/arrange" element={<ArrangeRoute />} />
-          <Route path="/market" element={<MarketView />} />
+          <Route path="/market" element={<MarketGuard />} />
           <Route path="/edit" element={<EditView />} />
           <Route path="/pitch" element={<PitchView />} />
           <Route path="/library" element={<LibraryView />} />

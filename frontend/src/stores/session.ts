@@ -1,9 +1,10 @@
 import { create } from 'zustand'
-import type { AuthData, User } from '../types/api'
+import type { AuthData, LicenseStatus, User } from '../types/api'
 import { clearToken, setToken } from '../lib/token'
 import { fetchMe } from '../api/auth'
 import { ApiError } from '../api/client'
 import { getCreditsBalance } from '../api/account'
+import { getLicenseStatus } from '../api/license'
 import { useStudioStore } from './studio'
 import { usePlayerStore } from './player'
 
@@ -13,6 +14,8 @@ function isAuthReject(e: unknown): boolean {
 
 interface SessionState {
   user: User | null
+  /** v0.16.0 买断制：试用/激活状态（bootstrap 时并行拉取；cloud 模式 mode=cloud） */
+  license: LicenseStatus | null
   ready: boolean
   /** 后端不可达（网络故障）：token 仍在，不踢登录，展示重试（P1-25） */
   offline: boolean
@@ -24,12 +27,15 @@ interface SessionState {
   refreshUser: () => Promise<void>
   /** 只刷新积分余额（提交生成即时扣分后同步侧栏，不等任务终态） */
   refreshCredits: () => Promise<void>
+  /** 激活/解除后刷新授权状态（v0.16.0：侧栏徽标与激活页数据源） */
+  refreshLicense: () => Promise<void>
   /** 契约 §13.5：登录后首屏并行 /auth/me + /credits/balance */
   bootstrap: () => Promise<void>
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
   user: null,
+  license: null,
   ready: false,
   offline: false,
 
@@ -69,13 +75,28 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }
   },
 
+  /** 激活/解除后刷新授权状态（侧栏徽标与激活页数据源） */
+  async refreshLicense() {
+    try {
+      set({ license: await getLicenseStatus() })
+    } catch {
+      /* 静默：授权状态不可达不打断创作流 */
+    }
+  },
+
   async bootstrap() {
     if (!get().user) {
       try {
-        const [user, balance] = await Promise.all([fetchMe(), getCreditsBalance()])
-        // 侧边栏积分数以 /auth/me 的 credits.balance 为准（契约 §13.5）
+        const [user, balance, license] = await Promise.all([
+          fetchMe(),
+          getCreditsBalance(),
+          getLicenseStatus().catch(() => null),
+        ])
+        // 侧边栏积分数以 /auth/me 的 credits.balance 为准（契约 §13.5）；
+        // license 状态拉取失败不阻塞会话（cloud 未登录语义下 401 由前两者兜底）
         set({
           user: { ...user, credits: { ...user.credits, balance: balance.balance } },
+          license,
           ready: true,
           offline: false,
         })

@@ -1,50 +1,42 @@
 import { pricingEn } from '../en/pricing'
 
-/** pricing 命名空间：中文与原文一致 */
+/** pricing 命名空间：中文与原文一致（v0.16.0 买断制口径） */
 export const pricingZh: Record<keyof typeof pricingEn, string> = {
   // 页头
-  'pricing.label': 'Pricing / 定价与积分',
-  'pricing.title': '为创作付费，不为焦虑付费',
-  'pricing.monthly': '按月',
-  'pricing.yearly': '按年',
-  'pricing.save20': '省 20%',
+  'pricing.label': 'Pricing / 定价与激活',
+  'pricing.title': '一次买断，终身使用',
   // 加载态
-  'pricing.loading': '加载档位…',
-  'pricing.loadFailed': '档位信息加载失败',
-  // 套餐卡
-  'pricing.popular': '最受欢迎',
-  'pricing.customPrice': '定制',
-  'pricing.perMonth': ' $/月',
-  'pricing.tag.free': '先玩起来',
-  'pricing.tag.proYearly': '按年付 · 积分可结转',
-  'pricing.tag.yearlyOnly': '按年付',
-  'pricing.tag.yearlyBetter': '年付 ${price}/月 更划算',
-  'pricing.tag.team': '席位 · API · 批量',
+  'pricing.loading': '加载中…',
+  'pricing.loadFailed': '加载失败',
+  // 买断卡（LICENSE_SKU 单档，与落地页同源）
+  'pricing.buy.badge': '限时首发',
+  'pricing.buy.oneTime': '一次性买断 · 终身',
+  'pricing.buy.cta': '前往官网购买',
+  'pricing.buy.note': '经 Stripe 一次付清。含全部版本更新；无订阅、无积分。',
+  'pricing.buy.enterprise': '需要私有化部署或团队批量授权？请联系销售。',
+  // 用量说明（license 模式积分=纯计量）
+  'pricing.usage.footnote':
+    '用量记录——生成/编辑成本仅作计量参考，桌面版中不扣减、不会用尽。',
+  'pricing.usage.title': '用量记录',
+  // cloud 存量：订阅停售公告
+  'pricing.sunsetTitle': '订阅已停售',
+  'pricing.sunsetDesc':
+    'Meloyu 已转型为桌面软件，终身授权一次买断（$399，限时首发 $159）——不再有月费。存量档位在过渡期内继续有效，新订阅不再受理。',
+  'pricing.plansRefTitle': '档位配额（参考）',
+  'pricing.planRef': '当前档位',
   'pricing.monthlyCredits.pre': '· 每月',
   'pricing.monthlyCredits.post': '积分',
-  // 切换按钮
-  'pricing.current': '当前方案',
-  'pricing.switching': '切换中…',
-  'pricing.contactSales': '联系销售',
-  'pricing.contactSalesToast': '团队版请联系销售获取定制报价',
-  'pricing.downgrade': '降级到免费',
-  'pricing.upgrade': '升级 {name}',
-  'pricing.switched': '已切换至「{name}」，积分已按月发放',
-  // 底部说明
-  'pricing.footnote':
-    '商用授权随有效订阅生效；订阅期内生成并导出的作品保留商用权利。积分按月发放、未用完可结转。当前余额',
-  'pricing.creditsUnit': '积分。',
-  // 积分流水
+  // 流水/用量表
   'pricing.tx.title': '积分流水',
   'pricing.tx.time': '时间',
   'pricing.tx.change': '变动',
   'pricing.tx.reason': '原因',
   'pricing.tx.balance': '余额',
   'pricing.tx.task': '关联任务',
-  'pricing.tx.empty': '暂无流水记录',
+  'pricing.tx.empty': '暂无记录',
   // ===== 开放 API 密钥（FR-19，v0.8.2）=====
   'apikey.title': '开放 API（β）',
-  'apikey.hint': '文本生歌 / 任务查询 / 作品列表 / 文件下载四个机器接口，密钥鉴权；按量计费直接扣本账号积分（与站内同价：v1_pro=12 / v1_fast=6），商用授权随账号档位×通道许可（证书同源）。',
+  'apikey.hint': '文本生歌 / 任务查询 / 作品列表 / 文件下载四个机器接口，密钥鉴权；用量按本账号计量（与站内同价：v1_pro=12 / v1_fast=6），商用授权随账号档位×通道许可（证书同源）。',
   'apikey.namePlaceholder': '密钥名（如 production）',
   'apikey.issue': '签发密钥',
   'apikey.revoke': '吊销',

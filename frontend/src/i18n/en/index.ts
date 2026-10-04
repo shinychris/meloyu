@@ -15,7 +15,7 @@ import { modelsEn } from './models'
 import { loginEn } from './login'
 import { layoutEn } from './layout'
 import { authEn } from './auth'
-import { billingEn } from './billing'
+import { licenseEn } from './license'
 import { editorEn } from './editor'
 import { editEn } from './edit'
 import { pitchEn } from './pitch'
@@ -35,7 +35,7 @@ export const en = {
   ...loginEn,
   ...layoutEn,
   ...authEn,
-  ...billingEn,
+  ...licenseEn,
   ...editorEn,
   ...editEn,
   ...pitchEn,

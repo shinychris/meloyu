@@ -16,7 +16,7 @@ import { modelsZh } from './models'
 import { loginZh } from './login'
 import { layoutZh } from './layout'
 import { authZh } from './auth'
-import { billingZh } from './billing'
+import { licenseZh } from './license'
 import { editorZh } from './editor'
 import { editZh } from './edit'
 import { pitchZh } from './pitch'
@@ -36,7 +36,7 @@ export const zh: Record<keyof typeof en, string> = {
   ...loginZh,
   ...layoutZh,
   ...authZh,
-  ...billingZh,
+  ...licenseZh,
   ...editorZh,
   ...editZh,
   ...pitchZh,

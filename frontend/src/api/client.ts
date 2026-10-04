@@ -52,6 +52,13 @@ function redirectToLogin(): void {
   }
 }
 
+/** 40203（v0.16.0 试用到期未激活）：跳「定价与激活」页（B12 前端配套） */
+function redirectToActivation(): void {
+  if (window.location.hash !== '#/pricing') {
+    window.location.hash = '#/pricing'
+  }
+}
+
 interface EnvelopeLike {
   code?: number
   message?: string
@@ -131,6 +138,13 @@ instance.interceptors.response.use(
         if (isAuthExpired(body.code)) {
           // 40102 尝试静默刷新重放；40101 直接踢登录
           return handleAuthExpired(body.code, res.config as RetriableConfig, makeError)
+        }
+        if (body.code === 40203) {
+          // 试用到期：toast 后端引导文案 + 跳激活页（生成/编辑/导出提交处触发）
+          const err = makeError()
+          useToastStore.getState().push(err.message)
+          redirectToActivation()
+          throw err
         }
         const err = makeError()
         useToastStore.getState().push(err.message)

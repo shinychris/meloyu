@@ -15,7 +15,6 @@ import LoginView from './LoginView'
 import EditView from './EditView'
 import PitchView from './PitchView'
 import ModelCenterView from './ModelCenterView'
-import BillingReturnView from './BillingReturnView'
 import ResetPasswordView from './ResetPasswordView'
 import CandidateCard from '../components/studio/CandidateCard'
 import DerivePanel from '../components/studio/DerivePanel'
@@ -106,33 +105,14 @@ describe('views render smoke', () => {
     expect(html).not.toContain('不可听水印')
   })
 
-  it('PricingView 渲染档位加载态、充值包与流水表（v0.7.0 支付流）', () => {
+  it('PricingView 渲染激活加载态与流水表（v0.16.0 买断制；license 状态未就绪时显示加载）', () => {
     const html = render(<PricingView />)
-    expect(html).toContain('Pay for your craft, not your anxiety')
-    expect(html).toContain('Credit transactions')
-    expect(html).toContain('Credit top-up pack')
-    // v0.14.0：充值包价格/积分数由 /plans 接口下发（SSR 未加载态渲染占位）
-    expect(html).toContain('$—')
-    expect(html).toContain('Manage subscription')
-  })
-
-  it('BillingReturnView success 态渲染支付处理中说明与刷新按钮', () => {
-    const html = renderAt(
-      '/billing/return?status=success&session_id=cs_test_123',
-      <BillingReturnView />,
-    )
-    expect(html).toContain('Payment received')
-    expect(html).toContain('activated asynchronously by the payment webhook')
-    // v0.14.0：success 态自动轮询到账（3s×10），按钮先显示自动确认中
-    expect(html).toContain('Auto-confirming payment')
-    expect(html).toContain('cs_test_123')
-    expect(html).toContain('Back to pricing')
-  })
-
-  it('BillingReturnView cancel 态渲染已取消提示', () => {
-    const html = renderAt('/billing/return?status=cancel', <BillingReturnView />)
-    expect(html).toContain('Checkout canceled')
-    expect(html).toContain('You were not charged')
+    expect(html).toContain('One purchase, yours for life')
+    // SSR 未加载态：license 为 null → Loading…
+    expect(html).toContain('Loading…')
+    // 订阅支付流组件已随 Stripe 拆除移除
+    expect(html).not.toContain('Manage subscription')
+    expect(html).not.toContain('Credit top-up pack')
   })
 
   it('ResetPasswordView 无 token 时提示链接无效；有 token 时渲染表单', () => {

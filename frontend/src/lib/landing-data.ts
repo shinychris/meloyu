@@ -12,7 +12,7 @@
  */
 import type { TranslationKey } from '../i18n'
 
-export const LANDING_VERSION = 'v0.15.0'
+export const LANDING_VERSION = 'v0.16.0'
 
 /** Hero 指标条（商业化口径：面向用户的价值指标，非开发过程指标） */
 export const LANDING_METRICS: Array<{ value: string; label: TranslationKey }> = [

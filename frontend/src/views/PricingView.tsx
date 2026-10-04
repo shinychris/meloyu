@@ -1,52 +1,53 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { CreditTransaction, PlanInfo } from '../types/api'
-import { getCreditTransactions, getPlans, switchPlan } from '../api/account'
-import { checkout, openPortal, redirectToUrl } from '../api/billing'
+import { getCreditTransactions, getPlans } from '../api/account'
+import { activateLicense, deactivateLicense } from '../api/license'
 import { useSessionStore } from '../stores/session'
 import { toast } from '../stores/toast'
 import { creditReasonLabel, formatDateTime, formatNum, planLabel } from '../lib/format'
+import { LICENSE_SKU } from '../lib/landing-data'
 import ApiKeysCard from '../components/pricing/ApiKeysCard'
 import Pagination from '../components/common/Pagination'
 import { PageHeader } from '../components/common/PageHeader'
 import { useT } from '../i18n'
 
 const PAGE_SIZE = 10
+/** 官网购买入口（P3 License Portal 就绪前的唯一购买通道） */
+const BUY_URL = 'https://meloyu.com'
 
-/** 美分 → $ 展示（P0-5：价格接口下发 USD 分值，单一事实源） */
+/** 美分 → $ 展示（价格单一事实源：后端下发/前端 LICENSE_SKU 同源） */
 const usd = (cents: number | null | undefined): string | null =>
+  cents == null ? null : `$${(cents / 100).toFixed(0)}`
+
+const usd2 = (cents: number | null | undefined): string | null =>
   cents == null ? null : `$${(cents / 100).toFixed(2)}`
 
 /**
- * 定价与积分：四档卡片（月/年切换）+ 积分流水表。
- * v0.7.0 支付流：付费档发起 Stripe 订阅（跳 checkout url）；免费档=降级（/subscriptions/switch）；
- * team 恒「联系销售」；另有充值积分包（kind=topup）与管理订阅（Stripe 门户）入口。
+ * 定价与激活（v0.16.0 买断制）：
+ * - license 模式（desktop/enterprise）：试用状态卡 + 终身授权买断卡 +
+ *   License Key 激活表单 + 用量记录；
+ * - cloud 模式（存量过渡）：订阅停售公告 + 档位配额参考（只读）+ 用量记录。
  */
 export default function PricingView() {
   const [plans, setPlans] = useState<PlanInfo[]>([])
-  const [salesContact, setSalesContact] = useState('')
-  const [topup, setTopup] = useState<{ amount_usd: number; credits: number } | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [yearly, setYearly] = useState(true)
-  const [switching, setSwitching] = useState<string | null>(null)
-  const [topupBuying, setTopupBuying] = useState(false)
-  const [portalOpening, setPortalOpening] = useState(false)
   const [txs, setTxs] = useState<CreditTransaction[]>([])
   const [txPage, setTxPage] = useState(1)
   const [txTotalPages, setTxTotalPages] = useState(1)
-  const { user, refreshUser } = useSessionStore()
+  const [keyInput, setKeyInput] = useState('')
+  const [activating, setActivating] = useState(false)
+  const [deactivating, setDeactivating] = useState(false)
+  const { user, license, refreshLicense } = useSessionStore()
   const t = useT()
 
+  const isLicense = license?.billing_mode === 'license'
+  const activated = license?.activated ?? false
+
   const loadPlans = useCallback(async () => {
-    setLoading(true)
     try {
       const res = await getPlans()
       setPlans(res.plans)
-      setSalesContact(res.sales_contact ?? '')
-      setTopup(res.topup ?? null)
     } catch {
       /* 拦截器已 toast */
-    } finally {
-      setLoading(false)
     }
   }, [])
 
@@ -68,224 +69,244 @@ export default function PricingView() {
     void loadTxs(txPage)
   }, [loadTxs, txPage])
 
-  /** 付费档：发起 Stripe 订阅（Stripe 未配置时后端返 40901，拦截器已 toast） */
-  const onCheckout = async (plan: PlanInfo) => {
-    if (switching) return
-    setSwitching(plan.code)
+  /** 激活：POST /licenses/activate（Ed25519 本地验签；40202 由拦截器 toast） */
+  const onActivate = async () => {
+    if (activating) return
+    const key = keyInput.trim()
+    if (!key) return
+    setActivating(true)
     try {
-      const res = await checkout({
-        kind: 'subscription',
-        plan: plan.code as 'pro' | 'studio',
-        interval: yearly ? 'yearly' : 'monthly',
-      })
-      if (res?.url) {
-        redirectToUrl(res.url)
-        return // 整页跳转中，保持按钮态
-      }
+      await activateLicense(key)
+      await refreshLicense()
+      setKeyInput('')
+      toast(t('license.activate.done'))
     } catch {
-      /* 拦截器已 toast（40901 Stripe 未配置 / 会话过期等） */
+      /* 拦截器已 toast（40202 无效 Key / 40901 未配公钥） */
     } finally {
-      setSwitching(null)
+      setActivating(false)
     }
   }
 
-  /** 免费档：降级（后端 v0.7.0 起允许降回 free） */
-  const onDowngrade = async (plan: PlanInfo) => {
-    if (switching) return
-    setSwitching(plan.code)
+  /** 解除激活：保留试用记录，到期后闸门接管 */
+  const onDeactivate = async () => {
+    if (deactivating) return
+    setDeactivating(true)
     try {
-      const user = await switchPlan(plan.code as 'free')
-      useSessionStore.setState({ user })
-      await loadPlans()
-      void refreshUser()
-      toast(t('pricing.switched', { name: planLabel(plan.code) }))
+      await deactivateLicense()
+      await refreshLicense()
+      toast(t('license.activate.deactivated'))
     } catch {
       /* 拦截器已 toast */
     } finally {
-      setSwitching(null)
-    }
-  }
-
-  const onSwitch = (plan: PlanInfo) => {
-    if (switching) return
-    if (plan.code === 'team') {
-      if (salesContact) {
-        window.location.assign(
-          `mailto:${salesContact}?subject=${encodeURIComponent('Meloyu Team plan')}`)
-      } else {
-        toast(t('pricing.contactSalesToast'), 'warn')
-      }
-      return
-    }
-    if (plan.current) return
-    if (plan.code === 'free') {
-      void onDowngrade(plan)
-    } else {
-      void onCheckout(plan)
-    }
-  }
-
-  /** 充值积分包：一次性购买（kind=topup） */
-  const onTopup = async () => {
-    if (topupBuying) return
-    setTopupBuying(true)
-    try {
-      const res = await checkout({ kind: 'topup' })
-      if (res?.url) {
-        redirectToUrl(res.url)
-        return
-      }
-    } catch {
-      /* 拦截器已 toast */
-    } finally {
-      setTopupBuying(false)
-    }
-  }
-
-  /** 管理订阅：Stripe 客户门户（无支付记录时后端返 40901，拦截器已 toast） */
-  const onPortal = async () => {
-    if (portalOpening) return
-    setPortalOpening(true)
-    try {
-      const res = await openPortal()
-      if (res?.url) {
-        redirectToUrl(res.url)
-        return
-      }
-    } catch {
-      /* 拦截器已 toast */
-    } finally {
-      setPortalOpening(false)
+      setDeactivating(false)
     }
   }
 
   return (
     <section className="view flex flex-col h-full">
-      <PageHeader
-        label={t('pricing.label')}
-        title={t('pricing.title')}
-        actions={
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-3 text-sm text-muted">
-              {t('pricing.monthly')}
-              <button className={`toggle ${yearly ? 'on' : ''}`} onClick={() => setYearly((v) => !v)}></button>
-              {t('pricing.yearly')}
-              <span className="badge badge-solid">{t('pricing.save20')}</span>
-            </div>
-            <button
-              className="btn btn-ghost btn-sm"
-              title={t('billing.manageTitle')}
-              disabled={portalOpening}
-              onClick={() => void onPortal()}
-            >
-              {portalOpening ? t('billing.manageOpening') : t('billing.manage')}
-            </button>
-          </div>
-        }
-      />
+      <PageHeader label={t('pricing.label')} title={t('pricing.title')} />
 
-      {loading ? (
-        <div className="rule-t py-16 text-center text-sm text-dim">
-          {t('pricing.loading')}
-        </div>
-      ) : plans.length === 0 ? (
-        <div className="rule-t py-16 text-center">
-          <div className="text-sm text-dim">{t('pricing.loadFailed')}</div>
-          <button className="btn btn-ghost mt-4" onClick={() => void loadPlans()}>{t('common.retry')}</button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 rule-t">
-          {plans.map((p) => {
-            const popular = p.code === 'studio'
-            const price = yearly ? p.price_yearly : p.price_monthly
-            const current = p.current || user?.plan === p.code
-            return (
-              <div
-                key={p.code}
-                className={`border-r px-7 py-8 relative ${popular ? 'border-acc bg-bg-2' : 'border-line'}`}
-              >
-                {popular && (
-                  <div className="badge badge-solid absolute top-0 left-0">
-                    {t('pricing.popular')}
+      {license == null ? (
+        <div className="rule-t py-16 text-center text-sm text-dim">{t('pricing.loading')}</div>
+      ) : isLicense ? (
+        /* ================= license 模式：状态 + 买断 + 激活 ================= */
+        <div className="rule-t">
+          {/* 授权状态卡 */}
+          <div className="px-8 py-6 border-b border-line">
+            {activated ? (
+              <div className="flex items-start justify-between gap-6 flex-wrap">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <div className="label" style={{ color: 'var(--acc)' }}>
+                      {t('license.status.title')}
+                    </div>
+                    <span className="badge badge-solid">{t('license.status.active')}</span>
                   </div>
-                )}
-                <div className="label" style={popular ? { color: 'var(--acc)' } : undefined}>{planLabel(p.code)}</div>
-                <div className="price-num mt-4">
-                  {price == null ? (p.code === 'team' ? t('pricing.customPrice') : '—') : usd(price)}
-                  {price != null && (
-                    <span className="text-lg font-bold text-muted">{t('pricing.perMonth')}</span>
-                  )}
+                  <div className="text-sm mt-3 text-muted">
+                    {license.license?.tier === 'enterprise'
+                      ? t('license.status.tier.enterprise')
+                      : t('license.status.tier.lifetime')}
+                    {' · '}
+                    {t('pricing.buy.oneTime')}
+                  </div>
+                  <div className="text-xs mt-2 num text-dim flex gap-6 flex-wrap">
+                    <span>
+                      {t('license.status.licenseId')}: {license.license?.license_id?.slice(0, 12) ?? '—'}
+                    </span>
+                    {license.license?.activated_at && (
+                      <span>
+                        {t('license.status.activatedAt')}: {formatDateTime(license.license.activated_at)}
+                      </span>
+                    )}
+                    <span>Device: {license.device_id.slice(0, 12)}</span>
+                  </div>
                 </div>
-                <div className="text-xs mt-1 text-dim">
-                  {p.code === 'free' && t('pricing.tag.free')}
-                  {p.code === 'pro' && (yearly ? t('pricing.tag.proYearly') : t('pricing.tag.yearlyBetter', { price: usd(p.price_yearly) ?? '' }))}
-                  {p.code === 'studio' && (yearly ? t('pricing.tag.yearlyOnly') : t('pricing.tag.yearlyBetter', { price: usd(p.price_yearly) ?? '' }))}
-                  {p.code === 'team' && t('pricing.tag.team')}
-                </div>
-                <ul className="mt-6 space-y-2.5 text-sm text-muted">
-                  {p.features.map((f) => (
-                    <li key={f}>· {f}</li>
-                  ))}
-                  {p.monthly_credits != null && !p.features.some((f) => f.includes('积分') || f.toLowerCase().includes('credit')) && (
-                    <li>
-                      · {t('pricing.monthlyCredits.pre')} <span className="num">{formatNum(p.monthly_credits)}</span> {t('pricing.monthlyCredits.post')}
-                    </li>
-                  )}
-                </ul>
                 <button
-                  className={`btn w-full mt-8 ${!current && p.code !== 'team' ? 'btn-acc' : ''} ${popular && !current ? 'font-bold' : ''}`}
-                  disabled={current || switching === p.code}
-                  onClick={() => onSwitch(p)}
+                  className="btn btn-ghost btn-sm"
+                  disabled={deactivating}
+                  onClick={() => void onDeactivate()}
                 >
-                  {current
-                    ? t('pricing.current')
-                    : switching === p.code
-                      ? p.code === 'free'
-                        ? t('pricing.switching')
-                        : t('billing.checkout.redirecting')
-                      : p.code === 'team'
-                        ? t('pricing.contactSales')
-                        : p.code === 'free'
-                          ? t('pricing.downgrade')
-                          : t('pricing.upgrade', { name: planLabel(p.code) })}
+                  {deactivating
+                    ? t('license.activate.deactivating')
+                    : t('license.activate.deactivate')}
                 </button>
               </div>
-            )
-          })}
+            ) : license.trial.expired ? (
+              <div className="border border-bad/60 px-5 py-4" style={{ background: 'var(--bg2)' }}>
+                <div className="label" style={{ color: 'var(--bad)' }}>
+                  {t('license.trial.expiredTitle')}
+                </div>
+                <div className="text-sm mt-2 text-muted leading-relaxed">
+                  {t('license.trial.expiredDesc')}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="label">{t('license.trial.title')}</div>
+                    <span className="badge">{t('license.sidebar.trial')}</span>
+                  </div>
+                  <span className="text-xs num text-muted">
+                    {t('license.trial.daysLeft', {
+                      n: String(license.trial.days_left ?? 0),
+                    })}
+                  </span>
+                </div>
+                <div className="text-xs mt-2 text-dim">{t('license.trial.desc')}</div>
+                <div className="h-[3px] mt-3 bg-bg-3 max-w-[420px]">
+                  <div
+                    className="h-full bg-acc"
+                    style={{
+                      width: `${Math.min(100, Math.max(3, ((license.trial.days_left ?? 0) / Math.max(1, license.trial.days)) * 100))}%`,
+                    }}
+                  ></div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 买断卡 + 激活表单 */}
+          <div className="grid grid-cols-1 md:grid-cols-2">
+            <div className="p-8 border-b md:border-b-0 md:border-r border-line relative">
+              <div className="badge badge-solid absolute top-6 right-8">
+                {t('pricing.buy.badge')}
+              </div>
+              <div className="label" style={{ color: 'var(--acc)' }}>
+                {t(LICENSE_SKU.name)}
+              </div>
+              <div className="price-num mt-4 flex items-baseline gap-3 flex-wrap">
+                <span>{usd(license.sale_price_usd)}</span>
+                <span className="text-base font-bold text-dim line-through">
+                  {usd(license.price_usd)}
+                </span>
+                <span className="text-base font-bold text-muted">
+                  {t('pricing.buy.oneTime')}
+                </span>
+              </div>
+              <div className="text-xs mt-1.5 text-dim">
+                {t(LICENSE_SKU.tagline)} · {t(LICENSE_SKU.platforms)}
+              </div>
+              <ul className="mt-5 space-y-2 text-sm text-muted">
+                {LICENSE_SKU.features.map((f) => (
+                  <li key={f}>
+                    <span style={{ color: 'var(--acc)' }}>· </span>
+                    {t(f)}
+                  </li>
+                ))}
+              </ul>
+              <a
+                className="btn btn-acc w-full mt-6 block text-center"
+                href={BUY_URL}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {t('pricing.buy.cta')}
+              </a>
+              <div className="text-xs mt-3 text-dim leading-relaxed">
+                {t('pricing.buy.note')}
+                <br />
+                {t('pricing.buy.enterprise')}
+              </div>
+            </div>
+
+            <div className="p-8">
+              <div className="label">{t('license.activate.label')}</div>
+              <div className="text-md font-bold mt-2">{t('license.activate.title')}</div>
+              <div className="text-xs mt-2 leading-relaxed max-w-[460px] text-dim">
+                {t('license.activate.desc')}
+              </div>
+              <textarea
+                className="input mt-4 w-full max-w-[460px] num"
+                style={{ minHeight: 88 }}
+                spellCheck={false}
+                value={keyInput}
+                placeholder={t('license.activate.placeholder')}
+                onChange={(e) => setKeyInput(e.target.value)}
+              />
+              <button
+                className="btn btn-acc mt-4"
+                disabled={activating || !keyInput.trim()}
+                onClick={() => void onActivate()}
+              >
+                {activating ? t('license.activate.activating') : t('license.activate.cta')}
+              </button>
+            </div>
+          </div>
+
+          <div className="rule-t px-8 py-4 text-xs text-dim">{t('pricing.usage.footnote')}</div>
+        </div>
+      ) : (
+        /* ================= cloud 存量：停售公告 + 配额参考（只读） ================= */
+        <div className="rule-t">
+          <div className="px-8 py-6 border-b border-line" style={{ background: 'var(--bg2)' }}>
+            <div className="label" style={{ color: 'var(--warn)' }}>
+              {t('pricing.sunsetTitle')}
+            </div>
+            <div className="text-sm mt-2 text-muted leading-relaxed max-w-[720px]">
+              {t('pricing.sunsetDesc')}
+            </div>
+          </div>
+          <div className="label px-8 pt-6">{t('pricing.plansRefTitle')}</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4">
+            {plans.map((p) => {
+              const current = p.current || user?.plan === p.code
+              return (
+                <div
+                  key={p.code}
+                  className={`border-r px-7 py-8 ${current ? 'border-acc bg-bg-2' : 'border-line'}`}
+                >
+                  <div className="label">{planLabel(p.code)}</div>
+                  <div className="text-xs mt-3 num text-dim">
+                    {p.price_monthly != null ? `${usd2(p.price_monthly)}/mo` : t('pricing.planRef')}
+                  </div>
+                  <ul className="mt-5 space-y-2.5 text-sm text-muted">
+                    {p.features.map((f) => (
+                      <li key={f}>· {f}</li>
+                    ))}
+                    {p.monthly_credits != null && (
+                      <li>
+                        · {t('pricing.monthlyCredits.pre')}{' '}
+                        <span className="num">{formatNum(p.monthly_credits)}</span>{' '}
+                        {t('pricing.monthlyCredits.post')}
+                      </li>
+                    )}
+                  </ul>
+                  {current && (
+                    <div className="badge badge-solid mt-6">{t('pricing.planRef')}</div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
-      {/* 充值积分包（一次性购买，积分永不过期） */}
-      <div className="rule-t px-8 py-5 flex items-center justify-between gap-6 flex-wrap bg-bg-2">
-        <div className="min-w-0">
-          <div className="label">{t('billing.topup.label')}</div>
-          <div className="text-md font-bold mt-1">{t('billing.topup.title')}</div>
-          <div className="text-xs mt-1 leading-relaxed max-w-[640px] text-dim">
-            {t('billing.topup.desc')}
-          </div>
-        </div>
-        <div className="flex items-center gap-6 flex-none">
-          <div className="text-right">
-            <span className="num font-extrabold text-2xl tracking-tight">{topup ? usd(topup.amount_usd) : '$—'}</span>
-            <div className="text-xs mt-0.5 text-muted">
-              <span className="num font-bold text-acc">{topup ? formatNum(topup.credits) : '—'}</span> {t('pricing.monthlyCredits.post')}
-            </div>
-          </div>
-          <button className="btn btn-acc !py-2.5" disabled={topupBuying} onClick={() => void onTopup()}>
-            {topupBuying ? t('billing.topup.buying') : t('billing.topup.cta')}
-          </button>
-        </div>
-      </div>
-
-      <div className="rule-t px-8 py-4 text-xs text-dim">
-        {t('pricing.footnote')}
-        <span className="num font-bold mx-1 text-acc">{formatNum(user?.credits.balance ?? 0)}</span>
-        {t('pricing.creditsUnit')}
-      </div>
-
-      {/* 积分流水 */}
+      {/* 用量/积分流水（license=纯计量，cloud=余额账本） */}
       <div className="rule-t px-8 py-4 tx-rows">
-        <div className="label mb-3">{t('pricing.tx.title')}</div>
+        <div className="label mb-3">
+          {isLicense ? t('pricing.usage.title') : t('pricing.tx.title')}
+        </div>
         <div className="row !cursor-default text-dim" style={{ gridTemplateColumns: '170px 90px 110px 100px 1fr' }}>
           <span className="label">{t('pricing.tx.time')}</span>
           <span className="label">{t('pricing.tx.change')}</span>

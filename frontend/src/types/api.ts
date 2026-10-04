@@ -325,44 +325,34 @@ export interface OkResult {
   ok: boolean
 }
 
-/* ============ v0.7.0 billing（Stripe） ============ */
+/* ============ v0.16.0 license（买断制激活，2026-10-03 定位转型） ============ */
 
-export type BillingKind = 'subscription' | 'topup'
-export type BillingInterval = 'monthly' | 'yearly'
-
-/** POST /billing/checkout —— 订阅或充值，返回 Stripe 跳转链接 */
-export interface BillingCheckoutRequest {
-  kind: BillingKind
-  plan?: 'pro' | 'studio'
-  interval?: BillingInterval
+/** GET /licenses/status —— 试用/激活状态（license 与 subscription 模式通用） */
+export interface LicenseStatus {
+  mode: 'cloud' | 'desktop' | 'enterprise'
+  billing_mode: 'license' | 'subscription'
+  trial: {
+    started_at: string
+    days: number
+    days_left: number | null
+    expires_at: string | null
+    expired: boolean
+  }
+  activated: boolean
+  license: {
+    license_id: string
+    tier: 'lifetime' | 'enterprise'
+    devices: number
+    note: string | null
+    activated_at: string | null
+  } | null
+  device_id: string
+  price_usd: number
+  sale_price_usd: number
 }
 
-export interface BillingCheckoutResult {
-  url: string
-  order_id: string
-}
-
-/** GET /billing/orders 的订单行 */
-export interface BillingOrder {
-  id: string
-  kind: BillingKind
-  plan: 'pro' | 'studio' | null
-  interval: BillingInterval | null
-  credits: number
-  amount_usd: number
-  status: string
-  created_at: string
-  paid_at: string | null
-}
-
-export interface BillingOrdersResult {
-  orders: BillingOrder[]
-}
-
-/** POST /billing/portal —— Stripe 客户门户（无支付记录时后端返 40901） */
-export interface BillingPortalResult {
-  url: string
-}
+/** POST /licenses/activate 响应 = LicenseStatus */
+export type LicenseActivateResult = LicenseStatus
 
 /* ============ generations / tasks ============ */
 export interface GenerationSubmitRequest {
@@ -712,6 +702,9 @@ export interface SystemMeta {
   inspiration: InspirationMeta
   /** 注册邮箱验证码开关（SMTP 配置后开启；v0.10.2） */
   email_verification_enabled?: boolean
+  /** 产品形态（v0.16.0 定位转型）：desktop=桌面单机 / enterprise=私有化 / cloud=存量云 */
+  app_mode?: 'cloud' | 'desktop' | 'enterprise'
+  billing_mode?: 'license' | 'subscription'
 }
 
 /* ============ 证书（§8.4，非包裹 JSON） ============ */
