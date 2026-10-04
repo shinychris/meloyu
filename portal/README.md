@@ -24,7 +24,7 @@ set PAYMENT_LINK_URL=https://buy.stripe.com/...   # Dashboard 建 Payment Link �
 
 | 端点 | 说明 |
 |---|---|
-| `GET /` | 营销站基座（买断定价 + 购买按钮；正式版由官网批次细化） |
+| `GET /` | 官网营销站：landing 独立构建（`cd frontend && npm run build:landing` → `dist-landing/`，默认英文、zh 可切、买断定价与购买入口）；未构建时兜底基座页 |
 | `GET /buy` | 302 → Stripe Payment Link |
 | `GET /thanks?session_id=` | 支付完成回跳：直查 Stripe 校验已付 → **幂等签发** → 页面展示 Key |
 | `POST /api/activate-report` | 桌面端可选在线上报：验签/吊销/设备数治理（离线验签不依赖） |

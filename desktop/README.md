@@ -67,8 +67,9 @@ cd desktop && npm run dist:mac           # dmg arm64 + x64
 
 ## 已知边界
 
-- 本地大模型（ACE-Step / MusicGen 权重）不随包分发，首启后经「组件中心」
-  按需下载（ModelOp 管线已有；组件中心 UI 为后续批次）。
+- 本地大模型（ACE-Step / MusicGen 权重）不随包分发，首启后经模型中心
+  「本地组件」区按需下载（组件中心 UI 已交付：许可/体积/显存如实标注，
+  下载复用 ModelOp 进度管线）。
 - 云通道（Suno 网关 / Replicate）为 BYOK：用户在模型中心自配 Key（桌面本地
   档案 is_admin，配置面即面向用户）。
 - macOS 本地推理以 MusicGen(CPU)+内置引擎保底；ACE-Step mac 构建未验证。
