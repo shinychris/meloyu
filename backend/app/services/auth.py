@@ -68,6 +68,12 @@ def register(db: Session, email: str, password: str, nickname: str,
 
 
 def login(db: Session, email: str, password: str) -> tuple[dict, str, int]:
+    if settings.app_mode == "desktop":
+        # B6（2026-10-04 用户口径收紧）：桌面客户端无用户鉴权/登录——本地档案
+        # 静默鉴权，凭据登录入口整体关闭（随机密码档案本就无法凭密码登录）
+        raise err_conflict(tr(
+            "桌面版无需登录——应用启动即自动进入本地档案",
+            "The desktop app needs no sign-in — it opens straight into your local profile"))
     user = db.query(User).filter(User.email == email.strip().lower()).first()
     if not user or not verify_password(password, user.password_hash):
         raise err_bad_credentials()

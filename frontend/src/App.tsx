@@ -207,6 +207,15 @@ function MarketGuard() {
   return <MarketView />
 }
 
+/** 密码重置守卫：desktop 形态无账号体系（B6），重置页不可达。 */
+function ResetPasswordGuard() {
+  const appMode = useSessionStore((s) => s.license?.mode)
+  if (appMode === 'desktop') {
+    return <Navigate to="/studio" replace />
+  }
+  return <ResetPasswordView />
+}
+
 /** 编曲路由壳：URL search 变化（工作台再次「送往编曲」）时以 key remount，
  *  ArrangementView 的首装参数逻辑无需感知参数更新 */
 function ArrangeRoute() {
@@ -224,7 +233,7 @@ function RootRoutes() {
       <Route path="/landing" element={<Navigate to="/" replace />} />
       <Route path="/login" element={<LoginGuard />} />
       {/* 邮件重置密码（Stripe 回跳页已随 v0.16.0 订阅拆除移除） */}
-      <Route path="/reset-password" element={<ResetPasswordView />} />
+      <Route path="/reset-password" element={<ResetPasswordGuard />} />
       <Route path="/billing/return" element={<Navigate to="/pricing" replace />} />
       {hasToken ? (
         <Route element={<AppLayout />}>

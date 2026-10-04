@@ -298,6 +298,12 @@ class TestLicenseLifecycle(_DBTestCase):
             auth_svc.register(self.db, "new@t.local", "Passw0rd123", "n")
         self.assertEqual(ctx.exception.code, 40901)
 
+    def test_desktop_login_guard(self):
+        # 桌面客户端无鉴权：凭据登录入口整体关闭（2026-10-04 用户口径）
+        with self.assertRaises(BizError) as ctx:
+            auth_svc.login(self.db, "whoever@t.local", "Passw0rd123")
+        self.assertEqual(ctx.exception.code, 40901)
+
     def test_status_dict_shape(self):
         out = license_svc.status_dict(self.db)
         self.assertEqual(out["mode"], "desktop")
