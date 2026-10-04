@@ -131,7 +131,18 @@ describe('views render smoke', () => {
     expect(pitchHtml).toContain('Piano-roll note editing')
   })
 
-  it('ModelCenterView 渲染双引擎通道区（V1.3 歌曲生成引擎）', () => {
+  it('ModelCenterView 渲染本地组件中心（v0.16.0 桌面按需下载：内置/MusicGen/ACE-Step）', () => {
+    const html = render(<ModelCenterView />)
+    expect(html).toContain('Local component center')
+    expect(html).toContain('Built-in synth engine')
+    expect(html).toContain('On-device MusicGen')
+    expect(html).toContain('On-device ACE-Step v1.5')
+    // 如实标注：许可与硬件要求出现在组件卡上
+    expect(html).toContain('CC-BY-NC')
+    expect(html).toContain('8GB VRAM recommended')
+  })
+
+  it('ModelCenterView 渲染双引擎通道区（V1.3 歌词生成引擎）', () => {
     const html = render(<ModelCenterView />)
     expect(html).toContain('Lyrics engine channels')
     expect(html).toContain('Song generation engine channels')

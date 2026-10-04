@@ -73,6 +73,7 @@ const MUSIC_GROUPS: { labelKey: TranslationKey; items: MusicBackend[]; fallback?
 /** 左侧分类导航（锚点 + scrollspy 高亮） */
 const SECTIONS: { id: string; labelKey: TranslationKey }[] = [
   { id: 'mc-overview', labelKey: 'models.nav.overview' },
+  { id: 'mc-components', labelKey: 'models.nav.components' },
   { id: 'mc-lyrics', labelKey: 'models.nav.lyrics' },
   { id: 'mc-music', labelKey: 'models.nav.music' },
   { id: 'mc-catalog', labelKey: 'models.nav.catalog' },
@@ -553,6 +554,51 @@ export default function ModelCenterView() {
   const lyricsReady = !!settings && settings.lyrics_backend !== 'localsynth'
   const songReady = !!settings && settings.music_backend !== 'localsynth'
 
+  // ---- 本地组件中心（v0.16.0）：数据切片与行渲染 ----
+  const musicgenModels = (catalog?.models ?? []).filter((m) => m.channels.includes('musicgen_local'))
+  const acestepModels = (catalog?.models ?? []).filter((m) => m.channels.includes('acestep_local'))
+  const minSizeMb = (channel: 'musicgen_local' | 'acestep_local') => {
+    const list = channel === 'musicgen_local' ? musicgenModels : acestepModels
+    return list.length ? Math.min(...list.map((m) => m.local_size_mb)) : 0
+  }
+  const compStatusBadge = (engine: 'musicgen' | 'acestep') => {
+    const deps = engine === 'musicgen'
+      ? catalog?.machine.musicgen_deps_installed
+      : catalog?.machine.acestep_deps_installed
+    const models = engine === 'musicgen' ? musicgenModels : acestepModels
+    if (!deps) return <span className="badge" style={{ color: 'var(--bad)' }}>{t('models.comp.status.depsMissing')}</span>
+    if (models.some((m) => m.local_status === 'ready')) {
+      return <span className="badge" style={{ color: 'var(--acc)' }}>{t('models.comp.status.ready')}</span>
+    }
+    return <span className="badge">{t('models.comp.status.notDownloaded')}</span>
+  }
+  const compModelRow = (m: MusicCatalogModel) => (
+    <div key={m.id} className="flex items-center gap-2 flex-wrap">
+      <span className="text-xs text-muted flex-1 min-w-0 truncate" title={m.name}>{m.name}</span>
+      <span className={`text-2xs num flex-none ${m.local_status === 'ready' ? 'text-acc' : 'text-dim'}`}>
+        {m.local_status === 'ready' ? t('models.comp.status.ready') : `≈${m.local_size_mb}MB`}
+      </span>
+      {m.local_status === 'ready' ? (
+        <button
+          className="btn btn-sm flex-none"
+          style={{ color: 'var(--bad)' }}
+          disabled={catalogBusy}
+          onClick={() => void removeMusicModel(m)}
+        >
+          {t('common.delete')}
+        </button>
+      ) : (
+        <button
+          className="btn btn-acc btn-sm flex-none"
+          disabled={catalogBusy || !!activeOp}
+          onClick={() => void downloadMusicModel(m)}
+        >
+          {t('models.catalog.downloadSize', { size: m.local_size_mb })}
+        </button>
+      )}
+    </div>
+  )
+
   /** 通道卡通用渲染（fallback 组弱化样式 + 「非 AI · 兜底」徽章） */
   const renderChannelCard = (
     title: TranslationKey, desc: TranslationKey,
@@ -691,6 +737,74 @@ export default function ModelCenterView() {
             </section>
 
             {/* ============ 歌词引擎 ============ */}
+
+            {/* ============ 本地组件中心（v0.16.0 桌面按需下载，方案 §3.2） ============ */}
+            <section id="mc-components" className="mt-10 scroll-mt-4">
+              <div className="label mb-1">{t('models.comp.label')}</div>
+              <div className="text-xs mb-3 max-w-[720px] text-dim leading-relaxed">
+                {t('models.comp.desc')}
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-stretch">
+                {/* 内置引擎：随包分发，恒可用 */}
+                <div className="card p-5 flex flex-col">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-base font-bold">{t('models.comp.builtin.title')}</div>
+                    <span className="badge badge-solid">{t('models.comp.status.builtin')}</span>
+                  </div>
+                  <div className="text-xs mt-2 text-muted leading-relaxed">
+                    {t('models.comp.builtin.desc')}
+                  </div>
+                  <div className="text-2xs mt-auto pt-4 text-dim">
+                    {t('models.comp.builtin.req')}
+                  </div>
+                </div>
+
+                {/* MusicGen 组件 */}
+                <div className="card p-5 flex flex-col">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-base font-bold">{t('models.comp.musicgen.title')}</div>
+                    {compStatusBadge('musicgen')}
+                  </div>
+                  <div className="text-xs mt-2 text-muted leading-relaxed">
+                    {t('models.comp.musicgen.desc')}
+                  </div>
+                  <div className="text-2xs mt-2 text-dim leading-relaxed">
+                    {t('models.comp.musicgen.req', { size: String(minSizeMb('musicgen_local')) })}
+                  </div>
+                  {catalog && !catalog.machine.musicgen_deps_installed && (
+                    <div className="text-2xs mt-2 text-warn leading-relaxed break-words">
+                      {t('models.comp.depsHint', { hint: catalog.machine.install_hint })}
+                    </div>
+                  )}
+                  <div className="mt-auto pt-4 space-y-1.5">
+                    {musicgenModels.map((m) => compModelRow(m))}
+                  </div>
+                </div>
+
+                {/* ACE-Step 组件 */}
+                <div className="card p-5 flex flex-col">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-base font-bold">{t('models.comp.acestep.title')}</div>
+                    {compStatusBadge('acestep')}
+                  </div>
+                  <div className="text-xs mt-2 text-muted leading-relaxed">
+                    {t('models.comp.acestep.desc')}
+                  </div>
+                  <div className="text-2xs mt-2 text-dim leading-relaxed">
+                    {t('models.comp.acestep.req')}
+                  </div>
+                  {catalog && !catalog.machine.acestep_deps_installed && (
+                    <div className="text-2xs mt-2 text-warn leading-relaxed break-words">
+                      {t('models.comp.depsHint', { hint: catalog.machine.acestep_install_hint })}
+                    </div>
+                  )}
+                  <div className="mt-auto pt-4 space-y-1.5">
+                    {acestepModels.map((m) => compModelRow(m))}
+                  </div>
+                </div>
+              </div>
+            </section>
+
             <section id="mc-lyrics" className="mt-10 scroll-mt-4">
               <div className="label mb-1">{t('models.lyrics.title')}</div>
               <p className="text-xs mb-3 text-dim">
