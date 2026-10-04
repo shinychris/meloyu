@@ -28,7 +28,7 @@ export default function LandingFooter() {
         <p className="text-base mt-3 text-muted">
           {t('landing.footer.ctaDesc')}
         </p>
-        <button className="btn btn-acc btn-lg mt-8" onClick={() => navigate('/login')}>
+        <button className="btn btn-acc btn-lg mt-8" onClick={() => scrollToSection('pricing')}>
           {t('landing.footer.ctaButton')}
         </button>
       </section>

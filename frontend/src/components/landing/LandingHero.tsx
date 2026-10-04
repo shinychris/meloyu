@@ -27,10 +27,10 @@ export default function LandingHero() {
           {t('landing.hero.desc.2')}
         </p>
         <div className="flex items-center justify-center gap-4 mt-9 flex-wrap">
-          <button className="btn btn-acc btn-lg" onClick={() => navigate('/login')}>
+          <button className="btn btn-acc btn-lg" onClick={() => scrollToSection('pricing')}>
             {t('landing.hero.cta.primary')}
           </button>
-          <button className="btn btn-ghost btn-lg" onClick={() => scrollToSection('pricing')}>
+          <button className="btn btn-ghost btn-lg" onClick={() => navigate('/login')}>
             {t('landing.hero.cta.secondary')}
           </button>
         </div>

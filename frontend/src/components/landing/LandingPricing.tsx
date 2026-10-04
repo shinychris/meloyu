@@ -1,9 +1,9 @@
 import { useNavigate } from 'react-router-dom'
-import { PLANS } from '../../lib/landing-data'
+import { LICENSE_SKU } from '../../lib/landing-data'
 import { useT } from '../../i18n'
 import { EqMark } from './EqMark'
 
-/** 定价四档（静态展示版：与工作台「定价与积分」同源，登录后可切换档位） */
+/** 定价：单档终身授权买断（D-1 定案：$399 终身、限时首发 $159；无免费层、无订阅） */
 export default function LandingPricing() {
   const navigate = useNavigate()
   const t = useT()
@@ -14,55 +14,36 @@ export default function LandingPricing() {
       <p className="text-base mt-2 max-w-[560px] text-muted">
         {t('landing.pricing.desc')}
       </p>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px mt-8" style={{ background: 'var(--line)' }}>
-        {PLANS.map((p) => (
-          <div
-            key={p.code}
-            className="p-6 relative flex flex-col"
-            style={{
-              background: p.popular ? 'var(--bg2)' : 'var(--bg)',
-              boxShadow: p.popular ? 'inset 0 2px 0 var(--acc)' : undefined,
-            }}
-          >
-            {p.popular && (
-              <div className="badge badge-solid absolute top-0 right-0">{t('landing.pricing.popular')}</div>
-            )}
-            <div className="label" style={p.popular ? { color: 'var(--acc)' } : undefined}>
-              {t(p.name)}
-            </div>
-            <div className="price-num mt-4">
-              {p.monthly == null ? t('landing.pricing.custom') : `$${(p.yearly! / 100).toFixed(2)}`}
-              {p.monthly != null && (
-                <span className="text-base font-bold text-muted">
-                  {' '}
-                  {t('landing.pricing.perMonth')}
-                </span>
-              )}
-            </div>
-            <div className="text-xs mt-1.5 text-dim">
-              {p.monthly != null && p.monthly > 0 ? t('landing.pricing.monthly', { p: (p.monthly / 100).toFixed(2) }) : ''}
-              {t(p.tagline)}
-            </div>
-            <ul className="mt-5 space-y-2 flex-1">
-              {p.features.map((f) => (
-                <li key={f} className="text-sm leading-relaxed flex gap-2 text-muted">
-                  <span style={{ color: p.popular ? 'var(--acc)' : 'var(--dim)' }}>·</span>
-                  {t(f)}
-                </li>
-              ))}
-            </ul>
-            <button
-              className={`btn w-full mt-6 ${p.popular ? 'btn-acc' : 'btn-ghost'}`}
-              onClick={() => navigate('/login')}
-            >
-              {p.code === 'team'
-                ? t('landing.pricing.cta.contact')
-                : p.code === 'free'
-                  ? t('landing.pricing.cta.free')
-                  : t('landing.pricing.cta.select', { name: t(p.name) })}
-            </button>
+      <div className="max-w-[440px] mt-8 relative border border-line-2" style={{ background: 'var(--bg2)', boxShadow: 'inset 0 2px 0 var(--acc)' }}>
+        <div className="badge badge-solid absolute top-0 right-0">{t(LICENSE_SKU.badge)}</div>
+        <div className="p-6 flex flex-col">
+          <div className="label" style={{ color: 'var(--acc)' }}>
+            {t(LICENSE_SKU.name)}
           </div>
-        ))}
+          <div className="price-num mt-4 flex items-baseline gap-3 flex-wrap">
+            <span>${(LICENSE_SKU.salePrice / 100).toFixed(0)}</span>
+            <span className="text-base font-bold text-dim line-through">
+              ${(LICENSE_SKU.price / 100).toFixed(0)}
+            </span>
+            <span className="text-base font-bold text-muted">
+              {t('landing.pricing.oneTime')}
+            </span>
+          </div>
+          <div className="text-xs mt-1.5 text-dim">
+            {t(LICENSE_SKU.tagline)} · {t(LICENSE_SKU.platforms)}
+          </div>
+          <ul className="mt-5 space-y-2 flex-1">
+            {LICENSE_SKU.features.map((f) => (
+              <li key={f} className="text-sm leading-relaxed flex gap-2 text-muted">
+                <span style={{ color: 'var(--acc)' }}>·</span>
+                {t(f)}
+              </li>
+            ))}
+          </ul>
+          <button className="btn btn-acc w-full mt-6" onClick={() => navigate('/login')}>
+            {t('landing.pricing.cta.buy')}
+          </button>
+        </div>
       </div>
       <p className="text-xs mt-4 text-dim">
         {t('landing.pricing.footnote')}

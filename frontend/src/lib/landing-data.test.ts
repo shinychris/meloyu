@@ -8,8 +8,8 @@ import {
   INSPIRE_CHIPS,
   LANDING_METRICS,
   LANDING_VERSION,
+  LICENSE_SKU,
   MODEL_CATALOG,
-  PLANS,
   SHOWCASE,
   WORKFLOW_STEPS,
 } from './landing-data'
@@ -80,22 +80,19 @@ describe('landing-data 落地页数据完整性', () => {
     }
   })
 
-  it('定价四档与 seed_data 口径一致（v0.14.0 起 USD 分值）', () => {
-    expect(PLANS.map((p) => p.code)).toEqual(['free', 'pro', 'studio', 'team'])
-    const pro = PLANS[1]
-    expect(pro.monthly).toBe(799)
-    expect(pro.yearly).toBe(639)
-    const studio = PLANS[2]
-    expect(studio.monthly).toBe(2299)
-    expect(studio.yearly).toBe(1839)
-    expect(studio.popular).toBe(true)
-    expect(PLANS[3].monthly).toBeNull()
-    for (const p of PLANS) {
-      expect(p.features.length).toBeGreaterThanOrEqual(3)
-      expect(en(p.name), p.code).toBeTruthy()
-      expect(en(p.tagline), p.code).toBeTruthy()
-      for (const f of p.features) expect(en(f), `${p.code} feature`).toBeTruthy()
-    }
+  it('授权定价与 D-1 定案一致（单档终身买断，USD 分值：$399 / 限时 $159）', () => {
+    expect(LICENSE_SKU.code).toBe('lifetime')
+    expect(LICENSE_SKU.price).toBe(39900)
+    expect(LICENSE_SKU.salePrice).toBe(15900)
+    expect(LICENSE_SKU.features.length).toBeGreaterThanOrEqual(5)
+    const fields = [
+      LICENSE_SKU.name,
+      LICENSE_SKU.tagline,
+      LICENSE_SKU.badge,
+      LICENSE_SKU.platforms,
+      ...LICENSE_SKU.features,
+    ]
+    for (const k of fields) expect(en(k), 'license field').toBeTruthy()
   })
 
   it('工作流四步与工作台 StepBar 一致', () => {
@@ -143,8 +140,7 @@ describe('landing 字典双语完整性', () => {
   })
 
   it('zh 关键口径保持现有原文', () => {
-    expect(zhMap['landing.data.plan.free.name']).toBe('免费')
-    expect(zhMap['landing.data.plan.pro.name']).toBe('个人 Pro')
+    expect(zhMap['landing.data.license.name']).toBe('Meloyu Desktop · 终身授权')
     expect(zhMap['landing.data.step.1.title']).toBe('描述灵感')
     expect(zhMap['landing.data.faq.4.q']).toBe('生成的作品可以商用吗？')
     expect(zhMap['landing.data.channel.acestep_local.name']).toBe('本机 ACE-Step v1.5')
@@ -153,8 +149,6 @@ describe('landing 字典双语完整性', () => {
   it('插值占位符在 en/zh 两侧一致', () => {
     const placeholders = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(',')
     const cases: LandingKey[] = [
-      'landing.pricing.monthly',
-      'landing.pricing.cta.select',
       'landing.footer.meta',
       'landing.footer.copyright',
     ]

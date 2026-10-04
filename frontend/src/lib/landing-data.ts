@@ -3,8 +3,8 @@
  *
  * 全部为静态内嵌：落地页必须不依赖后端即可完整渲染。
  * 通道/模型目录与 backend/app/providers/music_catalog.py 对齐；
- * 定价与 backend/app/seed_data.py PLANS_ROWS 对齐；版本号取交付报告口径（v0.7.0），
- * 并由 landing-data.test.ts 断言与 package.json version 严格同步。
+ * 定价为买断制终身授权口径（docs/06-商业化/2026-10-03-定位调整方案，D-1 定案）；
+ * 版本号取交付报告口径（v0.7.0），并由 landing-data.test.ts 断言与 package.json version 严格同步。
  *
  * i18n：所有用户可见文本字段值为字典 key（landing.data.*，见 src/i18n/en/landing.ts），
  * 类型即 TranslationKey，组件渲染处统一 t(field) 求值——语言切换即时生效，
@@ -20,7 +20,7 @@ export const LANDING_METRICS: Array<{ value: string; label: TranslationKey }> = 
   { value: '10', label: 'landing.data.metric.models' },
   { value: '15', label: 'landing.data.metric.sections' },
   { value: '4', label: 'landing.data.metric.langs' },
-  { value: '200', label: 'landing.data.metric.credits' },
+  { value: '2', label: 'landing.data.metric.platforms' },
 ]
 
 /** 灵感 chips（与 /api/v1/system/meta 枚举一致，纯展示） */
@@ -309,54 +309,34 @@ export const AUDIENCES: Array<{ title: TranslationKey; sub: TranslationKey; poin
   },
 ]
 
-/** 定价（与 seed_data.py PLANS_ROWS 对齐） */
-export const PLANS: Array<{
+/** 授权定价（买断制定位 D-1 定案：$399 终身授权、限时首发 $159；与
+ *  docs/06-商业化/2026-10-03-定位调整方案-SaaS转桌面买断制.md 对齐；USD 分值，展示侧 /100） */
+export const LICENSE_SKU: {
   code: string
   name: TranslationKey
-  monthly: number | null
-  yearly: number | null
   tagline: TranslationKey
+  badge: TranslationKey
+  platforms: TranslationKey
+  price: number
+  salePrice: number
   features: TranslationKey[]
-  popular?: boolean
-}> = [
-  {
-    code: 'free',
-    name: 'landing.data.plan.free.name',
-    monthly: 0,
-    yearly: 0,
-    tagline: 'landing.data.plan.free.tagline',
-    features: ['landing.data.plan.free.f1', 'landing.data.plan.free.f2', 'landing.data.plan.free.f3'],
-  },
-  {
-    code: 'pro',
-    name: 'landing.data.plan.pro.name',
-    monthly: 799,  // USD 分值（与 seed plans 对齐；落地页展示侧 /100）
-    yearly: 639,
-    tagline: 'landing.data.plan.pro.tagline',
-    features: ['landing.data.plan.pro.f1', 'landing.data.plan.pro.f2', 'landing.data.plan.pro.f3'],
-  },
-  {
-    code: 'studio',
-    name: 'landing.data.plan.studio.name',
-    monthly: 2299,
-    yearly: 1839,
-    tagline: 'landing.data.plan.studio.tagline',
-    features: [
-      'landing.data.plan.studio.f1',
-      'landing.data.plan.studio.f2',
-      'landing.data.plan.studio.f3',
-    ],
-    popular: true,
-  },
-  {
-    code: 'team',
-    name: 'landing.data.plan.team.name',
-    monthly: null,
-    yearly: null,
-    tagline: 'landing.data.plan.team.tagline',
-    features: ['landing.data.plan.team.f1', 'landing.data.plan.team.f2', 'landing.data.plan.team.f3'],
-  },
-]
+} = {
+  code: 'lifetime',
+  name: 'landing.data.license.name',
+  tagline: 'landing.data.license.tagline',
+  badge: 'landing.data.license.badge',
+  platforms: 'landing.data.license.platforms',
+  price: 39900,
+  salePrice: 15900,
+  features: [
+    'landing.data.license.f1',
+    'landing.data.license.f2',
+    'landing.data.license.f3',
+    'landing.data.license.f4',
+    'landing.data.license.f5',
+    'landing.data.license.f6',
+  ],
+}
 
 /** FAQ */
 export const FAQS: Array<{ q: TranslationKey; a: TranslationKey }> = [

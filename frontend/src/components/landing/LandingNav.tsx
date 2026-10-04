@@ -51,7 +51,7 @@ export default function LandingNav() {
           >
             {t('landing.nav.login')}
           </button>
-          <button className="btn btn-acc btn-sm" onClick={() => navigate('/login')}>
+          <button className="btn btn-acc btn-sm" onClick={() => scrollToSection('pricing')}>
             {t('landing.nav.cta')}
           </button>
         </div>
