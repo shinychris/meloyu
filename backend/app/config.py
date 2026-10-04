@@ -12,7 +12,13 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 REPO_DIR = BACKEND_DIR.parent
 
 API_PREFIX = "/api/v1"
-APP_VERSION = "0.15.0"
+APP_VERSION = "0.16.0"
+
+# ---- 买断制定价（D-1 定案，USD 分值；与前端 landing LICENSE_SKU / portal 一致）----
+LICENSE_PRICE_USD = 39900        # $399 终身授权
+LICENSE_SALE_PRICE_USD = 15900   # 限时首发 $159
+# 桌面版试用期天数（D-2：无免费层，14 天全功能试用）
+LICENSE_TRIAL_DAYS = 14
 
 # 模型积分单价（架构 §9.1：v1_pro=12、v1_fast=6）
 MODEL_CREDIT_COST: dict[str, int] = {"v1_pro": 12, "v1_fast": 6}
@@ -70,6 +76,12 @@ class Settings(BaseSettings):
     # 运行环境：dev（默认，本地开发）| production（启用生产断言：弱密钥拒启动、
     # 禁 demo 播种、关闭 /api/docs；见 main.py _assert_production）
     env: str = "dev"
+    # 产品形态（2026-10-03 定位转型，D-1~D-7）：
+    #   cloud      —— 云端 SaaS 形态（存量，转型过渡期保留）
+    #   desktop    —— 桌面单机版 sidecar：SQLite、单用户短路、试用期+License 激活、
+    #                 积分转纯计量、托管前端静态文件
+    #   enterprise —— 企业私有化部署：多用户 + PG（生产断言照常）+ 启动时校验 License
+    app_mode: str = "cloud"
     # 是否信任反代注入的客户端 IP 头（X-Real-IP / X-Forwarded-For）。
     # false：限流一律按 TCP 对端地址计数（直连部署防 XFF 伪造绕过）；
     # true：仅当部署在自有反代（如 deploy/nginx.conf）之后时开启——优先取
@@ -79,20 +91,16 @@ class Settings(BaseSettings):
     # dev 环境是否放行非回环来源请求（LAN 联调用；默认拒绝——demo 固定密码
     # 种子账号/开放 /api/docs 只应本机可达，见 main.py dev 来源守卫）
     allow_lan_dev: bool = False
-    # ---- Stripe 支付（D-2 决策：海外市场 Stripe；未配置时付费档不可订阅）----
-    stripe_secret_key: str = ""
-    stripe_webhook_secret: str = ""
-    # 对外可达基础 URL（Checkout 回跳/门户跳转用；如 https://app.meloyu.example）
+    # ---- License（买断制，desktop/enterprise 形态）----
+    # Ed25519 公钥（base64，32 字节原始公钥）；空 = License 激活不可用（dev 默认）。
+    # keypair 生成：python -m scripts.license_tools keygen
+    license_public_key: str = ""
+    # enterprise 形态启动必须携带的 License Key（env MELOYU_LICENSE_KEY）
+    meloyu_license_key: str = ""
+    # 桌面壳托管的 SPA 静态目录（默认 <repo>/frontend/dist；打包时由壳注入）
+    desktop_static_dir: str = ""
+    # 对外可达基础 URL（密码重置邮件链接用；如 https://www.meloyu.com）
     app_base_url: str = "http://localhost:5173"
-    # 订阅价格 ID（Stripe Dashboard 创建后填入；月/年 x pro/studio）
-    stripe_price_pro_monthly: str = ""
-    stripe_price_pro_yearly: str = ""
-    stripe_price_studio_monthly: str = ""
-    stripe_price_studio_yearly: str = ""
-    # 积分充值包（一次性）：金额美分 → 积分（默认值可按运营调整）
-    stripe_topup_price: str = ""
-    stripe_topup_amount_usd: int = 999   # $9.99
-    stripe_topup_credits: int = 1000
     # ---- SMTP 邮件（找回密码/注册验证码；未配置 host 时相关功能禁用）----
     smtp_host: str = ""
     smtp_port: int = 587
@@ -131,10 +139,25 @@ class Settings(BaseSettings):
     audiocpp_home: str = ""
 
     @property
+    def billing_mode(self) -> str:
+        """商业化模式：license（买断制，desktop/enterprise）| subscription（云端订阅，存量）。"""
+        return "license" if self.app_mode in ("desktop", "enterprise") else "subscription"
+
+    @property
     def data_path(self) -> Path:
         if self.data_dir:
             return Path(self.data_dir).resolve()
+        # 桌面形态默认数据目录迁至用户主目录（B9：随包只带代码不带数据）
+        if self.app_mode == "desktop":
+            return (Path.home() / "Meloyu").resolve()
         return (BACKEND_DIR / "data").resolve()
+
+    @property
+    def static_path(self) -> Path | None:
+        """桌面壳 SPA 静态目录（B8：sidecar 同源托管前端；不存在返回 None）。"""
+        raw = self.desktop_static_dir or str(REPO_DIR / "frontend" / "dist")
+        p = Path(raw)
+        return p.resolve() if p.is_dir() else None
 
     @property
     def db_path(self) -> Path:

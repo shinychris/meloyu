@@ -136,6 +136,21 @@ def check_generation_content(payload: dict) -> None:
     check_ip_protection(text)
 
 
+def check_generation_entitlement(db: Session, user: User) -> None:
+    """生成/派生提交的档位权益闸门（2026-10-03 B12）。
+
+    - license 模式（desktop/enterprise）：试用期闸门——未激活且试用到期 → 40203
+      （D-2：无免费层，14 天全功能试用；激活/试用期内全放行）；
+    - subscription 模式（cloud 存量）：免费档每日生成限额。
+    """
+    from app.config import settings
+    if settings.billing_mode == "license":
+        from app.services import license as license_svc
+        license_svc.ensure_generation_allowed(db)
+        return
+    check_free_daily_limit(db, user)
+
+
 def check_free_daily_limit(db: Session, user: User) -> None:
     """免费档每日生成限额（含 extend/variant/regen-section 派生任务）。"""
     if user.plan != "free":
@@ -235,7 +250,7 @@ def _check_maintenance() -> None:
 def submit_generation(db: Session, user: User, payload: dict) -> dict:
     _check_maintenance()
     check_generation_content(payload)
-    check_free_daily_limit(db, user)
+    check_generation_entitlement(db, user)
     check_account_hourly_limit(db, user)
     check_inflight_limit(db, user)
     check_storage_quota(db, user)

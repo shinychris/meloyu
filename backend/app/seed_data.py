@@ -207,6 +207,29 @@ def is_seeded(db) -> bool:
     return db.execute(select(User.id).where(User.email == DEMO_EMAIL)).fetchone() is not None
 
 
+def ensure_plans_seeded(db) -> int:
+    """仅灌 plans 档位行（desktop 形态启动用：配额/导出闸门查表无回退歧义）。
+
+    与 run_seed 不同：不建 demo 用户、不渲染音频——桌面首启秒级完成。
+    返回实际插入的行数（幂等）。
+    """
+    from app.models import Plan
+    ts = "2026-08-01T00:00:00Z"
+    added = 0
+    for row in PLANS_ROWS:
+        if db.get(Plan, row[0]) is None:
+            db.add(Plan(code=row[0], name=row[1], price_monthly=row[2], price_yearly=row[3],
+                        daily_generations=row[4], monthly_credits=row[5], max_export=row[6],
+                        commercial_license=row[7], watermark=row[8], switchable=row[9],
+                        sort_order=row[10], features=row[11],
+                        max_concurrent_tasks=row[12], storage_quota_mb=row[13],
+                        created_at=ts, updated_at=ts))
+            added += 1
+    if added:
+        db.commit()
+    return added
+
+
 def disable_seed_demo_accounts() -> int:
     """生产启动自愈：禁用库中残留的固定密码种子账号（安审计 H-1，2026-09-09）。
 

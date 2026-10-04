@@ -60,7 +60,6 @@ setuptools==84.0.0
 shellingham==1.5.4
 soundfile==0.14.0
 starlette==1.6.0
-stripe==15.6.1
 sympy==1.14.0
 tokenizers==0.23.1
 torch==2.13.0

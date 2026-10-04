@@ -22,6 +22,9 @@ setup_logging()
 
 # P0-5：生产环境关闭交互式 API 文档（信息收敛）；dev 保持可用
 _is_production = settings.env.strip().lower() == "production"
+# 2026-10-03 定位转型：desktop（单机 sidecar）/ enterprise（私有化）形态标记
+_is_desktop = settings.app_mode == "desktop"
+_is_enterprise = settings.app_mode == "enterprise"
 
 app = FastAPI(title="Meloyu API", version=APP_VERSION,
               docs_url=None if _is_production else "/api/docs",
@@ -42,24 +45,19 @@ def _assert_production() -> None:
     if not settings.key_encryption_secret:
         problems.append("KEY_ENCRYPTION_SECRET 为空——llm_settings 中的第三方 API Key "
                         "将明文落库；生产必须配置 Fernet 密钥（openssl rand -base64 32）")
-    # v0.10.2：APP_BASE_URL 指向 localhost 时 Stripe 回跳/密码重置邮件链接会指到
+    # v0.10.2：APP_BASE_URL 指向 localhost 时密码重置邮件链接会指到
     # 开发地址（不拒启：反代/本地生产栈可合法回环，但必须可见地告警）
     if "localhost" in settings.app_base_url or "127.0.0.1" in settings.app_base_url:
         logger.warning(f"APP_BASE_URL 指向本机地址（{settings.app_base_url}）——"
-                       "对外部署时 Stripe 回跳与密码重置链接将不可达，请在 .env 配置对外域名")
+                       "对外部署时密码重置链接将不可达，请在 .env 配置对外域名")
     # v0.15.0：生产数据库必须为 PostgreSQL（SQLite 单写入方约束与两次库损坏
     # 事故的根治项；SQLite 回退仅限本机开发）——DATABASE_URL 未配置或非 PG 拒启
     if engine.dialect.name != "postgresql":
         problems.append("DATABASE_URL 未配置 PostgreSQL 连接串——v0.15.0 起生产强制 "
                         "PostgreSQL（本地栈由 compose 的 postgres 服务提供，云端可用 "
                         "Supabase；SQLite 仅限本机开发回退）")
-    # v0.13.0 审计 M-2 延伸（2026-09-26 P2-13）：支付/邮件"半配置"静默通过是
-    # 公网配置期的高危窗口——Stripe 只配了 secret 没配 webhook 时，用户支付
-    # 成功、验签全拒、积分不入账（资金事故）；开了邮箱验证没配 SMTP 时注册
-    # 入口直接不可用。一律 fail-fast。
-    if settings.stripe_secret_key and not settings.stripe_webhook_secret:
-        problems.append("STRIPE_SECRET_KEY 已配置但 STRIPE_WEBHOOK_SECRET 为空——"
-                        "支付回调无法验签（用户付款后不入账），必须成对配置")
+    # v0.13.0 审计 M-2 延伸（2026-09-26 P2-13）：邮件"半配置"静默通过是
+    # 公网配置期的高危窗口——开了邮箱验证没配 SMTP 时注册入口直接不可用。
     if settings.email_verification_enabled and not settings.smtp_host:
         problems.append("EMAIL_VERIFICATION_ENABLED=true 但 SMTP_HOST 为空——"
                         "注册验证码发不出，注册入口不可用；请配置 SMTP 或关闭验证")
@@ -210,6 +208,9 @@ app.include_router(api_router, prefix=API_PREFIX)
 def _startup() -> None:
     if _is_production:
         _assert_production()
+    # enterprise 形态：启动即校验 License（fail-fast，防未授权部署）
+    from app.services.license import assert_enterprise_license
+    assert_enterprise_license()
     # import 顺序保证全部模型注册到同一 Base.metadata
     from app import models  # noqa: F401
     from app.core.tasks import recover_zombie_tasks
@@ -239,6 +240,15 @@ def _startup() -> None:
     from app.database import SessionLocal
     with SessionLocal() as db:
         purge_expired(db)
+        if _is_desktop:
+            # B6/B1：桌面首启——仅灌 plans 档位行（配额/导出闸门查表），自动建档
+            # 本地用户（随机密码+is_admin，模型中心即用户配置面），同时落试用起点
+            from app.seed_data import ensure_plans_seeded
+            from app.services.desktop import ensure_local_user
+            ensure_plans_seeded(db)
+            local = ensure_local_user(db)
+            logger.info(f"desktop mode: local profile ready (user={local.email}, "
+                        f"plan={local.plan}, data at {settings.data_path})")
     # P0-9（2026-09-26）：清扫不再挂列表读路径，改守护线程定时全量触发
     from app.services.works import start_periodic_purge
     start_periodic_purge()
@@ -250,9 +260,10 @@ def _startup() -> None:
         logger.info(f"startup: recovered {recovered} zombie tasks")
     # 首次启动（无 demo 账号）时后台线程灌种子（渲染音频耗时数分钟，不阻塞启动）
     # P0-5/D-6：生产环境禁用演示账号自动播种（固定密码账号=后门）
+    # 2026-10-03：desktop 形态跳过演示播种（首启秒级、无固定密码账号）
     from app.seed_data import ensure_seeded_in_background
-    if _is_production:
-        logger.warning("production env: demo seeding skipped (fixed-password accounts disabled)")
+    if _is_production or _is_desktop:
+        logger.warning("seed demo accounts skipped (production/desktop startup)")
     else:
         ensure_seeded_in_background()
 
@@ -260,3 +271,11 @@ def _startup() -> None:
 @app.on_event("startup")
 async def on_startup() -> None:
     _startup()
+
+
+# B8：桌面形态 sidecar 同源托管前端 SPA（StaticFiles html=True 兜底 / → index.html；
+# HashRouter 无服务端路由重写需求）。API 路由已先注册，mount("/") 只接剩余流量。
+if _is_desktop and settings.static_path is not None:
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory=str(settings.static_path), html=True),
+              name="spa")

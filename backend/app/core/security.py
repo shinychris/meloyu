@@ -131,9 +131,25 @@ def _extract_bearer(request: Request) -> str | None:
     return token or None
 
 
+def _desktop_local_user(db: Session) -> User | None:
+    """B6：desktop 形态免登录短路——无凭证请求直接以本地档案身份放行。
+
+    本地实例（数据/JWT 密钥均在用户机器上）不存在服务端信任边界，账号体系
+    整体短路；未建档时返回 None（首启建档在 main._startup 完成）。
+    """
+    if settings.app_mode != "desktop":
+        return None
+    from app.services.desktop import get_local_user
+    return get_local_user(db)
+
+
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     token = _extract_bearer(request)
     if not token:
+        local = _desktop_local_user(db)
+        if local is not None:
+            request.state.request_id = current_request_id()
+            return local
         raise err_unauthenticated()
     payload = decode_access_token(token)
     user_id = payload.get("sub")
@@ -160,9 +176,12 @@ def get_user_from_api_key(request: Request, db: Session = Depends(get_db)) -> tu
 
 def get_current_user_optional(request: Request, db: Session = Depends(get_db)) -> User | None:
     """可选鉴权：无 Authorization 头返回 None（供 ?st= 流地址端点）；
-    有头但无效仍然抛 40101/40102。"""
+    有头但无效仍然抛 40101/40102。desktop 形态无头时短路为本地档案。"""
     token = _extract_bearer(request)
     if not token:
+        local = _desktop_local_user(db)
+        if local is not None:
+            return local
         return None
     payload = decode_access_token(token)
     user_id = payload.get("sub")

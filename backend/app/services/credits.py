@@ -1,4 +1,10 @@
-"""积分服务：原子扣减/退款/发放 + 月度发放惰性触发 + 流水查询。"""
+"""积分服务：原子扣减/退款/发放 + 流水查询。
+
+2026-10-03 定位转型（B5）：license 模式（desktop/enterprise）下积分转为
+**纯用量计量**——只记流水不扣减不拒绝（本地引擎成本=用户本机算力，云通道
+成本=用户自有 Key，平台无需成本对冲）；subscription 模式（cloud 存量）保持
+真实扣减语义。
+"""
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -6,10 +12,15 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.core.errors import err_payment_required
 from app.core.i18n import tr
 from app.models import CreditTransaction, Plan, User
 from app.models.base import utc_now_iso
+
+
+def _metering_mode() -> bool:
+    return settings.billing_mode == "license"
 
 
 def _add_transaction(db: Session, user_id: str, delta: int, reason: str,
@@ -20,9 +31,17 @@ def _add_transaction(db: Session, user_id: str, delta: int, reason: str,
 
 def atomic_deduct(db: Session, user_id: str, amount: int, reason: str,
                   ref_task_id: str | None) -> int:
-    """原子扣减：UPDATE ... WHERE balance >= amount；失败抛 40201。"""
+    """原子扣减：UPDATE ... WHERE balance >= amount；失败抛 40201。
+
+    license 模式（B5）：只记用量流水（delta 为真实成本，便于统计），不扣减
+    余额、不拒绝请求。
+    """
     if amount <= 0:
         return _get_balance(db, user_id)
+    if _metering_mode():
+        balance = _get_balance(db, user_id)
+        _add_transaction(db, user_id, -amount, reason, ref_task_id, balance)
+        return balance
     result = db.execute(
         text("UPDATE users SET credit_balance = credit_balance - :amt, updated_at = :now "
              "WHERE id = :uid AND credit_balance >= :amt"),
@@ -74,21 +93,6 @@ def grant(db: Session, user: User, amount: int, reason: str,
     return user.credit_balance
 
 
-def deduct_refund(db: Session, user: User, amount: int) -> int:
-    """支付退款后的积分扣回：余额不足时扣至 0（不为负，CHECK 约束保护）。"""
-    if amount <= 0:
-        return user.credit_balance
-    actual = min(amount, user.credit_balance)
-    db.execute(
-        text("UPDATE users SET credit_balance = credit_balance - :amt, updated_at = :now "
-             "WHERE id = :uid AND credit_balance >= :amt"),
-        {"amt": actual, "uid": user.id, "now": utc_now_iso()},
-    )
-    db.refresh(user)
-    _add_transaction(db, user.id, -actual, "refund", None, user.credit_balance)
-    return user.credit_balance
-
-
 def lazy_monthly_grant(db: Session, user: User) -> None:
     """月度发放惰性触发：next_grant_at 已过则按当前档位发放并顺延。
 
@@ -97,13 +101,11 @@ def lazy_monthly_grant(db: Session, user: User) -> None:
     credit_next_grant_at <= now 仅首个请求能顺延水位（rowcount=0 即并发已
     发放，直接返回），再入账。
 
-    P0-1（2026-09-26 商业化审查）单时钟：Stripe 订阅用户的月度积分只由
-    invoice.paid（续期发票）驱动，本地时钟不参与——激活时本就不武装水位，
-    此处再挡一层历史存量已武装的行（旧库迁移防御），见到即拆除。
+    2026-10-03：license 模式无月度发放（积分=纯计量），见到历史武装水位即拆除。
     """
     if not user.credit_next_grant_at:
         return
-    if _has_active_stripe_subscription(db, user.id):
+    if _metering_mode():
         user.credit_next_grant_at = None
         db.flush()
         return
@@ -125,15 +127,6 @@ def lazy_monthly_grant(db: Session, user: User) -> None:
     user.credit_next_grant_at = next_at
     user.credit_monthly_grant = monthly
     db.flush()
-
-
-def _has_active_stripe_subscription(db: Session, user_id: str) -> bool:
-    from app.models import Subscription
-    return db.execute(
-        select(Subscription.id).where(
-            Subscription.user_id == user_id, Subscription.status == "active",
-            Subscription.source == "stripe").limit(1)
-    ).first() is not None
 
 
 def _next_month_first_day(offset_months: int = 1) -> str:

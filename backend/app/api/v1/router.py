@@ -3,13 +3,13 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     auth,
-    billing,
     candidates,
     credits,
     exports,
     files,
     generations,
     hum,
+    licenses,
     lyrics,
     market,
     models,
@@ -28,7 +28,7 @@ from app.api.v1 import (
 api_router = APIRouter()
 
 api_router.include_router(auth.router)
-api_router.include_router(billing.router)
+api_router.include_router(licenses.router)
 api_router.include_router(generations.router)
 api_router.include_router(tasks.router)
 api_router.include_router(candidates.router)

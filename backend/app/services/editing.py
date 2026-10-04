@@ -160,7 +160,7 @@ def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
                 details=[{"field": "occurrence", "message": f"1-{n_occ}"}])
         extra = f"{section}:{occurrence}"
 
-    gen_svc.check_free_daily_limit(db, user)  # 派生同样计入免费档每日生成限额
+    gen_svc.check_generation_entitlement(db, user)  # 派生任务同受权益闸门约束（B12）
 
     seed = derive_op_seed(cand.seed, op, extra)
     now = utc_now_iso()

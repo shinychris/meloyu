@@ -1,28 +1,32 @@
-"""auth 账号体系（P1-3）+ Stripe webhook（P1-1）+ switch_plan 止血（P0-4）单测。
+"""auth 账号体系（P1-3）+ 买断制 License（B2/B12）+ 计量模式（B5）单测。
+
+2026-10-03 定位转型：Stripe 订阅链路已拆除（B3），本文件覆盖——
+- 账号体系（注册/刷新轮换/改密/注销/导出）行为不变；
+- License Ed25519 签发/验签/激活/幂等/解除；
+- 试用闸门（D-2：14 天试用，到期未激活 40203 拦截生成/导出）；
+- license 模式积分纯计量（不扣减不拒绝）+ 月度发放水位拆除；
+- switch_plan 在 cloud/license 两模式下的引导语义。
 
 运行：.venv/Scripts/python.exe -m unittest discover -s tests -v
 全部走内存 SQLite（services 层直调，不起 HTTP 服务）。
 """
 from __future__ import annotations
 
-import hashlib
-import hmac
 import json
-import time
 import unittest
-from unittest import mock
 
-from tests.db import new_test_engine, reset_db
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401 —— 注册全部表
 from app.config import settings
 from app.core.errors import BizError
-from app.models import Base, CreditTransaction, Order, Plan, StripeEvent, Subscription, User
+from app.models import CreditTransaction, Plan, Subscription, User
 from app.models.base import utc_now_iso
 from app.services import auth as auth_svc
 from app.services import billing as billing_svc
-from app.services import stripe_billing
+from app.services import license as license_svc
+from tests.db import new_test_engine, reset_db
+
 
 class _DBTestCase(unittest.TestCase):
     """每个用例独立内存库。"""
@@ -52,6 +56,7 @@ class _DBTestCase(unittest.TestCase):
     def tearDown(self):
         self.db.close()
 
+
 class TestAuthFlow(_DBTestCase):
     EMAIL = "u1@test.local"
 
@@ -69,7 +74,7 @@ class TestAuthFlow(_DBTestCase):
             settings.admin_emails = ""
         user = self.db.query(User).filter(User.email == self.EMAIL).one()
         self.assertTrue(user.is_admin)
-        self.assertEqual(user.credit_balance, settings and 200)
+        self.assertEqual(user.credit_balance, 200)
         self.assertTrue(out["access_token"])
         self.assertTrue(refresh)
         self.assertNotIn("refresh_token", out, "refresh 必须走 HttpOnly Cookie，不进响应体")
@@ -87,10 +92,6 @@ class TestAuthFlow(_DBTestCase):
         again, again_refresh, _ = auth_svc.refresh(self.db, new_refresh)
         self.assertTrue(again["access_token"])
         self.assertTrue(again_refresh)
-
-    def _login_refresh(self) -> str:
-        out, refresh, _ttl = auth_svc.login(self.db, self.EMAIL, "Passw0rd123")
-        return refresh
 
     def test_logout_revokes(self):
         self._register()
@@ -150,8 +151,9 @@ class TestAuthFlow(_DBTestCase):
             data = json.loads(zf.read("meloyu-data-export.json"))
         self.assertEqual(data["profile"]["email"], self.EMAIL)
 
-class TestSwitchPlanHardening(_DBTestCase):
-    """P0-4：付费档不可白拿（无论 Stripe 是否配置，switch 都不发付费档）。"""
+
+class TestSwitchPlanSemantics(_DBTestCase):
+    """B4：订阅停售（cloud）→ 40901 转型公告；license 模式 → 40901 引导激活。"""
 
     def _user(self, plan="free"):
         from app.core.security import hash_password
@@ -162,27 +164,25 @@ class TestSwitchPlanHardening(_DBTestCase):
         self.db.commit()
         return u
 
-    def test_paid_switch_rejected_without_stripe(self):
-        settings.stripe_secret_key = ""
+    def test_cloud_paid_switch_rejected(self):
         user = self._user()
         with self.assertRaises(BizError) as ctx:
             billing_svc.switch_plan(self.db, user, "pro")
         self.assertEqual(ctx.exception.code, 40901)
+        self.assertEqual(user.plan, "free")
+        self.assertEqual(
+            self.db.query(Subscription).filter(Subscription.plan == "studio").count(), 0)
 
-    def test_paid_switch_rejected_even_with_stripe(self):
-        settings.stripe_secret_key = "sk_test_dummy"
+    def test_license_mode_switch_guided_to_activation(self):
+        old = settings.app_mode
+        settings.app_mode = "desktop"
         try:
             user = self._user()
             with self.assertRaises(BizError) as ctx:
                 billing_svc.switch_plan(self.db, user, "studio")
             self.assertEqual(ctx.exception.code, 40901)
-            # 没有订阅行、没有积分、档位未变
-            self.assertEqual(user.plan, "free")
-            self.assertEqual(
-                self.db.query(Subscription).filter(
-                    Subscription.plan == "studio").count(), 0)
         finally:
-            settings.stripe_secret_key = ""
+            settings.app_mode = old
 
     def test_downgrade_to_free_allowed(self):
         user = self._user(plan="studio")
@@ -194,298 +194,159 @@ class TestSwitchPlanHardening(_DBTestCase):
         out = billing_svc.switch_plan(self.db, user, "free")
         self.assertEqual(out["plan"], "free")
 
-class TestStripeWebhook(_DBTestCase):
-    """webhook 验签 + 事件处理（不发起真实 Stripe 调用）。"""
+    def test_list_plans_carries_license_block(self):
+        user = self._user()
+        out = billing_svc.list_plans(self.db, user)
+        self.assertEqual(out["mode"], "subscription")
+        self.assertEqual(out["license"]["price_usd"], 39900)
+        self.assertEqual(out["license"]["sale_price_usd"], 15900)
 
-    SECRET = "whsec_test_dummy"
+
+class TestLicenseLifecycle(_DBTestCase):
+    """B2：Ed25519 签发/验签/激活/幂等/解除 + B12 试用闸门 + B6 桌面注册闸。"""
 
     def setUp(self):
         super().setUp()
-        self._old_secret = settings.stripe_secret_key
-        self._old_wh = settings.stripe_webhook_secret
-        settings.stripe_secret_key = "sk_test_dummy"
-        settings.stripe_webhook_secret = self.SECRET
-        # v0.14.0 起幂等去重走 stripe_events 表（持久层），无进程内缓存可清
+        self._old = (settings.app_mode, settings.license_public_key)
+        self.priv, self.pub = license_svc.generate_keypair()
+        settings.license_public_key = self.pub
+        settings.app_mode = "desktop"
         ts = utc_now_iso()
-        self.user = User(email="pay@t.local", password_hash="x" * 60, nickname="p",
-                         plan="free", created_at=ts, updated_at=ts)
+        self.user = User(email="buyer@t.local", password_hash="x" * 60, nickname="b",
+                         plan="studio", created_at=ts, updated_at=ts)
         self.db.add(self.user)
         self.db.commit()
 
     def tearDown(self):
-        settings.stripe_secret_key = self._old_secret
-        settings.stripe_webhook_secret = self._old_wh
+        settings.app_mode, settings.license_public_key = self._old
         super().tearDown()
 
-    def _sign(self, payload: bytes) -> str:
-        t = str(int(time.time()))
-        mac = hmac.new(self.SECRET.encode(), f"{t}.".encode() + payload,
-                       hashlib.sha256).hexdigest()
-        return f"t={t},v1={mac}"
+    def _issue(self, tier="lifetime", **extra) -> str:
+        import time
+        import uuid
+        payload = {"lid": uuid.uuid4().hex, "tier": tier, "devices": 3,
+                   "iat": int(time.time()), "note": "buyer@t.local"}
+        payload.update(extra)
+        return license_svc.sign_license(payload, self.priv)
 
-    def _event(self, etype: str, obj: dict, event_id: str) -> bytes:
-        return json.dumps({"id": event_id, "type": etype, "data": {"object": obj}}).encode()
+    def test_keypair_roundtrip(self):
+        key = self._issue()
+        payload = license_svc.verify_license_key(key)
+        self.assertEqual(payload["tier"], "lifetime")
+        self.assertEqual(payload["devices"], 3)
 
-    def test_signature_rejected(self):
-        payload = self._event("checkout.session.completed", {"id": "cs_x"}, "evt_1")
-        with self.assertRaises(BizError):
-            stripe_billing.verify_and_parse_webhook(payload, "t=1,v1=bad")
+    def test_bad_signature_rejected(self):
+        key = self._issue()
+        body, sig = key.split(".")[1], key.split(".")[2]
+        tampered = f"v1.{body}.{'A' if not sig.startswith('A') else 'B'}{sig[1:]}"
+        with self.assertRaises(BizError) as ctx:
+            license_svc.verify_license_key(tampered)
+        self.assertEqual(ctx.exception.code, 40202)
 
-    def test_topup_paid_grants_credits_and_idempotent(self):
-        order = Order(user_id=self.user.id, kind="topup", credits=1000,
-                      amount_usd=999, status="pending",
-                      stripe_checkout_id="cs_test_topup_1",
-                      created_at=utc_now_iso(), updated_at=utc_now_iso())
-        self.db.add(order)
+    def test_garbage_key_rejected(self):
+        for bad in ("", "not-a-key", "v2.abc.def", "v1.only-two"):
+            with self.assertRaises(BizError):
+                license_svc.verify_license_key(bad)
+
+    def test_activate_sets_state_and_plan(self):
+        key = self._issue()
+        out = license_svc.activate(self.db, key, user=self.user)
+        self.assertTrue(out["activated"])
+        self.assertEqual(out["license"]["tier"], "lifetime")
+        self.db.refresh(self.user)
+        self.assertEqual(self.user.plan, "studio")
+        # 幂等：重复激活同一 Key 不报错不重复写
+        out2 = license_svc.activate(self.db, key, user=self.user)
+        self.assertTrue(out2["activated"])
+
+    def test_activate_enterprise_tier_maps_team(self):
+        key = self._issue(tier="enterprise", seats=20)
+        license_svc.activate(self.db, key, user=self.user)
+        self.db.refresh(self.user)
+        self.assertEqual(self.user.plan, "team")
+
+    def test_deactivate_restores_trial_gate_semantics(self):
+        key = self._issue()
+        license_svc.activate(self.db, key, user=self.user)
+        out = license_svc.deactivate(self.db)
+        self.assertFalse(out["activated"])
+        self.assertFalse(out["trial"]["expired"], "刚起的试用未到期")
+
+    def test_trial_gate_blocks_after_expiry_until_activated(self):
+        state = license_svc.get_state(self.db)
+        state.trial_started_at = "2020-01-01T00:00:00Z"  # 早已到期
         self.db.commit()
-        payload = self._event("checkout.session.completed", {
-            "id": "cs_test_topup_1", "customer": "cus_test_1",
-            "metadata": {"order_id": order.id, "user_id": self.user.id,
-                         "kind": "topup", "credits": "1000"},
-        }, "evt_topup_1")
-        event = stripe_billing.verify_and_parse_webhook(payload, self._sign(payload))
-        out = stripe_billing.handle_webhook_event(self.db, event)
-        self.assertTrue(out["received"])
-        self.db.refresh(order)
-        self.db.refresh(self.user)
-        self.assertEqual(order.status, "paid")
-        self.assertEqual(self.user.credit_balance, 1000)
-        self.assertEqual(
-            self.db.query(CreditTransaction).filter(
-                CreditTransaction.reason == "topup").count(), 1)
-        # 重放同一事件：幂等
-        out2 = stripe_billing.handle_webhook_event(
-            self.db, stripe_billing.verify_and_parse_webhook(payload, self._sign(payload)))
-        self.assertTrue(out2.get("duplicate"))
-        self.db.refresh(self.user)
-        self.assertEqual(self.user.credit_balance, 1000)
+        with self.assertRaises(BizError) as ctx:
+            license_svc.ensure_generation_allowed(self.db)
+        self.assertEqual(ctx.exception.code, 40203)
+        # 激活后放行
+        license_svc.activate(self.db, self._issue(), user=self.user)
+        license_svc.ensure_generation_allowed(self.db)  # 不抛即通过
 
-    def test_subscription_activation_and_cancellation(self):
-        order = Order(user_id=self.user.id, kind="subscription", plan="pro",
-                      interval="monthly", credits=0, amount_usd=58, status="pending",
-                      stripe_checkout_id="cs_test_sub_1",
-                      created_at=utc_now_iso(), updated_at=utc_now_iso())
-        self.db.add(order)
+    def test_trial_gate_allows_within_trial(self):
+        license_svc.ensure_generation_allowed(self.db)  # 刚建档：试用期内，不抛
+
+    def test_trial_gate_inert_in_cloud_mode(self):
+        settings.app_mode = "cloud"
+        state = license_svc.get_state(self.db)
+        state.trial_started_at = "2020-01-01T00:00:00Z"
         self.db.commit()
-        payload = self._event("checkout.session.completed", {
-            "id": "cs_test_sub_1", "customer": "cus_test_2",
-            "subscription": "sub_test_1",
-            "metadata": {"order_id": order.id, "user_id": self.user.id,
-                         "kind": "subscription", "plan": "pro"},
-        }, "evt_sub_1")
-        event = stripe_billing.verify_and_parse_webhook(payload, self._sign(payload))
-        stripe_billing.handle_webhook_event(self.db, event)
-        self.db.refresh(self.user)
-        self.assertEqual(self.user.plan, "pro")
-        self.assertEqual(self.user.credit_balance, 2500)
-        sub = self.db.query(Subscription).filter(
-            Subscription.user_id == self.user.id,
-            Subscription.status == "active").one()
-        self.assertEqual(sub.source, "stripe")
+        license_svc.ensure_generation_allowed(self.db)  # cloud 模式不适用，不抛
 
-        # 订阅取消 → 降级 free
-        payload2 = self._event("customer.subscription.deleted",
-                               {"id": "sub_test_1"}, "evt_sub_del")
-        stripe_billing.handle_webhook_event(
-            self.db, stripe_billing.verify_and_parse_webhook(payload2, self._sign(payload2)))
-        self.db.refresh(self.user)
-        self.assertEqual(self.user.plan, "free")
-        self.assertEqual(
-            self.db.query(Subscription).filter(
-                Subscription.user_id == self.user.id,
-                Subscription.status == "active").count(), 0)
+    def test_desktop_register_guard(self):
+        with self.assertRaises(BizError) as ctx:
+            auth_svc.register(self.db, "new@t.local", "Passw0rd123", "n")
+        self.assertEqual(ctx.exception.code, 40901)
 
-    def test_refund_deducts_credits(self):
-        self.user.credit_balance = 800
-        self.db.commit()
-        order = Order(user_id=self.user.id, kind="topup", credits=1000,
-                      amount_usd=999, status="paid",
-                      stripe_checkout_id="cs_test_refund_1",
-                      created_at=utc_now_iso(), updated_at=utc_now_iso())
-        self.db.add(order)
-        self.db.commit()
-        payload = self._event("charge.refunded", {
-            "amount_refunded": 999,
-            "metadata": {"checkout_session_id": "cs_test_refund_1",
-                         "user_id": self.user.id},
-        }, "evt_refund_1")
-        stripe_billing.handle_webhook_event(
-            self.db, stripe_billing.verify_and_parse_webhook(payload, self._sign(payload)))
-        self.db.refresh(self.user)
-        self.db.refresh(order)
-        self.assertEqual(order.status, "refunded")
-        self.assertEqual(self.user.credit_balance, 0, "余额不足扣至 0，不为负")
+    def test_status_dict_shape(self):
+        out = license_svc.status_dict(self.db)
+        self.assertEqual(out["mode"], "desktop")
+        self.assertEqual(out["billing_mode"], "license")
+        self.assertFalse(out["activated"])
+        self.assertEqual(out["trial"]["days"], 14)
+        self.assertEqual(out["price_usd"], 39900)
+        self.assertTrue(out["device_id"])
 
-class TestFundingLoopP0(_DBTestCase):
-    """v0.14.0 资金闭环修复回归（P0-1/2/3/5 + P1-4/5）。
 
-    - P0-2：事件表持久幂等 + 异常不吞（异常不落标记，可重试）
-    - P0-1：单时钟——invoice.paid 只在续期发票发放；stripe 订阅用户本地水位不武装
-    - P0-3：payment_failed / subscription.updated(past_due / 换档 / canceled)
-    - P1-5：订阅退款降级+追回
-    - P0-5：checkout 完成回填实收金额/币种
-    """
+class TestLicenseMetering(_DBTestCase):
+    """B5：license 模式积分纯计量（记账不扣减不拒绝）+ 水位拆除。"""
 
     def setUp(self):
         super().setUp()
-        self._old_secret = settings.stripe_secret_key
-        settings.stripe_secret_key = "sk_test_dummy"
+        self._old = settings.app_mode
+        settings.app_mode = "desktop"
+        from app.core.security import hash_password
         ts = utc_now_iso()
-        self.user = User(email="loop@t.local", password_hash="x" * 60, nickname="l",
-                         plan="free", credit_balance=0, created_at=ts, updated_at=ts)
+        self.user = User(email="m@t.local", password_hash=hash_password("Passw0rd123"),
+                         nickname="m", plan="studio", credit_balance=0,
+                         created_at=ts, updated_at=ts)
         self.db.add(self.user)
         self.db.commit()
 
     def tearDown(self):
-        settings.stripe_secret_key = self._old_secret
+        settings.app_mode = self._old
         super().tearDown()
 
-    def _emit(self, etype: str, obj: dict, event_id: str) -> dict:
-        return stripe_billing.handle_webhook_event(self.db, {"id": event_id,
-                                                             "type": etype,
-                                                             "data": {"object": obj}})
-
-    def _activate_via_checkout(self, sub_id: str = "sub_L1", plan: str = "pro") -> Order:
-        order = Order(user_id=self.user.id, kind="subscription", plan=plan,
-                      interval="monthly", credits=0, amount_usd=799, currency="usd",
-                      status="pending", stripe_checkout_id=f"cs_{sub_id}",
-                      created_at=utc_now_iso(), updated_at=utc_now_iso())
-        self.db.add(order)
-        self.db.commit()
-        with mock.patch.object(stripe_billing, "_cancel_other_stripe_subscriptions"):
-            self._emit("checkout.session.completed", {
-                "id": f"cs_{sub_id}", "customer": "cus_L", "subscription": sub_id,
-                "amount_total": 799, "currency": "usd",
-                "metadata": {"order_id": order.id, "user_id": self.user.id,
-                             "kind": "subscription", "plan": plan},
-            }, f"evt_co_{sub_id}")
-        self.db.refresh(order)
-        self.db.refresh(self.user)
-        return order
-
-    # ---- P0-2 ----
-
-    def test_event_idempotent_via_table_and_exception_not_marked(self):
-        order = Order(user_id=self.user.id, kind="topup", credits=500,
-                      amount_usd=999, status="pending", stripe_checkout_id="cs_E1",
-                      created_at=utc_now_iso(), updated_at=utc_now_iso())
-        self.db.add(order)
-        self.db.commit()
-        ev = {"id": "evt_E1", "type": "checkout.session.completed",
-              "data": {"object": {"id": "cs_E1", "amount_total": 999,
-                                  "metadata": {"order_id": order.id}}}}
-        out = stripe_billing.handle_webhook_event(self.db, ev)
-        self.assertTrue(out["received"])
-        self.db.refresh(order)
-        self.assertEqual(order.status, "paid")
-        self.assertEqual(order.amount_usd, 999)  # P0-5：回填 Stripe 实收
-        self.assertEqual(order.currency, "usd")
-        # 重放（进程"重启"后查表）→ duplicate，不重复发放
-        out2 = stripe_billing.handle_webhook_event(self.db, ev)
-        self.assertTrue(out2.get("duplicate"))
-        # 异常路径：handler 抛错 → 事件不落表 + 异常上抛（5xx → Stripe 重试）
-        ev_bad = {"id": "evt_E2", "type": "checkout.session.completed",
-                  "data": {"object": {"id": "cs_MISSING",
-                                      "metadata": {"order_id": order.id}}}}
-        with mock.patch.object(stripe_billing, "_on_checkout_completed",
-                               side_effect=RuntimeError("db down")):
-            with self.assertRaises(RuntimeError):
-                stripe_billing.handle_webhook_event(self.db, ev_bad)
-        self.assertIsNone(self.db.get(StripeEvent, "evt_E2"),
-                          "异常事件绝不能落表（否则 Stripe 重试被吞）")
-        self.assertIsNotNone(self.db.get(StripeEvent, "evt_E1"))
-
-    # ---- P0-1 单时钟 ----
-
-    def test_single_clock_activation_disarms_and_invoice_filters_reason(self):
-        self._activate_via_checkout()
-        self.assertEqual(self.user.plan, "pro")
-        self.assertEqual(self.user.credit_balance, 2500)  # 首期激活发放
-        self.assertIsNone(self.user.credit_next_grant_at, "stripe 订阅本地水位不武装")
-        # 首期发票（subscription_create）到达：不得再发（原双发路径之一）
-        self._emit("invoice.paid", {"subscription": "sub_L1",
-                                    "billing_reason": "subscription_create"},
-                   "evt_inv_create")
-        self.assertEqual(self.user.credit_balance, 2500)
-        # 续期发票（subscription_cycle）：发放当月
-        self._emit("invoice.paid", {"subscription": "sub_L1",
-                                    "billing_reason": "subscription_cycle"},
-                   "evt_inv_cycle")
-        self.db.refresh(self.user)
-        self.assertEqual(self.user.credit_balance, 5000)
-        # 同一续期事件重放：不重复
-        self._emit("invoice.paid", {"subscription": "sub_L1",
-                                    "billing_reason": "subscription_cycle"},
-                   "evt_inv_cycle")
-        self.db.refresh(self.user)
-        self.assertEqual(self.user.credit_balance, 5000)
-
-    def test_lazy_grant_skips_stripe_subscriber(self):
-        # 存量库防御：stripe 订阅 + 历史已武装的本地水位 → 惰性发放拆除水位且不发
+    def test_deduct_records_but_never_refuses(self):
         from app.services import credits as credits_svc
-        self._activate_via_checkout()
-        self.user.credit_next_grant_at = "2000-01-01T00:00:00Z"  # 模拟旧双发路径
+        balance = credits_svc.atomic_deduct(self.db, self.user.id, 12, "generation", "t1")
+        self.assertEqual(balance, 0, "计量模式余额不动")
+        self.db.refresh(self.user)
+        self.assertEqual(self.user.credit_balance, 0)
+        tx = self.db.query(CreditTransaction).filter(
+            CreditTransaction.ref_task_id == "t1").one()
+        self.assertEqual(tx.delta, -12, "用量照常记账（统计口径）")
+        self.assertEqual(tx.balance_after, 0)
+
+    def test_lazy_grant_disarms_watermark(self):
+        from app.services import credits as credits_svc
+        self.user.credit_next_grant_at = "2000-01-01T00:00:00Z"
         self.db.commit()
         credits_svc.lazy_monthly_grant(self.db, self.user)
         self.db.refresh(self.user)
-        self.assertIsNone(self.user.credit_next_grant_at)
-        self.assertEqual(self.user.credit_balance, 2500, "不双发")
+        self.assertIsNone(self.user.credit_next_grant_at, "license 模式拆除月度水位")
+        self.assertEqual(self.user.credit_balance, 0, "不发放")
 
-    # ---- P0-3 dunning / P1-4 换档 ----
-
-    def test_payment_failed_and_past_due_leave_no_grant(self):
-        self._activate_via_checkout()
-        base = self.user.credit_balance
-        self._emit("invoice.payment_failed", {"subscription": "sub_L1",
-                                              "attempt_count": 1}, "evt_pf1")
-        self._emit("customer.subscription.updated", {"id": "sub_L1",
-                                                     "status": "past_due"}, "evt_pd1")
-        self.db.refresh(self.user)
-        self.assertEqual(self.user.credit_balance, base, "dunning 期不再发积分")
-        self.assertEqual(self.user.plan, "pro", "宽限期内保留权益（Stripe 重试中）")
-
-    def test_subscription_updated_canceled_downgrades(self):
-        self._activate_via_checkout()
-        self._emit("customer.subscription.updated", {"id": "sub_L1",
-                                                     "status": "canceled"}, "evt_uc")
-        self.db.refresh(self.user)
-        self.assertEqual(self.user.plan, "free")
-
-    def test_subscription_updated_plan_change_activates_new_plan(self):
-        self._activate_via_checkout(plan="pro")  # +2500
-        old_prices = (settings.stripe_price_pro_monthly,
-                      settings.stripe_price_studio_monthly)
-        settings.stripe_price_pro_monthly = "price_pro_m"
-        settings.stripe_price_studio_monthly = "price_studio_m"
-        try:
-            self._emit("customer.subscription.updated", {
-                "id": "sub_L1", "status": "active",
-                "items": {"data": [{"price": {"id": "price_studio_m"}}]},
-            }, "evt_upgrade")
-        finally:
-            settings.stripe_price_pro_monthly, settings.stripe_price_studio_monthly = old_prices
-        self.db.refresh(self.user)
-        self.assertEqual(self.user.plan, "studio", "Portal 换档同步到本地")
-        self.assertEqual(self.user.credit_balance, 2500 + 10000, "换档一次性发放新档位积分")
-
-    def test_old_subscription_deleted_does_not_downgrade_new(self):
-        self._activate_via_checkout(sub_id="sub_old", plan="pro")
-        self._activate_via_checkout(sub_id="sub_new", plan="studio")
-        self._emit("customer.subscription.deleted", {"id": "sub_old"}, "evt_del_old")
-        self.db.refresh(self.user)
-        self.assertEqual(self.user.plan, "studio", "旧订阅删除不降级新订阅")
-
-    # ---- P1-5 订阅退款 ----
-
-    def test_subscription_refund_downgrades_and_claws_back(self):
-        order = self._activate_via_checkout(plan="pro")  # +2500
-        self._emit("charge.refunded", {
-            "amount_refunded": 799,
-            "metadata": {"order_id": order.id},
-        }, "evt_sub_refund")
-        self.db.refresh(self.user)
-        self.assertEqual(self.user.plan, "free", "订阅退款降级")
-        self.assertEqual(self.user.credit_balance, 0, "追回当期已发积分（扣至 0）")
 
 if __name__ == "__main__":
     unittest.main()

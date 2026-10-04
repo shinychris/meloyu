@@ -59,14 +59,17 @@ def _make_admin_via_db(email: str) -> None:
 
 
 def _activate_plan_via_db(email: str, plan: str) -> None:
-    """v0.7.0 冒烟辅助：模拟 Stripe webhook 已激活付费档（服务端直调，
-    等价于 checkout.session.completed 的 _activate_plan 路径）。"""
+    """冒烟辅助：直写档位并按档发放积分（2026-10-03 起 Stripe 已拆除，
+    等价旧 webhook 激活产物：plan + plan_grant 流水）。"""
     from app.database import SessionLocal
-    from app.models import User
-    from app.services.stripe_billing import _activate_plan
+    from app.models import Plan, User
+    from app.services import credits as credits_svc
     with SessionLocal() as db:
         user = db.query(User).filter(User.email == email).one()
-        _activate_plan(db, user, plan)
+        user.plan = plan
+        row = db.get(Plan, plan)
+        if row and row.monthly_credits:
+            credits_svc.grant(db, user, row.monthly_credits, "plan_grant")
         db.commit()
 
 
@@ -1304,7 +1307,7 @@ def main() -> int:
     r = client.get(f"{API}/credits/transactions", headers=auth_headers(token),
                    params={"page_size": 100})
     b = unwrap(r)
-    check("11.2 stripe 激活发放 10000 积分（plan_grant）", any(
+    check("11.2 激活发放 10000 积分（plan_grant）", any(
         t["reason"] == "plan_grant" and t["delta"] == 10000
         for t in b["data"]["items"]))
 
@@ -1357,19 +1360,14 @@ def main() -> int:
     check("16.2 forgot-password 不存在邮箱同样 ok（响应不可区分）",
           r.status_code == 200 and unwrap(r)["data"]["ok"] is True)
 
-    # 16.3 支付门（Stripe 未配置口径）
+    # 16.3 支付门（2026-10-03 转型：Stripe 已拆除，/billing/* 下线）
     r = client.post(f"{API}/billing/checkout", headers=auth_headers(token),
                     json={"kind": "subscription", "plan": "pro", "interval": "monthly"})
-    check("16.3 checkout 未配置 Stripe → 40901", r.status_code == 409
+    check("16.3 /billing/checkout 已下线 → 404", r.status_code == 404)
+    r = client.post(f"{API}/subscriptions/switch", headers=auth_headers(token),
+                    json={"plan": "pro"})
+    check("16.3 付费档订阅停售 → 40901", r.status_code == 409
           and unwrap(r)["code"] == 40901)
-    r = client.get(f"{API}/billing/orders", headers=auth_headers(token))
-    check("16.3 GET /billing/orders（空）", r.status_code == 200
-          and unwrap(r)["data"]["orders"] == [])
-    r = client.post(f"{API}/billing/portal", headers=auth_headers(token))
-    check("16.3 portal 无支付记录 → 40901", r.status_code == 409)
-    r = client.post(f"{API}/billing/webhook", json={}, headers={"stripe-signature": "bad"})
-    check("16.3 webhook 签名错误 → 40001", r.status_code == 422
-          and unwrap(r)["code"] == 40001)
 
     # 16.4 免费档降级 + 档位恢复（studio 供后续节使用）
     r = client.post(f"{API}/subscriptions/switch", headers=auth_headers(token),

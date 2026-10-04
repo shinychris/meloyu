@@ -25,6 +25,10 @@ def create_export(db: Session, user: User, version_id: str, fmt: str,
                   platform: str | None = None, meta: dict | None = None) -> dict:
     from app.services.generation import _check_maintenance
     _check_maintenance()
+    # B12（2026-10-03）：license 模式试用到期未激活 → 导出一并拦截（方案 §3.1：
+    # 仅保留浏览与激活入口；已有作品的浏览/播放不受影响）
+    from app.services.generation import check_generation_entitlement
+    check_generation_entitlement(db, user)
     from app.core.disk_guard import ensure_disk_available
     ensure_disk_available()
     # P0-4（2026-09-26 商业化审查）：付费档核心权益后端强制——Plan.max_export

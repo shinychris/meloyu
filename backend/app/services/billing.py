@@ -1,9 +1,16 @@
-"""订阅服务：档位展示 + 切换（v0.7.0：付费档经 Stripe 激活，本服务仅处理降级）。"""
+"""档位/授权服务（2026-10-03 定位转型 B4：订阅切换 → License 激活口径）。
+
+- license 模式（desktop/enterprise）：档位不可切换——权益由 License 激活决定，
+  switch 一律引导去激活入口；list_plans 下发买断价与模式标记。
+- cloud 模式（存量过渡）：订阅已停售（Stripe 拆除），付费档切换引导转型公告，
+  仅保留降级 free 的本地生效路径。
+"""
 from __future__ import annotations
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import LICENSE_PRICE_USD, LICENSE_SALE_PRICE_USD, LICENSE_TRIAL_DAYS, settings
 from app.core.errors import err_conflict, err_validation
 from app.core.i18n import current_locale, tr
 from app.models import Plan, Subscription, User
@@ -12,8 +19,6 @@ from app.services import works as works_svc
 from app.services.serializers import user_to_dict
 
 # 档位卖点文案（seed 写库为中文，API 层按 locale 展开英文；未收录条目原样返回）
-# v0.7.0：免费档卖点口径修正——实际能力为「SHA-256 指纹登记」（频域水印未实现，
-# 不再宣称水印，见盘点报告 R-44）
 _FEATURE_EN = {
     "每日 5 次生成": "5 generations per day",
     "仅 MP3 导出": "MP3 export only",
@@ -54,32 +59,43 @@ def list_plans(db: Session, user: User) -> dict:
         "features": [_feature_label(f) for f in (p.features or [])
                      if not _is_credit_feature(_feature_label(f))],
     } for p in rows]
-    from app.config import settings
-    # P0-5（2026-09-26）：价格单一事实源——前端/落地页只渲染接口下发值；
-    # currency 恒 usd（D-2 海外口径），topup SKU 一并下发（前端不再硬编码 $9.99）
+    # 2026-10-03：模式与买断价随 plans 一并下发（价格单一事实源；currency 恒 usd，D-7）
     return {"plans": plans, "sales_contact": settings.sales_contact_email,
             "currency": "usd",
-            "topup": {"amount_usd": settings.stripe_topup_amount_usd,
-                      "credits": settings.stripe_topup_credits}}
+            "mode": settings.billing_mode,
+            "license": {"price_usd": LICENSE_PRICE_USD,
+                        "sale_price_usd": LICENSE_SALE_PRICE_USD,
+                        "trial_days": LICENSE_TRIAL_DAYS}}
 
 
 def switch_plan(db: Session, user: User, plan_code: str) -> dict:
-    """档位切换（v0.7.0 商业化口径）：
+    """档位切换（B4 重写）。
 
-    - free：允许（降级/维持，不涉及资金）；
-    - pro/studio：**不再直接生效**（P0-4）——必须经 Stripe 支付，前端跳
-      POST /billing/checkout 完成订阅，webhook 确认后由 _activate_plan 激活；
-      Stripe 未配置时付费档整体不可用；
-    - team：联系销售。
+    - license 模式（desktop/enterprise）：权益由 License 决定，任何切换 → 409
+      引导激活入口；
+    - cloud 模式（存量过渡）：订阅停售（Stripe 已拆除），付费档 → 409 转型公告；
+      free 降级保留本地生效。
     """
+    if plan_code not in ("free", "pro", "studio", "team"):
+        raise err_validation(tr("plan 必须为 free/pro/studio/team",
+                                "plan must be free/pro/studio/team"))
     if plan_code == "team":
-        from app.config import settings
         contact = settings.sales_contact_email
         raise err_validation(
-            tr(f"团队版请联系销售{'（' + contact + '）' if contact else ''}",
-               f"Please contact sales for the Team plan{' (' + contact + ')' if contact else ''}"))
-    if plan_code not in ("free", "pro", "studio"):
-        raise err_validation(tr("plan 必须为 free/pro/studio", "plan must be free/pro/studio"))
+            tr(f"团队/企业版请联系销售{'（' + contact + '）' if contact else ''}",
+               f"Please contact sales for the Team plan"
+               f"{' (' + contact + ')' if contact else ''}"))
+    if settings.billing_mode == "license":
+        raise err_conflict(tr(
+            "买断制授权：档位不可切换——请在「定价与激活」输入 License Key 激活终身授权",
+            "One-time license: plans are not switchable — activate your lifetime "
+            "license key under Pricing & Activation"))
+    if plan_code != "free":
+        raise err_conflict(tr(
+            "订阅已停售：Meloyu 已转型为桌面软件买断制（$399 终身，限时 $159），"
+            "付费订阅不再受理",
+            "Subscriptions are no longer sold: Meloyu has moved to a one-time "
+            "desktop license ($399 lifetime, launch offer $159)"))
     if plan_code == user.plan:
         # 幂等：同档切换仅记录事件
         works_svc.add_event(db, user_id=user.id, action="plan_switch", actor="human",
@@ -87,19 +103,8 @@ def switch_plan(db: Session, user: User, plan_code: str) -> dict:
         db.commit()
         db.refresh(user)
         return user_to_dict(user)
-    if plan_code != "free":
-        from app.services import stripe_billing
-        if not stripe_billing.stripe_enabled():
-            raise err_conflict(tr(
-                "付费档需经 Stripe 支付，但支付未配置（STRIPE_SECRET_KEY），请联系管理员",
-                "Paid plans require Stripe payment, which is not configured "
-                "(STRIPE_SECRET_KEY); please contact the administrator"))
-        raise err_conflict(tr(
-            "付费档需经 Stripe 订阅支付：请通过定价页发起订阅，支付完成后自动生效",
-            "Paid plans require a Stripe subscription: subscribe from the pricing page; "
-            "the plan activates automatically after payment"))
 
-    # ---- free 降级 ----
+    # ---- free 降级（cloud 存量）----
     now = utc_now_iso()
     old_rows = db.execute(select(Subscription).where(
         Subscription.user_id == user.id, Subscription.status == "active")).scalars().all()
@@ -118,12 +123,3 @@ def switch_plan(db: Session, user: User, plan_code: str) -> dict:
     db.commit()
     db.refresh(user)
     return user_to_dict(user)
-
-
-def _next_month_first() -> str:
-    from datetime import UTC, datetime
-    now = datetime.now(UTC)
-    month = now.month + 1
-    year = now.year + (month - 1) // 12
-    month = (month - 1) % 12 + 1
-    return f"{year:04d}-{month:02d}-01T00:00:00Z"

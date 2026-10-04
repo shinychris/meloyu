@@ -220,6 +220,10 @@ def meta():
         ],
         # v0.10.2：注册邮箱验证码开关下发（SMTP 配置后开启；前端据此显示验证码输入）
         "email_verification_enabled": settings.email_verification_enabled,
+        # 2026-10-03 定位转型：产品形态下发（前端据此适配桌面模式：
+        # 免登录直达、激活页替换订阅页、隐藏市场等）
+        "app_mode": settings.app_mode,
+        "billing_mode": settings.billing_mode,
         "generation_limits": {
             "min_duration_sec": 30, "max_duration_sec": 240,
             "min_bpm": 60, "max_bpm": 174,
