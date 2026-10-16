@@ -3,7 +3,7 @@ import type { AuthData, LicenseStatus, User } from '../types/api'
 import { clearToken, setToken } from '../lib/token'
 import { fetchMe } from '../api/auth'
 import { ApiError } from '../api/client'
-import { getCreditsBalance } from '../api/account'
+import { getCreditsBalance, getSystemMeta } from '../api/account'
 import { getLicenseStatus } from '../api/license'
 import { useStudioStore } from './studio'
 import { usePlayerStore } from './player'
@@ -12,6 +12,10 @@ function isAuthReject(e: unknown): boolean {
   return e instanceof ApiError && (e.code === 40101 || e.code === 40102)
 }
 
+/** 桌面壳内运行（Electron preload 桥）；模块加载即同步判定，避免首帧闪登录页 */
+const inDesktopShell =
+  typeof window !== 'undefined' && Boolean(window.meloyuDesktop)
+
 interface SessionState {
   user: User | null
   /** v0.16.0 买断制：试用/激活状态（bootstrap 时并行拉取；cloud 模式 mode=cloud） */
@@ -19,6 +23,15 @@ interface SessionState {
   ready: boolean
   /** 后端不可达（网络故障）：token 仍在，不踢登录，展示重试（P1-25） */
   offline: boolean
+  /**
+   * 桌面形态判定（F3 修复，2026-10-16）：壳桥或桌面后端 app_mode 命中即为 true。
+   * 判定后无 token 也执行 bootstrap——桌面免登录短路在 sidecar 生效，
+   * 冷启动不再被 hasToken 门控卡在登录页（原死锁：bootstrap 只在 AppLayout 内调用，
+   * 而 AppLayout 被 hasToken 门控，随机端口下 localStorage 无跨启动 token）。
+   */
+  desktopShell: boolean
+  /** 形态探测只跑一次（StrictMode 双效应/路由重挂载防抖） */
+  shellProbed: boolean
   /** 登录/注册成功：存 token + 用户 */
   setAuthenticated: (data: AuthData) => void
   /** 登出：清 token、停轮询、停播放器 */
@@ -29,6 +42,8 @@ interface SessionState {
   refreshCredits: () => Promise<void>
   /** 激活/解除后刷新授权状态（v0.16.0：侧栏徽标与激活页数据源） */
   refreshLicense: () => Promise<void>
+  /** 应用形态探测：桌面后端（裸浏览器直连）兜底判定 + 桌面态立即拉本地档案会话 */
+  detectDesktopShell: () => Promise<void>
   /** 契约 §13.5：登录后首屏并行 /auth/me + /credits/balance */
   bootstrap: () => Promise<void>
 }
@@ -38,6 +53,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   license: null,
   ready: false,
   offline: false,
+  desktopShell: inDesktopShell,
+  shellProbed: inDesktopShell,
 
   setAuthenticated(data) {
     setToken(data.access_token)
@@ -81,6 +98,29 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       set({ license: await getLicenseStatus() })
     } catch {
       /* 静默：授权状态不可达不打断创作流 */
+    }
+  },
+
+  /**
+   * 应用形态探测（F3）：壳桥在模块加载时已同步判定；此处为裸浏览器直连桌面
+   * 后端的兜底——公开端点 /system/meta 下发 app_mode，命中 desktop 即视同桌面
+   * 形态并立即 bootstrap（免登录短路取本地档案）。云形态/后端不可达走既有登录流。
+   */
+  async detectDesktopShell() {
+    if (get().shellProbed) return
+    set({ shellProbed: true })
+    if (get().desktopShell) {
+      await get().bootstrap()
+      return
+    }
+    try {
+      const meta = await getSystemMeta()
+      if (meta.app_mode === 'desktop') {
+        set({ desktopShell: true })
+        await get().bootstrap()
+      }
+    } catch {
+      /* 后端不可达：维持云形态冷启动流（offline 重试态由 AppLayout 处理） */
     }
   },
 

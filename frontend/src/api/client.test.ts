@@ -84,6 +84,19 @@ describe('api/client 统一封装', () => {
     expect(useToastStore.getState().toasts.some((t) => t.message.includes('积分不足'))).toBe(true)
   })
 
+  it('40203（试用到期未激活）toast 引导文案并跳「定价与激活」页', async () => {
+    stubBrowser()
+    http.defaults.adapter = mockAdapter(402, {
+      code: 40203,
+      message: '试用期已结束：请输入 License Key 激活终身授权',
+      data: null,
+      request_id: 'abc',
+    })
+    await expect(apiPost('/generations', {})).rejects.toMatchObject({ code: 40203 })
+    expect(currentHash()).toBe('#/pricing')
+    expect(useToastStore.getState().toasts.some((t) => t.message.includes('试用期'))).toBe(true)
+  })
+
   it('HTTP 500 且无包裹体时给通用文案并抛 ApiError', async () => {
     http.defaults.adapter = mockErrorAdapter(500, 'internal crash')
     const err = await apiGet('/works').catch((e: unknown) => e)

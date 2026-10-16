@@ -6,8 +6,11 @@
  * - 选取空闲回环端口 → 拉起后端 sidecar（FastAPI 单体，APP_MODE=desktop）
  * - 健康检查就绪后加载 http://127.0.0.1:<port>（sidecar 同源托管前端 SPA，
  *   HttpOnly Cookie 刷新机制原样工作）
- * - 深度链接 meloyu://activate?key=... → 主进程代为激活 → 跳激活页
+ * - 深度链接 meloyu://activate?account=..&code=..（在线）/ ?key=..（离线备用）
+ *   → 主进程代为激活 → 跳激活页
  * - 麦克风权限（哼唱/人声克隆 getUserMedia）
+ * - CSP 响应头（默认同源；Google Fonts 为既有外链白名单）
+ * - 托盘（显示窗口/退出）+ 应用图标
  * - 自动更新（electron-updater + generic 更新源；未配置 UPDATE_URL 时静默跳过）
  * - 退出时优雅关停 sidecar（SIGTERM → 3s 强杀）
  *
@@ -15,17 +18,19 @@
  */
 'use strict'
 
-const { app, BrowserWindow, Menu, shell, session, dialog } = require('electron')
+const { app, BrowserWindow, Menu, shell, session, dialog, Tray, nativeImage } = require('electron')
 const { spawn } = require('node:child_process')
 const net = require('node:net')
 const path = require('node:path')
 const fs = require('node:fs')
 const http = require('node:http')
+const { extractLinkFromArgv, activateRequestFromParams, CSP_POLICY } = require('./lib')
 
 const IS_DEV = !app.isPackaged
 const DEV_BACKEND_URL = process.env.MELOYU_DEV_BACKEND || 'http://127.0.0.1:8000'
 
 let mainWindow = null
+let tray = null
 let sidecar = null          // ChildProcess
 let sidecarPort = 0
 let sidecarBase = ''
@@ -49,38 +54,21 @@ if (!gotLock) {
 app.setAsDefaultProtocolClient('meloyu')
 handleDeepLinkArgs(process.argv)
 
-function extractLinkFromArgv(argv) {
-  for (const arg of argv) {
-    const m = /^meloyu:\/\/activate\?(.+)$/i.exec(arg)
-    if (m) return new URLSearchParams(m[1])
-  }
-  return null
-}
-
-/** 深度链接两种形态（激活邮件可任选其一）：
- *  meloyu://activate?account=..&code=..  —— 在线激活（主流程）
- *  meloyu://activate?key=..              —— 离线激活（完整授权密钥） */
 function handleDeepLinkArgs(argv) {
-  const params = extractLinkFromArgv(argv)
-  if (!params || !sidecarBase) return
-  const account = params.get('account')
-  const code = params.get('code')
-  const key = params.get('key')
-  const path = account && code ? '/api/v1/licenses/activate-online' : '/api/v1/licenses/activate'
-  const body = account && code ? { account, code } : { license_key: key }
-  if (!body.license_key && !(body.account && body.code)) return
+  const req = activateRequestFromParams(extractLinkFromArgv(argv))
+  if (!req || !sidecarBase) return
   // 主进程代为激活（免手动粘贴），完成后跳「定价与激活」页展示结果
-  const req = http.request(
-    `${sidecarBase}${path}`,
+  const r = http.request(
+    `${sidecarBase}${req.path}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' } },
     () => {
       if (mainWindow) mainWindow.loadURL(`${sidecarBase}/#/pricing`).catch(() => {})
     },
   )
-  req.on('error', () => {
+  r.on('error', () => {
     if (mainWindow) mainWindow.loadURL(`${sidecarBase}/#/pricing`).catch(() => {})
   })
-  req.end(JSON.stringify(body))
+  r.end(JSON.stringify(req.body))
 }
 
 // ---------- 端口探测 ----------
@@ -97,13 +85,17 @@ function pickFreePort() {
 }
 
 // ---------- sidecar 生命周期 ----------
-function sidecarCommand() {
+function sidecarCommand(port) {
   if (IS_DEV) {
-    // dev：直接用 backend venv 的 python 起 uvicorn（热改代码即重启壳生效）
+    // dev：直接用 backend venv 的 python 起 uvicorn（热改代码即重启壳生效）；
+    // 端口用壳选取的空闲端口（--port 必传：uvicorn 默认 8000 会导致健康检查探测错端口）
     const py = process.platform === 'win32'
       ? path.resolve(__dirname, '../../backend/.venv/Scripts/python.exe')
       : path.resolve(__dirname, '../../backend/.venv/bin/python')
-    return { cmd: py, args: ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1'] }
+    return {
+      cmd: py,
+      args: ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', String(port)],
+    }
   }
   const dir = path.join(process.resourcesPath, 'meloyu-backend')
   const exe = process.platform === 'win32' ? 'desktop_runner.exe' : 'desktop_runner'
@@ -111,7 +103,7 @@ function sidecarCommand() {
 }
 
 function startSidecar() {
-  const { cmd, args, cwd } = sidecarCommand()
+  const { cmd, args, cwd } = sidecarCommand(sidecarPort)
   const userDataData = path.join(app.getPath('userData'), 'data')
   fs.mkdirSync(userDataData, { recursive: true })
   const env = {
@@ -209,6 +201,8 @@ function createWindow() {
     backgroundColor: '#0d0f10',
     autoHideMenuBar: process.platform !== 'darwin',
     show: false,
+    // win/linux 任务栏/窗口图标（mac 走 Dock 的 .icns/App 图标）
+    ...(process.platform !== 'darwin' ? { icon: trayIconPath() } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -237,6 +231,49 @@ function installPermissionHandlers() {
   })
 }
 
+// ---------- CSP（方案 §6.3：sidecar 回环页面的内容安全策略） ----------
+function installCsp() {
+  // 只作用于回环 sidecar 的响应；data: 装载页（启动 loading）无响应头，不受影响
+  session.defaultSession.webRequest.onHeadersReceived(
+    { urls: ['http://127.0.0.1:*/*'] },
+    (details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': [CSP_POLICY],
+        },
+      })
+    },
+  )
+}
+
+// ---------- 托盘（方案 §6.3：窗口/托盘/菜单） ----------
+function trayIconPath() {
+  return IS_DEV
+    ? path.join(__dirname, '../build/icon.png')
+    : path.join(process.resourcesPath, 'icon.png')
+}
+
+function createTray() {
+  const iconPath = trayIconPath()
+  if (!fs.existsSync(iconPath)) return // 图标缺失不阻断启动（构建产物异常时兜底）
+  tray = new Tray(nativeImage.createFromPath(iconPath))
+  tray.setToolTip('Meloyu')
+  const show = () => {
+    if (!mainWindow) return
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+  }
+  const menu = Menu.buildFromTemplate([
+    { label: 'Show Meloyu', click: show },
+    { type: 'separator' },
+    { label: 'Quit Meloyu', click: () => app.quit() },
+  ])
+  tray.setContextMenu(menu)
+  tray.on('click', show)
+}
+
 // ---------- 自动更新（签名后启用；未配置 UPDATE_URL 静默跳过） ----------
 function setupAutoUpdater() {
   const updateUrl = process.env.MELOYU_UPDATE_URL || ''
@@ -252,7 +289,9 @@ function setupAutoUpdater() {
 // ---------- App 生命周期 ----------
 app.whenReady().then(async () => {
   installPermissionHandlers()
+  installCsp()
   createWindow()
+  createTray()
 
   if (IS_DEV && process.env.MELOYU_DEV_SIDECAR !== '1') {
     // dev 直连本机已起的 uvicorn（vite proxy 同款拓扑）

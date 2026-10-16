@@ -60,6 +60,7 @@ function AppLayout() {
   const location = useLocation()
   const t = useT()
   const { user, ready, offline, bootstrap } = useSessionStore()
+  const desktopShell = useSessionStore((s) => s.desktopShell)
   const loadMeta = useMetaStore((s) => s.load)
   const reloadMeta = useMetaStore((s) => s.reloadForLocale)
   const startAsk = useUiStore((s) => s.startAsk)
@@ -127,6 +128,15 @@ function AppLayout() {
     )
   }
   if (!user) {
+    // F3：桌面形态无 user 只能是会话未就绪/瞬态失败（免登录短路总可取回本地档案），
+    // 不弹回登录页（桌面登录被 409 拒绝，回去即死锁）
+    if (desktopShell) {
+      return (
+        <div className="h-full flex items-center justify-center bg-bg">
+          <span className="label">{t('app.loading')}</span>
+        </div>
+      )
+    }
     return <Navigate to="/login" state={{ from: location.pathname }} replace />
   }
 
@@ -179,17 +189,19 @@ function ShortcutHandler() {
 }
 
 /** 登录页守卫：已登录则跳工作台；本地无 token 则同步清空残留会话（401 后避免回跳循环）。
- *  v0.16.0：desktop 形态免登录（本地档案静默鉴权），登录页不再可达。 */
+ *  v0.16.0：desktop 形态免登录（本地档案静默鉴权），登录页不再可达。
+ *  v0.16.2（F3 修复）：desktop 判定改为 desktopShell（冷启动即可知）或
+ *  license.mode（bootstrap 后兜底），不再依赖登录后才拉到的状态。 */
 function LoginGuard() {
   const user = useSessionStore((s) => s.user)
-  const appMode = useSessionStore((s) => s.license?.mode)
+  const desktop = useSessionStore((s) => s.desktopShell || s.license?.mode === 'desktop')
   useEffect(() => {
-    if (appMode === 'desktop') return
+    if (desktop) return
     if (!getToken()) {
       useSessionStore.setState({ user: null, ready: true })
     }
-  }, [appMode])
-  if (appMode === 'desktop') {
+  }, [desktop])
+  if (desktop) {
     return <Navigate to="/studio" replace />
   }
   if (user && getToken()) {
@@ -200,8 +212,8 @@ function LoginGuard() {
 
 /** 市场守卫（D-6）：desktop 形态隐藏作品市场（云社区非本阶段重点）。 */
 function MarketGuard() {
-  const appMode = useSessionStore((s) => s.license?.mode)
-  if (appMode === 'desktop') {
+  const desktop = useSessionStore((s) => s.desktopShell || s.license?.mode === 'desktop')
+  if (desktop) {
     return <Navigate to="/studio" replace />
   }
   return <MarketView />
@@ -209,8 +221,8 @@ function MarketGuard() {
 
 /** 密码重置守卫：desktop 形态无账号体系（B6），重置页不可达。 */
 function ResetPasswordGuard() {
-  const appMode = useSessionStore((s) => s.license?.mode)
-  if (appMode === 'desktop') {
+  const desktop = useSessionStore((s) => s.desktopShell || s.license?.mode === 'desktop')
+  if (desktop) {
     return <Navigate to="/studio" replace />
   }
   return <ResetPasswordView />
@@ -225,17 +237,25 @@ function ArrangeRoute() {
 
 function RootRoutes() {
   const hasToken = useSessionStore((s) => s.user !== null) || Boolean(getToken())
+  // F3 修复（2026-10-16）：桌面形态免 token 进入（bootstrap 拉本地档案）；
+  // 探测只跑一次——壳桥同步命中，裸浏览器直连桌面后端由 /system/meta 兜底
+  const desktopShell = useSessionStore((s) => s.desktopShell)
+  const detectDesktopShell = useSessionStore((s) => s.detectDesktopShell)
+  useEffect(() => {
+    void detectDesktopShell()
+  }, [detectDesktopShell])
+  const enterApp = hasToken || desktopShell
   return (
     <Routes>
       {/* F7：落地页已迁官网（portal 托管 dist-landing）；App 内 / 与旧 /landing
           一律按登录态分流（旧外链 → 登录页，不 404） */}
-      <Route path="/" element={hasToken ? <Navigate to="/studio" replace /> : <Navigate to="/login" replace />} />
+      <Route path="/" element={enterApp ? <Navigate to="/studio" replace /> : <Navigate to="/login" replace />} />
       <Route path="/landing" element={<Navigate to="/" replace />} />
       <Route path="/login" element={<LoginGuard />} />
       {/* 邮件重置密码（Stripe 回跳页已随 v0.16.0 订阅拆除移除） */}
       <Route path="/reset-password" element={<ResetPasswordGuard />} />
       <Route path="/billing/return" element={<Navigate to="/pricing" replace />} />
-      {hasToken ? (
+      {enterApp ? (
         <Route element={<AppLayout />}>
           <Route path="/studio" element={<StudioView />} />
           <Route path="/lyrics" element={<LyricsView />} />

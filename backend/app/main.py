@@ -208,6 +208,11 @@ app.include_router(api_router, prefix=API_PREFIX)
 def _startup() -> None:
     if _is_production:
         _assert_production()
+    if _is_desktop:
+        # B1 补全（2026-10-16）：首启生成/加载实例密钥（jwt + Key 落库加密），
+        # 须先于 reencrypt_plaintext_secrets 等密钥消费点
+        from app.services.desktop import ensure_desktop_secrets
+        ensure_desktop_secrets()
     # enterprise 形态：启动即校验 License（fail-fast，防未授权部署）
     from app.services.license import assert_enterprise_license
     assert_enterprise_license()

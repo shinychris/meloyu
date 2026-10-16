@@ -65,8 +65,10 @@ export default function PricingView() {
   }, [])
 
   useEffect(() => {
+    // 档位表仅 cloud 存量分支消费（订阅停售只读参考）；license 模式跳过该请求
+    if (license?.billing_mode !== 'subscription') return
     void loadPlans()
-  }, [loadPlans])
+  }, [loadPlans, license?.billing_mode])
 
   useEffect(() => {
     void loadTxs(txPage)
@@ -400,8 +402,8 @@ export default function PricingView() {
         <Pagination page={txPage} totalPages={txTotalPages} onChange={setTxPage} />
       </div>
 
-      {/* 开放 API（FR-19 β） */}
-      <ApiKeysCard />
+      {/* 开放 API（FR-19 β）——SaaS 账户档位口径，license 模式不展示 */}
+      {!isLicense && <ApiKeysCard />}
     </section>
   )
 }

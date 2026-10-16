@@ -15,21 +15,27 @@ files:
   - package.json
   - "!**/*.md"
 
-# 随包资源（asar 外）：sidecar 二进制目录 + 前端静态文件
+# 随包资源（asar 外）：sidecar 二进制目录 + 前端静态文件 + 托盘图标 + 三方声明
 extraResources:
   - from: ../backend/dist-backend/meloyu-backend
     to: meloyu-backend
   - from: ../frontend/dist
     to: web
+  - from: build/icon.png
+    to: icon.png
+  - from: THIRD-PARTY-NOTICES.md
+    to: THIRD-PARTY-NOTICES.md
 
 # License 公钥等敏感度低的构建期常量经环境注入 sidecar（打包脚本写 .env 时处理）；
 # UPDATE_URL 发布时经 -c.extraMetadata 或环境变量注入
 
 win:
+  icon: build/icon.ico
   target:
     - target: nsis
       arch: [x64]
-  # 代码签名（P0 证书采购后启用；未配置时 electron-builder 自动跳过签名）
+  # 代码签名（2026-10-04 口径：不签名起步零成本；转正路径 Azure Trusted Signing，
+  # 见 desktop/README.md 签名策略表）
   # certificateSubjectName: "Meloyu"
   artifactName: Meloyu-Setup-${version}-${arch}.${ext}
 
@@ -39,8 +45,11 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   shortcutName: Meloyu
+  # EULA 待法务定稿后经 nsis.license 挂载（安装器许可页）；当前随包携带
+  # resources/THIRD-PARTY-NOTICES.md 履行三方声明义务（方案 §8）
 
 mac:
+  # build/icon.png（512+）由 electron-builder 自动转换为 .icns
   target:
     - target: dmg
       arch: [arm64, x64]

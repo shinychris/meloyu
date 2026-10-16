@@ -225,6 +225,19 @@ async def admin_activations(request: Request, lid: str | None = None):
         return [dict(r) for r in rows]
 
 
+@app.delete("/api/admin/activations/{lid}/{device_id}")
+async def admin_unbind(lid: str, device_id: str, request: Request):
+    """换机解绑（方案 §6.4 设备治理补全，2026-10-16）：移除单台设备的激活
+    记录、释放设备额度；与整码吊销（revoke）互补，旧设备遗失/退役场景用。"""
+    require_admin(request)
+    with portal_db.conn() as c:
+        cur = c.execute("DELETE FROM activations WHERE lid = ? AND device_id = ?",
+                        (lid, device_id))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "activation not found")
+        return {"lid": lid, "device_id": device_id, "unbound": True}
+
+
 @app.post("/api/admin/keygen")
 async def admin_keygen(request: Request):
     """轮换 keypair（慎重：旧 Key 全部失效，需同步更新 App 内公钥）。"""
@@ -302,6 +315,10 @@ async def activate(request: Request):
             return {"ok": False, "reason": "revoked"}
         if row["account"] and row["account"] != account:
             return {"ok": False, "reason": "account_mismatch"}
+        if not row["account"]:
+            # 通用码首触绑定（2026-10-16）：人工签发未指定账户的激活码，首次兑换即
+            # 锁定兑换账户——防止同一码被任意账户重复领用（此后走上方一致性校验）
+            c.execute("UPDATE licenses SET account = ? WHERE lid = ?", (account, row["lid"]))
         existing = c.execute("SELECT id FROM activations WHERE lid = ? AND device_id = ?",
                              (row["lid"], device_id)).fetchone()
         now = portal_db.now_iso()

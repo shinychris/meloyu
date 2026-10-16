@@ -1,6 +1,12 @@
 # Meloyu 旋律屿 · 前端（React SPA）
 
-AI 音乐创作系统的浏览器前端：Vite + React 19 + TypeScript(strict) + Tailwind CSS v4 + Zustand + React Router 7（library 模式，HashRouter）。视觉规范逐项对齐 `docs/AI音乐创作系统方案和原型/app/` 高保真原型（暗色 #0e0e0e / 荧光绿 #00ff2c / Inter + Noto Sans SC / 直角无圆角）。
+AI 音乐创作系统的前端：Vite + React 19 + TypeScript(strict) + Tailwind CSS v4 + Zustand + React Router 7（library 模式，HashRouter）。视觉规范逐项对齐 `docs/AI音乐创作系统方案和原型/app/` 高保真原型（暗色 #0e0e0e / 荧光绿 #00ff2c / Inter + Noto Sans SC / 直角无圆角）。
+
+**一份产物两处运行（2026-10-03 定位转型）**：
+
+- **桌面版（主线）**：`dist/` 由 Electron 壳加载（sidecar 同源托管，见 `desktop/`）；桌面内免登录直达工作台——形态判定 = Electron 桥 `window.meloyuDesktop`（同步）+ 公开端点 `/system/meta` 的 `app_mode`（兜底），license 模式下侧栏积分条换授权徽标（试用剩余/已激活）、生成/导出到期未激活被 40203 拦截并跳「定价与激活」。
+- **官网营销站**：`npm run build:landing` 独立产出 `dist-landing/`（site 模式：登录入口隐藏、购买直链 /buy），由 `portal/` 托管；App 内不再含落地页路由。
+- cloud 形态（存量过渡）：登录/注册照常，订阅档位只读停售公告。
 
 ## 启动
 
@@ -19,7 +25,8 @@ npm run dev        # http://localhost:5173（/api 代理到 127.0.0.1:8000）
 | 命令 | 说明 |
 |---|---|
 | `npm run dev` | 开发服务器（HMR） |
-| `npm run build` | `tsc --noEmit` 类型检查 + `vite build` 产出 `dist/` |
+| `npm run build` | `tsc --noEmit` 类型检查 + `vite build` 产出 `dist/`（桌面壳消费） |
+| `npm run build:landing` | 官网营销站独立构建 → `dist-landing/`（portal 托管） |
 | `npm run typecheck` | 仅类型检查 |
 | `npm run preview` | 预览 dist 构建 |
 | `npm test` | Vitest 单测（纯函数 + client 拦截器 + 视图渲染冒烟） |
@@ -59,21 +66,21 @@ src/
 
 | 路由 | 视图 | 要点 |
 |---|---|---|
-| `#/` | 产品落地页（公共） | 未登录即落地页（产品入口/全套展示信息）；已登录自动跳工作台 |
-| `#/landing` | 产品落地页（恒定） | 不受登录态影响，供演示与对外分享 |
-| `#/login` | 登录/注册 | 演示账号一键填入；JWT 存 localStorage；底部「返回产品主页」 |
+| `#/` | 按登录态分流 | 有会话/桌面形态 → `#/studio`；否则 → `#/login`（落地页已迁官网，App 内不承载） |
+| `#/login` | 登录/注册（cloud） | 桌面形态守卫直跳工作台（免登录）；底部「返回官网」外链 meloyu.com |
 | `#/studio` | 创作工作台 | 四模式 chips（参考音频/哼唱=V1.1 置灰）、灵感指引组装 prompt、参数面板、四步引导条、生成→轮询→2 候选卡、版本树 + 操作日志 |
 | `#/lyrics` | 歌词助手 | 4 个歌词接口全接；草稿存 localStorage(`meloyu:lyric-draft:v1`) |
-| `#/arrange` `#/edit` `#/pitch` | V2 占位页 | 「即将上线」说明卡 + 返回工作台 |
+| `#/arrange` `#/edit` `#/pitch` | 编曲/编辑/音高 | 编曲以 URL search 为装载契约（可重复「送往编曲」） |
 | `#/library` | 作品库 | 筛选 chips / 收藏星标 / 回收站恢复与永久删除 / 行内试听 / 导出徽标(由导出任务推导) |
 | `#/works/:id` | 作品详情 | 版本树 + 候选（试听/采用定稿）+ 导出面板 + 证书 |
 | `#/rights` | 合规与权利中心 | 证书卡字段来自 /versions/{id}/certificate、合规检查清单、全局开关 |
-| `#/pricing` | 定价与积分 | 档位来自接口、月/年切换、升级调 /subscriptions/switch、积分流水表 |
-| `#/models` | 模型中心 | 七通道卡片 + 开源目录（10 模型）+ 下载管理 |
+| `#/pricing` | 定价与激活（v0.16.0） | license 模式：试用状态卡 + 买断卡（$399 划线/$159）+ 账户+激活码在线兑换 + 离线整钥备用；cloud 模式：停售公告只读档位 |
+| `#/models` | 模型中心 | 七通道卡片（BYOK Key 配置）+ 开源目录（10 模型）+ 下载管理 + 「本地组件」三卡（内置/MusicGen/ACE-Step，许可/体积/显存如实标注） |
+| `#/market` | 作品市场 | D-6：桌面形态隐藏（守卫重定向） |
 
-### 落地页（产品入口）
+### 落地页（官网营销站，独立构建）
 
-- 组件：`src/views/LandingView.tsx` + `src/components/landing/*`（Nav/Hero/WorkFlow/Capabilities/Channels/Models/Showcase/Audience/Pricing/Faq/Footer）。
+- F7 迁移（2026-10-04）：组件保留在 `src/views/LandingView.tsx` + `src/components/landing/*`，经 `landing.html` 入口 + `vite.config-landing.ts` 独立构建为 `dist-landing/`（site 模式：登录入口隐藏、购买直链 /buy），由 `portal/` 官网托管；App 内不再注册 landing 路由。
 - 数据：`src/lib/landing-data.ts` 单一事实源（七通道/十模型目录/定价/FAQ/里程碑），**纯静态内嵌、不依赖后端**；有 `landing-data.test.ts` 完整性测试兜底（通道数量/排序/许可口径/定价与 seed_data 一致）。
 - 真机截图：`public/shots/`（来自 `reports/sim-sessions/shots` 已验收画面）。
 - 宣传口径：商用表述遵循商业化盘点 R-01——「商用权利跟随所选通道的模型许可」，NC 权重如实标注，不写绝对化承诺。

@@ -1,6 +1,16 @@
-# Meloyu Backend · FastAPI 单体服务
+# Meloyu Backend · FastAPI 单体服务（一单体三形态）
 
-AI 音乐创作系统的后端：53 个契约接口 + 七通道歌曲生成（本地合成 / Suno 网关 / Replicate 托管 / 本机 MusicGen / 本机 ACE-Step v1.5 / 自托管 MiniMax Music 3（SGLang-Omni）/ 自托管 SongGeneration（Studio））+ 歌词 LLM 双通道（Ollama / OpenAI 兼容）+ SQLite 任务/积分/作品库。
+AI 音乐创作系统的后端：契约接口 + 七通道歌曲生成（本地合成 / Suno 网关 / Replicate 托管 / 本机 MusicGen / 本机 ACE-Step v1.5 / 自托管 MiniMax Music 3（SGLang-Omni）/ 自托管 SongGeneration（Studio））+ 歌词 LLM 双通道（Ollama / OpenAI 兼容）+ 任务/积分/作品库。
+
+**产品形态（`APP_MODE`，2026-10-03 定位转型）**——同一单体按 env 分流，桌面买断制为主线：
+
+| 形态 | 说明 |
+|---|---|
+| `desktop`（主线） | 桌面版 sidecar：SQLite + 本地档案免登录 + 14 天试用/License 激活（Ed25519）+ 积分纯计量 + 同源托管前端静态文件；数据目录 `~/Meloyu/`；首启自动生成实例密钥（jwt + BYOK Key 落库加密）。打包入口 `desktop/sidecar/build-sidecar.*`（PyInstaller → `scripts/desktop_runner.py`） |
+| `cloud`（存量过渡） | 原 SaaS 形态：多用户 + JWT 登录 + 订阅档位（付费档已停售，见 `services/billing.py` 转型公告） |
+| `enterprise` | 私有化部署：PG + 多用户 + 启动 License 断言（env `MELOYU_LICENSE_KEY`）+ admin 集中配 Key；交付见 `docs/06-商业化/企业交付与实施手册.md` |
+
+商业化基线：终身授权买断 $399（限时 $159）+ 激活码激活（在线兑换/离线整钥双通道）；试用到期未激活 40203 拦截生成/导出。License 签发/设备治理在 `portal/`（License Portal）。
 
 ## 环境要求
 
@@ -104,7 +114,7 @@ app/
 ├── models/            # SQLAlchemy 2.0 Mapped 模型（15 张表）
 ├── schemas/           # Pydantic 请求校验
 ├── api/v1/            # 15 个路由模块（49 接口）
-├── services/          # 生成编排/作品/积分/导出/证书/订阅/歌词/模型中心/序列化
+├── services/          # 生成编排/作品/积分/导出/证书/license 激活/桌面形态/歌词/模型中心/序列化
 ├── providers/         # MusicProvider/LyricsProvider 协议 + 本地实现 + 外部 API 实现
 │   ├── music_api.py   # 外部歌曲生成（Suno 兼容协议）
 │   ├── lyrics_llm.py  # LLM 歌词（Ollama / OpenAI 兼容）
@@ -135,7 +145,9 @@ data/                  # 运行时生成（gitignore）：meloyu.db + audio/{wor
 - 响应统一 `{code, message, data, request_id}`；错误码表见契约 §2。
 - 音频流：`GET /api/v1/files/{id}/stream` 支持 Range 206；`<audio>` 标签用
   `POST /files/{id}/stream-token` 换取 15 分钟 `?st=` 签名。
-- 积分：`UPDATE ... WHERE balance >= amount` 原子扣减；失败/取消自动退款（reason=refund）。
+- 积分：cloud 形态 `UPDATE ... WHERE balance >= amount` 原子扣减，失败/取消自动退款
+  （reason=refund）；desktop/enterprise（license 模式）**只记账不拒绝**（本地引擎成本=
+  用户算力、云通道 BYOK，`services/credits.py` 计量分支）。
 - 确定性：同 seed + 同参数 → WAV/MP3/STEMS SHA-256 逐字节一致（随机性仅来自
   `PCG64(seed)` 单实例；音频路径禁用 random/time）。
 - 启动自愈：running/queued 僵尸任务置 failed(50003) 并退款；回收站 30 天清扫。

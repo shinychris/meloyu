@@ -6,9 +6,10 @@ cd "$(dirname "$0")/../../backend"
 PY=.venv/bin/python
 [ -x "$PY" ] || { echo "[ERROR] backend/.venv not found"; exit 1; }
 "$PY" -m pip install -q pyinstaller
+# --specpath scripts 使相对路径以 scripts/ 为基准：app 包与导入根需回到上级
 "$PY" -m PyInstaller --noconfirm --clean --onedir --name desktop_runner \
   --distpath dist-backend --workpath build-desktop --specpath scripts \
-  --add-data "app:app" \
+  --paths .. --add-data "../app:app" \
   --exclude-module psycopg2 --exclude-module torch --exclude-module transformers \
   --exclude-module celery --exclude-module redis \
   scripts/desktop_runner.py

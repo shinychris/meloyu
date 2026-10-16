@@ -10,7 +10,8 @@ _bucket_key/_hit 两个函数）。
 - /api/v1/auth/send-code|forgot-password 3/hour —— 防邮件轰炸
 - /api/v1/generations                 30/hour  —— 防算力刷取（叠加免费档日限）
 - 其余 /api/v1/*                      300/min  —— 全局兜底
-- /api/v1/billing/webhook             不限     —— Stripe 服务器 IP 调用
+
+（v0.16.0 Stripe 拆除后无 webhook 豁免项）
 """
 from __future__ import annotations
 

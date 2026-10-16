@@ -139,6 +139,48 @@ class TestPortal(unittest.TestCase):
         self.assertIn("activation email", r.text)
         self.assertIn("activation code", r.text)
 
+    def test_device_unbind_frees_quota(self):
+        """换机解绑（2026-10-16 补全）：满额设备解绑后新设备可激活。"""
+        r = self.client.post("/api/admin/licenses", headers=ADMIN,
+                             json={"tier": "lifetime", "account": "swap@t.local",
+                                   "devices": 1})
+        lid = r.json()["license_id"]
+        code = r.json()["activation_code"]
+        self.assertTrue(self.client.post("/api/activate", json={
+            "account": "swap@t.local", "code": code, "device_id": "old-pc"}).json()["ok"])
+        # 满额：新机被拒
+        full = self.client.post("/api/activate", json={
+            "account": "swap@t.local", "code": code, "device_id": "new-mac"})
+        self.assertEqual(full.json()["reason"], "device_limit")
+        # 管理端解绑旧机 → 新机激活成功
+        un = self.client.delete(f"/api/admin/activations/{lid}/old-pc", headers=ADMIN)
+        self.assertEqual(un.status_code, 200)
+        self.assertTrue(un.json()["unbound"])
+        ok = self.client.post("/api/activate", json={
+            "account": "swap@t.local", "code": code, "device_id": "new-mac"})
+        self.assertTrue(ok.json()["ok"])
+        # 解绑不存在的记录 → 404
+        nf = self.client.delete(f"/api/admin/activations/{lid}/ghost", headers=ADMIN)
+        self.assertEqual(nf.status_code, 404)
+        # 鉴权同其他 admin 端点
+        self.assertEqual(
+            self.client.delete(f"/api/admin/activations/{lid}/new-mac").status_code, 401)
+
+    def test_generic_code_binds_account_on_first_redeem(self):
+        """通用码首触绑定（2026-10-16）：未指定账户的码首次兑换锁定账户，
+        他账户再兑被拒（account_mismatch）。"""
+        r = self.client.post("/api/admin/licenses", headers=ADMIN,
+                             json={"tier": "lifetime", "devices": 3})  # 未填 account
+        self.assertEqual(r.status_code, 200)
+        code = r.json()["activation_code"]
+        first = self.client.post("/api/activate", json={
+            "account": "first@t.local", "code": code, "device_id": "d1"})
+        self.assertTrue(first.json()["ok"])
+        second = self.client.post("/api/activate", json={
+            "account": "stranger@t.local", "code": code, "device_id": "d2"})
+        self.assertFalse(second.json()["ok"])
+        self.assertEqual(second.json()["reason"], "account_mismatch")
+
     def test_marketing_index_and_updates_mount(self):
         # F7：dist-landing 已构建 → 首页为落地页 SPA（默认英文营销站）；
         # 未构建 → 兜底基座页（两句式断言兼容 CI 无前端构建产物的场景）

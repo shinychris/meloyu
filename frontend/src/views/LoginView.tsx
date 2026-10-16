@@ -282,13 +282,16 @@ export default function LoginView() {
             {/* 2026-09-09 安审计 L2/M-4：移除 demo 固定凭据提示与自动填充——生产栈
                 启动即禁用种子账号，该凭据已不可用；dev 演示凭据见 backend/README.md。
                 商业化发布：不再展示 demo 引擎说明文案 */}
-            <button
+            {/* F7：落地页已迁官网营销站（portal 托管），App 内无 /landing 路由——
+                改为外链官网（原 navigate('/landing') 会弹回登录页成死按钮） */}
+            <a
               className="mt-3 flex items-center gap-1 transition-colors hover:text-white"
-              type="button"
-              onClick={() => navigate('/landing')}
+              href="https://meloyu.com"
+              target="_blank"
+              rel="noreferrer"
             >
               {t('login.backToLanding')}
-            </button>
+            </a>
           </div>
         </div>
       </div>

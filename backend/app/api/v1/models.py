@@ -13,6 +13,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.core.errors import err_forbidden
 from app.core.i18n import tr
 from app.core.responses import ok
@@ -34,7 +35,14 @@ router = APIRouter(prefix="/models", tags=["models"])
 
 
 def require_admin(user: User = Depends(get_current_user)) -> User:
-    """模型中心写操作需管理员（全局配置影响所有用户的通道与费用）。"""
+    """模型中心写操作需管理员（全局配置影响所有用户的通道与费用）。
+
+    B7（2026-10-16 补全）：desktop 形态配置即当前用户自己的配置——
+    get_current_user 已短路为本地档案，不再叠加 admin 判定；
+    cloud/enterprise 维持 admin 闸（全局配置影响所有用户）。
+    """
+    if settings.app_mode == "desktop":
+        return user
     if not user.is_admin:
         raise err_forbidden(tr(
             "模型中心写操作需管理员权限（平台级全局配置）",
@@ -49,7 +57,11 @@ def require_admin_probe(user: User = Depends(get_current_user)) -> User:
     test-external/test-music 接受调用方任意 base_url 并由服务端发起请求——
     若登录即可用，构成内网探测/云元数据读取原语（SSRF）；与 PUT /settings
     同级收权 admin（管理员本就可信配置任意通道地址，含本机推理端点）。
+    desktop 形态放开为当前用户（B7，2026-10-16：单机实例探测目标是
+    用户自己配置的本机/自托管端点，信任边界即本地档案）。
     """
+    if settings.app_mode == "desktop":
+        return user
     if not user.is_admin:
         raise err_forbidden(tr(
             "模型中心连通性测试需管理员权限（测试将用您填写的地址发起服务端请求）",

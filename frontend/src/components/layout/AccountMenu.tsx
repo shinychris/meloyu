@@ -131,7 +131,7 @@ function DeleteAccountModal({ open, onClose }: { open: boolean; onClose: () => v
       await deleteAccount({ password })
       toast(t('auth.delete.done'))
       logout() // 清 token / 停轮询 / 停播放器
-      navigate('/landing', { replace: true })
+      navigate('/login', { replace: true })
     } catch {
       /* 拦截器已 toast（密码错误 / 会话过期等） */
     } finally {
@@ -237,7 +237,7 @@ export default function AccountMenu() {
     }
     toast(t('auth.logoutAll.done'))
     logout()
-    navigate('/landing', { replace: true })
+    navigate('/login', { replace: true })
   }
 
   /** 导出我的数据：GET /auth/export-data（zip 流）→ a[download] 保存 */

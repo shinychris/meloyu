@@ -8,9 +8,10 @@ if not exist .venv\Scripts\python.exe (
   exit /b 1
 )
 .venv\Scripts\pip install -q pyinstaller || exit /b 1
+rem --specpath scripts 使相对路径以 scripts\ 为基准：app 包与导入根需回到上级
 .venv\Scripts\pyinstaller --noconfirm --clean --onedir --name desktop_runner ^
   --distpath dist-backend --workpath build-desktop --specpath scripts ^
-  --add-data "app;app" ^
+  --paths .. --add-data "..\app;app" ^
   --exclude-module psycopg2 --exclude-module torch --exclude-module transformers ^
   --exclude-module celery --exclude-module redis ^
   scripts\desktop_runner.py || exit /b 1
