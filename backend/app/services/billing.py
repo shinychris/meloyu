@@ -87,15 +87,15 @@ def switch_plan(db: Session, user: User, plan_code: str) -> dict:
                f"{' (' + contact + ')' if contact else ''}"))
     if settings.billing_mode == "license":
         raise err_conflict(tr(
-            "买断制授权：档位不可切换——请在「定价与激活」输入 License Key 激活终身授权",
+            "买断制授权：档位不可切换——请在「系统设置 · 授权」输入激活码激活终身授权",
             "One-time license: plans are not switchable — activate your lifetime "
-            "license key under Pricing & Activation"))
+            "license under Settings → License"))
     if plan_code != "free":
         raise err_conflict(tr(
-            "订阅已停售：Meloyu 已转型为桌面软件买断制（$399 终身，限时 $159），"
+            "订阅已停售：Meloyu 已转型为桌面软件买断制（$399 终身，限时 $129），"
             "付费订阅不再受理",
             "Subscriptions are no longer sold: Meloyu has moved to a one-time "
-            "desktop license ($399 lifetime, launch offer $159)"))
+            "desktop license ($399 lifetime, launch offer $129)"))
     if plan_code == user.plan:
         # 幂等：同档切换仅记录事件
         works_svc.add_event(db, user_id=user.id, action="plan_switch", actor="human",

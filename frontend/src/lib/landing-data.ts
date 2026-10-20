@@ -12,7 +12,7 @@
  */
 import type { TranslationKey } from '../i18n'
 
-export const LANDING_VERSION = 'v0.16.2'
+export const LANDING_VERSION = 'v0.17.0'
 
 /** Hero 指标条（商业化口径：面向用户的价值指标，非开发过程指标） */
 export const LANDING_METRICS: Array<{ value: string; label: TranslationKey }> = [
@@ -309,8 +309,8 @@ export const AUDIENCES: Array<{ title: TranslationKey; sub: TranslationKey; poin
   },
 ]
 
-/** 授权定价（买断制定位 D-1 定案：$399 终身授权、限时首发 $159；与
- *  docs/06-商业化/2026-10-03-定位调整方案-SaaS转桌面买断制.md 对齐；USD 分值，展示侧 /100） */
+/** 授权定价（买断制定位 D-1 定案：$399 终身授权原价锚、限时买断 $129（2026-10-17 调价）；
+ *  与 docs/06-商业化/2026-10-03-定位调整方案-SaaS转桌面买断制.md 对齐；USD 分值，展示侧 /100） */
 export const LICENSE_SKU: {
   code: string
   name: TranslationKey
@@ -327,7 +327,7 @@ export const LICENSE_SKU: {
   badge: 'landing.data.license.badge',
   platforms: 'landing.data.license.platforms',
   price: 39900,
-  salePrice: 15900,
+  salePrice: 12900,
   features: [
     'landing.data.license.f1',
     'landing.data.license.f2',

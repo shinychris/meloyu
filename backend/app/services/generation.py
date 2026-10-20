@@ -417,6 +417,8 @@ def _prepare_generation_inputs(db, task_id: str, payload_row: dict, resolved: di
     """
     params = resolved["params"]
     changed = False
+    # 歌词 LLM 通道是否实际参与（本地规则扩写/兜底不计入自定义 API 用量统计）
+    lyrics_llm_used = False
     if payload_row.get("mode") == "simple" and payload_row.get("simple_prompt"):
         _write_progress(task_id, "writing", 2,
                         tr("AI 扩写风格描述…", "Expanding style description with AI…"))
@@ -425,6 +427,7 @@ def _prepare_generation_inputs(db, task_id: str, payload_row: dict, resolved: di
         chat = model_center.get_lyrics_chat(db)
         if chat is not None:
             style = expand_style_by_llm(chat, simple) or style
+            lyrics_llm_used = True
         params["style_prompt"] = style
         resolved["style_prompt"] = style
         resolved["style_expanded"] = True
@@ -439,12 +442,19 @@ def _prepare_generation_inputs(db, task_id: str, payload_row: dict, resolved: di
         resolved["lyrics"] = gen.get("lyrics") or ""
         resolved["lyrics_engine"] = gen.get("engine", "")
         resolved["lyrics_fallback"] = bool(gen.get("fallback"))
+        lyrics_llm_used = lyrics_llm_used or not gen.get("fallback")
         changed = True
     if not changed:
         return
     task = db.get(Task, task_id)
     if task is None:
         return
+    # 用量统计快照（M-20261017-a）：歌词引擎通道族，列存供按通道聚合；
+    # 完整引擎串（含模型名）仍留在 request_payload._resolved.lyrics_engine
+    if lyrics_llm_used:
+        engine_family = model_center.current_lyrics_backend(db)
+        if engine_family != "localsynth":
+            task.lyrics_engine = engine_family
     task.request_payload = {**(task.request_payload or {}), "_resolved": resolved}
     version = db.get(Version, task.version_id)
     if version is not None:

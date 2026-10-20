@@ -691,6 +691,45 @@ export interface InspirationMeta {
   instruments: string[]
 }
 
+/* ============ usage stats（v0.17.0 用量统计：license 模式=纯计量，无扣减语义） ============ */
+
+export interface UsageTotals {
+  calls: number
+  succeeded: number
+  failed: number
+  canceled: number
+  /** 用量单位（历史积分口径等价量；仅统计成功任务，与流水净额一致） */
+  units: number
+}
+
+/** 歌曲引擎通道用量行（remote_api=用户自有 Key 的云端通道） */
+export interface UsageEngineRow {
+  engine: string
+  kind: 'remote_api' | 'local'
+  calls: number
+  succeeded: number
+  units: number
+}
+
+/** 歌词引擎通道调用行 */
+export interface UsageLyricsRow {
+  engine: string
+  kind: 'remote_api' | 'local'
+  calls: number
+}
+
+/** GET /usage/stats —— 按天/按引擎通道的生成用量统计与分析 */
+export interface UsageStats {
+  mode: 'license' | 'subscription'
+  window: { days: number; from: string; to: string }
+  totals: { all_time: UsageTotals; window: UsageTotals }
+  by_day: Array<{ date: string; calls: number; units: number }>
+  by_engine: UsageEngineRow[]
+  lyrics_by_engine: UsageLyricsRow[]
+  /** 窗口内用户自定义 API 通道的调用总数（歌曲+歌词） */
+  remote_api_calls: number
+}
+
 export interface SystemMeta {
   models: ModelMeta[]
   keys: KeyOption[]
@@ -706,6 +745,8 @@ export interface SystemMeta {
   /** 产品形态（v0.16.0 定位转型）：desktop=桌面单机 / enterprise=私有化 / cloud=存量云 */
   app_mode?: 'cloud' | 'desktop' | 'enterprise'
   billing_mode?: 'license' | 'subscription'
+  /** 桌面形态本地数据目录（系统设置页展示；云形态不下发） */
+  data_dir?: string | null
 }
 
 /* ============ 证书（§8.4，非包裹 JSON） ============ */
@@ -813,6 +854,10 @@ export interface MusicCatalog {
     downloaded_ids: string[]
     acestep_deps_installed: boolean
     acestep_install_hint: string
+    /** 最近一次 ACE-Step 组件部署操作（v0.16.3：首启自动/手动共用，含进度） */
+    acestep_deploy_op?: ModelOpInfo | null
+    /** desktop 形态首启自动部署开关（默认开） */
+    acestep_auto_deploy?: boolean
     services: Record<string, { running: boolean; detail: string; hint: string; host: string }>
   }
   selected: { music_backend: MusicBackend; music_model: string | null }
@@ -839,8 +884,8 @@ export interface RecommendedModel {
 
 export interface ModelOpInfo {
   id: string
-  /** V1.4 新增 music_pull/music_delete：开源歌曲模型（MusicGen）本地下载/删除 */
-  op_type: 'pull' | 'delete' | 'music_pull' | 'music_delete'
+  /** V1.4 music_pull/music_delete；v0.16.3 acestep_deploy（组件应用内部署） */
+  op_type: 'pull' | 'delete' | 'music_pull' | 'music_delete' | 'acestep_deploy'
   target: string
   status: 'queued' | 'running' | 'succeeded' | 'failed'
   progress: number

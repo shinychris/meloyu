@@ -66,7 +66,7 @@ Admin 端点鉴权：`Authorization: Bearer <PORTAL_ADMIN_TOKEN>`。
 
 **可选（Stripe Payment Link，无 webhook）**：
 
-1. Stripe Dashboard 创建 **Payment Link**（$159，成功后跳转
+1. Stripe Dashboard 创建 **Payment Link**（$129，成功后跳转
    `https://<portal>/thanks?session_id={CHECKOUT_SESSION_ID}`）→ 填 `PAYMENT_LINK_URL`。
 2. 用户付款 → 回跳 `/thanks` → 服务端凭 secret key 直查
    `GET /v1/checkout/sessions/{id}` 确认 `payment_status=paid` → 签发激活码

@@ -60,13 +60,18 @@ def _make_admin_via_db(email: str) -> None:
 
 def _activate_plan_via_db(email: str, plan: str) -> None:
     """冒烟辅助：直写档位并按档发放积分（2026-10-03 起 Stripe 已拆除，
-    等价旧 webhook 激活产物：plan + plan_grant 流水）。"""
+    等价旧 webhook 激活产物：plan + plan_grant 流水）。
+
+    plan 变更必须先 flush：SessionLocal autoflush=False，而 credits.grant 内的
+    db.refresh(user) 会以 DB 当前值覆写内存待写属性——不 flush 时 plan 改动
+    被静默丢弃，账号停留 free 档（2026-10-17 实测 40201 连锁，v0.16.3 修复）。"""
     from app.database import SessionLocal
     from app.models import Plan, User
     from app.services import credits as credits_svc
     with SessionLocal() as db:
         user = db.query(User).filter(User.email == email).one()
         user.plan = plan
+        db.flush()
         row = db.get(Plan, plan)
         if row and row.monthly_credits:
             credits_svc.grant(db, user, row.monthly_credits, "plan_grant")
@@ -570,13 +575,15 @@ def main() -> int:
               or (mop["status"] == "failed" and "requirements-musicgen" in mop["error_message"]),
               json.dumps(mop)[:200])
 
-    # ACE-Step v1.5 本机通道（V1.5 批）：权重已就绪 → 秒级 succeeded（已存在即跳过）；
-    # 未部署 venv → failed 且 error_message 含 setup_acestep 部署指引
+    # ACE-Step v1.5 本机通道（V1.5 批；v0.16.3 部署链入 pull）：权重已就绪 →
+    # 秒级 succeeded；未部署 venv → 先应用内自动部署（源码+uv+venv，可能远超
+    # 轮询窗）再下权重——「部署进行中 running」同为合法态；自动部署失败 →
+    # failed 且 error_message 含 setup_acestep 手动兜底指引
     r = client.post(f"{API}/models/music-pull", headers=auth_headers(token),
                     json={"model": "ace-step"})
     b = unwrap(r)
     ap_ok = r.status_code == 202 and b["code"] == 0 and b["data"]["id"]
-    check("15.8b music-pull ace-step（202 异步受理；未部署→可读失败）",
+    check("15.8b music-pull ace-step（202 异步受理；未部署→自动部署链启动）",
           ap_ok or (r.status_code == 422 and b["code"] == 40001), json.dumps(b)[:200])
     if ap_ok:
         mop_id = b["data"]["id"]
@@ -587,9 +594,11 @@ def main() -> int:
             mop = unwrap(r2)["data"]
             if mop["status"] not in ("queued", "running"):
                 break
-        check("15.8b music-pull ace-step 终态（就绪→succeeded/未部署→指引）",
+        check("15.8b music-pull ace-step 终态（就绪→succeeded/部署中→running/失败→指引）",
               mop["status"] == "succeeded"
-              or (mop["status"] == "failed" and "setup_acestep" in mop["error_message"]),
+              or (mop["status"] == "failed" and "setup_acestep" in mop["error_message"])
+              or (mop["status"] in ("queued", "running", "timeout")
+                  and ("部署" in mop["message"] or "deploy" in mop["message"].lower())),
               json.dumps(mop)[:200])
 
     r = client.put(f"{API}/models/settings", headers=auth_headers(token),
@@ -1294,9 +1303,11 @@ def main() -> int:
     r = client.post(f"{API}/subscriptions/switch", headers=auth_headers(token),
                     json={"plan": "studio"})
     b = unwrap(r)
-    check("11.2 同档切换幂等（不再发放积分）", r.status_code == 200
-          and b["data"]["plan"] == "studio"
-          and b["data"]["credits"]["balance"] == balance_now)
+    # v0.16.1 去 Stripe 化后：付费档一律 40901（订阅停售，billing.switch_plan
+    # 在同档幂等分支之前拦截）——不再有「同档切换 200 幂等」形态；余额必须未动
+    check("11.2 同档切换被拒（订阅停售 40901；不再发放积分）", r.status_code == 409
+          and b["code"] == 40901
+          and b["data"] is None)
 
     r = client.post(f"{API}/subscriptions/switch", headers=auth_headers(token),
                     json={"plan": "team"})
@@ -1334,7 +1345,10 @@ def main() -> int:
     new_rt = _refresh_from_setcookie(r)
     check("16.1 POST /auth/refresh 轮换（Cookie 通道）", r.status_code == 200
           and new_pair["access_token"] and bool(new_rt) and new_rt != rt)
-    r = client.post(f"{API}/auth/refresh", json={"refresh_token": rt})  # 旧值（body 兼容）
+    # 旧值重放须隔离 Cookie（端点 Cookie 优先，httpx 自动带新 Cookie 会把旧值
+    # body 重放「洗白」成 200——v0.16.3 修正检查方法学，auth 行为本身正确）
+    with httpx.Client(timeout=30.0, trust_env=False) as _bare:
+        r = _bare.post(f"{API}/auth/refresh", json={"refresh_token": rt})
     check("16.1 旧 refresh 已失效（40103）", r.status_code == 401
           and unwrap(r)["code"] == 40103)
     r = client.post(f"{API}/auth/refresh", json={"refresh_token": new_rt})  # 新值（body 兼容）
@@ -1620,7 +1634,9 @@ def main() -> int:
         with _SL() as _db:
             _row = _db.execute(_sel(_T.request_payload).where(
                 _T.id == gtask["id"])).first()
-        snap = json.loads(_row[0]) if _row else {}
+        # JSON 列经 SQLAlchemy JSON 类型已解码为 dict（旧口径为 TEXT 字符串，兼容两者）
+        _raw = _row[0] if _row else None
+        snap = json.loads(_raw) if isinstance(_raw, str) else (_raw or {})
         check("18.4 voice 留痕（voice_clone=true + profile/活体口径）",
               snap.get("voice", {}).get("voice_clone") is True
               and snap["voice"]["voice_profile_id"] == vp["id"]

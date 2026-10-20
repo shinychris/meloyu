@@ -12,11 +12,13 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 REPO_DIR = BACKEND_DIR.parent
 
 API_PREFIX = "/api/v1"
-APP_VERSION = "0.16.2"
+APP_VERSION = "0.17.0"
 
 # ---- 买断制定价（D-1 定案，USD 分值；与前端 landing LICENSE_SKU / portal 一致）----
-LICENSE_PRICE_USD = 39900        # $399 终身授权
-LICENSE_SALE_PRICE_USD = 15900   # 限时首发 $159
+# 原价锚 $399（划线展示）+ 折扣成交价；折扣支持：SALE ≥ PRICE 或非正时
+# 前端自动回退单价格局（env 调整 LICENSE_SALE_PRICE_USD 即可开关/改折扣）
+LICENSE_PRICE_USD = 39900        # $399 终身授权（原价锚）
+LICENSE_SALE_PRICE_USD = 12900   # 限时买断价 $129（2026-10-17 起，原首发 $159）
 # 桌面版试用期天数（D-2：无免费层，14 天全功能试用）
 LICENSE_TRIAL_DAYS = 14
 
@@ -137,6 +139,9 @@ class Settings(BaseSettings):
     # ACE-Step 独立部署目录（默认 backend/data/acestep：代码+独立 venv+checkpoints，
     # gitignored；其依赖钉死 torch 2.7.1+cu128 与后端 venv 互斥，故隔离部署）
     acestep_home: str = ""
+    # desktop 形态首启自动部署 ACE-Step 组件（v0.16.3：默认安装即部署完成——
+    # 完整应用开箱体验；env ACESTEP_AUTO_DEPLOY=false 关闭，改为组件中心手动触发）
+    acestep_auto_deploy: bool = True
     # MiniMax Music 3 本机 audio.cpp 部署目录（默认 backend/data/audiocpp：CLI+
     # GGUF 权重，gitignored；.env 可覆盖）
     audiocpp_home: str = ""

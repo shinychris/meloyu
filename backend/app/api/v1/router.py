@@ -20,6 +20,7 @@ from app.api.v1 import (
     tasks,
     taste,
     team,
+    usage,
     versions,
     voice,
     works,
@@ -43,6 +44,7 @@ api_router.include_router(versions.router)
 api_router.include_router(exports.router)
 api_router.include_router(files.router)
 api_router.include_router(credits.router)
+api_router.include_router(usage.router)
 api_router.include_router(subscriptions.router)
 api_router.include_router(voice.router)
 api_router.include_router(hum.router)

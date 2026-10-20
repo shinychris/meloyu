@@ -41,6 +41,8 @@ export const studioZh: Record<keyof typeof studioEn, string> = {
   'studio.param.label': '参数与模型',
   'studio.generate.generating': '生成中…',
   'studio.generate.button': '生成 2 个候选 · {n} 积分',
+  // license（桌面买断）模式变体：用量纯计量，无积分语义（v0.17.0）
+  'studio.generate.buttonLocal': '生成 2 个候选',
   'studio.generate.complianceNote': '付费方案生成内容含商用授权；全程留痕，可在「合规与权利中心」下载授权证书。',
 
   // ===== 结果列 / 失败 / 空状态 =====
@@ -50,6 +52,7 @@ export const studioZh: Record<keyof typeof studioEn, string> = {
   'studio.failure.retrySimplified': '重试（精简提示词）',
   'studio.failure.retryOriginal': '原参数重试',
   'studio.failure.note': '失败任务积分已自动退还；精简重试将把风格描述关键词减半。',
+  'studio.failure.noteLocal': '失败任务不计入用量；精简重试将把风格描述关键词减半。',
   'studio.untitled': '未命名作品',
   'studio.empty.title': '三步出第一版',
   'studio.empty.step1': '① 在左侧「灵感指引」点选场景 / 情绪 / 风格',
@@ -93,6 +96,7 @@ export const studioZh: Record<keyof typeof studioEn, string> = {
   // ===== 生成进度 =====
   'studio.progress.queued': '排队中…',
   'studio.progress.cancelTitle': '取消将全额退还积分',
+  'studio.progress.cancelTitleLocal': '取消生成',
   'studio.progress.pipeline': 'MusiCoT 结构规划 → 编曲生成 → 人声合成 → 母带渲染',
 
   // ===== 候选卡 =====
@@ -121,6 +125,7 @@ export const studioZh: Record<keyof typeof studioEn, string> = {
   'studio.derive.variant.title': 'Variant / 变体',
   'studio.derive.regen.title': 'Regen / 段落重生成',
   'studio.derive.extend.hint': '从结尾续写生成新子版本（消耗积分，失败自动退还）',
+  'studio.derive.extend.hintLocal': '从结尾续写生成新子版本',
   'studio.derive.variant.hint': '保持结构与歌词不变，仅更换风格，生成新子版本',
   'studio.derive.variant.placeholder': '新风格描述（可留空 = 自动换风格）',
   'studio.derive.variant.aria': '新风格描述',
@@ -203,8 +208,11 @@ export const studioZh: Record<keyof typeof studioEn, string> = {
   'studio.log.generated': '生成 {n} 个候选（任务已完成）',
   'studio.log.generatedEmpty': '生成完成（任务已完成）',
   'studio.log.submit': '提交生成（{n} 积分）',
+  'studio.log.submitLocal': '提交生成（用量 {n}）',
   'studio.log.submitSimplified': '提交生成（{n} 积分） · 精简重试',
+  'studio.log.submitSimplifiedLocal': '提交生成（用量 {n}） · 精简重试',
   'studio.log.deriveStart': '{op}（{n} 积分）→ {code} 新子版本生成中',
+  'studio.log.deriveStartLocal': '{op}（用量 {n}）→ {code} 新子版本生成中',
   'studio.log.extendOp': '延长 {n} 秒',
   'studio.log.variantOp': '生成变体',
   'studio.log.regenOp': '段落重生成 {section}',

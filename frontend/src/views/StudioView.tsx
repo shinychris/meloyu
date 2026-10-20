@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStudioStore } from '../stores/studio'
 import { useMetaStore } from '../stores/meta'
+import { useSessionStore } from '../stores/session'
 import { toast } from '../stores/toast'
 import { countParenMarks, countStructureTags, insertAtCaret } from '../lib/structure'
 import { getModelsRuntime } from '../api/models'
@@ -41,6 +42,8 @@ export default function StudioView() {
   const workTitle = useStudioStore((s) => s.workTitle)
   const meta = useMetaStore((s) => s.meta)
   const referenceTrack = useStudioStore((s) => s.referenceTrack)
+  // license（桌面买断）模式：用量纯计量——按钮/失败提示不再出现积分语义（v0.17.0）
+  const isLicense = useSessionStore((s) => s.license?.billing_mode === 'license')
 
   const creditCost = meta.models.find((m) => m.value === form.model)?.credit_cost ?? 12
   const modelLabel = meta.models.find((m) => m.value === form.model)?.label ?? 'V1 Pro'
@@ -285,7 +288,9 @@ export default function StudioView() {
             disabled={generating}
             onClick={() => void submitGeneration()}
           >
-            {generating ? t('studio.generate.generating') : t('studio.generate.button', { n: creditCost })}
+            {generating
+              ? t('studio.generate.generating')
+              : t(isLicense ? 'studio.generate.buttonLocal' : 'studio.generate.button', { n: creditCost })}
           </button>
           <div className="text-2xs mt-2.5 leading-relaxed text-dim">
             {t('studio.generate.complianceNote')}
@@ -329,7 +334,7 @@ export default function StudioView() {
                 </button>
               </div>
               <div className="text-2xs mt-3 text-dim">
-                {t('studio.failure.note')}
+                {t(isLicense ? 'studio.failure.noteLocal' : 'studio.failure.note')}
               </div>
             </div>
           ) : candidates.length > 0 ? (

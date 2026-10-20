@@ -53,6 +53,10 @@ _ADD_COLUMNS: list[tuple[str, str, str]] = [
      "ALTER TABLE plans ADD COLUMN max_concurrent_tasks INTEGER"),
     ("plans", "storage_quota_mb",
      "ALTER TABLE plans ADD COLUMN storage_quota_mb INTEGER"),
+    # M-20261017-a：v0.17.0——任务补歌词引擎快照列（用量统计的歌词通道维度；
+    # 积分已转纯计量，统计面向用户自定义 API 的调用分析）
+    ("tasks", "lyrics_engine",
+     "ALTER TABLE tasks ADD COLUMN lyrics_engine VARCHAR(16)"),
 ]
 
 

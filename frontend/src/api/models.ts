@@ -78,6 +78,11 @@ export function pullMusicModel(model: string): Promise<ModelOpInfo> {
   return apiPost<ModelOpInfo>('/models/music-pull', { model })
 }
 
+/** POST /models/acestep-deploy —— ACE-Step 组件应用内部署（v0.16.3，202，轮询 ops/{id}） */
+export function deployAceStep(): Promise<ModelOpInfo> {
+  return apiPost<ModelOpInfo>('/models/acestep-deploy', {})
+}
+
 /** POST /models/music-delete —— 删除本机开源歌曲模型（同步返回） */
 export function deleteMusicModel(model: string): Promise<ModelOpInfo> {
   return apiPost<ModelOpInfo>('/models/music-delete', { model })

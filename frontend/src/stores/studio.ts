@@ -304,12 +304,14 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     try {
       const result = await submitGeneration(req)
       set({ task: result.task, workId: result.work.id, workTitle: result.work.title })
-      // 积分在提交时即被扣减：立刻同步侧栏余额，不等任务终态（真实业务测试发现 #5）
-      void useSessionStore.getState().refreshCredits()
+      // license（桌面买断）模式：用量纯计量无余额语义，跳过余额刷新、
+      // 日志按用量口径；cloud 形态积分在提交时即扣，立刻同步侧栏（测试发现 #5）
+      const metered = useSessionStore.getState().license?.billing_mode === 'license'
+      if (!metered) void useSessionStore.getState().refreshCredits()
       get().logOp(
         opts?.simplified
-          ? t('studio.log.submitSimplified', { n: result.cost_credits })
-          : t('studio.log.submit', { n: result.cost_credits }),
+          ? t(metered ? 'studio.log.submitSimplifiedLocal' : 'studio.log.submitSimplified', { n: result.cost_credits })
+          : t(metered ? 'studio.log.submitLocal' : 'studio.log.submit', { n: result.cost_credits }),
       )
       get().startPolling(result.task.id)
     } catch {
@@ -344,11 +346,16 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       candidates: [],
     })
     get().logOp(
-      t('studio.log.deriveStart', {
-        op: opLabel,
-        n: result.cost_credits,
-        code: result.work.display_code,
-      }),
+      t(
+        useSessionStore.getState().license?.billing_mode === 'license'
+          ? 'studio.log.deriveStartLocal'
+          : 'studio.log.deriveStart',
+        {
+          op: opLabel,
+          n: result.cost_credits,
+          code: result.work.display_code,
+        },
+      ),
     )
     get().startPolling(result.task.id)
   },

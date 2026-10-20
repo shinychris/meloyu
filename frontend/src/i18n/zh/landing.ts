@@ -13,7 +13,7 @@ export const landingZh: Record<keyof typeof landingEn, string> = {
   'landing.nav.pricing': '定价',
   'landing.nav.faq': 'FAQ',
   'landing.nav.login': '登录',
-  'landing.nav.cta': '限时 $159 预售',
+  'landing.nav.cta': '限时 $129 预售',
   // Hero
   'landing.hero.eyebrow': 'AI 音乐创作桌面软件',
   'landing.hero.title.a': '从一句灵感，',
@@ -22,7 +22,7 @@ export const landingZh: Record<keyof typeof landingEn, string> = {
   'landing.hero.title.b3': '的歌',
   'landing.hero.desc.1': '可控生成 · 段落级编辑 · DAW 级导出 · 授权留痕',
   'landing.hero.desc.2': '原生运行于 macOS 与 Windows 的专业 AI 音乐工作站——创作在本地完成，作品在你自己手里',
-  'landing.hero.cta.primary': '限时 $159 · 获取终身授权',
+  'landing.hero.cta.primary': '限时 $129 · 获取终身授权',
   'landing.hero.cta.secondary': '登录在线版',
   'landing.hero.chipHint': '点一个灵感，马上开始创作',
   'landing.hero.shotLabel': 'Meloyu · 创作工作台',
@@ -73,9 +73,9 @@ export const landingZh: Record<keyof typeof landingEn, string> = {
   // Pricing
   'landing.pricing.label': 'Pricing · 定价',
   'landing.pricing.title': '一次买断，终身使用',
-  'landing.pricing.desc': '无订阅、无月费、无积分消耗。限时首发 $159（原价 $399），一次付费获得终身授权，含全部版本更新。',
+  'landing.pricing.desc': '无订阅、无月费、无积分消耗。限时首发 $129（原价 $399），一次付费获得终身授权，含全部版本更新。',
   'landing.pricing.oneTime': '一次性买断 · 终身',
-  'landing.pricing.cta.buy': '立即以 $159 获取终身授权',
+  'landing.pricing.cta.buy': '立即以 $129 获取终身授权',
   'landing.pricing.footnote': '一次性买断付款（购买页见支付方式）。企业私有化部署与团队批量授权请联系销售。',
   // FAQ
   'landing.faq.label': 'FAQ · 常见问题',
@@ -83,8 +83,8 @@ export const landingZh: Record<keyof typeof landingEn, string> = {
   // Footer
   'landing.footer.ctaLabel': 'Start Now · 开始',
   'landing.footer.ctaTitle': '今晚就写出第一首歌',
-  'landing.footer.ctaDesc': '限时 $159 终身授权 · 无订阅无月费 · 作品与数据全部本地存储',
-  'landing.footer.ctaButton': '限时 $159 · 立即获取',
+  'landing.footer.ctaDesc': '限时 $129 终身授权 · 无订阅无月费 · 作品与数据全部本地存储',
+  'landing.footer.ctaButton': '限时 $129 · 立即获取',
   'landing.footer.brand': 'MELOYU 旋律屿',
   'landing.footer.about': '面向创作者的 AI 音乐桌面软件：可控生成、段落级编辑、DAW 级导出、授权留痕，原生运行于 macOS 与 Windows。',
   'landing.footer.meta': '{v} · 桌面应用（macOS / Windows）',
@@ -250,7 +250,7 @@ export const landingZh: Record<keyof typeof landingEn, string> = {
     '全部存在你自己的电脑上：作品、音频文件与曲库数据库均为本地存储，不上传 Meloyu 服务器。只有你主动选择云端引擎时，提示词才会发往对应服务商，且通道归属在任务记录中明示。',
   'landing.data.faq.6.q': '是订阅制吗？',
   'landing.data.faq.6.a':
-    '不是。$399 一次性买断终身授权，含全部版本更新——无月费、无积分、无档位。限时首发期 $159。企业团队的私有化部署另行提供，含实施与维保服务。',
+    '不是。$399 一次性买断终身授权，含全部版本更新——无月费、无积分、无档位。限时首发期 $129。企业团队的私有化部署另行提供，含实施与维保服务。',
   // 界面一览
   'landing.data.showcase.1.title': '创作工作台',
   'landing.data.showcase.1.desc': '四步指引 + 灵感 chips + 参数面板：从一句描述开始，双候选卡与版本树就在同一屏。',

@@ -113,7 +113,19 @@ PAYMENT_LINK_URL = os.environ.get("PAYMENT_LINK_URL", "")
 # 无在线支付模式（默认）：售卖走人工渠道（邮箱联系 → 人工签发 Key）
 SALES_EMAIL = os.environ.get("PORTAL_SALES_EMAIL", "")
 PRICE_USD = 39900
-SALE_PRICE_USD = 15900
+SALE_PRICE_USD = 12900
+# 折扣展示：成交价低于原价时动态算折扣百分比（与后端 config / 前端 LICENSE_SKU 同源口径；
+# SALE ≥ PRICE 或非正 = 无折扣，回退单价格局——env 改价即可开关折扣）
+_DISCOUNT_PCT = (
+    round((PRICE_USD - SALE_PRICE_USD) * 100 / PRICE_USD)
+    if 0 < SALE_PRICE_USD < PRICE_USD else None
+)
+_PRICE_STRIKE = (
+    f'\n<span style="font-size:20px;color:#5c666b;text-decoration:line-through">'
+    f'${PRICE_USD // 100}</span> '
+    f'<span style="font-size:20px;color:#8be9c0;font-weight:700">-{_DISCOUNT_PCT}%</span>'
+    if _DISCOUNT_PCT else ""
+)
 
 app = FastAPI(title="Meloyu License Portal", docs_url=None)
 portal_db.init(DATA_DIR / "portal.db")
@@ -356,11 +368,11 @@ margin:0}}.card{{max-width:560px;padding:40px;background:#16191b;border:1px soli
 h2{{color:#8be9c0;margin:0 0 12px}}.price{{font-size:40px;font-weight:800;margin:16px 0}}
 a{{color:#8be9c0}}li{{margin:8px 0;color:#9aa3a7;font-size:14px}}</style></head><body>
 <div class="card"><h2>Meloyu Desktop — Lifetime License</h2>
-<div class="price">$159 <span style="font-size:16px;color:#5c666b;text-decoration:line-through">$399</span></div>
+<div class="price">${SALE_PRICE_USD // 100}{_PRICE_STRIKE}</div>
 <ol>
-<li>Email <a href="mailto:{contact}">{contact}</a> to purchase (launch-offer $159, one-time, lifetime).</li>
+<li>Email <a href="mailto:{contact}">{contact}</a> to purchase (launch-offer ${SALE_PRICE_USD // 100}, one-time, lifetime).</li>
 <li>You receive an activation email with your account and activation code (usually within 24 hours).</li>
-<li>Open Meloyu → Pricing &amp; Activation → enter your account + code. Done.</li>
+<li>Open Meloyu → Settings → License → enter your account + code. Done.</li>
 </ol>
 <p style="color:#5c666b;font-size:13px">One-time purchase · up to 3 devices · all future updates included ·
 14-day full-feature trial in the app before you buy.</p>
@@ -439,9 +451,7 @@ a.btn{{background:#8be9c0;color:#0d0f10;padding:14px 34px;text-decoration:none;
 font-weight:700}}</style></head><body>
 <div style="letter-spacing:.2em;font-weight:700">MELOYU</div>
 <div>AI Music Desktop Studio — one purchase, yours for life</div>
-<div class="price">${SALE_PRICE_USD // 100}
-<span style="font-size:20px;color:#5c666b;text-decoration:line-through">
-${PRICE_USD // 100}</span></div>
+<div class="price">${SALE_PRICE_USD // 100}{_PRICE_STRIKE}</div>
 <a class="btn" href="/buy">Buy lifetime license</a>
 <div style="color:#5c666b;font-size:13px">Launch offer · macOS &amp; Windows ·
 all future updates included</div>

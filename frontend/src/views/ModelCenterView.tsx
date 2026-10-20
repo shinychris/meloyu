@@ -12,6 +12,7 @@ import type {
 import {
   deleteModel,
   deleteMusicModel,
+  deployAceStep,
   getLLMSettings,
   getLocalModels,
   getModelOp,
@@ -89,7 +90,8 @@ const localChannelOf = (m: MusicCatalogModel): MusicBackend | undefined =>
   m.channels.find((c) => LOCAL_CHANNELS.includes(c))
 
 const OP_TYPE_LABEL: Record<ModelOpInfo['op_type'], TranslationKey> = {
-  pull: 'common.download', delete: 'common.delete', music_pull: 'common.download', music_delete: 'common.delete',
+  pull: 'common.download', delete: 'common.delete', music_pull: 'common.download',
+  music_delete: 'common.delete', acestep_deploy: 'models.comp.deploying',
 }
 
 /** 目录模型的本机状态文案（t 为模块级翻译函数；本组件经 useT 订阅语言变化后重渲染） */
@@ -224,6 +226,29 @@ export default function ModelCenterView() {
       if (pollRef.current) window.clearInterval(pollRef.current)
     }
   }, [activeOp, refreshAll])
+
+  // ACE-Step 组件部署在桌面首启后台自动发起时（v0.16.3 默认安装即部署）：
+  // 进入模型中心即接管轮询，卡片进度实时化
+  useEffect(() => {
+    const dop = catalog?.machine.acestep_deploy_op
+    if (!activeOp && dop && (dop.status === 'queued' || dop.status === 'running')) {
+      setActiveOp(dop)
+    }
+  }, [catalog, activeOp])
+
+  const startAceDeploy = async () => {
+    setCatalogBusy(true)
+    try {
+      const op = await deployAceStep()
+      setActiveOp(op)
+      toast(t('models.comp.deployStarted'))
+    } catch {
+      /* 拦截器已 toast（409=已有部署/下载进行中）；刷新以接管展示在跑操作 */
+      void refreshAll().catch(() => {})
+    } finally {
+      setCatalogBusy(false)
+    }
+  }
 
   const saveBackend = async (target: LyricsBackend, extra: Record<string, string> = {}) => {
     if (target === 'ollama' && !pickedModel && !extra.ollama_model) {
@@ -793,11 +818,51 @@ export default function ModelCenterView() {
                   <div className="text-2xs mt-2 text-dim leading-relaxed">
                     {t('models.comp.acestep.req')}
                   </div>
-                  {catalog && !catalog.machine.acestep_deps_installed && (
-                    <div className="text-2xs mt-2 text-warn leading-relaxed break-words">
-                      {t('models.comp.depsHint', { hint: catalog.machine.acestep_install_hint })}
-                    </div>
-                  )}
+                  {catalog && !catalog.machine.acestep_deps_installed && (() => {
+                    // 组件部署进度（v0.16.3）：首启自动/手动共用 ops 管线；
+                    // activeOp 为本视图轮询态（实时），目录快照兜底
+                    const dop = activeOp?.op_type === 'acestep_deploy'
+                      ? activeOp
+                      : catalog.machine.acestep_deploy_op ?? null
+                    if (dop && (dop.status === 'queued' || dop.status === 'running')) {
+                      return (
+                        <div className="mt-2">
+                          <div className="flex items-center justify-between text-2xs mb-1">
+                            <span className="font-bold text-acc">{t('models.comp.deploying')}</span>
+                            <span className="num text-acc">{dop.progress}%</span>
+                          </div>
+                          <div className="h-[4px] bg-bg-3">
+                            <div
+                              className="h-full transition-all bg-acc"
+                              style={{ width: `${dop.progress}%` }}
+                            />
+                          </div>
+                          <div className="text-2xs mt-1 text-dim break-words">{dop.message}</div>
+                        </div>
+                      )
+                    }
+                    return (
+                      <>
+                        {dop?.status === 'failed' && !!dop.error_message && (
+                          <div className="text-2xs mt-2 text-bad leading-relaxed break-words">
+                            {t('models.comp.deployFailed', { err: dop.error_message })}
+                          </div>
+                        )}
+                        <button
+                          className="btn btn-acc btn-sm mt-2 self-start"
+                          disabled={catalogBusy || !!activeOp}
+                          onClick={() => void startAceDeploy()}
+                        >
+                          {dop?.status === 'failed'
+                            ? t('models.comp.deployRetry')
+                            : t('models.comp.deploy')}
+                        </button>
+                        <div className="text-2xs mt-2 text-warn leading-relaxed break-words">
+                          {t('models.comp.depsHint', { hint: catalog.machine.acestep_install_hint })}
+                        </div>
+                      </>
+                    )
+                  })()}
                   <div className="mt-auto pt-4 space-y-1.5">
                     {acestepModels.map((m) => compModelRow(m))}
                   </div>

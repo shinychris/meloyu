@@ -224,6 +224,8 @@ def meta():
         # 免登录直达、激活页替换订阅页、隐藏市场等）
         "app_mode": settings.app_mode,
         "billing_mode": settings.billing_mode,
+        # 桌面形态附带本地数据目录（系统设置页展示；云形态不下发，避免泄漏服务端路径）
+        **({"data_dir": settings.data_path} if settings.app_mode == "desktop" else {}),
         "generation_limits": {
             "min_duration_sec": 30, "max_duration_sec": 240,
             "min_bpm": 60, "max_bpm": 174,

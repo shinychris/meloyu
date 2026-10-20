@@ -57,16 +57,17 @@ handleDeepLinkArgs(process.argv)
 function handleDeepLinkArgs(argv) {
   const req = activateRequestFromParams(extractLinkFromArgv(argv))
   if (!req || !sidecarBase) return
-  // 主进程代为激活（免手动粘贴），完成后跳「定价与激活」页展示结果
+  // 主进程代为激活（免手动粘贴），完成后跳系统设置的授权分区展示结果
+  // （v0.17.0 起激活/授权入口自定价页迁入 /settings）
   const r = http.request(
     `${sidecarBase}${req.path}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' } },
     () => {
-      if (mainWindow) mainWindow.loadURL(`${sidecarBase}/#/pricing`).catch(() => {})
+      if (mainWindow) mainWindow.loadURL(`${sidecarBase}/#/settings`).catch(() => {})
     },
   )
   r.on('error', () => {
-    if (mainWindow) mainWindow.loadURL(`${sidecarBase}/#/pricing`).catch(() => {})
+    if (mainWindow) mainWindow.loadURL(`${sidecarBase}/#/settings`).catch(() => {})
   })
   r.end(JSON.stringify(req.body))
 }

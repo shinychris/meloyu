@@ -199,7 +199,8 @@ class TestSwitchPlanSemantics(_DBTestCase):
         out = billing_svc.list_plans(self.db, user)
         self.assertEqual(out["mode"], "subscription")
         self.assertEqual(out["license"]["price_usd"], 39900)
-        self.assertEqual(out["license"]["sale_price_usd"], 15900)
+        # 2026-10-17 定价调整：限时买断价 $159 → $129（原价锚 $399 保留）
+        self.assertEqual(out["license"]["sale_price_usd"], 12900)
 
 
 class TestLicenseLifecycle(_DBTestCase):

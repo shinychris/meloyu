@@ -84,7 +84,7 @@ describe('api/client 统一封装', () => {
     expect(useToastStore.getState().toasts.some((t) => t.message.includes('积分不足'))).toBe(true)
   })
 
-  it('40203（试用到期未激活）toast 引导文案并跳「定价与激活」页', async () => {
+  it('40203（试用到期未激活）toast 引导文案并跳系统设置的授权分区', async () => {
     stubBrowser()
     http.defaults.adapter = mockAdapter(402, {
       code: 40203,
@@ -93,7 +93,8 @@ describe('api/client 统一封装', () => {
       request_id: 'abc',
     })
     await expect(apiPost('/generations', {})).rejects.toMatchObject({ code: 40203 })
-    expect(currentHash()).toBe('#/pricing')
+    // v0.17.0：激活迁入 /settings（系统设置 · 授权分区）
+    expect(currentHash()).toBe('#/settings')
     expect(useToastStore.getState().toasts.some((t) => t.message.includes('试用期'))).toBe(true)
   })
 

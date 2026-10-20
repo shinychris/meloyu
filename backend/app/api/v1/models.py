@@ -161,6 +161,14 @@ def music_pull(body: CatalogModelRequest, db: Session = Depends(get_db),
     return ok(svc.start_music_pull(db, user.id, body.model), status_code=202)
 
 
+@router.post("/acestep-deploy")
+def acestep_deploy(db: Session = Depends(get_db),
+                   user: User = Depends(require_admin)):
+    """部署 ACE-Step 组件（v0.16.3：源码+uv 引导+独立 venv 约 4GB，异步轮询
+    ops/{id} 看进度；desktop 首启自动走同一链路，此端点供组件中心手动触发/重试）。"""
+    return ok(svc.start_acestep_deploy(db, user.id), status_code=202)
+
+
 @router.post("/music-delete")
 def music_delete(body: CatalogModelRequest, db: Session = Depends(get_db),
                  user: User = Depends(require_admin)):

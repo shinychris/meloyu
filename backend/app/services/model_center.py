@@ -14,6 +14,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.core.crypto import decrypt_secret, encrypt_secret
 from app.core.errors import err_conflict, err_not_found, err_validation
 from app.core.i18n import current_locale, run_with_locale, tr
@@ -65,6 +66,7 @@ from app.providers.music_selfhosted import (
     SongGenSelfHostedProvider,
     probe_service,
 )
+from app.services.acestep_deploy import ACEStepDeployError, deploy_acestep
 
 _op_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="meloyu-model-op")
 
@@ -646,6 +648,23 @@ def get_lyrics_chat(db: Session):
     return chat if callable(chat) else None
 
 
+def current_lyrics_backend(db: Session) -> str:
+    """留痕/用量统计用：当前生效的歌词引擎通道族（配置不完整按回退本地计）。
+
+    与 get_lyrics_provider 的回退口径一致（ollama 缺模型 / openai_compat 缺
+    端点+模型 → localsynth）；完整引擎串（含模型名）见任务快照 _resolved.lyrics_engine。
+    """
+    s = db.get(LLMSetting, SETTING_ID)
+    if s is None:
+        return "localsynth"
+    if s.lyrics_backend == "ollama" and s.ollama_model:
+        return "ollama"
+    if (s.lyrics_backend == "openai_compat"
+            and s.external_base_url and s.external_model):
+        return "openai_compat"
+    return "localsynth"
+
+
 # ---------- 歌曲引擎工厂（services/generation 消费） ----------
 
 def current_music_backend(db: Session) -> str:
@@ -704,6 +723,9 @@ def get_music_catalog(db: Session) -> dict:
     downloaded = set(local_downloaded_ids())
     ace_deps = acestep_deps_installed()
     ace_downloaded = set(acestep_downloaded_ids()) if ace_deps else set()
+    ace_deploy_op = db.execute(
+        select(ModelOp).where(ModelOp.op_type == "acestep_deploy")
+        .order_by(ModelOp.created_at.desc()).limit(1)).scalars().first()
     probes = {ch: probe_service(ch, s.local_service_hosts) for ch in _SELFHOSTED_BACKENDS}
     slugs: dict = s.replicate_slugs or {}
     models = []
@@ -748,6 +770,11 @@ def get_music_catalog(db: Session) -> dict:
                     "downloaded_ids": sorted(downloaded | ace_downloaded),
                     "acestep_deps_installed": ace_deps,
                     "acestep_install_hint": "" if ace_deps else acestep_install_hint(),
+                    # v0.16.3 组件自动部署：最近一次部署操作（首启自动/手动共用）
+                    # 供组件中心展示进度；desktop 形态默认首启自动部署
+                    "acestep_deploy_op": ace_deploy_op.to_dict() if ace_deploy_op else None,
+                    "acestep_auto_deploy": (settings.app_mode == "desktop"
+                                            and settings.acestep_auto_deploy),
                     "services": probes},
         "selected": {"music_backend": s.music_backend,
                      "music_model": s.music_model or None},
@@ -759,6 +786,41 @@ def get_music_catalog(db: Session) -> dict:
 def _execute_music_pull(op_id: str, model_id: str) -> None:
     _write_op(op_id, status="running",
               message=tr("准备下载模型权重…", "Preparing model weight download…"))
+    on_progress = _throttled_progress(op_id)
+    entry = CATALOG_BY_ID.get(model_id) or {}
+    is_acestep = "acestep_local" in entry.get("channels", [])
+    err_cls = ACEStepLocalError if is_acestep else MusicGenLocalError
+    pull_fn = acestep_pull_local if is_acestep else pull_local
+    try:
+        # v0.16.3：acestep 依赖未部署时先应用内自动部署（源码+uv 引导+venv，
+        # 约 4GB，进度占 0~30%），再下权重（30~100%）——桌面用户单按钮走完
+        # 全链路，不再要求跑脚本（方案 §3.2 组件中心 + 默认安装即部署）
+        if is_acestep and not acestep_deps_installed():
+            deploy_acestep(lambda pct, msg: on_progress(int(pct * 0.3), msg))
+
+            def weights_progress(pct: int, message: str) -> None:
+                on_progress(30 + int(pct * 0.7), message)
+
+            pull_fn(model_id, weights_progress)
+        else:
+            pull_fn(model_id, on_progress)
+        _write_op(op_id, status="succeeded", progress=100,
+                  message=tr(f"已下载 {model_id}", f"Downloaded {model_id}"))
+    except (ACEStepDeployError, err_cls) as e:  # type: ignore[misc] —— 动态 err_cls
+        detail = e.message
+        if isinstance(e, ACEStepDeployError):
+            # 自动部署失败时附手动兜底指引（dev=脚本 / desktop=组件中心重试）
+            detail = f"{detail}；{acestep_install_hint()}"
+        _write_op(op_id, status="failed", message=tr("下载失败", "Download failed"),
+                  error_message=detail[:280])
+    except Exception as e:  # noqa: BLE001 —— 线程兜底
+        logger.exception(f"music pull {model_id} crashed: {e}")
+        _write_op(op_id, status="failed", message=tr("下载失败", "Download failed"),
+                  error_message=str(e)[:280])
+
+
+def _throttled_progress(op_id: str):
+    """操作进度落库节流（≥2% 或 ≥1s 才写一次）。"""
     last = {"t": 0.0, "pct": -1}
 
     def on_progress(pct: int, message: str) -> None:
@@ -768,21 +830,66 @@ def _execute_music_pull(op_id: str, model_id: str) -> None:
         last.update(t=now, pct=pct)
         _write_op(op_id, progress=max(pct, 0), message=message[:280])
 
-    entry = CATALOG_BY_ID.get(model_id) or {}
-    is_acestep = "acestep_local" in entry.get("channels", [])
-    err_cls = ACEStepLocalError if is_acestep else MusicGenLocalError
-    pull_fn = acestep_pull_local if is_acestep else pull_local
+    return on_progress
+
+
+def _execute_acestep_deploy(op_id: str) -> None:
+    on_progress = _throttled_progress(op_id)
+    _write_op(op_id, status="running",
+              message=tr("准备部署 ACE-Step 组件…", "Preparing ACE-Step deployment…"))
     try:
-        pull_fn(model_id, on_progress)
+        deploy_acestep(on_progress)
         _write_op(op_id, status="succeeded", progress=100,
-                  message=tr(f"已下载 {model_id}", f"Downloaded {model_id}"))
-    except err_cls as e:
-        _write_op(op_id, status="failed", message=tr("下载失败", "Download failed"),
-                  error_message=e.message[:280])
+                  message=tr("ACE-Step 组件部署完成（权重请在下方下载）",
+                             "ACE-Step component deployed "
+                             "(download weights below)"))
+    except ACEStepDeployError as e:
+        _write_op(op_id, status="failed",
+                  message=tr("组件部署失败", "Component deployment failed"),
+                  error_message=f"{e.message}；{acestep_install_hint()}"[:280])
     except Exception as e:  # noqa: BLE001 —— 线程兜底
-        logger.exception(f"music pull {model_id} crashed: {e}")
-        _write_op(op_id, status="failed", message=tr("下载失败", "Download failed"),
+        logger.exception(f"acestep deploy crashed: {e}")
+        _write_op(op_id, status="failed",
+                  message=tr("组件部署失败", "Component deployment failed"),
                   error_message=str(e)[:280])
+
+
+def start_acestep_deploy(db: Session, user_id: str, *, auto: bool = False) -> dict | None:
+    """发起 ACE-Step 组件部署（异步，轮询 GET /models/ops/{id} 看进度）。
+
+    auto=True 为 desktop 首启自动部署（v0.16.3：默认安装即部署完成）——
+    已就绪时静默跳过（返回 None，不落 ops 防每次启动刷记录）；有其他操作
+    进行中则冲突，由调用方（main.py）捕获静默跳过，下次启动自愈。
+    手动调用（auto=False）已就绪时幂等落 succeeded 秒回。
+    """
+    if acestep_deps_installed():
+        if auto:
+            return None
+        op = ModelOp(id=new_uuid(), user_id=user_id, op_type="acestep_deploy",
+                     target="acestep", status="succeeded", progress=100,
+                     message=tr("ACE-Step 组件已就绪", "ACE-Step component ready"))
+        db.add(op)
+        db.commit()
+        db.refresh(op)
+        return op.to_dict()
+    running = db.execute(select(ModelOp).where(
+        ModelOp.status.in_(("queued", "running")))).scalars().all()
+    if any(op.target == "acestep" for op in running):
+        raise err_conflict(tr("ACE-Step 组件正在部署中",
+                              "ACE-Step component deployment is already running"))
+    if running:
+        raise err_conflict(tr("已有模型下载任务进行中，请等待完成后再发起",
+                              "Another model download is in progress; wait for it "
+                              "to finish before starting a new one"))
+    op = ModelOp(id=new_uuid(), user_id=user_id, op_type="acestep_deploy",
+                 target="acestep", status="queued",
+                 message=tr("排队中（首启自动）" if auto else "排队中",
+                            "Queued (auto)" if auto else "Queued"))
+    db.add(op)
+    db.commit()
+    db.refresh(op)
+    _submit_op(_execute_acestep_deploy, op.id)
+    return op.to_dict()
 
 
 _DOWNLOADABLE_CHANNELS = {"musicgen_local", "acestep_local"}  # 下载型本机通道（V1.5.1 区分）

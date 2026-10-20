@@ -10,7 +10,7 @@ import type { TranslationKey } from '../../i18n'
 
 const NAV_GROUPS: Array<{
   labelKey: TranslationKey
-  items: Array<{ to: string; labelKey: TranslationKey; kbd: string }>
+  items: Array<{ to: string; labelKey: TranslationKey; kbd?: string }>
 }> = [
   {
     labelKey: 'app.sidebar.group.create',
@@ -44,9 +44,9 @@ const NAV_GROUPS: Array<{
   },
 ]
 
-/** 212px 侧边栏（对齐原型：logo / 导航分组 / 新手引导 / 积分余额条 / 账号菜单）。
+/** 212px 侧边栏（对齐原型：logo / 导航分组 / 新手引导 / 授权徽标 / 账号菜单）。
  *  v0.16.0：license 模式（买断制）积分条替换为授权徽标（试用剩余天数/终身），
- *  点击进入「定价与激活」页。 */
+ *  v0.17.0：点击进入「系统设置」页的授权分区（激活自定价页迁入）。 */
 export default function Sidebar() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -65,10 +65,22 @@ export default function Sidebar() {
   const trialPct = activated
     ? 100
     : Math.min(100, Math.max(3, (daysLeft / Math.max(1, license?.trial.days ?? 14)) * 100))
-  // D-6：desktop 形态隐藏作品市场（云社区非本阶段重点；路由侧亦有 MarketGuard 兜底）
-  const navGroups = isLicense && license?.mode === 'desktop'
-    ? NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => i.to !== '/market') }))
-    : NAV_GROUPS
+  // D-6：desktop 形态隐藏作品市场（云社区非本阶段重点；路由侧亦有 MarketGuard 兜底）；
+  // v0.17.0：license（买断）形态「定价与积分」换「系统设置」（授权/用量/引擎入口
+  // 收口到 /settings，定价页 cloud 存量专用）
+  const navGroups = NAV_GROUPS.map((g) => {
+    let items = g.items
+    if (isLicense) {
+      items = items.filter((i) => i.to !== '/pricing')
+      if (g.labelKey === 'app.sidebar.group.account') {
+        items = [{ to: '/settings', labelKey: 'app.sidebar.nav.settings' }, ...items]
+      }
+      if (license?.mode === 'desktop') {
+        items = items.filter((i) => i.to !== '/market')
+      }
+    }
+    return { ...g, items }
+  })
 
   return (
     <aside className="sidebar w-[212px] flex-none border-r flex flex-col border-line bg-bg">
@@ -101,7 +113,7 @@ export default function Sidebar() {
                 >
                   <span className="dot"></span>
                   {t(item.labelKey)}
-                  <span className="kbd">{item.kbd}</span>
+                  {item.kbd && <span className="kbd">{item.kbd}</span>}
                 </button>
               )
             })}
@@ -114,8 +126,8 @@ export default function Sidebar() {
           {t('app.sidebar.onboarding')}
         </button>
         {isLicense ? (
-          /* license 模式：授权徽标（试用剩余 / 终身 / 已到期），点击进激活页 */
-          <button className="block w-full text-left" onClick={() => navigate('/pricing')}>
+          /* license 模式：授权徽标（试用剩余 / 终身 / 已到期），点击进系统设置的授权分区 */
+          <button className="block w-full text-left" onClick={() => navigate('/settings')}>
             <div className="flex items-center justify-between">
               <span className="label">{t('license.sidebar.label')}</span>
               <span className="text-xs font-bold num text-acc">

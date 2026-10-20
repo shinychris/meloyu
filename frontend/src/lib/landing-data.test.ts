@@ -80,10 +80,12 @@ describe('landing-data 落地页数据完整性', () => {
     }
   })
 
-  it('授权定价与 D-1 定案一致（单档终身买断，USD 分值：$399 / 限时 $159）', () => {
+  it('授权定价与定案一致（单档终身买断，USD 分值：$399 原价锚 / 限时买断 $129，2026-10-17 调价）', () => {
     expect(LICENSE_SKU.code).toBe('lifetime')
     expect(LICENSE_SKU.price).toBe(39900)
-    expect(LICENSE_SKU.salePrice).toBe(15900)
+    expect(LICENSE_SKU.salePrice).toBe(12900)
+    // 折扣支持：成交价必须低于原价锚（LandingPricing 依此展示折扣百分比与划线原价）
+    expect(LICENSE_SKU.salePrice).toBeLessThan(LICENSE_SKU.price)
     expect(LICENSE_SKU.features.length).toBeGreaterThanOrEqual(5)
     const fields = [
       LICENSE_SKU.name,

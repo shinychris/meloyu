@@ -3,6 +3,7 @@ import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'ax
 import { http } from './client'
 import {
   deleteModel,
+  deployAceStep,
   getModelOp,
   getModelsRuntime,
   pullModel,
@@ -72,6 +73,17 @@ describe('api/models 模型中心封装', () => {
     const op = await getModelOp('op123')
     expect(op.progress).toBe(55)
     expect(lastConfig?.url).toBe('/models/ops/op123')
+  })
+
+  it('deployAceStep POST /models/acestep-deploy（v0.16.3 组件应用内部署）', async () => {
+    http.defaults.adapter = recordingAdapter({
+      id: 'opd1', op_type: 'acestep_deploy', target: 'acestep', status: 'queued',
+      progress: 0, message: '排队中', error_message: '', created_at: '', updated_at: '',
+    }, 202)
+    const op = await deployAceStep()
+    expect(op.op_type).toBe('acestep_deploy')
+    expect(lastConfig?.url).toBe('/models/acestep-deploy')
+    expect(lastConfig?.method).toBe('post')
   })
 
   it('deleteModel / updateLLMSettings / testExternal 的方法与路径', async () => {

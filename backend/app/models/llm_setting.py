@@ -50,8 +50,8 @@ class LLMSetting(BaseModel):
 
 
 class ModelOp(BaseModel):
-    """本地模型操作任务：op_type ∈ pull|delete|music_pull|music_delete（V1.4 增后两值）；
-    status ∈ queued|running|succeeded|failed。"""
+    """本地模型操作任务：op_type ∈ pull|delete|music_pull|music_delete|
+    acestep_deploy（v0.16.3 增组件部署）；status ∈ queued|running|succeeded|failed。"""
 
     __tablename__ = "model_ops"
     __table_args__ = (Index("ix_model_ops_status_target", "status", "target"),)

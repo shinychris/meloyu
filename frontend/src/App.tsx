@@ -18,6 +18,7 @@ const WorkDetailView = lazy(() => import('./views/WorkDetailView'))
 const RightsView = lazy(() => import('./views/RightsView'))
 const PricingView = lazy(() => import('./views/PricingView'))
 const ModelCenterView = lazy(() => import('./views/ModelCenterView'))
+const SettingsView = lazy(() => import('./views/SettingsView'))
 const ArrangementView = lazy(() => import('./views/ArrangementView'))
 const EditView = lazy(() => import('./views/EditView'))
 const PitchView = lazy(() => import('./views/PitchView'))
@@ -228,6 +229,16 @@ function ResetPasswordGuard() {
   return <ResetPasswordView />
 }
 
+/** 系统设置守卫（v0.17.0）：license（桌面买断/私有化）形态专属页；
+ *  cloud 存量形态回定价页（设置页内的授权/用量对云模式无意义）。 */
+function SettingsRoute() {
+  const license = useSessionStore((s) => s.license)
+  if (license != null && license.billing_mode !== 'license') {
+    return <Navigate to="/pricing" replace />
+  }
+  return <SettingsView />
+}
+
 /** 编曲路由壳：URL search 变化（工作台再次「送往编曲」）时以 key remount，
  *  ArrangementView 的首装参数逻辑无需感知参数更新 */
 function ArrangeRoute() {
@@ -270,6 +281,7 @@ function RootRoutes() {
           <Route path="/rights" element={<RightsView />} />
           <Route path="/pricing" element={<PricingView />} />
           <Route path="/models" element={<ModelCenterView />} />
+          <Route path="/settings" element={<SettingsRoute />} />
           <Route path="*" element={<Navigate to="/studio" replace />} />
         </Route>
       ) : (

@@ -6,7 +6,7 @@ import StudioView from './StudioView'
 import LyricsView, { resolveDraftText } from './LyricsView'
 import { lyricsEn } from '../i18n/en/lyrics'
 import { lyricsZh } from '../i18n/zh/lyrics'
-import { useI18nStore } from '../i18n'
+import { t, useI18nStore } from '../i18n'
 import LibraryView from './LibraryView'
 import RightsView from './RightsView'
 import PricingView from './PricingView'
@@ -16,6 +16,7 @@ import EditView from './EditView'
 import PitchView from './PitchView'
 import ModelCenterView from './ModelCenterView'
 import ResetPasswordView from './ResetPasswordView'
+import SettingsView from './SettingsView'
 import CandidateCard from '../components/studio/CandidateCard'
 import DerivePanel from '../components/studio/DerivePanel'
 import type { Candidate } from '../types/api'
@@ -113,6 +114,28 @@ describe('views render smoke', () => {
     // 订阅支付流组件已随 Stripe 拆除移除
     expect(html).not.toContain('Manage subscription')
     expect(html).not.toContain('Credit top-up pack')
+  })
+
+  it('SettingsView 渲染四分区设置页（v0.17.0：授权/用量统计收口到系统设置）', () => {
+    const html = render(<SettingsView />)
+    // 页头 + 四分区导航（SSR 快照为 store 初始态：license 未就绪时授权区局部加载，
+    // 其余分区照常渲染——设置内容不被授权状态阻塞）
+    expect(html).toContain('System settings')
+    expect(html).toContain('General')
+    expect(html).toContain('Usage &amp; analytics')
+    expect(html).toContain('License')
+    expect(html).toContain('Engines &amp; API')
+    // 用量口径声明：单次买断、无官方积分消耗
+    expect(html).toContain('No official credits are consumed')
+    // 通用区：语言切换 + 引擎入口
+    expect(html).toContain('Language')
+    expect(html).toContain('English')
+    expect(html).toContain('Open model center')
+    // 授权分区文案（分区标题 + 加载态/词条齐备性）
+    expect(html).toContain('Loading…')
+    expect(t('license.trial.title')).toBe('Free trial')
+    expect(t('license.trial.daysLeft', { n: 10 })).toBe('10 days left')
+    expect(t('settings.general.edition.desktop')).toBe('Desktop (one-time license)')
   })
 
   it('ResetPasswordView 无 token 时提示链接无效；有 token 时渲染表单', () => {

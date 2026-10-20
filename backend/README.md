@@ -80,7 +80,7 @@ master.wav SHA-256 一致」确定性验证与「simple 模式执行线程自动
 | 歌曲/整曲生成 | 外部歌曲生成 API（Suno 兼容） | `music_backend=api` + `music_api_base_url`（网关根，自动补 /api/v1）+ Key |
 | 同上 | **Replicate 开源模型托管（V1.4）** | `music_backend=replicate` + `replicate_api_token` + 目录选模型（ACE-Step/YuE/DiffRhythm/MusicGen…） |
 | 同上 | **本机 MusicGen（V1.4，离线免 Key）** | `music_backend=musicgen_local` + 目录选 musicgen-small|medium + 下载权重 |
-| 同上 | **本机 ACE-Step v1.5（V1.5，人声成曲）** | 先 `python scripts/setup_acestep.py`（独立 venv，约 4GB 依赖），再 `music_backend=acestep_local` + 目录选 ace-step + 下载权重（约 11GB） |
+| 同上 | **本机 ACE-Step v1.5（V1.5，人声成曲）** | 组件自动部署（v0.16.3：desktop 首启自动 / 模型中心「本地组件」一键 / `POST /models/acestep-deploy`；干净机器自动引导 uv+Python 3.12，约 4GB），再 `music_backend=acestep_local` + 目录选 ace-step + 下载权重（约 11GB，music-pull 未部署时自动先部署）。开发者/Docker 手动通道：`python scripts/setup_acestep.py` |
 | 同上 | **自托管推理服务（V1.5.1，ADR-017）** | MiniMax Music 3 双形态：①本机 audio.cpp（`data/audiocpp/`：CLI+GGUF Q4 约 8.4GB，Windows CUDA 可跑，实测 4060 Ti 约 16 分钟/10s 曲）优先；②SGLang-Omni 服务端点（Linux+双卡，速度快）。SongGeneration=SongGeneration-Studio model server（Windows 可跑）。均经 `music_backend=mmax_local`/`songgen_local` + 模型中心配置 |
 | 同上 | 本地合成引擎（离线兜底） | `music_backend=localsynth`（默认） |
 
@@ -91,6 +91,10 @@ master.wav SHA-256 一致」确定性验证与「simple 模式执行线程自动
 - **本机 ACE-Step v1.5 通道**：独立 venv 子进程桥（ADR-016）——其依赖钉死 torch 2.7.1+cu128
   与后端 venv（MusicGen 用 torch 2.13+cu130）互斥，故部署于 `data/acestep/`（gitignored）；
   推理经 `scripts/acestep_runner.py` 子进程，stdout JSON Lines 回传进度，取消=terminate。
+  部署链路（v0.16.3）实现在 `services/acestep_deploy.py`：源码钉版下载 + uv 双钉引导
+  （版本+sha256，干净机器零前置，uv 托管 Python 3.12）+ `uv sync` 独立 venv + import
+  校验，幂等可续跑；desktop 首启自动发起，模型中心「本地组件」与 `POST
+  /models/acestep-deploy` 手动触发，`music-pull` 未部署时自动前置部署。
 - Replicate 通道：一个 Token 接全部目录模型；每模型白名单 input 适配；一次并行 2 个
   prediction 对应 A/B 候选；社区 slug 变动可在 `replicate_slugs` 覆盖。
 - 本机 MusicGen：HF 真实下载（POST /models/music-pull，进度轮询）+ transformers 推理

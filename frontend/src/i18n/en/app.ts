@@ -27,6 +27,7 @@ export const appEn = {
   'app.sidebar.nav.rights': 'Rights & Compliance',
   'app.sidebar.nav.market': 'Marketplace',
   'app.sidebar.nav.pricing': 'Pricing & Credits',
+  'app.sidebar.nav.settings': 'Settings',
   'app.sidebar.nav.models': 'Model Center',
   'app.sidebar.onboarding': 'Take the Tour',
   'app.sidebar.credits': 'Credits',

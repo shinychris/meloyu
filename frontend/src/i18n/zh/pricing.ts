@@ -3,7 +3,7 @@ import { pricingEn } from '../en/pricing'
 /** pricing 命名空间：中文与原文一致（v0.16.0 买断制口径） */
 export const pricingZh: Record<keyof typeof pricingEn, string> = {
   // 页头
-  'pricing.label': 'Pricing / 定价与激活',
+  'pricing.label': 'Pricing / 定价与积分',
   'pricing.title': '一次买断，终身使用',
   // 加载态
   'pricing.loading': '加载中…',
@@ -21,7 +21,7 @@ export const pricingZh: Record<keyof typeof pricingEn, string> = {
   // cloud 存量：订阅停售公告
   'pricing.sunsetTitle': '订阅已停售',
   'pricing.sunsetDesc':
-    'Meloyu 已转型为桌面软件，终身授权一次买断（$399，限时首发 $159）——不再有月费。存量档位在过渡期内继续有效，新订阅不再受理。',
+    'Meloyu 已转型为桌面软件，终身授权一次买断（$399，限时 $129）——不再有月费。存量档位在过渡期内继续有效，新订阅不再受理。',
   'pricing.plansRefTitle': '档位配额（参考）',
   'pricing.planRef': '当前档位',
   'pricing.monthlyCredits.pre': '· 每月',

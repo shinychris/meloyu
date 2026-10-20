@@ -14,7 +14,7 @@ export const landingEn = {
   'landing.nav.pricing': 'Pricing',
   'landing.nav.faq': 'FAQ',
   'landing.nav.login': 'Sign in',
-  'landing.nav.cta': 'Launch offer $159',
+  'landing.nav.cta': 'Launch offer $129',
   // Hero
   'landing.hero.eyebrow': 'AI Music Desktop Studio',
   'landing.hero.title.a': 'From a spark of inspiration,',
@@ -23,7 +23,7 @@ export const landingEn = {
   'landing.hero.title.b3': ' song',
   'landing.hero.desc.1': 'Controllable generation · Section-level editing · DAW-grade export · Licensed & traceable',
   'landing.hero.desc.2': 'A professional AI music studio that runs natively on macOS and Windows — creation happens locally, your work stays yours',
-  'landing.hero.cta.primary': 'Launch offer $159 · Lifetime license',
+  'landing.hero.cta.primary': 'Launch offer $129 · Lifetime license',
   'landing.hero.cta.secondary': 'Sign in to the web edition',
   'landing.hero.chipHint': 'Tap a spark to start creating',
   'landing.hero.shotLabel': 'Meloyu · Studio',
@@ -71,9 +71,9 @@ export const landingEn = {
   // Pricing
   'landing.pricing.label': 'Pricing',
   'landing.pricing.title': 'One purchase, yours for life',
-  'landing.pricing.desc': 'No subscription, no monthly fees, no credits. Launch offer $159 (regular $399): pay once for a lifetime license that includes all future updates.',
+  'landing.pricing.desc': 'No subscription, no monthly fees, no credits. Launch offer $129 (regular $399): pay once for a lifetime license that includes all future updates.',
   'landing.pricing.oneTime': 'one-time · lifetime',
-  'landing.pricing.cta.buy': 'Get the lifetime license — $159',
+  'landing.pricing.cta.buy': 'Get the lifetime license — $129',
   'landing.pricing.footnote':'One-time payment (see the purchase page for options). For on-premise deployment and volume licensing, contact sales.',
   // FAQ
   'landing.faq.label': 'FAQ',
@@ -81,8 +81,8 @@ export const landingEn = {
   // Footer
   'landing.footer.ctaLabel': 'Start Now',
   'landing.footer.ctaTitle': 'Write your first song tonight',
-  'landing.footer.ctaDesc': 'Launch offer $159 for a lifetime license · no subscription · your works and data stay on your machine',
-  'landing.footer.ctaButton': 'Get it for $159',
+  'landing.footer.ctaDesc': 'Launch offer $129 for a lifetime license · no subscription · your works and data stay on your machine',
+  'landing.footer.ctaButton': 'Get it for $129',
   'landing.footer.brand': 'MELOYU · Melody Isle',
   'landing.footer.about':'The AI music desktop studio for creators: controllable generation, section-level editing, DAW-grade export, licensed and traceable — running natively on macOS and Windows.',
   'landing.footer.meta': '{v} · Desktop app · macOS & Windows',
@@ -242,7 +242,7 @@ export const landingEn = {
   'landing.data.faq.5.q': 'Where are my data and songs stored?',
   'landing.data.faq.5.a':'On your own machine. Works, audio files and the library database all live locally — nothing is uploaded to Meloyu servers. Prompts reach an external model provider only when you deliberately choose a cloud engine, and which engine was used is stated in every task record.',
   'landing.data.faq.6.q': 'Is this a subscription?',
-  'landing.data.faq.6.a':'No. A one-time purchase of $399 gets you a lifetime license including all future updates — no monthly fees, no credits, no tiers. Launch-offer early buyers get it for $159. On-premise deployment for teams is available separately with implementation and support plans.',
+  'landing.data.faq.6.a':'No. A one-time purchase of $399 gets you a lifetime license including all future updates — no monthly fees, no credits, no tiers. Launch-offer early buyers get it for $129. On-premise deployment for teams is available separately with implementation and support plans.',
   // 界面一览
   'landing.data.showcase.1.title': 'Creation studio',
   'landing.data.showcase.1.desc':'Four-step guide, inspiration chips and the parameter panel: start from one line — dual-candidate cards and the version tree live on the same screen.',

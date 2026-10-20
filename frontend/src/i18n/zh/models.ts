@@ -32,6 +32,12 @@ export const modelsZh: Record<keyof typeof modelsEn, string> = {
   'models.comp.status.depsMissing': '缺依赖',
   'models.comp.status.notDownloaded': '未下载',
   'models.comp.depsHint': '首次安装：{hint}',
+  // v0.16.3 组件应用内部署（默认安装即部署完成；不再让用户跑脚本）
+  'models.comp.deploy': '部署组件（约 4GB）',
+  'models.comp.deployRetry': '重试部署',
+  'models.comp.deploying': '组件部署中',
+  'models.comp.deployStarted': '组件部署已开始（后台进行，进度见本地组件卡片）',
+  'models.comp.deployFailed': '上次部署失败：{err}',
   'models.comp.vram': '显存',
   'models.nav.library': '本地模型库',
   'models.nav.ops': '操作记录',

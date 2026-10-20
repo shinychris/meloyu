@@ -46,6 +46,8 @@ export const studioEn = {
   'studio.param.label': 'Parameters & model',
   'studio.generate.generating': 'Generating…',
   'studio.generate.button': 'Generate 2 candidates · {n} credits',
+  // license（桌面买断）模式变体：用量纯计量，无积分语义（v0.17.0）
+  'studio.generate.buttonLocal': 'Generate 2 candidates',
   'studio.generate.complianceNote':
     'Paid-plan outputs include a commercial license; every step is traceable — download your license certificate in Rights & Compliance.',
 
@@ -57,6 +59,8 @@ export const studioEn = {
   'studio.failure.retryOriginal': 'Retry with original params',
   'studio.failure.note':
     'Credits for failed runs are refunded automatically; a simplified retry halves the style-prompt keywords.',
+  'studio.failure.noteLocal':
+    "Failed runs don't count toward usage; a simplified retry halves the style-prompt keywords.",
   'studio.untitled': 'Untitled work',
   'studio.empty.title': 'First version in three steps',
   'studio.empty.step1': '① Pick a scene / mood / genre under “Inspiration” on the left',
@@ -100,6 +104,7 @@ export const studioEn = {
   // ===== 生成进度 =====
   'studio.progress.queued': 'Queued…',
   'studio.progress.cancelTitle': 'Canceling refunds all credits',
+  'studio.progress.cancelTitleLocal': 'Cancel generation',
   'studio.progress.pipeline': 'MusiCoT structure planning → arrangement → vocal synthesis → mastering',
 
   // ===== 候选卡 =====
@@ -129,6 +134,8 @@ export const studioEn = {
   'studio.derive.regen.title': 'Section re-gen',
   'studio.derive.extend.hint':
     'Continues from the end into a new child version (costs credits, auto-refunded on failure)',
+  'studio.derive.extend.hintLocal':
+    'Continues from the end into a new child version',
   'studio.derive.variant.hint': 'Keeps structure and lyrics, swaps only the style — creates a new child version',
   'studio.derive.variant.placeholder': 'New style prompt (leave blank = auto restyle)',
   'studio.derive.variant.aria': 'New style prompt',
@@ -212,8 +219,11 @@ export const studioEn = {
   'studio.log.generated': 'Generated {n} candidates (task completed)',
   'studio.log.generatedEmpty': 'Generation complete (task completed)',
   'studio.log.submit': 'Generation submitted ({n} credits)',
+  'studio.log.submitLocal': 'Generation submitted (usage {n})',
   'studio.log.submitSimplified': 'Generation submitted ({n} credits) · simplified retry',
+  'studio.log.submitSimplifiedLocal': 'Generation submitted (usage {n}) · simplified retry',
   'studio.log.deriveStart': '{op} ({n} credits) → {code} generating a new child version',
+  'studio.log.deriveStartLocal': '{op} (usage {n}) → {code} generating a new child version',
   'studio.log.extendOp': 'Extend {n}s',
   'studio.log.variantOp': 'Create variant',
   'studio.log.regenOp': 'Section re-gen {section}',

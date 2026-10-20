@@ -254,6 +254,20 @@ def _startup() -> None:
             local = ensure_local_user(db)
             logger.info(f"desktop mode: local profile ready (user={local.email}, "
                         f"plan={local.plan}, data at {settings.data_path})")
+            # v0.16.3：默认安装即部署完成——ACE-Step 组件（买断制主打引擎）
+            # 首启后台自动部署（源码+uv 引导+独立 venv，约 4GB，进度见模型中心
+            # 「本地组件」；env ACESTEP_AUTO_DEPLOY=false 关闭改手动触发）。
+            # 受理失败仅记日志，部署失败落在 ops 记录，均不阻塞启动；
+            # 未完成时下次启动自愈续跑（部署链路幂等只补缺口）。
+            if settings.acestep_auto_deploy:
+                from app.services.model_center import start_acestep_deploy
+                try:
+                    if start_acestep_deploy(db, local.id, auto=True) is None:
+                        logger.info("desktop mode: ACE-Step component already ready")
+                    else:
+                        logger.info("desktop mode: ACE-Step component auto-deploy started")
+                except Exception as e:  # noqa: BLE001 —— 已有操作进行中/库异常不拦启动
+                    logger.warning(f"acestep auto-deploy not started: {e}")
     # P0-9（2026-09-26）：清扫不再挂列表读路径，改守护线程定时全量触发
     from app.services.works import start_periodic_purge
     start_periodic_purge()

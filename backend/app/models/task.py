@@ -61,6 +61,8 @@ class Task(BaseModel):
     )
     format: Mapped[str | None] = mapped_column(String(10))  # release=7字符（FR-11）
     provider: Mapped[str | None] = mapped_column(String(16))
+    # 歌词引擎快照（auto_lyrics / simple 扩写实际通道，用量统计维度）
+    lyrics_engine: Mapped[str | None] = mapped_column(String(16))
     # derive_seed 产 0~4294967295（无符号 32 位）：PG Integer 为有符号
     # 32 位，半数取值溢出（SQLite 动态类型无感）——v0.15.0 切 PG 改 BigInteger
     seed: Mapped[int | None] = mapped_column(BigInteger)

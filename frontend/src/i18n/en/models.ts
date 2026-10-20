@@ -32,6 +32,12 @@ export const modelsEn = {
   'models.comp.status.depsMissing': 'Deps missing',
   'models.comp.status.notDownloaded': 'Not downloaded',
   'models.comp.depsHint': 'First install: {hint}',
+  // v0.16.3 in-app component deployment (deployed by default install; no scripts)
+  'models.comp.deploy': 'Deploy component (~4GB)',
+  'models.comp.deployRetry': 'Retry deployment',
+  'models.comp.deploying': 'Deploying component',
+  'models.comp.deployStarted': 'Deployment started (runs in background; progress on the card)',
+  'models.comp.deployFailed': 'Last deployment failed: {err}',
   'models.comp.vram': 'VRAM',
   'models.nav.library': 'Local model library',
   'models.nav.ops': 'Operations',

@@ -1,4 +1,5 @@
 import { useStudioStore } from '../../stores/studio'
+import { useSessionStore } from '../../stores/session'
 import { useT } from '../../i18n'
 import type { Task } from '../../types/api'
 
@@ -6,6 +7,8 @@ import type { Task } from '../../types/api'
 export default function GenProgress({ task }: { task: Task | null }) {
   const t = useT()
   const cancelGeneration = useStudioStore((s) => s.cancelGeneration)
+  // license（桌面买断）模式无积分退还语义，取消提示用中性文案（v0.17.0）
+  const isLicense = useSessionStore((s) => s.license?.billing_mode === 'license')
   const label = task?.stage_label || t('studio.progress.queued')
   const pct = task?.progress ?? 0
 
@@ -20,7 +23,7 @@ export default function GenProgress({ task }: { task: Task | null }) {
         <button
           className="btn btn-ghost btn-sm"
           onClick={() => void cancelGeneration()}
-          title={t('studio.progress.cancelTitle')}
+          title={t(isLicense ? 'studio.progress.cancelTitleLocal' : 'studio.progress.cancelTitle')}
         >
           {t('common.cancel')}
         </button>

@@ -12,6 +12,7 @@ import { workEn } from './work'
 import { rightsEn } from './rights'
 import { pricingEn } from './pricing'
 import { modelsEn } from './models'
+import { settingsEn } from './settings'
 import { loginEn } from './login'
 import { layoutEn } from './layout'
 import { authEn } from './auth'
@@ -32,6 +33,7 @@ export const en = {
   ...rightsEn,
   ...pricingEn,
   ...modelsEn,
+  ...settingsEn,
   ...loginEn,
   ...layoutEn,
   ...authEn,

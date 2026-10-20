@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Candidate, RegenSectionRequest } from '../../types/api'
 import { formatClock, sectionLabel } from '../../lib/format'
+import { useSessionStore } from '../../stores/session'
 import { useT, type TranslationKey } from '../../i18n'
 
 export type DeriveKind = 'extend' | 'variant' | 'regen'
@@ -49,6 +50,8 @@ export default function DerivePanel({
   onClose,
 }: DerivePanelProps) {
   const t = useT()
+  // license（桌面买断）模式：续写提示不再出现积分语义（v0.17.0）
+  const isLicense = useSessionStore((s) => s.license?.billing_mode === 'license')
   const [seconds, setSeconds] = useState<number>(30)
   const [stylePrompt, setStylePrompt] = useState('')
   const [selectedSeg, setSelectedSeg] = useState<number | null>(null)
@@ -81,7 +84,7 @@ export default function DerivePanel({
       {kind === 'extend' && (
         <>
           <div className="text-xs mt-2 text-dim">
-            {t('studio.derive.extend.hint')}
+            {t(isLicense ? 'studio.derive.extend.hintLocal' : 'studio.derive.extend.hint')}
           </div>
           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
             {EXTEND_PRESETS.map((s) => (

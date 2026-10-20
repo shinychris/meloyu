@@ -125,6 +125,15 @@ def checkpoints_dir() -> Path:
 
 
 def acestep_install_hint() -> str:
+    """未部署指引。desktop（v0.16.3）：完整应用口径——组件中心一键部署 +
+    首启自动部署，不出现「跑脚本」的开发者指令；dev/cloud/docker 保留脚本
+    指引（含 Docker 容器通道）。"""
+    if settings.app_mode == "desktop":
+        return tr("ACE-Step 组件未部署：请到模型中心「本地组件」发起部署"
+                  "（约 4GB），或等待应用自动部署完成后重试",
+                  "ACE-Step component is not deployed: start deployment in the "
+                  "model center (Local components, ~4GB), or retry after the app "
+                  "finishes auto-deploying it")
     hint = tr(_INSTALL_HINT_ZH, _INSTALL_HINT_EN)
     if _in_docker():
         hint += "；" + tr(_INSTALL_HINT_DOCKER_ZH, _INSTALL_HINT_DOCKER_EN)

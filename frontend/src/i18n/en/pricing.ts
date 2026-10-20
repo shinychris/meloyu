@@ -1,7 +1,7 @@
-/** pricing 命名空间：定价与激活（v0.16.0 买断制；原订阅/充值文案随 Stripe 拆除） */
+/** pricing 命名空间：定价与积分（v0.17.0 起 cloud 存量专用；激活/买断卡已迁入 settings 命名空间的系统设置页） */
 export const pricingEn = {
   // 页头
-  'pricing.label': 'Pricing / Plans & Activation',
+  'pricing.label': 'Pricing / Plans & Credits',
   'pricing.title': 'One purchase, yours for life',
   // 加载态
   'pricing.loading': 'Loading…',
@@ -20,7 +20,7 @@ export const pricingEn = {
   // cloud 存量：订阅停售公告
   'pricing.sunsetTitle': 'Subscriptions have been retired',
   'pricing.sunsetDesc':
-    'Meloyu is now a desktop app with a one-time lifetime license ($399, launch offer $159) — no more monthly fees. Your current plan stays active for the transition period; new subscriptions are no longer sold.',
+    'Meloyu is now a desktop app with a one-time lifetime license ($399, launch offer $129) — no more monthly fees. Your current plan stays active for the transition period; new subscriptions are no longer sold.',
   'pricing.plansRefTitle': 'Plan quotas (reference)',
   'pricing.planRef': 'Current plan',
   'pricing.monthlyCredits.pre': '· Monthly',

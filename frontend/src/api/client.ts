@@ -52,10 +52,10 @@ function redirectToLogin(): void {
   }
 }
 
-/** 40203（v0.16.0 试用到期未激活）：跳「定价与激活」页（B12 前端配套） */
+/** 40203（试用到期未激活）：跳系统设置的授权分区激活（v0.17.0 起激活迁入 /settings） */
 function redirectToActivation(): void {
-  if (window.location.hash !== '#/pricing') {
-    window.location.hash = '#/pricing'
+  if (window.location.hash !== '#/settings') {
+    window.location.hash = '#/settings'
   }
 }
 
