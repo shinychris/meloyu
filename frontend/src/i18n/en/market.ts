@@ -35,4 +35,6 @@ export const marketEn = {
   'market.toast.published': 'Listed',
   'market.confirm.buy': 'Buy "{title}" for {n} credits? (non-exclusive license)',
   'market.confirm.ack': 'Confirm you hold the commercial license for this work and accept the 90/10 split?',
+  'market.confirm.delistTitle': 'Delist "{title}"?',
+  'market.confirm.delistDesc': 'Buyers will no longer be able to purchase this listing.',
 } as const

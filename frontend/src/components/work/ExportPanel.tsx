@@ -44,11 +44,15 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
   const timers = useRef<number[]>([])
   const mounted = useRef(true)
 
+  // F-FE-26：清理先拷贝 ref 引用再读 .current——直接在 effect 闭包里解引用
+  // timers.current 会拿到过期数组（react-hooks/exhaustive-deps 告警）
   useEffect(() => {
     mounted.current = true
+    const timersRef = timers
     return () => {
       mounted.current = false
-      timers.current.forEach((tm) => window.clearTimeout(tm))
+      for (const tm of timersRef.current) window.clearTimeout(tm)
+      timersRef.current = []
     }
   }, [])
 
@@ -64,6 +68,8 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
 
   const schedule = (taskId: string, format: ExportFormat, fails: number, namePrefix?: string) => {
     const timer = window.setTimeout(async () => {
+      // 已触发的定时器从数组移除（长导出会话不再无限累积）
+      timers.current = timers.current.filter((tm) => tm !== timer)
       try {
         const task: Task = await getTask(taskId)
         if (!mounted.current) return

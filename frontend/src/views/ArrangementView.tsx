@@ -6,12 +6,12 @@ import { getVersionTree } from '../api/works'
 import type { VersionTreeNode } from '../types/api'
 import { listCandidates } from '../api/generation'
 import { getTask } from '../api/generation'
-import { getStreamToken } from '../api/files'
+import { fetchAudioBytes, getStreamToken } from '../api/files'
 import { apiPost } from '../api/client'
 import { DEFAULT_PARAMS, Mixer, peaksOf, type TrackParams } from '../lib/mixer'
 import { toast } from '../stores/toast'
 import { useT, t as tGlobal } from '../i18n'
-import { formatDuration } from '../lib/format'
+import { formatDuration, versionSourceLabel } from '../lib/format'
 
 const STEM_NAMES = ['vocals', 'drums', 'bass', 'other'] as const
 const EQ_KEYS = { low: 'editor.eq.low', mid: 'editor.eq.mid', high: 'editor.eq.high' } as const
@@ -57,19 +57,21 @@ function LaneWaveform({ peaks }: { peaks: number[] }) {
 export default function ArrangementView() {
   const t = useT()
   const navigate = useNavigate()
-  /** 工作台「送往编曲」带来的上下文（?work=&version=&candidate=），仅首次装载生效 */
+  /** 工作台「送往编曲」带来的上下文（?work=&version=&candidate=），仅首次装载生效：
+   *  惰性 useState 固化首帧值（渲染期读 ref.current 触发 react-hooks/refs 告警；
+   *  路由以 key remount 保证参数变化即重装，本值无需跨渲染更新） */
   const [searchParams] = useSearchParams()
-  const initialRef = useRef({
+  const [initialParams] = useState(() => ({
     work: searchParams.get('work'),
     version: searchParams.get('version'),
     candidate: searchParams.get('candidate'),
-  })
+  }))
   const [works, setWorks] = useState<Work[]>([])
-  const [workId, setWorkId] = useState<string | null>(initialRef.current.work)
+  const [workId, setWorkId] = useState<string | null>(initialParams.work)
   const [nodes, setNodes] = useState<VersionTreeNode[]>([])
   const [currentVersionId, setCurrentVersionId] = useState<string | null>(null)
   const [versionId, setVersionId] = useState<string | null>(null)
-  const [candidate, setCandidates] = useState<Candidate | null>(null)
+  const [candidate, setCandidate] = useState<Candidate | null>(null)
   const [lanes, setLanes] = useState<Lane[]>([])
   const [loading, setLoading] = useState(false)
   const [position, setPosition] = useState(0)
@@ -77,6 +79,8 @@ export default function ArrangementView() {
   const [saving, setSaving] = useState(false)
   const [retuning, setRetuning] = useState(false)
   const [retuneBpm, setRetuneBpm] = useState(96)
+  /** 混音总时长（Mixer 装载完成时落 state；渲染期不再读 mixerRef.current） */
+  const [duration, setDuration] = useState(0)
   const mixerRef = useRef<Mixer | null>(null)
   const rafRef = useRef<number>(0)
   const fillRef = useRef<HTMLDivElement | null>(null)
@@ -99,13 +103,13 @@ export default function ArrangementView() {
         setNodes(tree.nodes)
         setCurrentVersionId(tree.current_version_id)
         // 工作台指定的版本存在则优先装载，否则落回当前版本
-        const wanted = initialRef.current.version
+        const wanted = initialParams.version
         setVersionId(
           wanted && tree.nodes.some((n) => n.id === wanted) ? wanted : tree.current_version_id,
         )
       })
       .catch(() => setNodes([]))
-  }, [workId])
+  }, [workId, initialParams.version])
 
   const loadVersion = useCallback(async (vid: string) => {
     setLoading(true)
@@ -115,10 +119,10 @@ export default function ArrangementView() {
       const res = await listCandidates(vid)
       // 工作台送来的候选优先，其次已采用，最后首个
       const cand =
-        res.items.find((c) => c.id === initialRef.current.candidate) ??
+        res.items.find((c) => c.id === initialParams.candidate) ??
         res.items.find((c) => c.adopted) ??
         res.items[0]
-      setCandidates(cand ?? null)
+      setCandidate(cand ?? null)
       if (!cand) return
       setRetuneBpm(cand.bpm || 96)
       const stems = STEM_NAMES.map((n) => cand.files.find((f) => f.kind === 'stem' && f.stem_name === n)).filter(Boolean) as FileRef[]
@@ -137,7 +141,14 @@ export default function ArrangementView() {
       const loaded: Lane[] = []
       for (const f of toLoad) {
         const { url } = await getStreamToken(f.file_id)
-        const raw = await fetch(url).then((r) => r.arrayBuffer())
+        // F-FE-06：音频字节下载收敛进 api/files（r.ok 校验）；失败显式 toast
+        let raw: ArrayBuffer
+        try {
+          raw = await fetchAudioBytes(url)
+        } catch {
+          toast(tGlobal('editor.toast.loadFailed'), 'warn')
+          return
+        }
         const Ctx =
           window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
         const tmp = new Ctx()
@@ -152,7 +163,7 @@ export default function ArrangementView() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [initialParams.candidate])
 
   useEffect(() => {
     if (versionId) void loadVersion(versionId)
@@ -163,16 +174,18 @@ export default function ArrangementView() {
     mixerRef.current?.close()
     if (tracksRef.current.length === 0) {
       mixerRef.current = null
+      setDuration(0)
       return
     }
     const m = new Mixer()
     m.load(tracksRef.current)
     mixerRef.current = m
+    // 总时长在装载时落 state（渲染期不再读 mixerRef.current）
+    setDuration(m.duration)
     return () => {
       m.close()
       mixerRef.current = null
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lanes])
 
   // 时间轴 rAF（P1-21）：进度条由 rAF 直接改 DOM——每帧 setPosition 会把整个
@@ -205,8 +218,6 @@ export default function ArrangementView() {
   useEffect(() => () => {
     mountedRef.current = false
   }, [])
-
-  const duration = lanes.length ? mixerRef.current?.duration ?? 0 : 0
 
   const setLaneParams = (i: number, patch: Partial<TrackParams>) => {
     setLanes((prev) => {
@@ -328,7 +339,7 @@ export default function ArrangementView() {
               <option value="">{t('editor.pick.version')}</option>
               {nodes.map((n) => (
                 <option key={n.id} value={n.id}>
-                  {n.version_no} · {n.source}{n.id === currentVersionId ? ' ✓' : ''}
+                  {n.version_no} · {versionSourceLabel(n.source)}{n.id === currentVersionId ? ' ✓' : ''}
                 </option>
               ))}
             </select>

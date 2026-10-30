@@ -354,12 +354,15 @@ class ReplicateMusicProvider:
         if is_wav:
             with wave.open(str(raw), "rb") as wf:
                 sr, ch = wf.getframerate(), wf.getnchannels()
+                nframes = wf.getnframes()
             channels = read_wav(raw)
             left = channels[0]
             right = channels[1] if ch > 1 and len(channels) > 1 else channels[0]
             preview = cand_dir / "preview.mp3"
             encode_mp3(preview, left, right, bitrate=192, sample_rate=sr)
-            duration = size / (sr * ch * 2)  # 16bit 近似：按采样率与声道数估长
+            # 时长按 wav 头真实帧数（2026-10-27：原按 16bit 字节数近似，24bit
+            # 产物低估 1.5 倍）；任意采样位深下帧数口径恒准
+            duration = nframes / sr
             files = [
                 dict(relpath=preview.relative_to(dest).as_posix(), kind="preview",
                      stem_name=None, mime="audio/mpeg",

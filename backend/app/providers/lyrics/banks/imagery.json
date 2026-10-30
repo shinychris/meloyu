@@ -18,6 +18,8 @@
   },
   "en": {
     "nouns": ["rain", "streetlight", "window", "station", "letters", "moonlight", "ocean", "shadow"],
+    "places": ["the corner store", "the last platform", "an empty avenue", "the rooftop", "the old pier", "the midnight train"],
+    "adjs": ["gentle", "quiet", "restless", "fading", "endless", "half-lit"],
     "verbs": ["fading", "waiting", "burning", "falling", "shining", "leaving", "holding", "dreaming"],
     "endings": ["away", "light", "night", "again", "rain", "stay", "same", "name"]
   }

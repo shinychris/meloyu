@@ -32,10 +32,14 @@ export default function CandidateCard({
   const t = useT()
   const playTrack = usePlayerStore((s) => s.playTrack)
   const workId = useStudioStore((s) => s.workId)
-  /** 生成中（含延长/变体/段落重生成等派生任务）：禁用派生操作，避免并发扣积分 */
-  const generating =
-    useStudioStore((s) => s.submitting) ||
-    useStudioStore((s) => s.task != null && (s.task.status === 'queued' || s.task.status === 'running'))
+  const markAdopted = useStudioStore((s) => s.markAdopted)
+  /** 生成中（含延长/变体/段落重生成等派生任务）：禁用派生操作，避免并发扣积分
+   *  （F-FE-16：单 selector 内完成派生，不再出现「|| 右侧调 hook」的规则违规） */
+  const generating = useStudioStore(
+    (s) =>
+      s.submitting ||
+      (s.task != null && (s.task.status === 'queued' || s.task.status === 'running')),
+  )
   /** V1.1 派生操作面板：extend 选秒数 / variant 输入风格 / regen 选段落 */
   const [panel, setPanel] = useState<DeriveKind | null>(null)
   const [busy, setBusy] = useState(false)
@@ -66,9 +70,7 @@ export default function CandidateCard({
     try {
       await adoptCandidate(candidate.id)
       const s = useStudioStore.getState()
-      useStudioStore.setState({
-        candidates: s.candidates.map((c) => ({ ...c, adopted: c.id === candidate.id })),
-      })
+      markAdopted(candidate.id)
       s.logOp(t('studio.log.adopted', { label: candidate.label }))
       s.refreshVersionTree()
       toast(t('studio.toast.adopted', { label: candidate.label }))

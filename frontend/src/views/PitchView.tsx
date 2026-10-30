@@ -53,6 +53,15 @@ export default function PitchView() {
   const [quantize, setQuantize] = useState<'off' | '8' | '16'>('off')
   const [submitting, setSubmitting] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  /** F-FE-04：卸载守卫——修调轮询在视图卸载后立即停止，不再空转 60s */
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     listWorks({ page_size: 100 }).then((r) => setWorks(r.items)).catch(() => {})
@@ -92,13 +101,13 @@ export default function PitchView() {
   const editedMidi = useCallback(
     (i: number, base: number) => base + (edits[i] ?? 0), [edits])
 
-  const bump = (idx: number, delta: number) => {
+  const bump = useCallback((idx: number, delta: number) => {
     setEdits((prev) => {
       const cur = prev[idx] ?? 0
       const next = Math.max(-12, Math.min(12, cur + delta))
       return { ...prev, [idx]: next }
     })
-  }
+  }, [])
 
   // 键盘：↑/↓ 半音、Esc 取消（须在 bump 定义之后挂监听）
   useEffect(() => {
@@ -118,8 +127,7 @@ export default function PitchView() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, edits])
+  }, [selected, bump])
 
   const snapToScale = () => {
     if (!ls) return
@@ -206,8 +214,7 @@ export default function PitchView() {
     const cv = e.currentTarget
     const rect = cv.getBoundingClientRect()
     const x = ((e.clientX - rect.left) / rect.width) * cv.width
-    const y = ((e.clientY - rect.top) / rect.height) * cv.height
-    // 最近音符命中（时间窗优先）
+    // 最近音符命中（时间窗优先；纵向坐标不参与命中判定）
     if (!ls) return
     const totalBeats = ls.stats.bar_count * ls.meta.beats_per_bar || 1
     const beat = (x / cv.width) * totalBeats
@@ -224,7 +231,6 @@ export default function PitchView() {
         }
       })
     })
-    void y
     if (best !== null && bestDist <= ls.meta.beats_per_bar) setSelected(best)
   }
 
@@ -245,13 +251,28 @@ export default function PitchView() {
         semi,
       }))
       const res = await pitchEditCandidate(candidate.id, { edits: payload, quantize })
-      // 轮询到终态（确定性渲染秒级完成）
+      // 轮询到终态（确定性渲染秒级完成）；间隔 1.5s 与全站轮询口径一致，卸载即停
       for (let k = 0; k < 60; k++) {
-        await new Promise((r) => setTimeout(r, 1000))
+        if (!mountedRef.current) return
+        await new Promise((r) => setTimeout(r, 1500))
+        if (!mountedRef.current) return
         const task = await getTask(res.task.id)
+        if (!mountedRef.current) return
         if (task.status === 'succeeded') {
-          toast(t('pitch.toast.done', { no: k + 1 }))
           setEdits({})
+          // F-FE-05：完成提示使用真实版本号（version_no），轮询次数不再是版本号；
+          // 版本号取不到时回退为不含占位符的词条
+          if (task.version_id && workId) {
+            try {
+              const tree = await getVersionTree(workId)
+              const node = tree.nodes.find((n) => n.id === task.version_id)
+              toast(node ? t('pitch.toast.done', { no: node.version_no }) : t('pitch.toast.donePlain'))
+            } catch {
+              toast(t('pitch.toast.donePlain'))
+            }
+          } else {
+            toast(t('pitch.toast.donePlain'))
+          }
           if (task.version_id) void loadVersion(task.version_id)
           break
         }
@@ -263,7 +284,7 @@ export default function PitchView() {
     } catch {
       /* 拦截器已 toast */
     } finally {
-      setSubmitting(false)
+      if (mountedRef.current) setSubmitting(false)
     }
   }
 

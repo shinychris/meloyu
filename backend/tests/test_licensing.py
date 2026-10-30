@@ -9,6 +9,7 @@ import unittest
 
 from app.services import licensing
 
+
 class TestGrades(unittest.TestCase):
     def test_allowed_channels(self):
         self.assertEqual(licensing.commercial_grade("localsynth"), "allowed")

@@ -42,5 +42,7 @@ export const pricingEn = {
   'apikey.empty': 'No keys yet',
   'apikey.freshNotice': 'The full key is shown only once — copy it now (lost keys can only be revoked and reissued)',
   'apikey.toast.nameRequired': 'Enter a key name first',
+  'apikey.confirm.revokeTitle': 'Revoke API key "{name}"?',
+  'apikey.confirm.revokeDesc': 'Integrations using this key stop working immediately. This cannot be undone.',
   'apikey.endpointHint': 'Usage: POST /api/v1/public/generations (X-API-Key header) → poll GET /api/v1/public/tasks/{id} → download via the downloads links once succeeded. Rate limit: 30 generations/hour (shared with in-app quota).',
 } as const

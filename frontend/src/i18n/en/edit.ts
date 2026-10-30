@@ -27,6 +27,7 @@ export const editEn = {
   'edit.save.hint': 'Non-destructive: ops replay from the original master; saved via mixdown with human-participation tracking',
   'edit.ops.title': 'Operation stack',
   'edit.toast.noAudio': 'This candidate has no audio file',
+  'edit.toast.loadFailed': 'Failed to download the master audio — please retry',
   'edit.toast.needSelection': 'Drag on the waveform to select a range first',
   'edit.toast.opApplied': 'Operation {n} applied',
   'edit.toast.saved': 'Saved as new version {no}',

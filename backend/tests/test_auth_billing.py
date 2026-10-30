@@ -399,5 +399,67 @@ class TestLicenseMetering(_DBTestCase):
         self.assertEqual(self.user.credit_balance, 0, "不发放")
 
 
+class TestEnterpriseLicenseGate(_DBTestCase):
+    """F-BE-04（2026-10-27）：enterprise 形态 License 激活/解除收管理员。
+
+    任何登录成员可解除整站授权=破坏性 DoS；activate 写调用者 plan=自我提权。
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._old = settings.app_mode
+        settings.app_mode = "enterprise"
+        ts = utc_now_iso()
+        self.member = User(email="member@t.local", password_hash="x" * 60, nickname="m",
+                           plan="free", is_admin=False, created_at=ts, updated_at=ts)
+        self.admin = User(email="root@t.local", password_hash="x" * 60, nickname="r",
+                          plan="free", is_admin=True, created_at=ts, updated_at=ts)
+        self.db.add_all([self.member, self.admin])
+        self.db.commit()
+
+    def tearDown(self):
+        settings.app_mode = self._old
+        super().tearDown()
+
+    def test_activate_deactivate_require_admin(self):
+        from app.api.v1.licenses import require_mode_admin
+        with self.assertRaises(BizError) as ctx:
+            require_mode_admin(self.member)
+        self.assertEqual(ctx.exception.code, 40301)
+        self.assertIs(require_mode_admin(self.admin), self.admin)
+
+    def test_activate_does_not_write_caller_plan_in_enterprise(self):
+        from app.services import license as license_svc
+        priv, pub = license_svc.generate_keypair()
+        settings.license_public_key = pub
+        try:
+            key = license_svc.sign_license(
+                {"lid": "lid1", "tier": "lifetime", "devices": 1, "iat": 0}, priv)
+            out = license_svc.activate(self.db, key, user=self.member)
+            self.assertTrue(out["activated"], "激活状态本身允许（配合 admin 端点闸）")
+            self.db.refresh(self.member)
+            self.assertEqual(self.member.plan, "free",
+                             "enterprise 集中授权不得把调用者 plan 升档（防自我提权）")
+        finally:
+            settings.license_public_key = ""
+
+    def test_desktop_activate_still_writes_plan(self):
+        """desktop 单机形态维持「激活即升档」（B 系列原语义）。"""
+        from app.services import license as license_svc
+        settings.app_mode = "desktop"
+        priv, pub = license_svc.generate_keypair()
+        settings.license_public_key = pub
+        try:
+            key = license_svc.sign_license(
+                {"lid": "lid2", "tier": "lifetime", "devices": 1, "iat": 0}, priv)
+            self.member.is_admin = True  # desktop 本地档案即管理员
+            self.db.commit()
+            license_svc.activate(self.db, key, user=self.member)
+            self.db.refresh(self.member)
+            self.assertEqual(self.member.plan, "studio")
+        finally:
+            settings.license_public_key = ""
+
+
 if __name__ == "__main__":
     unittest.main()

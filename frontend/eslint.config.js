@@ -12,14 +12,13 @@ export default tseslint.config(
   // ESLint 10 要求 plugins 为对象形式，用插件的 flat 变体（recommended 的等价 flat 导出）
   reactHooks.configs.flat.recommended,
   {
-    // 存量代码暂降级为 warn 的规则（不改正业务代码；后续专项清零后调回 error）：
-    // - rules-of-hooks：ModelCenterView 的 useCatalogModel 是 use 前缀的普通异步函数（命名误报）；
-    //   CandidateCard.tsx:38 存在 || 右侧条件调用 useStudioStore（zustand 下实际安全，待重构）
-    // - set-state-in-effect / refs：react-hooks v7 新增规则，对既有「effect 内拉数据」模式报 error
+    // F-FE-16/29 整改：rules-of-hooks 与 refs 已恢复 error（诱因——use 前缀普通函数、
+    // 条件 hook 调用、渲染期读写 ref——已修复，见 VoicePanel/CandidateCard/
+    // SearchInput/AccountMenu/ArrangementView 等）。
+    // 仍暂降级 warn 的规则：既有「effect 内拉数据」模式（拦截器统一 toast 口径），
+    // 本批已清理可安全清理者，剩余告警清单见评审整改记录。
     rules: {
-      'react-hooks/rules-of-hooks': 'warn',
       'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/refs': 'warn',
     },
   },
   {

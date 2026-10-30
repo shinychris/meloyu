@@ -9,24 +9,24 @@ LLM 生成提示词（想法驱动 + 括号标记指令）；LyricGenerateReques
 from __future__ import annotations
 
 import json
+import re
 import tempfile
 import unittest
 
 from fastapi.testclient import TestClient
-
-from tests.db import new_test_engine, reset_db
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app import models  # noqa: F401
 from app.config import settings
 from app.database import get_db
 from app.main import app
-from app.models import Base
 from app.models.enums import SECTIONS
 from app.providers.lyrics_llm import LLMLyricsProvider
+from app.providers.lyrics_local import LocalLyricsProvider
 from app.schemas.auth import LyricGenerateRequest
 from app.synth.structure import parse_lyrics, plan_sections, strip_paren_marks
+from tests.db import new_test_engine, reset_db
+
 
 class StripParenMarksTest(unittest.TestCase):
     """括号表演标记剥离：中英括号、独立行、行内、行尾。"""
@@ -144,6 +144,33 @@ class ThemeSchemaTest(unittest.TestCase):
         from pydantic import ValidationError
         with self.assertRaises(ValidationError):
             LyricGenerateRequest(theme="")
+
+class LocalProviderLanguageBankTest(unittest.TestCase):
+    """F-03 回归（2026-10-28 模拟用户测试）：en 词库曾缺 places 键致
+    _fill_line KeyError（英文界面歌词生成 500），且 {E} 曾嵌中文辙尾词
+    （中英混排）。en 生成必须全程拉丁字符；zh 路径与 mood 词库不受影响。"""
+
+    def test_en_generation_latin_only(self):
+        out = LocalLyricsProvider().generate(
+            theme="midnight convenience store, last bus in the rain", language="en")
+        self.assertTrue(out["lyrics"].strip())
+        self.assertFalse(re.search(r"[\u4e00-\u9fff]", out["lyrics"]),
+                         f"en 歌词混入中文: {out['lyrics'][:120]}")
+        for alt in out["alternatives"]:
+            self.assertFalse(re.search(r"[\u4e00-\u9fff]", alt["lyrics"]))
+
+    def test_en_generation_with_mood_bank(self):
+        out = LocalLyricsProvider().generate(theme="urban loneliness",
+                                             mood="孤独", language="en")
+        self.assertFalse(re.search(r"[\u4e00-\u9fff]", out["lyrics"]))
+
+    def test_zh_generation_unaffected(self):
+        out = LocalLyricsProvider().generate(theme="深夜便利店的城市孤独感",
+                                             mood="孤独", language="zh")
+        self.assertTrue(re.search(r"[\u4e00-\u9fff]", out["lyrics"]))
+        sections = [s["section"] for s in out["structure"]]
+        self.assertIn("chorus", sections)
+
 
 class MetaLyricsCreationTest(unittest.TestCase):
     """/system/meta：段落 desc 说明 + performance_marks 词表（zh 默认 locale）。"""

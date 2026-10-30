@@ -10,18 +10,17 @@ import unittest
 from unittest import mock
 
 from fastapi.testclient import TestClient
-
-from tests.db import new_test_engine, reset_db, seed_plans
-from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401
 from app.config import settings
 from app.database import get_db
 from app.main import app
-from app.models import Base, Plan, User
+from app.models import Plan, User
 from app.models.base import utc_now_iso
 from app.services import api_keys as keys_svc
+from tests.db import new_test_engine, reset_db, seed_plans
+
 
 class _ApiTestCase(unittest.TestCase):
     def setUp(self):

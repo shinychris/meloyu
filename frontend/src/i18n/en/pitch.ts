@@ -19,7 +19,8 @@ export const pitchEn = {
   'pitch.toast.quantizeOnly': 'Quantize-only submission',
   'pitch.toast.snapped': 'Snapped {n} notes to scale',
   'pitch.toast.allInScale': 'All notes already in scale',
-  'pitch.toast.done': 'Tuned version saved (v{no})',
+  'pitch.toast.done': 'Tuned version saved ({no})',
+  'pitch.toast.donePlain': 'Tuned version saved',
   'pitch.toast.failed': 'Re-render failed',
   'pitch.footnote':
     'Source: leadsheet melody (candidate MIDI). Off-scale notes you keep intentionally (blue notes) are preserved as-is.',

@@ -12,16 +12,16 @@ from pathlib import Path
 from unittest import mock
 
 import numpy as np
-
-from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401 —— 注册全部表
 from app.config import settings
 from app.core.errors import BizError
-from app.models import Base, Plan, User
+from app.models import User
 from app.models.base import utc_now_iso
 from app.services import voice as voice_svc
+from tests.db import new_test_engine, reset_db, seed_plans
+
 
 def _speaker_wav(path: Path, *, f0: float, formant: float, sr: int = 22050,
                  dur: float = 4.0, seed: int = 7) -> bytes:
@@ -52,8 +52,8 @@ class TestSimilarity(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         d = Path(tmp.name)
-        from app.services.voice import extract_features, similarity
         from app.services.reference_analysis import read_wav_mono
+        from app.services.voice import extract_features, similarity
 
         def feats(f0, formant, seed):
             p = d / f"s_{f0}_{formant}_{seed}.wav"
@@ -158,7 +158,9 @@ class TestEnrollFlow(_VoiceTestCase):
         p = voice_svc.enroll(self.db, self.user, "短采样")
         buf = Path(self.tmp.name) / "short.wav"
         with wav_mod.open(str(buf), "wb") as wf:
-            wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(22050)
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(22050)
             wf.writeframes(np.zeros(11025, dtype="<i2").tobytes())  # 0.5s
         with self.assertRaises(BizError):
             voice_svc.submit_sample(self.db, self.user, p["id"], 1, buf.read_bytes())
@@ -197,7 +199,7 @@ class TestGenerationGate(_VoiceTestCase):
                 })
         self.assertEqual(cm.exception.code, 40901)
         # 3) 验证后 → 提交成功，timbre 进参数快照，voice 留痕
-        p1 = voice_svc.submit_sample(self.db, self.user, p["id"], 1, self._sample(180, 1.0))
+        voice_svc.submit_sample(self.db, self.user, p["id"], 1, self._sample(180, 1.0))
         p2 = voice_svc.submit_sample(self.db, self.user, p["id"], 2,
                                      self._sample(180, 1.0, seed=3))
         self.assertEqual(p2["status"], "verified")
@@ -207,7 +209,8 @@ class TestGenerationGate(_VoiceTestCase):
                 "params": {"vocal": "voice_clone", "duration_sec": 30,
                            "voice_profile_id": p["id"]},
             })
-        from app.models import Task as TaskRow, Version
+        from app.models import Task as TaskRow
+        from app.models import Version
         row = self.db.get(TaskRow, out["task"]["id"])
         self.assertEqual(row.request_payload["voice"]["voice_profile_id"], p["id"])
         self.assertTrue(row.request_payload["voice"]["voice_clone"])

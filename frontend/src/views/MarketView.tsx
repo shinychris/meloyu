@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { MarketListingInfo, MarketOrderInfo, Work } from '../types/api'
-import { apiDelete, apiGet, apiPost } from '../api/client'
+import {
+  createMarketListing,
+  delistMarketListing,
+  listMarketListings,
+  listMyMarketListings,
+  listMyMarketOrders,
+  purchaseListing,
+} from '../api/market'
 import { listWorks } from '../api/works'
 import { useSessionStore } from '../stores/session'
 import { usePlayerStore } from '../stores/player'
@@ -42,11 +49,11 @@ export default function MarketView() {
   const refresh = useCallback(() => {
     setLoading(true)
     Promise.allSettled([
-      apiGet<{ items: MarketListingInfo[] }>('/market/listings', { page_size: 50 })
+      listMarketListings({ page_size: 50 })
         .then((r) => setListings(r.items)),
-      apiGet<{ items: MarketListingInfo[] }>('/market/my/listings')
+      listMyMarketListings()
         .then((r) => setMyListings(r.items)),
-      apiGet<{ items: MarketOrderInfo[] }>('/market/my/orders')
+      listMyMarketOrders()
         .then((r) => setOrders(r.items)),
       listWorks({ page_size: 50 })
         .then((r) => setMyWorks(r.items)),
@@ -82,7 +89,7 @@ export default function MarketView() {
     if (!okToBuy) return
     setBusy(true)
     try {
-      const order = await apiPost<MarketOrderInfo>(`/market/listings/${l.id}/purchase`)
+      const order = await purchaseListing(l.id)
       toast(t('market.toast.bought', { title: l.title }))
       void refreshUser()
       setOrders((prev) => [order, ...prev])
@@ -107,7 +114,7 @@ export default function MarketView() {
     if (!okToPublish) return
     setBusy(true)
     try {
-      await apiPost('/market/listings', { work_id: publishWorkId, price_credits: price })
+      await createMarketListing({ work_id: publishWorkId, price_credits: price })
       toast(t('market.toast.published'))
       setPublishWorkId('')
       refresh()
@@ -118,9 +125,17 @@ export default function MarketView() {
     }
   }
 
-  const onDelist = async (id: string) => {
+  const onDelist = async (l: MarketListingInfo) => {
+    // F-FE-22：下架为破坏性操作（买家不可再购），二次确认
+    const ok = await useConfirmStore.getState().confirm({
+      title: t('market.confirm.delistTitle', { title: l.title }),
+      description: t('market.confirm.delistDesc'),
+      confirmText: t('market.delist'),
+      danger: true,
+    })
+    if (!ok) return
     try {
-      await apiDelete(`/market/listings/${id}`)
+      await delistMarketListing(l.id)
       refresh()
     } catch {
       /* 拦截器已 toast */
@@ -235,7 +250,7 @@ export default function MarketView() {
                       </div>
                     </div>
                     {l.status === 'active' && (
-                      <button className="btn btn-ghost btn-sm" onClick={() => void onDelist(l.id)}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => void onDelist(l)}>
                         {t('market.delist')}
                       </button>
                     )}

@@ -57,6 +57,7 @@ export const lyricsEn = {
   'lyrics.panel.stressOk': 'Stresses land on the beat',
   'lyrics.panel.stressPending': 'Run “Rhyme / stress check” to see results',
   'lyrics.panel.rhyme': 'Rhyme ends',
+  'lyrics.panel.rhymeEmpty': 'Run the rhyme check to see rhyme ends here',
   'lyrics.panel.rhymeMain': ' · main rhyme {group}',
   'lyrics.panel.backStudio': 'Back to Studio →',
   'lyrics.defaultLyrics':

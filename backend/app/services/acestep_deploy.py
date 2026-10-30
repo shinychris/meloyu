@@ -29,8 +29,8 @@ import threading
 import time
 import urllib.request
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from app.config import BACKEND_DIR, settings
 from app.core.i18n import tr

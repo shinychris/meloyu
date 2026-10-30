@@ -16,6 +16,7 @@ from unittest import mock
 
 from app.providers.llm.openai_compat import OpenAICompatClient, looks_like_ollama
 
+
 def _ok_response(content: str = "hello") -> mock.MagicMock:
     r = mock.MagicMock()
     r.status_code = 200

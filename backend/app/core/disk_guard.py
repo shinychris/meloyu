@@ -16,7 +16,13 @@ from app.core.logging import logger
 
 
 def disk_free_gb() -> float:
-    """数据盘剩余空间（GB）。data_path 必存（库文件所在），audio_path 首次可能未建。"""
+    """数据盘剩余空间（GB）。data_path 必存（库文件所在），audio_path 首次可能未建。
+
+    2026-10-27：data 目录可能尚不存在（如数据盘新挂载/首次启动竞态），此时
+    shutil.disk_usage 抛 FileNotFoundError 使生成提交 500——入口先建目录
+    （幂等），保证水位检查总有可探测目标。
+    """
+    settings.data_path.mkdir(parents=True, exist_ok=True)
     return shutil.disk_usage(settings.data_path).free / (1 << 30)
 
 

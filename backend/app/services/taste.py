@@ -44,8 +44,9 @@ def rebuild(db: Session, user: User) -> dict:
                     if v and v.active_candidate_id else None)
             if cand:
                 p = (v.params or {}) if v else {}
-                densities.append(int(p.get("instrument_density",
-                                           cand.style_tags and 65 or 65)))
+                # 密度缺省 65（与生成参数默认 instrument_density 一致；
+                # 画像只做统计建议值预填，不训练模型）
+                densities.append(int(p.get("instrument_density", 65)))
                 if cand.vocal and cand.vocal != "instrumental":
                     vocals[cand.vocal] += 1
                 languages[cand.language] += 1

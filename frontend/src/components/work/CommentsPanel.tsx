@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { WorkCommentItem } from '../../types/api'
-import { apiDelete, apiGet, apiPatch, apiPost } from '../../api/client'
+import {
+  createComment,
+  deleteComment,
+  listComments,
+  resolveComment,
+} from '../../api/comments'
 import { usePlayerStore } from '../../stores/player'
+import { confirmDialog } from '../../stores/confirm'
 import { toast } from '../../stores/toast'
 import { useT } from '../../i18n'
 import { formatDuration } from '../../lib/format'
-
-function listComments(workId: string): Promise<{ items: WorkCommentItem[]; total: number }> {
-  return apiGet(`/works/${workId}/comments`)
-}
 
 /**
  * 协作评论面板（FR-13）：评论锚定作品时间轴——发评时默认取播放器当前时间，
@@ -39,7 +41,7 @@ export default function CommentsPanel({ workId, canComment }: { workId: string; 
     }
     setBusy(true)
     try {
-      await apiPost(`/works/${workId}/comments`, {
+      await createComment(workId, {
         time_sec: Math.round(position * 10) / 10,
         body: text,
       })
@@ -62,7 +64,7 @@ export default function CommentsPanel({ workId, canComment }: { workId: string; 
 
   const onResolve = async (c: WorkCommentItem) => {
     try {
-      await apiPatch(`/comments/${c.id}`, { resolved: !c.resolved })
+      await resolveComment(c.id, !c.resolved)
       refresh()
     } catch {
       /* 拦截器已 toast */
@@ -70,8 +72,16 @@ export default function CommentsPanel({ workId, canComment }: { workId: string; 
   }
 
   const onDelete = async (c: WorkCommentItem) => {
+    // F-FE-22：删除评论为破坏性操作，接 confirmDialog({ danger: true }) 二次确认
+    const ok = await confirmDialog({
+      title: t('comments.confirm.deleteTitle'),
+      description: t('comments.confirm.deleteDesc'),
+      confirmText: t('common.delete'),
+      danger: true,
+    })
+    if (!ok) return
     try {
-      await apiDelete(`/comments/${c.id}`)
+      await deleteComment(c.id)
       refresh()
     } catch {
       /* 拦截器已 toast */

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useStudioStore } from '../stores/studio'
+import { useStudioStore, defaultStylePrompt, defaultLyrics } from '../stores/studio'
 import { useMetaStore } from '../stores/meta'
 import { useSessionStore } from '../stores/session'
 import { toast } from '../stores/toast'
@@ -40,15 +40,22 @@ export default function StudioView() {
   const submitting = useStudioStore((s) => s.submitting)
   const failureMessage = useStudioStore((s) => s.failureMessage)
   const workTitle = useStudioStore((s) => s.workTitle)
+  const randomizeInspire = useStudioStore((s) => s.randomizeInspire)
   const meta = useMetaStore((s) => s.meta)
   const referenceTrack = useStudioStore((s) => s.referenceTrack)
   // license（桌面买断）模式：用量纯计量——按钮/失败提示不再出现积分语义（v0.17.0）
   const isLicense = useSessionStore((s) => s.license?.billing_mode === 'license')
 
-  const creditCost = meta.models.find((m) => m.value === form.model)?.credit_cost ?? 12
-  const modelLabel = meta.models.find((m) => m.value === form.model)?.label ?? 'V1 Pro'
-  const tagCount = countStructureTags(form.lyrics)
-  const markCount = countParenMarks(form.lyrics)
+  // F-FE-24：价目与型号一律信任 /system/meta（含 stores/meta.ts 的 defaultMeta 兜底），
+  // 不再做字面量兜底；模型档位异常缺失时展示文案走 i18n
+  const model = meta.models.find((m) => m.value === form.model)
+  const creditCost = model?.credit_cost ?? 0
+  const modelLabel = model?.label ?? t('studio.view.modelUnknown')
+  // F-FE-13：样例态（字段为空）显示当前 locale 的默认样例，切语言自然跟随
+  const stylePromptText = form.stylePrompt || defaultStylePrompt()
+  const lyricsText = form.lyrics || defaultLyrics()
+  const tagCount = countStructureTags(lyricsText)
+  const markCount = countParenMarks(lyricsText)
   const generating =
     submitting || (task != null && (task.status === 'queued' || task.status === 'running'))
 
@@ -74,8 +81,8 @@ export default function StudioView() {
 
   const insertTag = (tag: string) => {
     const el = lyricBoxRef.current
-    const caret = el?.selectionStart ?? form.lyrics.length
-    const [next, pos] = insertAtCaret(form.lyrics, caret, tag, { block: true })
+    const caret = el?.selectionStart ?? lyricsText.length
+    const [next, pos] = insertAtCaret(lyricsText, caret, tag, { block: true })
     patchForm({ lyrics: next })
     markStep(2)
     requestAnimationFrame(() => {
@@ -87,34 +94,14 @@ export default function StudioView() {
   /** 表演标记：内联插入光标处（音乐编排类整行包裹） */
   const insertMark = (mark: string, group: string) => {
     const el = lyricBoxRef.current
-    const caret = el?.selectionStart ?? form.lyrics.length
-    const [next, pos] = insertAtCaret(form.lyrics, caret, mark, { block: group === 'music' })
+    const caret = el?.selectionStart ?? lyricsText.length
+    const [next, pos] = insertAtCaret(lyricsText, caret, mark, { block: group === 'music' })
     patchForm({ lyrics: next })
     markStep(2)
     requestAnimationFrame(() => {
       el?.focus()
       el?.setSelectionRange(pos, pos)
     })
-  }
-
-  const randomInspire = () => {
-    const inspiration = meta.inspiration
-    const pickFrom = (list: string[]) =>
-      list.length > 0 ? list[Math.floor(Math.random() * list.length)] : ''
-    const next = {
-      scene: pickFrom(inspiration.scenes),
-      mood: pickFrom(inspiration.moods),
-      genre: pickFrom(inspiration.genres),
-      inst: pickFrom(inspiration.instruments),
-    }
-    useStudioStore.setState({ inspire: next })
-    useStudioStore.getState().applyInspireToPrompt(next)
-    markStep(1)
-    useStudioStore.getState().logOp(
-      t('studio.log.inspire', {
-        detail: [next.genre, next.mood, next.inst, next.scene].filter(Boolean).join(' / '),
-      }),
-    )
   }
 
   return (
@@ -215,7 +202,7 @@ export default function StudioView() {
                 rows={3}
                 className="mt-2"
                 maxLength={meta.generation_limits.max_style_prompt}
-                value={form.stylePrompt}
+                value={stylePromptText}
                 onChange={(e) => {
                   patchForm({ stylePrompt: e.target.value })
                   markStep(1)
@@ -264,7 +251,7 @@ export default function StudioView() {
                 ref={lyricBoxRef}
                 rows={5}
                 maxLength={meta.generation_limits.max_lyrics}
-                value={form.lyrics}
+                value={lyricsText}
                 onChange={(e) => patchForm({ lyrics: e.target.value })}
               />
               <button
@@ -362,7 +349,7 @@ export default function StudioView() {
               }
               actionLabel={t('studio.empty.random')}
               onAction={() => {
-                randomInspire()
+                randomizeInspire()
                 toast(t('studio.toast.randomInspired'))
               }}
             />

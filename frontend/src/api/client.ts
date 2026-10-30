@@ -30,6 +30,12 @@ const instance = axios.create({
   timeout: 20000,
 })
 
+/**
+ * 大文件下载（数据导出 zip / 母带 wav / 词谱 PDF / 证书）专用超时：
+ * 20s 全局默认对慢网大文件必失败（F-FE-07），下载类接口统一放宽到 300s。
+ */
+export const DOWNLOAD_TIMEOUT_MS = 300000
+
 /** 导出实例仅供单测替换 adapter 使用；业务代码请用 apiGet/apiPost 等封装 */
 export const http = instance
 
@@ -175,6 +181,14 @@ instance.interceptors.response.use(
     if (isAuthExpired(code)) {
       // 刷新请求自身失败（refresh token 也过期）：直接踢登录，不再递归
       redirectToLogin()
+      throw makeError()
+    }
+    if (code === 40203) {
+      // 试用到期（真实响应 HTTP 402 → 走本 rejected 分支；成功分支仅覆盖
+      // 非 2xx 被上层放行的非典型形态）：toast 引导文案 + 跳 /settings 授权
+      // （2026-10-28 模拟用户测试 F-07：到期后此前只弹 toast 不跳转）
+      if (!cfg?._meloyuSkipAuthRefresh) useToastStore.getState().push(message)
+      redirectToActivation()
       throw makeError()
     }
     if (!cfg?._meloyuSkipAuthRefresh) {

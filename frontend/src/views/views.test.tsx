@@ -49,6 +49,11 @@ describe('views render smoke', () => {
     const html = render(<LyricsView />)
     expect(html).toContain('Write lyrics that lock to the melody')
     expect(html).toContain('Generate with AI')
+    // F-04 回归：结构面板随编辑器内容实时解析（默认样例挂载即出各段行数，
+    // 不再等首次生成响应才有结构数据）
+    expect(html).toContain('Verse: 4 lines')
+    expect(html).toContain('Pre-Chorus: 2 lines')
+    expect(html).toContain('Outro: 0 lines')
   })
 
   it('LyricsView 默认样例跟随界面语言（v0.12.3：en 样例 → 切 zh 出中文样例）', () => {

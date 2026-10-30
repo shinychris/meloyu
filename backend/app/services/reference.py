@@ -118,6 +118,8 @@ def attach_analysis_wav(db: Session, user: User, track_id: str, content: bytes) 
     try:
         analysis = reference_analysis.analyze_wav(p)
     except Exception as e:  # noqa: BLE001
+        # 解析失败不留残盘（2026-10-27 对齐 voice.py 同场景行为）
+        p.unlink(missing_ok=True)
         raise err_validation(
             tr(f"分析失败：wav 无法解析（{e}）",
                f"Analysis failed: cannot parse wav ({e})")) from e

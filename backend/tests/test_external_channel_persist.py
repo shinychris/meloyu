@@ -17,15 +17,16 @@ from types import SimpleNamespace
 from unittest import mock
 
 from sqlalchemy import select
-from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401 —— 注册全部表
 from app.config import settings
-from app.models import Base, File, Task, User, Version, Work
+from app.models import File, Task, User, Version, Work
 from app.models.base import utc_now_iso
 from app.providers.base import CandidateArtifact, GenerationOutput
 from app.services import generation as gen
+from tests.db import new_test_engine, reset_db, seed_plans
+
 
 def _mk_artifact(label: str, relpath: str) -> CandidateArtifact:
     fmeta = dict(relpath=relpath, kind="preview", stem_name=None, mime="audio/mpeg",

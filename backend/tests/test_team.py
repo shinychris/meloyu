@@ -7,16 +7,17 @@ from __future__ import annotations
 import tempfile
 import unittest
 
-from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401
 from app.config import settings
 from app.core.errors import BizError
-from app.models import Base, User, Work
+from app.models import User, Work
 from app.models.base import utc_now_iso
 from app.services import team as team_svc
 from app.services import works as works_svc
+from tests.db import new_test_engine, reset_db, seed_plans
+
 
 class _TeamTestCase(unittest.TestCase):
     def setUp(self):

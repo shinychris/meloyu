@@ -50,4 +50,5 @@ export const licenseZh: Record<keyof typeof licenseEn, string> = {
   'license.status.licenseId': '授权编号',
   'license.status.activatedAt': '激活时间',
   'license.status.note': '授权对象',
+  'license.status.device': '设备',
 }

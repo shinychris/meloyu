@@ -1,4 +1,4 @@
-import { apiBlob, apiGet, apiPost } from './client'
+import { apiBlob, apiGet, apiPost, DOWNLOAD_TIMEOUT_MS } from './client'
 import type {
   AuthData,
   ChangePasswordRequest,
@@ -62,7 +62,7 @@ export function deleteAccount(req: DeleteAccountRequest): Promise<OkResult> {
   return apiPost<OkResult>('/auth/delete-account', req)
 }
 
-/** GET /auth/export-data —— 导出我的数据（zip 二进制流） */
+/** GET /auth/export-data —— 导出我的数据（zip 二进制流；慢网大文件放宽 300s 超时） */
 export function exportData(): Promise<Blob> {
-  return apiBlob('/auth/export-data')
+  return apiBlob('/auth/export-data', { timeout: DOWNLOAD_TIMEOUT_MS })
 }

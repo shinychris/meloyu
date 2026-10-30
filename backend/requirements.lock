@@ -1,71 +1,47 @@
-# 依赖锁定（2026-09-09 安审计 L-4 起；2026-09-26 P1-14 起镜像构建按本文件安装——
-# 构建可重现。由 .venv/Scripts/python.exe -m pip freeze 生成；升级依赖后请重新
-# 生成，并保证 requirements.txt 的每个包都被本文件钉住。）
-Jinja2==3.1.6
-MarkupSafe==3.0.3
+# 依赖锁定——运行时集合（2026-10-27 评审 F-XC-03 拆分：仅含 requirements.txt
+# 及其传递依赖，ML 可选栈（torch/transformers 等）已拆至 requirements-musicgen.lock，
+# 开发工具（ruff）不再混入。镜像构建按本文件安装，不再拉取多 GB 的 CUDA torch 轮子。
+#
+# 版本来源：原 dev venv 全量 freeze（2026-09-09 安审计 L-4 起，2026-09-26 P1-14 起
+# 镜像按 lock 安装）剔除 ML 闭包后的同一套版本——与已测试的 dev venv 完全一致，
+# 未做重新解析。升级依赖后请重新生成，并保证 requirements.txt 的每个包都被本文件钉住。
+# ML 本地通道（可选）：先装本文件，再装 requirements-musicgen.lock。
 PyJWT==2.13.0
-PyYAML==6.0.3
-Pygments==2.21.0
 SQLAlchemy==2.0.52
-psycopg2-binary==2.9.13
-accelerate==1.14.0
 annotated-doc==0.0.5
 annotated-types==0.8.0
 anyio==4.14.2
 bcrypt==5.0.0
 certifi==2026.7.22
 cffi==2.1.1
-charset-normalizer==3.5.1
 click==8.5.0
 colorama==0.4.6
 cryptography==50.0.1
 defusedxml==0.7.1
 fastapi==0.141.1
-filelock==3.32.4
 fonttools==4.63.0
 fpdf2==2.8.8
-fsspec==2026.7.0
 greenlet==3.5.5
 h11==0.16.0
-hf-xet==1.6.0
 httpcore==1.0.9
 httptools==0.8.0
 httpx==0.28.1
-huggingface_hub==1.29.0
 idna==3.19
 lameenc==1.8.4
 loguru==0.7.3
-markdown-it-py==4.2.0
-mdurl==0.1.2
 mido==1.3.3
-mpmath==1.3.0
-networkx==3.6.1
 numpy==2.5.2
-packaging==26.3
 pillow==12.3.0
-psutil==7.2.2
+psycopg2-binary==2.9.13
 pycparser==3.0
-pydantic-settings==2.15.0
 pydantic==2.13.5
+pydantic-settings==2.15.0
 pydantic_core==2.46.5
 pypinyin==0.55.0
 python-dotenv==1.2.3
-regex==2026.8.31
-requests==2.34.2
-rich==15.0.0
-ruff==0.16.5
-safetensors==0.8.0
 sentry-sdk==2.70.0
-setuptools==84.0.0
-shellingham==1.5.4
 soundfile==0.14.0
 starlette==1.6.0
-sympy==1.14.0
-tokenizers==0.23.1
-torch==2.13.0
-tqdm==4.70.0
-transformers==5.16.1
-typer==0.27.2
 typing-inspection==0.4.4
 typing_extensions==4.16.0
 urllib3==2.7.0

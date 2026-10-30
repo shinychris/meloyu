@@ -11,7 +11,6 @@ Windows venv（.venv/Scripts/python.exe，PE 二进制）当解释器执行 → 
 """
 from __future__ import annotations
 
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -19,6 +18,7 @@ from unittest import mock
 
 from app.config import settings
 from app.providers import music_acestep as mas
+
 
 def _mk(p: Path) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)

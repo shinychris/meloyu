@@ -21,7 +21,8 @@ export const pitchZh: Record<keyof typeof pitchEn, string> = {
   'pitch.toast.quantizeOnly': '仅提交节奏量化',
   'pitch.toast.snapped': '已把 {n} 个音符吸附回音阶',
   'pitch.toast.allInScale': '所有音符都在调内',
-  'pitch.toast.done': '修调版本已生成（v{no}）',
+  'pitch.toast.done': '修调版本已生成（{no}）',
+  'pitch.toast.donePlain': '修调版本已生成',
   'pitch.toast.failed': '重渲染失败',
   'pitch.footnote':
     '数据源为词谱旋律（候选 MIDI）。你有意保留的离调音（蓝调音等）不会被强制吸附。',

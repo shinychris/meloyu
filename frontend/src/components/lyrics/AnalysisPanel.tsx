@@ -1,13 +1,11 @@
-import type {
-  CompleteTagsResult,
-  LyricsGenerateResult,
-  RhymeCheckResult,
-} from '../../types/api'
-import { useT, getLocale } from '../../i18n'
+import type { CompleteTagsResult, RhymeCheckResult } from '../../types/api'
+import type { StructureSection } from '../../lib/structure'
+import { useT } from '../../i18n'
 import { sectionLabel } from '../../lib/format'
 
 interface AnalysisPanelProps {
-  gen: LyricsGenerateResult | null
+  /** 编辑器内容的实时结构解析（F-04：随编辑刷新，不再用上次生成响应的快照） */
+  structure: StructureSection[]
   rhyme: RhymeCheckResult | null
   tagInfo: CompleteTagsResult | null
   changes: Array<{ line_no: number; before: string; after: string }>
@@ -15,7 +13,7 @@ interface AnalysisPanelProps {
 }
 
 /** 歌词助手右侧面板：结构建议 / 润色记录 / 重音对齐 / 韵脚（数据来自接口响应） */
-export default function AnalysisPanel({ gen, rhyme, tagInfo, changes, onBackStudio }: AnalysisPanelProps) {
+export default function AnalysisPanel({ structure, rhyme, tagInfo, changes, onBackStudio }: AnalysisPanelProps) {
   const t = useT()
   const stressIssues = rhyme?.suggestions.filter((s) => s.type === 'stress') ?? []
   const otherIssues = rhyme?.suggestions.filter((s) => s.type !== 'stress') ?? []
@@ -32,8 +30,8 @@ export default function AnalysisPanel({ gen, rhyme, tagInfo, changes, onBackStud
     <div className="px-6 py-5 overflow-y-auto">
       <div className="label">{t('lyrics.panel.structure')}</div>
       <div className="text-sm leading-relaxed mt-2 text-muted">
-        {gen && gen.structure.length > 0
-          ? gen.structure
+        {structure.length > 0
+          ? structure
               .map((s) => t('lyrics.panel.sectionCount', { section: sectionLabel(s.section), n: s.line_count }))
               .join(' · ')
           : t('lyrics.panel.structureDefault')}
@@ -94,14 +92,12 @@ export default function AnalysisPanel({ gen, rhyme, tagInfo, changes, onBackStud
         {rhyme ? t('lyrics.panel.rhymeMain', { group: rhyme.main_rhyme_group }) : ''}
       </div>
       <div className="flex flex-wrap gap-1.5 mt-2">
-        {rhymeChips.length === 0
-          ? (getLocale() === 'zh'
-              ? ['台 ai', '白 ai', '待 ai', '轻 in', '心 in', '音 in']
-              : ['ai', 'in', 'ing', 'an', 'ou', 'ei']
-          ).map((c) => (
-              <span key={c} className="chip" style={{ opacity: 0.5 }}>{c}</span>
-            ))
-          : rhymeChips.map((c, i) => <span key={i} className="chip">{c}</span>)}
+        {/* F-FE-27：无数据展示 i18n 空态说明，不再渲染形似真实结果的硬编码示例 chips */}
+        {rhymeChips.length === 0 ? (
+          <span className="text-2xs text-dim">{t('lyrics.panel.rhymeEmpty')}</span>
+        ) : (
+          rhymeChips.map((c, i) => <span key={i} className="chip">{c}</span>)
+        )}
       </div>
       <div className="mt-6">
         <button className="btn btn-ghost w-full" onClick={onBackStudio}>

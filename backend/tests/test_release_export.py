@@ -11,21 +11,20 @@ import tempfile
 import unittest
 import wave as wav_mod
 import zipfile
-from pathlib import Path
 
 from pydantic import ValidationError
-
-from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401 —— 注册全部表
 from app.config import settings
 from app.core.errors import BizError
-from app.models import Base, Candidate, File, User, Version, Work
+from app.models import Candidate, File, User, Version, Work
 from app.models.base import utc_now_iso
 from app.schemas.auth import ExportRequest
 from app.services import export as export_svc
 from app.services.release_export import cover_png, preset_of
+from tests.db import new_test_engine, reset_db, seed_plans
+
 
 def _png_size(data: bytes) -> tuple[int, int]:
     return struct.unpack(">II", data[16:24])
@@ -218,7 +217,7 @@ class TestPresetOf(unittest.TestCase):
             preset_of("myspace")
 
     def test_preset_shape(self):
-        for key, preset in preset_of.__globals__["RELEASE_PRESETS"].items():  # type: ignore[index]
+        for preset in preset_of.__globals__["RELEASE_PRESETS"].values():  # type: ignore[index]
             self.assertIn(preset["audio"], ("mp3", "wav"))
             self.assertTrue(preset["cover_size"][0] >= 1000)
 

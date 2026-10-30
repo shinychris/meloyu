@@ -35,4 +35,6 @@ export const marketZh = {
   'market.toast.published': '已上架',
   'market.confirm.buy': '以 {n} 积分购买「{title}」？（非独占授权）',
   'market.confirm.ack': '确认持有该作品商用授权并接受 90/10 分账？',
+  'market.confirm.delistTitle': '下架「{title}」？',
+  'market.confirm.delistDesc': '下架后买家将无法再购买该作品。',
 } as const

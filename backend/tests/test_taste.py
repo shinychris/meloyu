@@ -3,13 +3,14 @@ from __future__ import annotations
 
 import unittest
 
-from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401
-from app.models import Base, Candidate, User, Version, Work
+from app.models import Candidate, User, Version, Work
 from app.models.base import utc_now_iso
 from app.services import taste as taste_svc
+from tests.db import new_test_engine, reset_db, seed_plans
+
 
 class TestTaste(unittest.TestCase):
     def setUp(self):

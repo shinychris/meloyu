@@ -1,9 +1,10 @@
 """作品市场（V2-c，v0.10.1）：站内上架/浏览/积分购买与非独占授权记录。
 
-分账口径：卖家得 90%、平台 10%（落 market_orders 双向流水 reason=market_sale /
-market_fee，积分账本可审计）；买家获**非独占、不可转让**使用授权（订单即凭证，
-AIGC 署名随产物保留）；上架须属主确认持有该作品的商用授权（ack_commercial 落库
-合规留痕）。发行分发对接：发行打包见 FR-11 release 导出，外部平台提交为人工路径
+分账口径：卖家得 90%、平台 10%（落 market_orders + credit_transactions 双向
+流水，reason=market_purchase（买家扣减）/ market_sale（卖家入账），积分账本
+可审计）；买家获**非独占、不可转让**使用授权（订单即凭证，AIGC 署名随产物
+保留）；上架须属主确认持有该作品的商用授权（ack_commercial 落库合规留痕）。
+发行分发对接：发行打包见 FR-11 release 导出，外部平台提交为人工路径
 （发行清单在 marketplace UI 提供）。
 """
 from __future__ import annotations
@@ -53,6 +54,9 @@ class MarketOrder(BaseModel):
     __table_args__ = (
         Index("ix_market_orders_buyer", "buyer_user_id", "created_at"),
         Index("ix_market_orders_listing", "listing_id"),
+        # 购买防双单（2026-10-27）：已购校验是 check-then-act，并发 double-click
+        # 可双双下单双扣；订单无取消态（业务上终身一单），直接全列唯一约束
+        Index("uq_market_order_buyer", "listing_id", "buyer_user_id", unique=True),
     )
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_uuid)

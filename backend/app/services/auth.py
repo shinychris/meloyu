@@ -8,6 +8,7 @@ import shutil
 import zipfile
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import SIGNUP_BONUS_CREDITS, settings
@@ -56,7 +57,13 @@ def register(db: Session, email: str, password: str, nickname: str,
                 email_verified=settings.email_verification_enabled,
                 created_at=now, updated_at=now)
     db.add(user)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        # 并发注册撞 users.email 唯一约束（2026-10-27）：上方查重是
+        # check-then-act，双请求同邮箱时后到者原为 500——转 409 业务码
+        db.rollback()
+        raise err_conflict(tr("该邮箱已注册", "This email is already registered")) from None
     db.add(Subscription(user_id=user.id, plan="free", status="active", started_at=now,
                         source="signup", granted_credits=0, created_at=now, updated_at=now))
     credits_svc.grant(db, user, SIGNUP_BONUS_CREDITS, "signup_bonus")
@@ -67,6 +74,13 @@ def register(db: Session, email: str, password: str, nickname: str,
     return out, refresh, refresh_ttl
 
 
+# 登录时延抹平锚点（2026-10-27）：对不存在的邮箱也执行一次等价 bcrypt 校验，
+# 消除「存在=慢 / 不存在=快」的响应时延差（可被用于枚举注册邮箱）。
+# 固定 hash 常量（明文无意义，仅作计算量锚），避免模块导入期现算 bcrypt。
+_DUMMY_BCRYPT_HASH = ("$2b$12$u/aNSU7vO0r41jrHyIuU5u4Nck/kNJZ."
+                      "eAY3G.eYvCjWCZW5do1HC")
+
+
 def login(db: Session, email: str, password: str) -> tuple[dict, str, int]:
     if settings.app_mode == "desktop":
         # B6（2026-10-04 用户口径收紧）：桌面客户端无用户鉴权/登录——本地档案
@@ -75,7 +89,10 @@ def login(db: Session, email: str, password: str) -> tuple[dict, str, int]:
             "桌面版无需登录——应用启动即自动进入本地档案",
             "The desktop app needs no sign-in — it opens straight into your local profile"))
     user = db.query(User).filter(User.email == email.strip().lower()).first()
+    # 不存在邮箱走 dummy hash 同价校验后统一报错（时延与真实校验对齐）
     if not user or not verify_password(password, user.password_hash):
+        if not user:
+            verify_password(password, _DUMMY_BCRYPT_HASH)
         raise err_bad_credentials()
     credits_svc.lazy_monthly_grant(db, user)
     out, refresh, refresh_ttl = _with_tokens(user)

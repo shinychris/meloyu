@@ -11,7 +11,7 @@ import unittest
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401 —— 注册全部表
-from app.models import LLMSetting, SETTING_ID, Task, User
+from app.models import SETTING_ID, LLMSetting, Task, User
 from app.models.base import utc_now_iso
 from app.services import model_center
 from app.services import usage as usage_svc
@@ -19,7 +19,7 @@ from tests.db import new_test_engine, reset_db
 
 
 def _ts(days_ago: float) -> str:
-    from datetime import datetime, timedelta, UTC
+    from datetime import UTC, datetime, timedelta
     return (datetime.now(UTC) - timedelta(days=days_ago)).strftime(
         "%Y-%m-%dT%H:%M:%SZ")
 
@@ -94,14 +94,22 @@ class TestUsageStatsAggregation(_UsageTestCase):
         self.assertEqual(out["remote_api_calls"], 3)
 
     def test_by_day_zero_filled_and_local_day_bucket(self):
-        self._task(days_ago=0.2)
+        # 时间稳健：任务时间取 min(1 小时, 本地今天已过时长的一半)。原
+        # days_ago=0.2 固定 4.8 小时前，在本地 0:00~4:48 之间跑会跨过午夜
+        # 落到昨天桶而必红——按当天已过多久动态取点，任何时刻运行都落今天桶
+        _dt = __import__("datetime")
+        now_local = _dt.datetime.now().astimezone()
+        midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        since_midnight = (now_local - midnight).total_seconds()
+        days_ago = min(3600.0, since_midnight / 2) / 86400
+        self._task(days_ago=days_ago)
         self.db.commit()
         out = usage_svc.stats_dict(self.db, self.user, days=7)
         dates = [d["date"] for d in out["by_day"]]
         # 补零序列：7 天窗口按本机自然日，跨时区边界为 7~8 个桶
         self.assertIn(len(dates), (7, 8))
         self.assertEqual(dates[-1],
-                         __import__("datetime").datetime.now().astimezone()
+                         _dt.datetime.now().astimezone()
                          .strftime("%Y-%m-%d"))
         today = out["by_day"][-1]
         self.assertEqual(today["calls"], 1)

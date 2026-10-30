@@ -198,7 +198,9 @@ def _structure_of(lyrics: str) -> list[dict]:
 
 
 def _style_tags(style_prompt: str) -> list[str]:
-    return [t for t in re.split(r"[，,。;；\s]+", style_prompt or "") if t][:4]
+    """分隔符只认逗号族（与 music_local._style_tags 同口径，F-02）：短语段
+    （great for {scene} 等）不按空格二次拆碎。"""
+    return [t.strip() for t in re.split(r"[，,、。;；]+", style_prompt or "") if t.strip()][:4]
 
 
 class APIMusicProvider:

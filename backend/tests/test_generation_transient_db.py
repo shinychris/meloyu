@@ -17,6 +17,7 @@ from sqlalchemy.exc import OperationalError
 
 from app.services import generation as gen
 
+
 def _op_err() -> OperationalError:
     return OperationalError("PRAGMA journal_mode=WAL", {},
                             Exception("unable to open database file"))

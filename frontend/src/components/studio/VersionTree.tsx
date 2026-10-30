@@ -1,20 +1,7 @@
 import { useStudioStore } from '../../stores/studio'
 import { useT } from '../../i18n'
-import type { VersionTreeNode } from '../../types/api'
+import { depthOf } from '../../lib/tree'
 import { versionSourceLabel } from '../../lib/format'
-
-/** 计算每个节点深度（parent_version_id 自引用链） */
-function depthOf(nodes: VersionTreeNode[], node: VersionTreeNode): number {
-  const map = new Map(nodes.map((n) => [n.id, n]))
-  let depth = 0
-  let cur: VersionTreeNode | undefined = node
-  while (cur?.parent_version_id) {
-    cur = map.get(cur.parent_version_id)
-    depth++
-    if (depth > 20) break
-  }
-  return depth
-}
 
 /** 版本树侧栏（GET /works/{id}/versions，前端构树）+ 最近操作日志 */
 export default function VersionTree() {
@@ -22,7 +9,11 @@ export default function VersionTree() {
   const versionTree = useStudioStore((s) => s.versionTree)
   const workId = useStudioStore((s) => s.workId)
   const opLog = useStudioStore((s) => s.opLog)
+  const opLogBaseLogged = useStudioStore((s) => s.opLogBaseLogged)
   const resetForNewWork = useStudioStore((s) => s.resetForNewWork)
+
+  // F-FE-13：初始「模板已载入」行按当前 locale 现取（store 不在模块加载时冻结文案）
+  const logLines = opLogBaseLogged ? opLog : [t('studio.log.templateLoaded'), ...opLog]
 
   const nodes = [...(versionTree?.nodes ?? [])].sort(
     (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
@@ -67,7 +58,7 @@ export default function VersionTree() {
       </div>
       <div className="label mt-6">{t('studio.tree.recentOps')}</div>
       <div className="mt-2 space-y-2 text-xs text-dim">
-        {opLog.map((op, i) => (
+        {logLines.map((op, i) => (
           <div key={`${op}-${i}`}>· {op}</div>
         ))}
       </div>

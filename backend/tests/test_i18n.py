@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import unittest
 
-from tests.db import new_test_engine, reset_db
-
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -23,6 +21,8 @@ from app.core.i18n import (
 )
 from app.providers.base import stage_label
 from app.providers.music_catalog import MUSIC_CATALOG, localized_entry
+from tests.db import new_test_engine, reset_db
+
 
 class TestParseAcceptLanguage(unittest.TestCase):
     def test_zh_variants(self):
@@ -214,12 +214,36 @@ class TestEnglishOutputNoChinese(unittest.TestCase):
         set_locale("zh")
         self.assertEqual(_style_tags("", "guofeng"), ["国风"])
 
+    def test_style_tags_phrase_preserved(self):
+        """F-02 回归（2026-10-28 模拟用户测试）：style_prompt 按逗号族分段，
+        短语段（great for {scene} / 适合{scene} / {inst}-led）不得被空格二次
+        拆成 "great" 等碎片词；两 provider 同口径。"""
+        from app.providers.music_api import _style_tags as api_style_tags
+        from app.providers.music_local import _style_tags
+        prompt = "Mandopop, Energetic, great for Short-video BGM"
+        set_locale("en")
+        try:
+            # en 家族标签 "pop" ⊆ "Mandopop"，不追加兜底段
+            self.assertEqual(_style_tags(prompt, "pop"),
+                             ["Mandopop", "Energetic", "great for Short-video BGM"])
+        finally:
+            set_locale("zh")
+        self.assertEqual(api_style_tags(prompt),
+                         ["Mandopop", "Energetic", "great for Short-video BGM"])
+        # 中文短语与顿号分隔同样完整保留；家族标签 ⊆ 首段时不追加
+        self.assertEqual(_style_tags("华语流行、安静，适合短视频BGM", "pop"),
+                         ["华语流行", "安静", "适合短视频BGM"])
+        # 空白仍会被 strip，不影响段内清洗
+        self.assertEqual(_style_tags("流行 ,  摇滚 ，国风", "pop")[:3],
+                         ["流行", "摇滚", "国风"])
+
     def test_synth_raise_messages_bilingual(self):
         import tempfile
         import wave
         from types import SimpleNamespace
 
         import numpy as np
+
         from app.synth import editing as editing_mod
         from app.synth import wav_io as wav_mod
         from app.synth.ir import SAMPLE_RATE
@@ -275,10 +299,11 @@ class TestEnglishOutputNoChinese(unittest.TestCase):
     def test_mail_single_language_per_locale(self):
         # v0.14.0：验证码落库（send/verify/consume 均带 db），邮件文案口径不变
         
-        from sqlalchemy.orm import sessionmaker
         from unittest.mock import patch
+
+        from sqlalchemy.orm import sessionmaker
+
         from app import models  # noqa: F401
-        from app.models import Base
         from app.services import mail
         engine = new_test_engine()
         reset_db(engine)

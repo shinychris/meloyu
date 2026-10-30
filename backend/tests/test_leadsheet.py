@@ -8,18 +8,18 @@ from __future__ import annotations
 import tempfile
 import unittest
 
-from tests.db import new_test_engine, reset_db, seed_plans
+import mido
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401
 from app.config import settings
 from app.core.errors import BizError
-from app.models import Base, Candidate, User, Version, Work
+from app.models import Candidate, User, Version, Work
 from app.models.base import utc_now_iso
 from app.services import leadsheet as ls_svc
 from app.synth.midi_out import TICKS_PER_BEAT
+from tests.db import new_test_engine, reset_db, seed_plans
 
-import mido
 
 def _write_test_midi(melody_path, chords_path, bpm: int = 96) -> None:
     """两小节 C 大调旋律（C4 D4 E4 G4 | A4 G4 E4 D4）+ C/Am 和弦。"""

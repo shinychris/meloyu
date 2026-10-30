@@ -30,6 +30,7 @@ export const editorEn = {
   'editor.toast.sameBpm': 'BPM unchanged — nothing to retune',
   'editor.toast.retuneDone': 'Retuned to {bpm} BPM — new version loaded',
   'editor.toast.retuneFailed': 'Retune failed',
+  'editor.toast.loadFailed': 'Failed to download a track audio — mixing stopped',
   'editor.toast.mixdownSaved': 'Mixdown saved as {no} (human-edit trace recorded)',
   'editor.footnote':
     'M/S = mute / solo; EQ is a 3-band Web Audio chain per stem (low shelf 200Hz / peaking 1kHz / high shelf 4kHz). "Save mixdown" renders the current mix offline (48kHz) into a new child version with human-participation provenance; retune re-renders the same seed deterministically at the new tempo (6 credits).',

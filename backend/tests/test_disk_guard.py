@@ -15,6 +15,7 @@ from app.config import settings
 from app.core.disk_guard import disk_free_gb, ensure_disk_available
 from app.core.errors import BizError
 
+
 def _usage(free_gb: float):
     return mock.MagicMock(free=int(free_gb * (1 << 30)), total=1 << 40, used=0)
 

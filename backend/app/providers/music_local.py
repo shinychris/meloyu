@@ -56,8 +56,13 @@ def _stage(progress: ProgressCallback, should_cancel: CancelCheck, key: str, pct
 
 
 def _style_tags(style_prompt: str, family: str) -> list[str]:
-    """由 style_prompt 派生风格标签（候选展示用）；家族兜底标签按当前 locale。"""
-    tags = [t for t in re.split(r"[，,。;；\s]+", style_prompt or "") if t][:3]
+    """由 style_prompt 派生风格标签（候选展示用）；家族兜底标签按当前 locale。
+
+    分隔符只认逗号族（，,、。;；）——灵感指引组装的 "great for {scene}" /
+    "{inst}-led" / "适合{scene}" 是有意为之的短语段，把空格也当分隔符会拆出
+    "great" 这类碎片词（2026-10-28 模拟用户测试 F-02）。
+    """
+    tags = [t.strip() for t in re.split(r"[，,、。;；]+", style_prompt or "") if t.strip()][:3]
     families = {"pop": ("流行", "pop"), "guofeng": ("国风", "Chinese traditional"),
                 "edm": ("电子", "electronic"), "hiphop": ("嘻哈", "hip-hop"),
                 "lofi": ("Lo-fi", "Lo-fi"), "rock": ("摇滚", "rock")}

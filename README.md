@@ -1,7 +1,7 @@
 # Meloyu · AI 音乐创作系统（桌面买断制）
 
 > 2026-10-03 定位转型定案：SaaS 订阅 → **桌面软件买断**（macOS/Windows，
-> $399 终身授权 / 限时首发 $159）+ 企业私有化部署服务。
+> $399 终身授权 / 限时买断价 $129，2026-10-17 起）+ 企业私有化部署服务。
 > 完整方案：[docs/06-商业化/2026-10-03-定位调整方案-SaaS转桌面买断制.md](docs/06-商业化/2026-10-03-定位调整方案-SaaS转桌面买断制.md)
 
 ## 仓库结构
@@ -33,10 +33,10 @@ cd ../desktop && npm install && npm start
 ## 测试
 
 ```bash
-cd backend && .venv/Scripts/python -m unittest discover -s tests   # 226 用例
-cd frontend && npm test                                            # 114 用例
-cd portal && ../backend/.venv/Scripts/python.exe -m unittest test_portal  # 9 用例
-cd desktop && npm test                                             # node:test 6 用例
+cd backend && .venv/Scripts/python -m unittest discover -s tests   # 270 用例
+cd frontend && npm test                                            # 116 用例
+cd portal && ../backend/.venv/Scripts/python.exe -m unittest test_portal  # 18 用例
+cd desktop && npm test                                             # node:test 18 用例
 ```
 
-版本：**v0.16.2**（版本事实源五处一致：config.APP_VERSION / 前后端+壳 package.json / pyproject / CHANGELOG）。
+版本：**v0.17.1**（版本事实源五处一致：config.APP_VERSION / 前后端+壳 package.json / pyproject / CHANGELOG + git tag；2026-10-27 评审 F-XC-02 更正——本行曾滞留 v0.16.2、价格滞留 $159）。

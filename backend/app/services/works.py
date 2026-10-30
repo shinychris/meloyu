@@ -4,7 +4,7 @@ from __future__ import annotations
 import shutil
 from datetime import UTC
 
-from sqlalchemy import String, func, or_, select, text
+from sqlalchemy import String, func, or_, select, text, update
 from sqlalchemy.orm import Session
 
 from app.config import TRASH_RETENTION_DAYS, settings
@@ -267,6 +267,23 @@ def get_version_owned(db: Session, version_id: str, user: User,
     from app.services.team import require_work_access
     require_work_access(db, work, user, min_role=min_role)
     return version
+
+
+def claim_next_version_no(db: Session, work: Work, now: str) -> str:
+    """原子自增版本计数并返回新版本号（v{n}）。
+
+    2026-10-27：原「读 version_count → +1 写回」为读改写，并发提交/派生/
+    混音回存可互相丢失自增，产生重复 version_no。改为单条 UPDATE
+    version_count = version_count + 1 并以 RETURNING 取更新后计数
+    （PG/SQLite 3.35+ 均支持）。
+    """
+    new_count = db.execute(
+        update(Work).where(Work.id == work.id)
+        .values(version_count=Work.version_count + 1, updated_at=now)
+        .returning(Work.version_count)
+    ).scalar_one()
+    work.version_count = new_count
+    return f"v{new_count}"
 
 
 def new_display_code(db: Session) -> str:

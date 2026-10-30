@@ -43,5 +43,7 @@ export const pricingZh: Record<keyof typeof pricingEn, string> = {
   'apikey.empty': '还没有密钥',
   'apikey.freshNotice': '完整密钥仅此一次显示，请立即复制保存（丢失只能吊销重发）',
   'apikey.toast.nameRequired': '请先填写密钥名',
+  'apikey.confirm.revokeTitle': '吊销 API 密钥「{name}」？',
+  'apikey.confirm.revokeDesc': '使用该密钥的集成立即失效，操作不可撤销。',
   'apikey.endpointHint': '调用方式：POST /api/v1/public/generations（X-API-Key 头）→ 轮询 GET /api/v1/public/tasks/{id} → succeeded 后按 downloads 链接下载。限流：生歌 30 次/小时（与站内共享额度）。',
 }

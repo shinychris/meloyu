@@ -18,6 +18,7 @@ from app.services import licensing
 from app.services.certificate import provider_attribution
 from app.synth.id3 import mark_mp3, mark_wav
 
+
 class TestObligation1Attribution(unittest.TestCase):
     """义务①：MiniMax 产出在证书与导出标识中显著署名 "MiniMax-Music3"。"""
 
@@ -61,6 +62,21 @@ class TestObligation2IpProtection(unittest.TestCase):
     def test_check_raises_42202(self):
         with self.assertRaises(BizError) as ctx:
             ip.check_ip_protection("in the style of Michael Jackson")
+        self.assertEqual(ctx.exception.code, 42202)
+
+    def test_lyrics_generate_and_polish_guarded(self):
+        """F-BE-28（2026-10-27）：歌词 generate/polish 输入接防侵权（义务口径对齐）。
+
+        _guard 先于 provider 调用执行，冒用输入直接 42202（db 参数不可达，传 None）。
+        """
+        from app.services import lyrics as lyrics_svc
+        with self.assertRaises(BizError) as ctx:
+            lyrics_svc.generate(None, "a song in the style of Michael Jackson",
+                                "", None, "en", None)
+        self.assertEqual(ctx.exception.code, 42202)
+        with self.assertRaises(BizError) as ctx:
+            lyrics_svc.polish(None, "[Verse] sounds like Beyonce tonight",
+                              None, "", [])
         self.assertEqual(ctx.exception.code, 42202)
 
     def test_extra_artists_file_isolated(self):

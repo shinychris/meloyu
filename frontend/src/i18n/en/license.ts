@@ -51,4 +51,5 @@ export const licenseEn = {
   'license.status.licenseId': 'License ID',
   'license.status.activatedAt': 'Activated at',
   'license.status.note': 'Licensed to',
+  'license.status.device': 'Device',
 } as const

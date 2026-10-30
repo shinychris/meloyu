@@ -51,13 +51,24 @@ def _mark_done() -> None:
         logger.warning(f"backup marker write failed: {e}")
 
 
-def run_backup_now() -> bool:
-    """执行一次备份（复用 scripts/backup.py；返回是否成功）。"""
+def _scripts_on_path() -> None:
+    """把 backend 根目录注入 sys.path（scripts 包可导入的前提）。
+
+    2026-10-27：原实现取 settings.data_path.parent——那是数据目录的父目录，
+    desktop 形态（数据在 ~/Meloyu）下完全不含代码，`from scripts.backup
+    import main` 必然 ImportError，每日备份静默失效。改用 app.config.
+    BACKEND_DIR（代码根，随安装位置确定），与启动方式/数据目录无关。
+    """
     import sys
 
-    backend_dir = settings.data_path.parent
-    if str(backend_dir) not in sys.path:
-        sys.path.insert(0, str(backend_dir))
+    from app.config import BACKEND_DIR
+    if str(BACKEND_DIR) not in sys.path:
+        sys.path.insert(0, str(BACKEND_DIR))
+
+
+def run_backup_now() -> bool:
+    """执行一次备份（复用 scripts/backup.py；返回是否成功）。"""
+    _scripts_on_path()
     try:
         from scripts.backup import main as backup_main
     except ImportError:

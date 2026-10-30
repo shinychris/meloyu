@@ -9,9 +9,9 @@ import time
 from datetime import UTC
 from pathlib import Path
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.config import GENERATION_TASK_TIMEOUT_SEC, MODEL_CREDIT_COST, settings
 from app.core.errors import (
@@ -162,9 +162,12 @@ def check_free_daily_limit(db: Session, user: User) -> None:
     now_cn = datetime.now(UTC) + timedelta(hours=8)
     day_start_utc = (now_cn.replace(hour=0, minute=0, second=0, microsecond=0)
                      - timedelta(hours=8)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # failed/canceled 不计入（2026-10-27）：失败/取消即退款（reason=refund 幂等
+    # 账本），失败也扣次数等于对已退款请求二次收费——口径与退款对齐
     count = db.execute(
         select(func.count()).select_from(Task).where(
             Task.user_id == user.id, Task.type == "generation",
+            Task.status.in_(("queued", "running", "succeeded")),
             Task.created_at >= day_start_utc)
     ).scalar_one()
     # P1-14：限额读 Plan 表（运营调表即时生效，不再硬编码 5）
@@ -247,7 +250,14 @@ def _check_maintenance() -> None:
                "The system is under maintenance; please try again shortly"))
 
 
-def submit_generation(db: Session, user: User, payload: dict) -> dict:
+def submit_generation(db: Session, user: User, payload: dict,
+                      via: dict | None = None) -> dict:
+    """提交生成任务。
+
+    via：发起渠道留痕（如 {"source": "api_key", ...}，开放 API 审计用），随
+    request_snapshot 一次性落库（2026-10-27：原由 public.py 在调度提交后回写
+    request_payload，与执行线程的 _resolved 回填构成并发丢失更新窗口）。
+    """
     _check_maintenance()
     check_generation_content(payload)
     check_generation_entitlement(db, user)
@@ -341,7 +351,7 @@ def submit_generation(db: Session, user: User, payload: dict) -> dict:
                     created_at=now, updated_at=now)
         db.add(work)
         db.flush()
-    version_no = f"v{work.version_count + 1}"
+    version_no = works_svc.claim_next_version_no(db, work, now)
     if parent_version_id:
         parent = db.get(Version, parent_version_id)
         if not parent or parent.work_id != work.id:
@@ -357,7 +367,6 @@ def submit_generation(db: Session, user: User, payload: dict) -> dict:
                       updated_at=now)
     db.add(version)
     db.flush()
-    work.version_count += 1
     work.updated_at = now
 
     request_snapshot = {
@@ -372,6 +381,8 @@ def submit_generation(db: Session, user: User, payload: dict) -> dict:
         "voice": voice_info,
         "_resolved": resolved,
     }
+    if via:
+        request_snapshot["via"] = via
     task = Task(user_id=user.id, type="generation", status="queued", progress=0,
                 stage_key="queued", stage_label=tr("排队中", "Queued"), work_id=work.id,
                 version_id=version.id,
@@ -466,13 +477,18 @@ def _prepare_generation_inputs(db, task_id: str, payload_row: dict, resolved: di
 def execute_generation(task_id: str) -> None:
     t_start = time.monotonic()
     with SessionLocal() as db:
-        task = db.get(Task, task_id)
-        if task is None or task.status != "queued":
-            return
-        task.status = "running"
-        task.started_at = utc_now_iso()
-        task.updated_at = utc_now_iso()
+        # queued→running 条件抢占（2026-10-27，与 cancel_task 守卫对称）：并发
+        # cancel 已把任务翻成 canceled 并退款时（rowcount=0），此处不得把行
+        # 翻回 running 复活已退款任务（原读-改-写无守卫，money 侧现由退款
+        # 唯一索引兜底，状态机侧在此封口）
+        now = utc_now_iso()
+        claimed = db.execute(
+            update(Task).where(Task.id == task_id, Task.status == "queued")
+            .values(status="running", started_at=now, updated_at=now))
         db.commit()
+        if claimed.rowcount == 0:
+            return
+        task = db.get(Task, task_id)
         user_id = task.user_id
 
     try:
@@ -539,10 +555,11 @@ def execute_generation(task_id: str) -> None:
         _cleanup_failed_audio(task_id)
     except Exception as e:  # noqa: BLE001 —— 任务级兜底，退款 + 50002
         logger.exception(f"generation {task_id} failed: {e}")
+        # 用户侧只回固定短语+异常类名（2026-10-27）：原始异常文本可能含路径/
+        # URL/SQL 片段，经 task.error_message 下发即泄漏；完整异常仅入服务端日志
         with SessionLocal() as db:
             _finish_task(db, task_id, "failed", 50002,
-                         tr("生成失败：", "Generation failed: ")
-                         + f"{type(e).__name__} {e}")
+                         tr("生成失败：", "Generation failed: ") + type(e).__name__)
             _refund(db, task_id)
             rollback_empty_current_version(db, task_id)
             db.commit()
@@ -854,14 +871,26 @@ def cancel_task(db: Session, user: User, task_id: str) -> dict:
                               "Export is running and cannot be interrupted "
                               "(auto-finishes within 10 minutes)"))
     if task.status == "queued":
-        task.status = "canceled"
-        task.finished_at = utc_now_iso()
-        task.updated_at = utc_now_iso()
-        _refund(db, task.id)
-        rollback_empty_current_version(db, task.id)
-        db.commit()  # 终态、退款与电流向回滚同事务提交
+        # 条件 UPDATE 占位（2026-10-27）：原「读 status → 置 canceled + 退款」
+        # 无状态守卫，并发取消可双双通过终态检查各退一笔（积分双花）。仅把
+        # queued→canceled 的首个事务判胜（rowcount=1）并随其退款；未命中=
+        # 已被并发翻态，按最新状态重新分流。
+        now = utc_now_iso()
+        claimed = db.execute(
+            update(Task).where(Task.id == task.id, Task.status == "queued")
+            .values(status="canceled", finished_at=now, updated_at=now))
+        if claimed.rowcount:
+            _refund(db, task.id)
+            rollback_empty_current_version(db, task.id)
+            db.commit()  # 终态、退款与电流向回滚同事务提交
+            db.refresh(task)
+            return task_to_dict(task)
+        db.rollback()
         db.refresh(task)
-        return task_to_dict(task)
+        if task.status in ("succeeded", "failed", "canceled"):
+            raise err_conflict(tr("任务已结束，无法取消", "Task already finished; cannot cancel"))
+        # 并发窗口内已转入 running：落入下方取消标志分支（是否退款由执行线程
+        # 的 SynthCancelled 终态分支处理，refund 唯一索引保证不与该分支双发）
     # running：置取消标志，渲染循环在阶段边界到达
     task.cancel_requested = True
     task.stage_label = tr("正在取消…", "Canceling…")
@@ -875,7 +904,10 @@ def cancel_task(db: Session, user: User, task_id: str) -> dict:
 
 def list_candidates(db: Session, version_id: str, user: User) -> dict:
     version = works_svc.get_version_owned(db, version_id, user, min_role="viewer")
-    rows = db.execute(select(Candidate).where(Candidate.version_id == version.id)
+    # selectinload 预取文件（2026-10-27）：candidate_to_dict 读 c.files，
+    # 逐候选懒加载在多候选版本上放大查询数
+    rows = db.execute(select(Candidate).options(selectinload(Candidate.files))
+                      .where(Candidate.version_id == version.id)
                       .order_by(Candidate.label.asc())).scalars().all()
     items = [candidate_to_dict(c) for c in rows]
     # 义务①（MiniMax 社区许可）：生成结果页（作品详情候选卡）展示生成引擎署名——

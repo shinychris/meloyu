@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
 
 import httpx
@@ -116,7 +117,7 @@ def _audiocpp_home() -> Path:
 
 
 # R-37：audio.cpp 通道级并发上限（生成线程池共 2 worker，慢通道独占 1）
-_AUDIOCPP_SEMAPHORE = __import__("threading").BoundedSemaphore(1)
+_AUDIOCPP_SEMAPHORE = threading.BoundedSemaphore(1)
 
 
 def _kill_process_tree(proc) -> None:

@@ -10,8 +10,6 @@ _bucket_key/_hit 两个函数）。
 - /api/v1/auth/send-code|forgot-password 3/hour —— 防邮件轰炸
 - /api/v1/generations                 30/hour  —— 防算力刷取（叠加免费档日限）
 - 其余 /api/v1/*                      300/min  —— 全局兜底
-
-（v0.16.0 Stripe 拆除后无 webhook 豁免项）
 """
 from __future__ import annotations
 
@@ -32,12 +30,11 @@ _RULES: list[tuple[str, int, int]] = [
     ("/api/v1/auth/forgot-password", 3600, 3),
     ("/api/v1/generations", 3600, 30),
     ("/api/v1/public/generations", 3600, 30),  # FR-19 开放 API β：与站内同额度
-    ("/api/v1/billing/webhook", 0, 0),  # 0 = 不限流（显式豁免）
     ("/api/v1/", 60, 300),
 ]
 
 _hits: dict[str, deque[float]] = defaultdict(deque)
-_MAX_KEYS = 20000  # 内存上限：超量整体重置（防地址随机化撑爆内存）
+_MAX_KEYS = 20000  # 内存上限：超量按最旧键淘汰（防地址随机化撑爆内存）
 
 
 def _client_ip(request: Request) -> str:
@@ -72,7 +69,13 @@ def _hit(key: str, window: int, limit: int) -> bool:
     """记录一次命中；返回是否放行。"""
     now = time.monotonic()
     if len(_hits) > _MAX_KEYS:
-        _hits.clear()
+        # 淘汰最旧键（dict 保序，弹出最早插入者）直到回到阈值内（2026-10-27：
+        # 原整体 clear() 可被故意撑爆后一次性清空全部防护窗口，等于给爆破者
+        # 开闸；LRU 淘汰只牺牲最久不活跃的键，近期计数保留）
+        for oldest in list(_hits.keys()):
+            if len(_hits) <= _MAX_KEYS:
+                break
+            _hits.pop(oldest, None)
     q = _hits[key]
     while q and q[0] <= now - window:
         q.popleft()

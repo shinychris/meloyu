@@ -47,6 +47,45 @@ export function countParenMarks(lyrics: string): number {
   return (lyrics.match(PAREN_MARK_RE) ?? []).length
 }
 
+export interface StructureSection {
+  section: Section
+  line_count: number
+}
+
+/**
+ * 编辑器内容的实时结构解析（F-04，2026-10-28 模拟用户测试）：
+ * 镜像后端 parse_lyrics 的展示语义——标签行切换段落（连续同名标签各自成段）；
+ * 首个标签前的行归 verse；无任何标签时全文归 verse（后端 has_tags=false 口径）；
+ * 括号表演标记行内剥除后仍计一行，纯标记行不计行；空段保留。
+ * 歌词助手结构面板据此随编辑内容实时刷新，不再依赖上一次生成响应的快照。
+ */
+export function parseLyricsStructure(lyrics: string): StructureSection[] {
+  const sections: StructureSection[] = []
+  let current: Section = 'verse'
+  let pending = 0
+  let hasTags = false
+  const flush = (): void => {
+    if (hasTags || pending > 0) sections.push({ section: current, line_count: pending })
+    pending = 0
+  }
+  for (const raw of (lyrics || '').split(/\r?\n/)) {
+    const line = raw.trim()
+    if (!line) continue
+    const sec = parseSectionTag(line)
+    if (sec) {
+      flush()
+      current = sec
+      hasTags = true
+      continue
+    }
+    const content = line.replace(PAREN_MARK_RE, '').trim()
+    if (!content) continue
+    pending++
+  }
+  flush()
+  return sections
+}
+
 /** 在光标处插入片段；返回 [新文本, 新光标位]。
  *  block=true（段落标签/整行标记）：确保片段独立成行，光标停在片段行末 */
 export function insertAtCaret(

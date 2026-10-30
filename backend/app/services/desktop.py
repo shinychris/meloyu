@@ -68,8 +68,23 @@ def ensure_desktop_secrets(root: Path | None = None) -> Path:
     if file_dirty:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        _restrict_file_mode(target)
         logger.info(f"desktop mode: instance secrets generated at {target}")
     return target
+
+
+def _restrict_file_mode(path: Path) -> None:
+    """密钥文件权限收紧（2026-10-27）：POSIX 0o600（仅属主可读写）。
+
+    Windows 的 NTFS ACL 无法经 chmod 表达（os.chmod 仅切换只读位，无害），
+    桌面数据目录位于用户主目录下，默认 ACL 已限定本用户+管理员——按平台
+    容错处理，POSIX 上严格受限，Windows 上不因权限调用失败影响启动。
+    """
+    import os
+    try:
+        os.chmod(path, 0o600)
+    except OSError as e:
+        logger.warning(f"desktop secrets chmod failed (non-POSIX fs?): {e}")
 
 
 

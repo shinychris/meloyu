@@ -30,6 +30,7 @@ export const editorZh = {
   'editor.toast.sameBpm': 'BPM 未变化，无需重渲染',
   'editor.toast.retuneDone': '已重渲染为 {bpm} BPM，新版本已载入',
   'editor.toast.retuneFailed': '重渲染失败',
+  'editor.toast.loadFailed': '轨道音频下载失败，已停止装载',
   'editor.toast.mixdownSaved': '混音已保存为 {no}（人类参与留痕）',
   'editor.footnote':
     'M/S=静音/独听；EQ 为每轨三段 Web Audio 链（低架 200Hz / 峰值 1kHz / 高架 4kHz）。「混音存为新版本」将当前混音离线渲染（48kHz）为子版本并记人类参与留痕；变速重渲染为同 seed 确定性重作（6 积分）。',

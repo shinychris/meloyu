@@ -19,6 +19,10 @@ class PublishRequest(BaseModel):
     price_credits: int = Field(ge=1, le=100000)
 
 
+class AdminDelistRequest(BaseModel):
+    reason: str = Field(min_length=2, max_length=200)
+
+
 @router.post("/listings", status_code=201)
 def publish(body: PublishRequest, user: User = Depends(get_current_user),
             db: Session = Depends(get_db)):
@@ -71,7 +75,3 @@ def admin_delist(listing_id: str, body: AdminDelistRequest,
                  user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """平台治理下架（admin；P1-2 违规/投诉处置入口）。"""
     return ok(market_svc.admin_delist(db, user, listing_id, body.reason))
-
-
-class AdminDelistRequest(BaseModel):
-    reason: str = Field(min_length=2, max_length=200)

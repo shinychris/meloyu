@@ -22,6 +22,9 @@ export const useConfirmStore = create<ConfirmState>((set, get) => ({
   resolver: null,
   confirm(options) {
     return new Promise<boolean>((resolve) => {
+      // 并发调用：对话框只有一份，直接否决（resolve(false)）旧请求，
+      // 其 Promise 立刻落地，避免前一个调用方永久悬挂
+      get().resolver?.(false)
       set({ visible: true, options, resolver: resolve })
     })
   },

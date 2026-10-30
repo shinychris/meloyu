@@ -6,6 +6,7 @@ docker exec 在 GPU 容器上受 seccomp 限制不可用——备份改由应用
 """
 from __future__ import annotations
 
+import sys
 import tempfile
 import unittest
 from datetime import datetime, timedelta
@@ -13,6 +14,7 @@ from unittest import mock
 
 from app.config import settings
 from app.services import ops_backup
+
 
 def _freeze(when: datetime):
     """冻结 ops_backup.datetime.now（built-in 类不可 patch，替换模块级引用）"""
@@ -49,6 +51,16 @@ class TestBackupSchedule(unittest.TestCase):
         nxt = at + timedelta(days=1)
         with _freeze(nxt):
             self.assertTrue(ops_backup._due_now())
+
+    def test_scripts_path_points_at_backend_dir(self):
+        """desktop 形态（数据目录在 ~/Meloyu）下 sys.path 必须注入代码根
+        BACKEND_DIR 而非数据目录父目录——否则 scripts.backup 永不可导入，
+        每日备份静默失效（2026-10-27 评审 F-BE-02）。"""
+        from app.config import BACKEND_DIR
+        with mock.patch.object(settings, "data_dir", self._tmp.name):
+            ops_backup._scripts_on_path()
+        self.assertIn(str(BACKEND_DIR), sys.path)
+        import scripts.backup  # noqa: F401 —— 注入后必须可导入（旧实现走数据目录父目录必 ImportError）
 
 if __name__ == "__main__":
     unittest.main()

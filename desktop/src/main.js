@@ -2,17 +2,19 @@
  * Meloyu Desktop — Electron 主进程（P2，2026-10-03 定位转型）。
  *
  * 职责：
- * - 单实例锁（第二实例聚焦已有窗口，转发命令行深度链接）
+ * - 单实例锁（第二实例聚焦已有窗口并转发命令行深度链接；锁失败分支完全隔离，
+ *   不做任何协议/菜单/事件注册——评审 F-DT-13）
  * - 选取空闲回环端口 → 拉起后端 sidecar（FastAPI 单体，APP_MODE=desktop）
  * - 健康检查就绪后加载 http://127.0.0.1:<port>（sidecar 同源托管前端 SPA，
- *   HttpOnly Cookie 刷新机制原样工作）
+ *   HttpOnly Cookie 刷新机制原样工作）；冷启动收到的深链在此刻重放（F-DT-01）
  * - 深度链接 meloyu://activate?account=..&code=..（在线）/ ?key=..（离线备用）
- *   → 主进程代为激活 → 跳激活页
- * - 麦克风权限（哼唱/人声克隆 getUserMedia）
+ *   → 主进程代为激活 → 读响应结果区分提示后跳授权设置页（F-DT-14）
+ * - 导航/新窗口守卫 + openExternal 白名单（F-DT-03/04）+ 权限来源校验（F-DT-05）
+ * - sidecar 优雅退出：HTTP /_sidecar/shutdown → SIGTERM 宽限 → Windows
+ *   taskkill /T 树杀兜底（F-DT-06/07）
  * - CSP 响应头（默认同源；Google Fonts 为既有外链白名单）
  * - 托盘（显示窗口/退出）+ 应用图标
- * - 自动更新（electron-updater + generic 更新源；未配置 UPDATE_URL 时静默跳过）
- * - 退出时优雅关停 sidecar（SIGTERM → 3s 强杀）
+ * - 自动更新（electron-updater + generic 更新源，仅接受 https；未配置时静默跳过）
  *
  * 安全基线：contextIsolation=true、nodeIntegration=false、http 仅限回环 sidecar。
  */
@@ -24,7 +26,17 @@ const net = require('node:net')
 const path = require('node:path')
 const fs = require('node:fs')
 const http = require('node:http')
-const { extractLinkFromArgv, activateRequestFromParams, CSP_POLICY } = require('./lib')
+const {
+  extractLinkFromArgv,
+  activateRequestFromParams,
+  planDeepLink,
+  isExternalOpenAllowed,
+  classifyWindowOpen,
+  isPermissionAllowed,
+  parseActivationResponse,
+  isHttpsUpdateUrl,
+  CSP_POLICY,
+} = require('./lib')
 
 const IS_DEV = !app.isPackaged
 const DEV_BACKEND_URL = process.env.MELOYU_DEV_BACKEND || 'http://127.0.0.1:8000'
@@ -35,40 +47,69 @@ let sidecar = null          // ChildProcess
 let sidecarPort = 0
 let sidecarBase = ''
 let quitting = false
+let pendingDeepLink = null  // 冷启动挂起的激活请求（后到覆盖先到，就绪后重放）
 
-// ---------- 单实例锁 ----------
-const gotLock = app.requestSingleInstanceLock()
-if (!gotLock) {
-  app.quit()
-} else {
-  app.on('second-instance', (_e, argv) => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore()
-      mainWindow.focus()
-    }
-    handleDeepLinkArgs(argv)
-  })
-}
-
-// ---------- 深度链接 meloyu:// ----------
-app.setAsDefaultProtocolClient('meloyu')
-handleDeepLinkArgs(process.argv)
+// ---------- 深度链接 meloyu://（评审 F-DT-01） ----------
 
 function handleDeepLinkArgs(argv) {
   const req = activateRequestFromParams(extractLinkFromArgv(argv))
-  if (!req || !sidecarBase) return
-  // 主进程代为激活（免手动粘贴），完成后跳系统设置的授权分区展示结果
+  const plan = planDeepLink(req, sidecarBase)
+  if (plan.action === 'ignore') return
+  if (plan.action === 'park') {
+    // 冷启动 sidecar 未就绪：挂起待健康检查通过后重放（后到的覆盖先到的）
+    pendingDeepLink = req
+    return
+  }
+  dispatchActivation(req)
+}
+
+/** sidecar 就绪后重放挂起的激活深链（购买邮件「一键激活」冷启动不再静默丢失） */
+function replayPendingDeepLink() {
+  if (!pendingDeepLink || !sidecarBase) return
+  const req = pendingDeepLink
+  pendingDeepLink = null
+  dispatchActivation(req)
+}
+
+/** mainWindow 使用前的销毁守卫 + loadURL 同步异常捕获（窗口销毁竞态，F-DT-14） */
+function safeLoad(url) {
+  const win = mainWindow
+  if (!win || win.isDestroyed()) return
+  try {
+    win.loadURL(url).catch(() => {})
+  } catch { /* 窗口在导航期间被销毁 */ }
+}
+
+function activationFailed(reason) {
+  // F-DT-14：失败显式提示，不再导航设置页假装成功
+  dialog.showMessageBox({
+    type: 'error',
+    title: 'Meloyu',
+    message: `Activation failed: ${reason}`,
+    detail: 'Open Settings → License in the app and try again, or use the full '
+      + 'license key from your activation email for offline activation.',
+  }).catch(() => {})
+  safeLoad(`${sidecarBase}/#/settings`)
+}
+
+function dispatchActivation(req) {
+  // 主进程代为激活（免手动粘贴），读响应体 ok 字段区分结果后跳授权设置分区
   // （v0.17.0 起激活/授权入口自定价页迁入 /settings）
   const r = http.request(
     `${sidecarBase}${req.path}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' } },
-    () => {
-      if (mainWindow) mainWindow.loadURL(`${sidecarBase}/#/settings`).catch(() => {})
+    (res) => {
+      const chunks = []
+      res.on('data', (c) => chunks.push(c))
+      res.on('end', () => {
+        const { ok, reason } = parseActivationResponse(
+          res.statusCode, Buffer.concat(chunks).toString('utf8'))
+        if (ok) safeLoad(`${sidecarBase}/#/settings`)
+        else activationFailed(reason)
+      })
     },
   )
-  r.on('error', () => {
-    if (mainWindow) mainWindow.loadURL(`${sidecarBase}/#/settings`).catch(() => {})
-  })
+  r.on('error', () => activationFailed('network error'))
   r.end(JSON.stringify(req.body))
 }
 
@@ -109,17 +150,24 @@ function startSidecar() {
   fs.mkdirSync(userDataData, { recursive: true })
   const env = {
     ...process.env,
+    // F-DT-17 调研结论（2026-10-27）：app_mode=desktop 即现值（pydantic 的
+    // app_mode 字段读 APP_MODE env）——license gate/试用闸门/本地档案链路照常
+    // 生效；数据路径由 DATA_DIR 接管（config.data_path 中 data_dir 非空时优先
+    // 于 desktop 默认的 ~/Meloyu，无冲突，config.py 无需改动）。
     APP_MODE: 'desktop',
     MELOYU_PORT: String(sidecarPort),
     DATA_DIR: userDataData,
-    ENV: 'dev',               // 桌面形态沿用 dev 语义（无生产断言；无固定密码播种）
+    // ENV=dev 为刻意保留的「desktop 档」leniency：桌面形态无强随机密钥/PG，
+    // 生产启动断言不适用；dev 语义残留面（/api/docs、CORS）由 desktop_runner.py
+    // 在桌面专属入口收敛（见 backend/scripts/desktop_runner.py）
+    ENV: 'dev',
     ALLOW_LAN_DEV: 'false',
     // 前端静态目录：dev=仓库 frontend/dist；打包=resources/web
     DESKTOP_STATIC_DIR: IS_DEV
       ? path.resolve(__dirname, '../../frontend/dist')
       : path.join(process.resourcesPath, 'web'),
   }
-  sidecar = spawn(cmd, [...args, ...(!IS_DEV ? [] : [])], {
+  sidecar = spawn(cmd, args, {
     cwd: cwd || path.resolve(__dirname, '../../backend'),
     env,
     windowsHide: true,
@@ -127,30 +175,82 @@ function startSidecar() {
   })
   sidecar.stdout.on('data', (d) => process.stdout.write(`[sidecar] ${d}`))
   sidecar.stderr.on('data', (d) => process.stderr.write(`[sidecar] ${d}`))
-  sidecar.on('exit', (code) => {
-    sidecar = null
-    if (!quitting) {
-      dialog.showErrorBox(
-        'Meloyu',
-        `Backend exited unexpectedly (code ${code}). The app will now close.`,
-      )
-      app.quit()
-    }
+  // 评审 F-DT-06：spawn 失败（ENOENT 等）此前变未捕获异常 + 等满 30s 健康检查
+  // 超时——补 error 监听，与 exit 共用清理/退出逻辑，失败即刻可见
+  sidecar.on('exit', (code) => sidecarDied(`exited unexpectedly (code ${code})`))
+  sidecar.on('error', (err) => sidecarDied(`failed to start: ${err.message}`))
+}
+
+/** sidecar 异常死亡共用路径：提示 + 退出（quitting 中静默，交给退出流程） */
+function sidecarDied(reason) {
+  if (!sidecar) return // 已被 stopSidecar 收管或已报告过（error 后可能仍发 exit）
+  sidecar = null
+  if (!quitting) {
+    dialog.showErrorBox('Meloyu', `Backend ${reason}. The app will now close.`)
+    app.quit()
+  }
+}
+
+// ---------- sidecar 优雅退出（评审 F-DT-07） ----------
+const SHUTDOWN_TIMEOUT_MS = 2500  // HTTP 优雅关停请求等待
+const KILL_GRACE_MS = 3000        // 信号后宽限
+const KILL_WAIT_MS = 2000         // 强杀后等待
+
+/** 请求 desktop_runner 注册的 /_sidecar/shutdown（置 uvicorn should_exit，
+ *  完成在途请求后退出，防 SQLite 写入中途被杀）；dev 直启 uvicorn 无此路由
+ *  → 404/网络错误，走信号兜底 */
+function requestSidecarShutdown(base) {
+  return new Promise((resolve) => {
+    const req = http.request(`${base}/_sidecar/shutdown`, { method: 'POST' }, (res) => {
+      res.resume()
+      resolve(res.statusCode === 200)
+    })
+    req.setTimeout(SHUTDOWN_TIMEOUT_MS, () => { req.destroy(); resolve(false) })
+    req.on('error', () => resolve(false))
+    req.end()
   })
+}
+
+function waitExit(child, ms) {
+  return new Promise((resolve) => {
+    if (child.exitCode !== null || child.signalCode !== null) { resolve(); return }
+    const timer = setTimeout(() => { child.removeListener('exit', onExit); resolve() }, ms)
+    const onExit = () => { clearTimeout(timer); resolve() }
+    child.once('exit', onExit)
+  })
+}
+
+/** 硬杀兜底（退出失败路径）：Windows 用 taskkill /T 连带子进程树——sidecar
+ *  可能拉起推理子进程，kill 只及直接子进程会留孤儿；POSIX 用 SIGKILL */
+function hardKill(child) {
+  try {
+    if (process.platform === 'win32') {
+      if (child.pid) {
+        spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'],
+          { windowsHide: true, stdio: 'ignore' })
+      }
+    } else {
+      child.kill('SIGKILL')
+    }
+  } catch { /* already gone */ }
 }
 
 function stopSidecar() {
   if (!sidecar) return Promise.resolve()
   const child = sidecar
+  const base = sidecarBase
   sidecar = null
-  return new Promise((resolve) => {
-    const killTimer = setTimeout(() => {
-      try { child.kill('SIGKILL') } catch { /* already gone */ }
-      resolve()
-    }, 3000)
-    child.once('exit', () => { clearTimeout(killTimer); resolve() })
-    try { child.kill() } catch { /* already gone */ }
-  })
+  return (async () => {
+    // ① HTTP 优雅关停（桌面 sidecar 专属路由）；不可用（dev 404/已死）→ 信号兜底
+    const graceful = base ? await requestSidecarShutdown(base) : false
+    if (!graceful) { try { child.kill() } catch { /* already gone */ } }
+    // ② 宽限期后强杀
+    await waitExit(child, KILL_GRACE_MS)
+    if (child.exitCode === null && child.signalCode === null) {
+      hardKill(child)
+      await waitExit(child, KILL_WAIT_MS)
+    }
+  })()
 }
 
 // ---------- 健康检查 ----------
@@ -213,11 +313,23 @@ function createWindow() {
   })
   mainWindow.once('ready-to-show', () => mainWindow.show())
   mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(LOADING_HTML)}`)
+    .catch(() => {})
 
-  // 外链一律走系统浏览器（官网购买/帮助文档）
+  // 导航守卫（评审 F-DT-03）：SPA 内 location.href 指向非 sidecarBase 的导航
+  // 一律拦下——任意页面不得被载入主窗口（绕过 CSP 且可请求麦克风）；
+  // 白名单外链转交系统浏览器
+  mainWindow.webContents.on('will-navigate', (e, url) => {
+    if (sidecarBase && url.startsWith(sidecarBase)) return
+    e.preventDefault()
+    if (isExternalOpenAllowed(url)) shell.openExternal(url).catch(() => {})
+  })
+
+  // 新窗口（评审 F-DT-03/04）：仅同源前缀可在窗口内打开；白名单外链走系统
+  // 浏览器；其余（file:/smb:/自定义协议等）一律拒绝
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http://127.0.0.1:') || url.startsWith('meloyu://')) return { action: 'allow' }
-    shell.openExternal(url)
+    const kind = classifyWindowOpen(url, sidecarBase)
+    if (kind === 'allow') return { action: 'allow' }
+    if (kind === 'external') shell.openExternal(url).catch(() => {})
     return { action: 'deny' }
   })
 
@@ -226,9 +338,10 @@ function createWindow() {
 
 // ---------- 权限（麦克风：哼唱/人声克隆） ----------
 function installPermissionHandlers() {
-  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
-    const allowed = new Set(['media', 'audioCapture', 'pointerLock', 'fullscreen'])
-    callback(allowed.has(permission))
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback, details) => {
+    // 评审 F-DT-05：media/audioCapture 仅 sidecarBase 来源（requestingUrl）
+    // 放行，其余来源拒绝——麦克风不外借给导航守卫漏进来的页面
+    callback(isPermissionAllowed(permission, details?.requestingUrl, sidecarBase))
   })
 }
 
@@ -279,6 +392,11 @@ function createTray() {
 function setupAutoUpdater() {
   const updateUrl = process.env.MELOYU_UPDATE_URL || ''
   if (IS_DEV || !updateUrl) return
+  if (!isHttpsUpdateUrl(updateUrl)) {
+    // 评审 F-DT-16：feed 含可执行更新，非 https 明文可被中间人替换——拒绝启用
+    console.warn('[meloyu] MELOYU_UPDATE_URL must start with https:// — auto-update disabled')
+    return
+  }
   try {
     const { autoUpdater } = require('electron-updater')
     autoUpdater.setFeedURL({ provider: 'generic', url: updateUrl })
@@ -305,17 +423,21 @@ app.whenReady().then(async () => {
 
   try {
     await waitUntilReady(sidecarBase)
-    if (mainWindow) await mainWindow.loadURL(`${sidecarBase}/`)
+    if (mainWindow && !mainWindow.isDestroyed()) await mainWindow.loadURL(`${sidecarBase}/`)
   } catch (e) {
     dialog.showErrorBox('Meloyu', `Failed to start local backend: ${e.message}`)
     app.quit()
     return
   }
+  // F-DT-01：健康检查通过（sidecarBase 就绪）后重放冷启动挂起的激活深链
+  replayPendingDeepLink()
   setupAutoUpdater()
 
+  // F-DT-08：createWindow 同步返回 undefined，原 `createWindow().catch?.(...)`
+  // 对 undefined 取 .catch 必崩 TypeError
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow().catch?.(() => {})
-    else if (mainWindow) mainWindow.show()
+    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    else mainWindow?.show()
   })
 })
 
@@ -334,6 +456,7 @@ app.on('before-quit', async (e) => {
 })
 
 // 基础菜单（mac 需要 About 项；win 菜单栏自动隐藏）
+// 评审 F-DT-11：reload/toggleDevTools 仅 dev 注入，生产构建不暴露调试入口
 const template = [
   ...(process.platform === 'darwin' ? [{
     label: app.name,
@@ -348,12 +471,34 @@ const template = [
   {
     label: 'View',
     submenu: [
-      { role: 'reload' },
-      { role: 'toggleDevTools' },
-      { type: 'separator' },
+      ...(IS_DEV ? [{ role: 'reload' }, { role: 'toggleDevTools' }, { type: 'separator' }] : []),
       { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' },
       { role: 'togglefullscreen' },
     ],
   },
 ]
-Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+
+// ---------- 单实例锁（评审 F-DT-13：失败分支完全隔离） ----------
+// 第二实例仅退出，不做协议注册/菜单/事件挂载；全部注册收敛进 gotLock 分支
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_e, argv) => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
+    handleDeepLinkArgs(argv)
+  })
+  // macOS 深链经 open-url 送达（含冷启动与第二实例场景：系统统一转交第一实例）
+  app.on('open-url', (e, url) => {
+    e.preventDefault()
+    handleDeepLinkArgs([url])
+  })
+
+  app.setAsDefaultProtocolClient('meloyu')
+  handleDeepLinkArgs(process.argv)
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}

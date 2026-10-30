@@ -18,6 +18,7 @@ import hashlib
 import importlib.util
 import re
 import shutil
+import threading
 from pathlib import Path
 
 from app.config import MUSICGEN_TASK_TIMEOUT_SEC, settings
@@ -73,7 +74,7 @@ _CUDA_POISONED = {"flag": False}
 # （原实现每次生成都冷加载权重，small 也要分钟级）。GPU 采样全程持锁串行
 # （transformers generate 非线程安全，且单卡显存本就只能串行）。
 _MODEL_CACHE: dict[str, tuple] = {}
-_GEN_LOCK = __import__("threading").Lock()
+_GEN_LOCK = threading.Lock()
 
 
 def _load_or_get(hf_id: str, device: str):

@@ -11,22 +11,26 @@ import tempfile
 import unittest
 
 from fastapi.testclient import TestClient
-
-from tests.db import new_test_engine, reset_db
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app import models  # noqa: F401
 from app.config import settings
 from app.database import get_db
 from app.main import app
-from app.models import Base
 from app.models.enums import SECTIONS
 from app.providers.lyrics_local import LocalLyricsProvider
 from app.services.leadsheet import _syllable_lines
-from app.synth.structure import (SECTION_ALIASES, SECTION_BASE_BARS,
-                                 SECTION_ENERGY, SECTION_ORDER, SECTION_TAG,
-                                 parse_lyrics, plan_sections)
+from app.synth.structure import (
+    SECTION_ALIASES,
+    SECTION_BASE_BARS,
+    SECTION_ENERGY,
+    SECTION_ORDER,
+    SECTION_TAG,
+    parse_lyrics,
+    plan_sections,
+)
+from tests.db import new_test_engine, reset_db
+
 
 class SectionRegistryTest(unittest.TestCase):
     """段落注册表一致性：新增段落必须四处同步（别名表/枚举/映射/权重）。"""

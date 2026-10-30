@@ -9,17 +9,24 @@
 ```
 Electron 主进程（src/main.js）
  ├─ 单实例锁 + meloyu://activate 深度链接（account+code 在线 / key 离线备用，
- │  纯函数抽 src/lib.js 供 node:test 覆盖）
+ │  纯函数抽 src/lib.js 供 node:test 覆盖；冷启动先挂起、sidecar 就绪后重放，
+ │  macOS 走 open-url、Windows/Linux 走第二实例 argv 转发）
  ├─ pickFreePort → spawn sidecar（127.0.0.1 随机端口；dev uvicorn 同端口）
  ├─ 健康检查 /api/v1/system/health → loadURL http://127.0.0.1:<port>
- ├─ 麦克风权限（哼唱/人声克隆）、外链走系统浏览器、electron-updater
+ ├─ 麦克风权限（哼唱/人声克隆，仅 sidecar 同源来源放行）
+ ├─ 导航/新窗口守卫 + openExternal 白名单（https / 回环 http 之外一律拒绝）
  ├─ CSP 响应头（同源默认 + Google Fonts 白名单，src/lib.js CSP_POLICY）
  ├─ 托盘（Show/Quit）+ 应用图标（build/icon.{png,ico}，品牌方格音符标）
- └─ 退出优雅关停 sidecar（SIGTERM → 3s 强杀）
+ └─ 退出优雅关停 sidecar（POST /_sidecar/shutdown → SIGTERM 3s 宽限 →
+    Windows taskkill /T 树杀 / POSIX SIGKILL 兜底）
 
 sidecar（backend 打包，scripts/desktop_runner.py）
  ├─ APP_MODE=desktop：SQLite、本地档案免登录、14 天试用 + License 激活
  ├─ 首启生成实例密钥 ~/Meloyu/.secrets.json（jwt + BYOK Key 落库加密）
+ ├─ Host 头校验（仅 127.0.0.1/localhost + 本端口，防 DNS rebinding）+ 摘除
+ │  /api/docs 与 CORS（桌面成品收敛 dev 语义面；dev 直启 uvicorn 不经过
+ │  desktop_runner，无这些收敛也不强制）
+ ├─ POST /_sidecar/shutdown：壳退出时 HTTP 优雅关停（仅 MELOYU_PORT 注入时注册）
  ├─ DESKTOP_STATIC_DIR=resources/web → 同源托管前端（Cookie 刷新机制原样）
  └─ DATA_DIR=<userData>/data（作品/库/权重随用户目录，升级不丢数据）
 ```
@@ -57,6 +64,10 @@ cd desktop && npm run dist:win           # NSIS x64
 cd desktop && npm run dist:mac           # dmg arm64 + x64（需 mac 主机）
 ```
 
+图标已入库（`build/icon.ico`、`build/icon.png`，electron-builder 直接引用，
+新 clone 无需预生成步骤）；品牌重制时用
+`python desktop/scripts/gen-icon.py` 重新生成（依赖 Pillow，见脚本头注释）。
+
 ## 签名与公证（2026-10-04 口径：可零成本起步，**自签证书对分发无意义**）
 
 **先回答"能否自签"**：代码签名证书自签≠免警告——用户机器不信任自建根，
@@ -71,8 +82,13 @@ Apple 签发的 Developer ID，自签根本走不通。因此签名策略按成�
 
 - 起步期缓解：Windows 提交微软误报分析降低 Defender 命中（PyInstaller 产物
   误报是已知问题）；macOS 可发 zip 并附一行 `xattr -cr` 引导。
-- **更新通道完整性不依赖购买证书**：electron-updater 的 latest.yml 用构建时
-  自生成的 SHA512 密钥签名（`electron-builder` 自动管理），与代码签名证书无关。
+- **更新通道完整性现状（2026-10-27 更正）**：electron-updater 的 `latest.yml`
+  中的 sha512 只是**构建产物校验和（checksum），不是签名**——它只能检测
+  下载损坏，不能证明发布者身份；更新完整性当前仅由更新目录的 HTTPS 传输
+  保障。**启用自动更新通道前必须先落实代码签名/公证**（Win 走 Azure
+  Trusted Signing、mac 走 Developer ID + notarize，见上表转正档），
+  electron-updater 拿到签名后的安装包才能完成发布者校验闭环；在那之前
+  更新分发保持「官网手动下载」口径。
 - License 验签同样自管：keypair 由 `backend/scripts/license_tools.py keygen`
   生成（Ed25519），公钥构建时注入 `LICENSE_PUBLIC_KEY`，私钥离线保管——
   这部分"自签"是完全正当且零成本的。
@@ -85,10 +101,16 @@ Apple 签发的 Developer ID，自签根本走不通。因此签名策略按成�
 - 更新源：官网静态目录（P3，`https://meloyu.com/updates/`，Dokploy/nginx 或 R2 CDN）。
 - 打包机注入 `MELOYU_UPDATE_URL` 启用 electron-updater（generic provider），
   `latest.yml` 由 electron-builder 随包产出，直接上传更新目录即可。
+  **仅接受 `https://` 前缀**（非 https 拒绝启用并告警，防中间人替换安装包）；
+  且须先落实上节代码签名/公证（见「签名与公证」更新通道完整性条目）。
 - 更新权利随 License 验签放行（方案 §4.3：终身授权含全部版本更新）。
 
 ## 已知边界
 
+- **Electron 依赖时效纪律（2026-10-27 评审 F-XC-01 起）**：桌面客户端 Chromium
+  只能靠发版升级，每次发版前跑 `npm outdated` 检查 electron/electron-builder——
+  不得落后官方支持窗口（最近 3 个大版本）两个大版本以上。曾因 v0.16.x 起步时
+  钉 ^33 而失察，2026-10-27 评审时已落后两年（33→45 补升）。
 - 本地大模型（ACE-Step / MusicGen 权重）不随包分发，首启后经模型中心
   「本地组件」区按需下载（组件中心 UI 已交付：许可/体积/显存如实标注，
   下载复用 ModelOp 进度管线）。

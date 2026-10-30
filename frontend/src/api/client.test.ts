@@ -98,6 +98,21 @@ describe('api/client 统一封装', () => {
     expect(useToastStore.getState().toasts.some((t) => t.message.includes('试用期'))).toBe(true)
   })
 
+  it('40203 走真实 rejected 分支（HTTP 402 被 validateStatus 拒绝）同样跳转 + toast', async () => {
+    // F-07 回归（2026-10-28 模拟用户测试）：生产环境非 2xx 走 rejected 拦截器，
+    // 成功分支的 40203 处理是死代码——到期后只弹 toast 不跳 /settings。
+    stubBrowser()
+    http.defaults.adapter = mockErrorAdapter(402, {
+      code: 40203,
+      message: '试用期已结束——14 天全功能试用到期后需终身授权才能继续创作。',
+      data: null,
+      request_id: 'abc',
+    })
+    await expect(apiPost('/generations', {})).rejects.toMatchObject({ code: 40203 })
+    expect(currentHash()).toBe('#/settings')
+    expect(useToastStore.getState().toasts.some((t) => t.message.includes('试用期'))).toBe(true)
+  })
+
   it('HTTP 500 且无包裹体时给通用文案并抛 ApiError', async () => {
     http.defaults.adapter = mockErrorAdapter(500, 'internal crash')
     const err = await apiGet('/works').catch((e: unknown) => e)

@@ -61,6 +61,7 @@ function AppLayout() {
   const location = useLocation()
   const t = useT()
   const { user, ready, offline, bootstrap } = useSessionStore()
+  const retryBootstrap = useSessionStore((s) => s.retryBootstrap)
   const desktopShell = useSessionStore((s) => s.desktopShell)
   const loadMeta = useMetaStore((s) => s.load)
   const reloadMeta = useMetaStore((s) => s.reloadForLocale)
@@ -117,10 +118,7 @@ function AppLayout() {
           </div>
           <button
             className="btn btn-acc btn-md mt-6"
-            onClick={() => {
-              useSessionStore.setState({ ready: false, offline: false })
-              void bootstrap()
-            }}
+            onClick={() => retryBootstrap()}
           >
             {t('app.offline.retry')}
           </button>
@@ -195,13 +193,14 @@ function ShortcutHandler() {
  *  license.mode（bootstrap 后兜底），不再依赖登录后才拉到的状态。 */
 function LoginGuard() {
   const user = useSessionStore((s) => s.user)
+  const clearStaleSession = useSessionStore((s) => s.clearStaleSession)
   const desktop = useSessionStore((s) => s.desktopShell || s.license?.mode === 'desktop')
   useEffect(() => {
     if (desktop) return
     if (!getToken()) {
-      useSessionStore.setState({ user: null, ready: true })
+      clearStaleSession()
     }
-  }, [desktop])
+  }, [desktop, clearStaleSession])
   if (desktop) {
     return <Navigate to="/studio" replace />
   }

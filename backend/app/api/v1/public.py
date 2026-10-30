@@ -58,26 +58,15 @@ def public_generate(body: GenerationRequest, request: Request,
     """文本生歌（与站内 /generations 同构：mode/simple_prompt 或 style_prompt+lyrics/params）。
 
     按量计费：提交即扣账号积分（v1_pro=12 / v1_fast=6），失败自动退款；轮询
-    GET /public/tasks/{id} 至 succeeded 后经 result.files 下载。
+    GET /public/tasks/{id} 至 succeeded 后经 result.files 下载。via 留痕随
+    submit_generation 一次性落库（与执行线程的快照回填互不踩踏）。
     """
     user, key_row = auth
-    out = gen_svc.submit_generation(db, user, body.payload())
-    row = _task_row(db, out["task"]["id"])
-    # 留痕：本任务经 API 密钥发起（审计可溯到 key；计费已随 submit 扣账号积分）
-    snap = dict(row.request_payload or {})
-    snap["via"] = {"source": "api_key", "key_id": key_row.id, "key_name": key_row.name}
-    row.request_payload = snap
-    db.commit()
-    out["task"] = task_to_dict(_task_row(db, out["task"]["id"]))
+    out = gen_svc.submit_generation(
+        db, user, body.payload(),
+        via={"source": "api_key", "key_id": key_row.id, "key_name": key_row.name})
     out["poll"] = f"/api/v1/public/tasks/{out['task']['id']}"
     return ok(out, status_code=201)
-
-
-def _task_row(db: Session, task_id: str):
-    from sqlalchemy.orm import Session as _S  # noqa: F401
-
-    from app.models import Task
-    return db.get(Task, task_id)
 
 
 @router.get("/public/tasks/{task_id}")

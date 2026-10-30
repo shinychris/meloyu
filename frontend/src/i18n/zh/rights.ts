@@ -18,8 +18,9 @@ export const rightsZh: Record<keyof typeof rightsEn, string> = {
   'rights.cert.view': '查看证书',
   'rights.cert.download': '下载证书 JSON',
   'rights.cert.downloadStarted': '授权证书 JSON 已开始下载',
-  'rights.cert.copyLink': '复制验证链接',
-  'rights.cert.linkCopied': '已复制留痕验证链接',
+  'rights.cert.copyApiRef': '复制取证引用（API）',
+  'rights.cert.apiRefCopied': '已复制取证引用（API 地址），可用于调取证书 JSON 核验',
+  'rights.cert.errorNoVersion': '该作品还没有已采用的定稿版本，暂无证书可签发',
   'rights.cert.copyFailed': '复制失败，请手动复制：{link}',
   // 证书字段
   'rights.field.workId': '作品 ID',

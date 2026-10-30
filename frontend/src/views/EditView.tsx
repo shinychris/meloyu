@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FileRef, Work } from '../types/api'
 import { listWorks, getVersionTree } from '../api/works'
 import { listCandidates } from '../api/generation'
-import { getStreamToken } from '../api/files'
+import { fetchAudioBytes, getStreamToken } from '../api/files'
 import { apiPost } from '../api/client'
 import { encodeWav } from '../lib/mixer'
 import {
@@ -10,11 +10,28 @@ import {
   type EditOp, nextOpId,
 } from '../lib/audioedit'
 import { toast } from '../stores/toast'
-import { useT, t as tGlobal } from '../i18n'
+import { useT, t as tGlobal, type TranslationKey } from '../i18n'
 import { formatDuration } from '../lib/format'
 import { EmptyState } from '../components/common/EmptyState'
 
 type Tool = 'cut' | 'keep' | 'fadein' | 'fadeout' | 'gainUp' | 'gainDown' | 'normalize'
+
+/** F-FE-18：工具 → 词条常量表（消除模板字符串 + as never 的类型逃逸） */
+const TOOL_KEYS: Record<Tool, TranslationKey> = {
+  cut: 'edit.tool.cut',
+  keep: 'edit.tool.keep',
+  fadein: 'edit.tool.fadein',
+  fadeout: 'edit.tool.fadeout',
+  gainUp: 'edit.tool.gainUp',
+  gainDown: 'edit.tool.gainDown',
+  normalize: 'edit.tool.normalize',
+}
+
+/** 操作栈 chip 的词条：gain 按方向拆为 gainUp/gainDown */
+function opToolKey(op: EditOp): TranslationKey {
+  if (op.type === 'gain') return op.db != null && op.db > 0 ? TOOL_KEYS.gainUp : TOOL_KEYS.gainDown
+  return TOOL_KEYS[op.type]
+}
 
 interface VersionLite {
   id: string
@@ -83,7 +100,15 @@ export default function EditView() {
         return
       }
       const { url } = await getStreamToken(file.file_id)
-      const raw = await fetch(url).then((r) => r.arrayBuffer())
+      // F-FE-06：音频字节下载收敛进 api/files（r.ok 校验）；失败显式 toast
+      // （流地址带签名 query 走直连 fetch，不经 axios 拦截器）
+      let raw: ArrayBuffer
+      try {
+        raw = await fetchAudioBytes(url)
+      } catch {
+        toast(tGlobal('edit.toast.loadFailed'), 'warn')
+        return
+      }
       const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
       const tmp = new Ctx()
       const buf = await tmp.decodeAudioData(raw)
@@ -148,14 +173,9 @@ export default function EditView() {
     const toSec = (x: number) =>
       Math.max(0, Math.min(renderDuration, ((x - rect.left) / rect.width) * renderDuration))
     const a = toSec(e.clientX)
+    // F-FE-17：删除死代码（elementFromPoint → getBoundingClientRect 计算后 void 弃用）
     const move = (ev: MouseEvent) => {
-      const target = document.elementFromPoint(ev.clientX, ev.clientY)
-      if (!target) return
-      const r = (target as HTMLElement).getBoundingClientRect
-        ? (target as HTMLElement).getBoundingClientRect()
-        : rect
       setSel({ a, b: toSec(ev.clientX) })
-      void r
     }
     const up = () => {
       window.removeEventListener('mousemove', move)
@@ -278,7 +298,7 @@ export default function EditView() {
       <div className="px-8 mt-3 flex gap-1.5 flex-wrap">
         {(['cut', 'keep', 'fadein', 'fadeout', 'gainUp', 'gainDown', 'normalize'] as Tool[]).map((k) => (
           <button type="button" key={k} className={`chip ${tool === k ? 'on' : ''}`} onClick={() => setTool(k)}>
-            {t(`edit.tool.${k}` as never)}
+            {t(TOOL_KEYS[k])}
           </button>
         ))}
       </div>
@@ -333,7 +353,7 @@ export default function EditView() {
                 <div className="flex gap-1.5 flex-wrap">
                   {ops.map((op) => (
                     <span key={op.id} className="text-2xs px-1.5 py-0.5 bg-bg-3 text-muted">
-                      {t(`edit.tool.${op.type === 'gain' ? (op.db && op.db > 0 ? 'gainUp' : 'gainDown') : op.type}` as never)}
+                      {t(opToolKey(op))}
                       {' '}{op.start.toFixed(1)}–{op.end.toFixed(1)}s
                     </span>
                   ))}

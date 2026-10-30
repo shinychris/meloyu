@@ -10,18 +10,19 @@ import wave as wav_mod
 from unittest import mock
 
 import numpy as np
-
-from tests.db import new_test_engine, reset_db
+from pydantic import ValidationError
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401
 from app.core.errors import BizError
-from app.models import Base, Candidate, Plan, Task, User, Version, Work
+from app.models import Candidate, Plan, Task, User, Version, Work
 from app.models.base import utc_now_iso
 from app.services import editing as edit_svc
 from app.services import hum as hum_svc
 from app.synth.ir import Note, SongIR, SongRequest
 from app.synth.melody import apply_hum_melody
+from tests.db import new_test_engine, reset_db
+
 
 def _hum_wav(freqs: list[float], sec_each: float = 0.5, sr: int = 22050) -> bytes:
     x = []
@@ -46,8 +47,8 @@ class TestHumAnalysis(unittest.TestCase):
         r = hum_svc.analyze_hum(_hum_wav([220.0, 261.63, 329.63, 293.66]))
         semis = [n["semi"] for n in r["notes"]]
         self.assertGreaterEqual(len(semis), 4)
-        ivs = [b - a for a, b in zip(semis, semis[1:])]
-        self.assertTrue(all(abs(x - y) <= 1 for x, y in zip(ivs[:3], [3, 4, -2])), (semis, ivs))
+        ivs = [b - a for a, b in zip(semis, semis[1:], strict=False)]  # 相邻配对，尾部差一
+        self.assertTrue(all(abs(x - y) <= 1 for x, y in zip(ivs[:3], [3, 4, -2], strict=True)), (semis, ivs))
         self.assertIn(0, semis)  # 中位归一：与自身中位音同高的音符为 0
         self.assertTrue(60 <= r["bpm_hint"] <= 174)
         self.assertTrue(0 < r["confidence"] <= 1)
@@ -64,7 +65,9 @@ class TestHumAnalysis(unittest.TestCase):
         silent = (0.001 * np.sin(2 * np.pi * 220 * t) * 32767).astype("<i2")
         buf = io.BytesIO()
         with wav_mod.open(buf, "wb") as wf:
-            wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(sr)
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(sr)
             wf.writeframes(silent.tobytes())
         with self.assertRaises(BizError):
             hum_svc.analyze_hum(buf.getvalue())
@@ -98,6 +101,7 @@ class TestApplyHumMelody(unittest.TestCase):
 class TestPitchEditSubmit(unittest.TestCase):
     def setUp(self):
         import tempfile
+
         from app.config import settings
         self.tmp = tempfile.TemporaryDirectory()
         self._old_data = settings.data_dir
@@ -142,7 +146,7 @@ class TestPitchEditSubmit(unittest.TestCase):
         from app.models.task import File as FileRow
         ts3 = utc_now_iso()
         # id 4+28=32 字符：id String(32)，PG 校验长度（SQLite 无感）
-        rows = [FileRow(id=("f%03d" % i) + "f" * 28,
+        rows = [FileRow(id=f"f{i:03d}" + "f" * 28,
                         work_id=self.work.id,
                         version_id=self.version.id, candidate_id=self.cand.id,
                         kind=kind, stem_name=stem, name=f"{kind}.x",
@@ -162,13 +166,16 @@ class TestPitchEditSubmit(unittest.TestCase):
         self.work.active_version_id = self.version.id
         self.db.commit()
         # 磁盘产物占位（_source_context 校验存在性；本用例不执行渲染）
-        from app.config import settings as _st
         import wave as _w
+
+        from app.config import settings as _st
         base = _st.audio_path / self.work.id / self.version.id / "candidates/A/stems"
         base.mkdir(parents=True, exist_ok=True)
         buf = io.BytesIO()
         with _w.open(buf, "wb") as wf:
-            wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(48000)
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(48000)
             wf.writeframes(bytes(960))
         for rel in ("master.wav", "preview.mp3", "stems/vocals.wav",
                     "stems/drums.wav", "stems/bass.wav", "stems/other.wav"):
@@ -211,11 +218,11 @@ class TestGenerationParamsHum(unittest.TestCase):
         from app.schemas.auth import GenerationParams
         ok = GenerationParams(hum_melody=[[0, 1], [3, 0.5]])
         self.assertEqual(ok.hum_melody, [[0, 1], [3, 0.5]])
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValidationError):
             GenerationParams(hum_melody=[[0, 1]])            # <2 项
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValidationError):
             GenerationParams(hum_melody=[[30, 1], [0, 1]])   # semi 越界
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValidationError):
             GenerationParams(hum_melody=[[0, 9], [0, 1]])    # 拍长越界
         self.assertIsNone(GenerationParams().hum_melody)
 

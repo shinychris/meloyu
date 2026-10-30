@@ -155,13 +155,23 @@ def health(db: Session = Depends(get_db)):
     # P0-9（2026-09-26）：回报数据盘真实水位，低于写入阈值时 degraded——
     # "healthy 但拒绝一切写"的隐性失效必须能被探针看见。
     # P1-12：生成队列深度（积压监控；无鉴权端点只给计数不给业务信息）
+    # 2026-10-27：db 检查执行真实 SELECT 1（原硬编码 ok，库挂时探针失明）；
+    # 异常报 degraded 而非让探针 500——端点本身保持可达，状态字段如实降级。
+    from sqlalchemy import text as _text
+
     from app.config import settings
     from app.core.disk_guard import disk_free_gb
     from app.core.tasks import queued_depth
     free = disk_free_gb()
+    try:
+        db.execute(_text("SELECT 1"))
+        db_status = "ok"
+    except Exception:  # noqa: BLE001 —— 探针不因库异常挂掉，只如实降级
+        db_status = "degraded"
+    healthy = (free >= settings.disk_min_free_gb) and db_status == "ok"
     return ok({
-        "status": "ok" if free >= settings.disk_min_free_gb else "degraded",
-        "db": "ok",
+        "status": "ok" if healthy else "degraded",
+        "db": db_status,
         "disk_free_gb": round(free, 1),
         "task_queue_depth": queued_depth(),
         "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -225,7 +235,7 @@ def meta():
         "app_mode": settings.app_mode,
         "billing_mode": settings.billing_mode,
         # 桌面形态附带本地数据目录（系统设置页展示；云形态不下发，避免泄漏服务端路径）
-        **({"data_dir": settings.data_path} if settings.app_mode == "desktop" else {}),
+        **({"data_dir": str(settings.data_path)} if settings.app_mode == "desktop" else {}),
         "generation_limits": {
             "min_duration_sec": 30, "max_duration_sec": 240,
             "min_bpm": 60, "max_bpm": 174,

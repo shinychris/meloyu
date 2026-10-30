@@ -1,4 +1,4 @@
-import { apiBlob, apiDelete, apiGet, apiPatch, apiPost, saveBlob } from './client'
+import { apiBlob, apiDelete, apiGet, apiPatch, apiPost, saveBlob, DOWNLOAD_TIMEOUT_MS } from './client'
 import type {
   Certificate,
   EditEvent,
@@ -64,13 +64,14 @@ export async function fetchCertificate(versionId: string): Promise<Certificate> 
   return JSON.parse(text) as Certificate
 }
 
-/** 下载证书 JSON 文件（契约 §8.4：attachment 文件名由后端定，此处前端命名兜底） */
+/** 下载证书 JSON 文件（契约 §8.4：attachment 文件名由后端定，此处前端命名兜底；300s 下载超时） */
 export async function downloadCertificate(versionId: string, filename: string): Promise<void> {
-  const blob = await apiBlob(`/versions/${versionId}/certificate`)
+  const blob = await apiBlob(`/versions/${versionId}/certificate`, { timeout: DOWNLOAD_TIMEOUT_MS })
   saveBlob(blob, filename)
 }
 
-/** GET /versions/{id}/leadsheet?format=pdf —— 词谱 PDF（简谱+歌词+和弦，v0.10.0） */
+/** GET /versions/{id}/leadsheet?format=pdf —— 词谱 PDF（简谱+歌词+和弦，v0.10.0；300s 下载超时） */
 export function downloadLeadsheet(versionId: string, filename: string): Promise<void> {
-  return apiBlob(`/versions/${versionId}/leadsheet?format=pdf`).then((blob) => saveBlob(blob, filename))
+  return apiBlob(`/versions/${versionId}/leadsheet?format=pdf`, { timeout: DOWNLOAD_TIMEOUT_MS })
+    .then((blob) => saveBlob(blob, filename))
 }

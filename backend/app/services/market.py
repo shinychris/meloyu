@@ -1,7 +1,8 @@
 """市场服务（V2-c，v0.10.1）：上架/下架/浏览/购买（分账+非独占授权记录）。"""
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errors import err_conflict, err_forbidden, err_not_found, err_validation
@@ -19,18 +20,44 @@ LICENSE_NOTICE = ("非独占、不可转让的使用授权（限买家本人项�
                   "only); the work is AI-assisted — AIGC attribution and disclosure are "
                   "retained; sublicensing or resale requires the seller's permission.")
 
+_ERR_ALREADY_BOUGHT = tr("已购买过该作品（非独占授权已生效）",
+                         "Already purchased (non-exclusive license in effect)")
 
-def listing_to_dict(db: Session, listing: MarketListing, sales: int | None = None) -> dict:
+
+def _prefetch_listing_extras(db: Session, listings: list[MarketListing]) -> dict[str, dict]:
+    """批量预取条目的销售计数与卖家昵称（列表页 N+1 → 两条附加查询）。
+
+    返回 {listing_id: {"sales": int, "nickname": str}}。
+    """
+    if not listings:
+        return {}
+    listing_ids = [item.id for item in listings]
+    sales = dict(db.execute(
+        select(MarketOrder.listing_id, func.count()).where(
+            MarketOrder.listing_id.in_(listing_ids)).group_by(MarketOrder.listing_id)
+    ).all())
+    seller_ids = {item.seller_user_id for item in listings}
+    nicknames = {u.id: u.nickname for u in db.execute(
+        select(User).where(User.id.in_(seller_ids))).scalars()}
+    return {item.id: {"sales": int(sales.get(item.id, 0)),
+                      "nickname": nicknames.get(item.seller_user_id, "")}
+            for item in listings}
+
+
+def listing_to_dict(db: Session, listing: MarketListing, sales: int | None = None,
+                    seller_nickname: str | None = None) -> dict:
     if sales is None:
-        sales = len(db.execute(select(MarketOrder.id).where(
-            MarketOrder.listing_id == listing.id)).all())
-    seller = db.get(User, listing.seller_user_id)
+        sales = db.execute(select(func.count()).select_from(MarketOrder).where(
+            MarketOrder.listing_id == listing.id)).scalar_one()
+    if seller_nickname is None:
+        seller = db.get(User, listing.seller_user_id)
+        seller_nickname = seller.nickname if seller else ""
     return {
         "id": listing.id, "work_id": listing.work_id, "title": listing.title, "tags": listing.tags or [],
         "price_credits": listing.price_credits, "status": listing.status,
         "preview_file_id": listing.preview_file_id,
         "seller": {"user_id": listing.seller_user_id,
-                   "nickname": seller.nickname if seller else ""},
+                   "nickname": seller_nickname},
         "sales": sales, "created_at": listing.created_at,
     }
 
@@ -153,9 +180,20 @@ def browse(db: Session, page: int = 1, page_size: int = 20, q: str | None = None
     rows = db.execute(select(MarketListing).where(*cond)
                       .order_by(MarketListing.created_at.desc())
                       .offset((page - 1) * page_size).limit(page_size)).scalars().all()
-    total = len(db.execute(select(MarketListing.id).where(*cond)).all())
-    return {"items": [listing_to_dict(db, listing) for listing in rows], "total": total,
-            "page": page, "page_size": page_size}
+    total = db.execute(select(func.count()).select_from(MarketListing)
+                       .where(*cond)).scalar_one()
+    extras = _prefetch_listing_extras(db, rows)
+    items = [listing_to_dict(db, listing, sales=extras[listing.id]["sales"],
+                             seller_nickname=extras[listing.id]["nickname"])
+             for listing in rows]
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+
+def _already_owned(db: Session, listing_id: str, buyer_user_id: str) -> bool:
+    """该买家是否已购过该条目（非独占授权一次性；另有 uq_market_order_buyer 兜底）。"""
+    return db.execute(select(MarketOrder.id).where(
+        MarketOrder.listing_id == listing_id,
+        MarketOrder.buyer_user_id == buyer_user_id)).first() is not None
 
 
 def purchase(db: Session, user: User, listing_id: str) -> dict:
@@ -174,18 +212,15 @@ def purchase(db: Session, user: User, listing_id: str) -> dict:
         db.commit()
         raise err_not_found(tr("该作品已被卖家删除，条目已下架",
                            "The seller has deleted this work; listing delisted"))
-    bought = db.execute(select(MarketOrder.id).where(
-        MarketOrder.listing_id == listing.id, MarketOrder.buyer_user_id == user.id)).first()
-    if bought:
-        raise err_conflict(tr("已购买过该作品（非独占授权已生效）",
-                          "Already purchased (non-exclusive license in effect)"))
+    if _already_owned(db, listing.id, user.id):
+        raise err_conflict(_ERR_ALREADY_BOUGHT)
     price = int(listing.price_credits)
     fee = int(round(price * PLATFORM_FEE_RATE))
     earnings = price - fee
     atomic_deduct(db, user.id, price, "market_purchase", None)  # 买家扣减（卖家入账=market_sale）
     # 卖家入账（正向调整直写，事务内一致）
     db.execute(
-        __import__("sqlalchemy").text(
+        text(
             "UPDATE users SET credit_balance = credit_balance + :amt, "
             "updated_at = :now WHERE id = :uid"),
         {"amt": earnings, "uid": listing.seller_user_id, "now": utc_now_iso()})
@@ -200,7 +235,14 @@ def purchase(db: Session, user: User, listing_id: str) -> dict:
                         seller_user_id=listing.seller_user_id, price_credits=price,
                         seller_earnings=earnings, platform_fee=fee, created_at=now)
     db.add(order)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # uq_market_order_buyer（listing_id, buyer_user_id）唯一兜底（2026-10-27）：
+        # 上方已购校验是 check-then-act，并发 double-click 可双双通过校验各自
+        # 下单双扣——冲突即回滚整体（扣款/入账/订单同事务），转 409 业务码
+        db.rollback()
+        raise err_conflict(_ERR_ALREADY_BOUGHT) from None
     db.refresh(order)
     return order_to_dict(order)
 

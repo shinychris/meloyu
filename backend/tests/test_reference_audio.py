@@ -4,6 +4,7 @@
 内存 SQLite + 临时 audio 目录；生成集成用例 mock 掉调度（不起真实合成）。
 """
 from __future__ import annotations
+
 import tempfile
 import unittest
 import wave as wav_mod
@@ -11,18 +12,18 @@ from pathlib import Path
 from unittest import mock
 
 import numpy as np
-
-from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401 —— 注册全部表
 from app.config import settings
 from app.core.errors import BizError
-from app.models import Base, Plan, User
+from app.models import User
 from app.models.base import utc_now_iso
 from app.services import reference as reference_svc
 from app.services import reference_analysis
 from app.services.generation import submit_generation
+from tests.db import new_test_engine, reset_db, seed_plans
+
 
 def synth_click_wav(path: Path, bpm: int, sr: int = 22050, dur: float = 30.0,
                     noise: float = 0.02) -> None:
@@ -85,7 +86,9 @@ class TestAnalysis(unittest.TestCase):
             x = sum(np.sin(2 * np.pi * f * t + rng.uniform(0, 6.28)) for f in triad)
             x = (x / np.abs(x).max() * 0.7 * 32767).astype("<i2")
             with wav_mod.open(str(path), "wb") as wf:
-                wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(sr)
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(sr)
                 wf.writeframes(x.tobytes())
         cases = [((220.0, 261.63, 329.63), "A", "minor"),   # A3 C4 E4
                  ((261.63, 329.63, 392.0), "C", "major"),   # C4 E4 G4
@@ -158,7 +161,9 @@ class TestTrackCrud(_RefTestCase):
         sr = 8000
         n = int(490 * sr)
         with wav_mod.open(str(p), "wb") as wf:
-            wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(sr)
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(sr)
             wf.writeframes(np.zeros(n, dtype="<i2").tobytes())
         with self.assertRaises(BizError):
             reference_svc.create_track(self.db, self.user, filename="long.wav",
@@ -167,8 +172,9 @@ class TestTrackCrud(_RefTestCase):
     def test_list_and_delete(self):
         a = reference_svc.create_track(self.db, self.user, filename="a.wav",
                                        content=self._wav_bytes())
-        b = reference_svc.create_track(self.db, self.user, filename="b.mp3",
-                                       content=b"\xff\xfb" + b"0" * 100)
+        # 第二条仅为占位列表行（mp3 魔数），无需持有返回值
+        reference_svc.create_track(self.db, self.user, filename="b.mp3",
+                                   content=b"\xff\xfb" + b"0" * 100)
         lst = reference_svc.list_tracks(self.db, self.user)
         self.assertEqual(lst["total"], 2)
         # created_at 秒级同刻时以 id 决胜——此处仅断言集合与分页字段
@@ -220,7 +226,8 @@ class TestGenerationIntegration(_RefTestCase):
         sched.assert_called_once()
         task = out["task"]
         # 留痕断言取 DB 原行（task_to_dict 的对外口径不含 request_payload 全量）
-        from app.models import Task as TaskRow, Version
+        from app.models import Task as TaskRow
+        from app.models import Version
         row = self.db.get(TaskRow, task["id"])
         ref = row.request_payload["reference"]
         self.assertEqual(ref["reference_track_id"], track["id"])

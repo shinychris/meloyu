@@ -1,4 +1,8 @@
-"""2026-09-06 恢复脚本：WAL 跨 Docker bind 并发后主库 b-tree 损坏（versions 树
+"""【存档脚本，勿再执行——2026-10-27 评审 F-XC-09 标注】SQLite 时代的一次性恢复
+工具，处置 SOP 已成文（docs/04-质量保障/09-SQLite损坏处置SOP.md）；v0.15.0 起主库
+为 PostgreSQL，本脚本仅作历史事故处置留档保留，勿对任何现役库执行。
+
+2026-09-06 恢复脚本：WAL 跨 Docker bind 并发后主库 b-tree 损坏（versions 树
 1419 坏 cell + files rowid>4500 坏块），宿主机冷读亦 malformed。
 
 策略：新库重建 schema + 逐表分块搬运（坏块跳过并计数），坏区间数据如实丢弃

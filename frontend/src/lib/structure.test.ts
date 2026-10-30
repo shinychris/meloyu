@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach } from 'vitest'
-import { composeStylePrompt, countParenMarks, countStructureTags, detectSectionAtCaret, insertAtCaret, parseSectionTag } from './structure'
+import { composeStylePrompt, countParenMarks, countStructureTags, detectSectionAtCaret, insertAtCaret, parseLyricsStructure, parseSectionTag } from './structure'
 import { useI18nStore } from '../i18n'
 
 afterEach(() => {
@@ -132,5 +132,38 @@ describe('composeStylePrompt（灵感指引组装）', () => {
   })
   it('全空返回空串', () => {
     expect(composeStylePrompt({ scene: '', mood: '', genre: '', inst: '' })).toBe('')
+  })
+})
+
+describe('parseLyricsStructure（F-04：编辑器实时结构解析，镜像后端 parse_lyrics）', () => {
+  it('标签分段与行数统计', () => {
+    const s = parseLyricsStructure('[Verse]\n一行\n两行\n[Chorus]\n三行\n四行\n五行\n六行')
+    expect(s).toEqual([
+      { section: 'verse', line_count: 2 },
+      { section: 'chorus', line_count: 4 },
+    ])
+  })
+  it('首个标签前的行归 verse；无标签全文归 verse（后端 has_tags=false 口径）', () => {
+    expect(parseLyricsStructure('第一行\n第二行')).toEqual([{ section: 'verse', line_count: 2 }])
+    expect(parseLyricsStructure('引子\n[Chorus]\n副歌行')).toEqual([
+      { section: 'verse', line_count: 1 },
+      { section: 'chorus', line_count: 1 },
+    ])
+  })
+  it('纯标记行不计行；行内标记剥除后仍计一行；空段保留（器乐段口径）', () => {
+    expect(parseLyricsStructure('[Verse]\n（轻声）行一\n（合唱）\n[Outro]')).toEqual([
+      { section: 'verse', line_count: 1 },
+      { section: 'outro', line_count: 0 },
+    ])
+  })
+  it('连续同名标签各自成段（与后端分段一致）', () => {
+    expect(parseLyricsStructure('[Verse]\n一\n[Verse]\n二')).toEqual([
+      { section: 'verse', line_count: 1 },
+      { section: 'verse', line_count: 1 },
+    ])
+  })
+  it('空文本为空数组', () => {
+    expect(parseLyricsStructure('')).toEqual([])
+    expect(parseLyricsStructure('\n\n  \n')).toEqual([])
   })
 })

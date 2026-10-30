@@ -1,55 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { HumAnalysisData } from '../../types/api'
 import { analyzeHum } from '../../api/hum'
+import { decodeToWav } from '../../lib/audio'
 import { toast } from '../../stores/toast'
 import { useT } from '../../i18n'
-
-/** 录音 → mono 22.05kHz 16bit wav（复用 ReferencePanel 的渲染口径）。 */
-async function recordChunkToWav(chunk: Blob): Promise<ArrayBuffer> {
-  const raw = await chunk.arrayBuffer()
-  const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-  const ctx = new Ctx()
-  try {
-    const buf = await ctx.decodeAudioData(raw.slice(0))
-    const targetRate = 22050
-    const off = new OfflineAudioContext(1, Math.max(1, Math.ceil(buf.duration * targetRate)), targetRate)
-    const src = off.createBufferSource()
-    src.buffer = buf
-    src.connect(off.destination)
-    src.start()
-    const rendered = await off.startRendering()
-    const samples = rendered.getChannelData(0)
-    const pcm = new Int16Array(samples.length)
-    for (let i = 0; i < samples.length; i++) {
-      const v = Math.max(-1, Math.min(1, samples[i]))
-      pcm[i] = v < 0 ? v * 0x8000 : v * 0x7fff
-    }
-    const header = new ArrayBuffer(44)
-    const dv = new DataView(header)
-    const write = (o: number, str: string) => {
-      for (let i = 0; i < str.length; i++) dv.setUint8(o + i, str.charCodeAt(i))
-    }
-    write(0, 'RIFF')
-    dv.setUint32(4, 36 + pcm.length * 2, true)
-    write(8, 'WAVE')
-    write(12, 'fmt ')
-    dv.setUint32(16, 16, true)
-    dv.setUint16(20, 1, true)
-    dv.setUint16(22, 1, true)
-    dv.setUint32(24, targetRate, true)
-    dv.setUint32(28, targetRate * 2, true)
-    dv.setUint16(32, 2, true)
-    dv.setUint16(34, 16, true)
-    write(36, 'data')
-    dv.setUint32(40, pcm.length * 2, true)
-    const out = new Uint8Array(44 + pcm.length * 2)
-    out.set(new Uint8Array(header), 0)
-    out.set(new Uint8Array(pcm.buffer), 44)
-    return out.buffer
-  } finally {
-    void ctx.close()
-  }
-}
 
 const MAX_SEC = 30
 
@@ -57,6 +11,8 @@ const MAX_SEC = 30
  * 哼唱成歌录音弹窗（v0.11.0）：MediaRecorder 录 ≤30s → 浏览器渲染 mono wav →
  * POST /hum/analyze（真实 f0 提取）→ 展示音高轮廓 → 「应用」写入表单
  * params.hum_melody（生成时由引擎按音程关系映射为人声旋律）。
+ * WAV 编码复用 lib/audio 的 decodeToWav（F-FE-10：删除本地重复实现；
+ * mimeType 以 MediaRecorder 实际值为准，兜底 audio/webm）。
  */
 export default function HumDialog({ open, onClose, onApply }: {
   open: boolean
@@ -92,7 +48,9 @@ export default function HumDialog({ open, onClose, onApply }: {
         stream.getTracks().forEach((tr) => tr.stop())
         setAnalyzing(true)
         try {
-          const wav = await recordChunkToWav(new Blob(chunksRef.current, { type: 'audio/webm' }))
+          const wav = await decodeToWav(
+            await new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' }).arrayBuffer(),
+          )
           setResult(await analyzeHum(wav))
         } catch {
           /* 拦截器已 toast（太短/信号弱/格式） */

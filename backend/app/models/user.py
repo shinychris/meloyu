@@ -1,10 +1,15 @@
 from __future__ import annotations
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, Integer, String
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import BaseModel, ISOTimestamp
 from .enums import CREDIT_REASONS, PLANS, _in
+
+# 退款幂等兜底（2026-10-27）：同任务至多一笔 refund 流水——部分唯一索引
+# PG/SQLite 双方言支持，竞态窗口（并发 cancel/异常退款双发）由唯一约束
+# 在插入侧硬保证（services/credits.refund 以 ON CONFLICT DO NOTHING 抢位）
+_REFUND_WHERE = text("reason = 'refund'")
 
 
 class User(BaseModel):
@@ -58,6 +63,8 @@ class CreditTransaction(BaseModel):
         CheckConstraint("balance_after >= 0", name="ck_ct_balance_nonneg"),
         Index("ix_ct_user_created", "user_id", "created_at"),
         Index("ix_ct_task", "ref_task_id"),
+        Index("uq_ct_refund_per_task", "ref_task_id", unique=True,
+              postgresql_where=_REFUND_WHERE, sqlite_where=_REFUND_WHERE),
     )
 
     user_id: Mapped[str] = mapped_column(

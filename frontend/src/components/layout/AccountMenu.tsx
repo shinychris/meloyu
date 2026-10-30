@@ -13,23 +13,14 @@ function isValidNewPassword(v: string): boolean {
   return v.length >= 8 && v.length <= 64 && /[A-Za-z]/.test(v) && /\d/.test(v)
 }
 
-/** 修改密码弹窗（账号菜单） */
-function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** 修改密码弹窗（账号菜单）：仅在打开时挂载——弹窗状态天然随挂载重置，
+ *  不再需要 open 变化时的 setState 重置 effect（react-hooks/set-state-in-effect） */
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const t = useT()
   const [oldPwd, setOldPwd] = useState('')
   const [newPwd, setNewPwd] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-
-  useEffect(() => {
-    if (open) {
-      setOldPwd('')
-      setNewPwd('')
-      setError(null)
-    }
-  }, [open])
-
-  if (!open) return null
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -101,23 +92,15 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
   )
 }
 
-/** 删除账号弹窗：红色警示 + 输密码确认（复用 ConfirmDialog 的视觉模式） */
-function DeleteAccountModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** 删除账号弹窗：红色警示 + 输密码确认（复用 ConfirmDialog 的视觉模式）；
+ *  仅在打开时挂载，状态随挂载重置 */
+function DeleteAccountModal({ onClose }: { onClose: () => void }) {
   const t = useT()
   const navigate = useNavigate()
   const logout = useSessionStore((s) => s.logout)
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-
-  useEffect(() => {
-    if (open) {
-      setPassword('')
-      setError(null)
-    }
-  }, [open])
-
-  if (!open) return null
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -317,8 +300,8 @@ export default function AccountMenu() {
         </div>
       )}
 
-      <ChangePasswordModal open={pwdOpen} onClose={() => setPwdOpen(false)} />
-      <DeleteAccountModal open={delOpen} onClose={() => setDelOpen(false)} />
+      {pwdOpen && <ChangePasswordModal onClose={() => setPwdOpen(false)} />}
+      {delOpen && <DeleteAccountModal onClose={() => setDelOpen(false)} />}
     </div>
   )
 }

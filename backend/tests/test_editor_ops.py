@@ -11,16 +11,16 @@ import wave as wav_mod
 from unittest import mock
 
 import numpy as np
-
-from tests.db import new_test_engine, reset_db
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401
 from app.config import settings
 from app.core.errors import BizError
-from app.models import Base, Candidate, File, Plan, User, Version, Work
+from app.models import Candidate, File, Plan, User, Version, Work
 from app.models.base import utc_now_iso
 from app.services import editing as edit_svc
+from tests.db import new_test_engine, reset_db
+
 
 def _tone_wav(seconds: float = 8.0, sr: int = 48000) -> bytes:
     t = np.arange(int(seconds * sr)) / sr
@@ -174,6 +174,38 @@ class TestMixdown(_EditorTestCase):
             edit_svc.submit_mixdown(self.db, self.user, self.version.id, b"not wav")
         with self.assertRaises(BizError):
             edit_svc.submit_mixdown(self.db, self.user, self.version.id, _tone_wav(3.0))
+
+    def test_multichannel_wav_rejected(self):
+        """F-BE-26（2026-10-27）：>2 声道 wav 入口即拒（立体声拆分会取错样本）。"""
+        t = np.arange(int(35.0 * 48000)) / 48000
+        x = (0.5 * np.sin(2 * np.pi * 440 * t) * 32767).astype("<i2")
+        buf = io.BytesIO()
+        with wav_mod.open(buf, "wb") as wf:
+            wf.setnchannels(3)
+            wf.setsampwidth(2)
+            wf.setframerate(48000)
+            wf.writeframes(np.tile(x, 3).tobytes())
+        with self.assertRaises(BizError) as ctx:
+            edit_svc.submit_mixdown(self.db, self.user, self.version.id, buf.getvalue())
+        self.assertEqual(ctx.exception.code, 40001)
+
+
+class TestVariantGuards(_EditorTestCase):
+    def test_variant_blocks_artist_impersonation(self):
+        """F-BE-28（2026-10-27）：variant 提示词过防侵权（与 POST /generations 同口径）。"""
+        with self.assertRaises(BizError) as ctx:
+            edit_svc.submit_variant(self.db, self.user, self.cand.id,
+                                    "a dreamy ballad in the style of Taylor Swift")
+        self.assertEqual(ctx.exception.code, 42202)
+
+    def test_variant_normal_style_passes_guard(self):
+        with mock.patch("app.core.tasks.schedule_generation"):
+            out = edit_svc.submit_variant(self.db, self.user, self.cand.id,
+                                          "lo-fi bedroom pop with tape saturation")
+        from app.models import Task
+        row = self.db.get(Task, out["task"]["id"])
+        self.assertEqual(row.request_payload["_derived"]["op"], "variant")
+
 
 if __name__ == "__main__":
     unittest.main()

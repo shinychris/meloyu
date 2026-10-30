@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { Candidate, VersionTreeNode, Work } from '../types/api'
 import { getWork, getVersionTree, patchWork } from '../api/works'
@@ -9,22 +9,11 @@ import { usePlayerStore } from '../stores/player'
 import { toast } from '../stores/toast'
 import { useT } from '../i18n'
 import { formatDuration, keyLabel, sectionLabel, versionSourceLabel } from '../lib/format'
+import { depthOf } from '../lib/tree'
 import ExportPanel from '../components/work/ExportPanel'
 import CommentsPanel from '../components/work/CommentsPanel'
 import TeamPanel from '../components/work/TeamPanel'
 import { EmptyState } from '../components/common/EmptyState'
-
-function depthOf(nodes: VersionTreeNode[], node: VersionTreeNode): number {
-  const map = new Map(nodes.map((n) => [n.id, n]))
-  let depth = 0
-  let cur: VersionTreeNode | undefined = node
-  while (cur?.parent_version_id) {
-    cur = map.get(cur.parent_version_id)
-    depth++
-    if (depth > 20) break
-  }
-  return depth
-}
 
 /** 作品详情：版本树 + 候选列表（试听/采用）+ 导出与证书 */
 export default function WorkDetailView() {
@@ -77,12 +66,18 @@ export default function WorkDetailView() {
     }
   }
 
+  /** F-FE-03：候选请求序号守卫——快速切换版本节点时旧响应不再覆盖新选中版本的候选 */
+  const candSeqRef = useRef(0)
+
   const loadCandidates = useCallback(async (versionId: string) => {
+    const seq = ++candSeqRef.current
     try {
       const res = await fetchCandidates(versionId)
+      if (seq !== candSeqRef.current) return
       setCandidates(res.items)
       setEngineDisplay(res.provider_display || '')
     } catch {
+      if (seq !== candSeqRef.current) return
       setCandidates([])
       setEngineDisplay('')
     }

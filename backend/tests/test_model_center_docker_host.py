@@ -14,13 +14,14 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from tests.db import new_test_engine, reset_db
 from sqlalchemy.orm import Session, sessionmaker
 
 from app import models  # noqa: F401 —— 注册全部表
-from app.models import SETTING_ID, Base, LLMSetting
+from app.models import SETTING_ID, LLMSetting
 from app.providers.llm.ollama_client import OllamaClient, _norm_host
 from app.services import model_center as mc
+from tests.db import new_test_engine, reset_db
+
 
 def _db() -> Session:
     engine = new_test_engine()

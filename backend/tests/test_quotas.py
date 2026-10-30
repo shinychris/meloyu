@@ -10,15 +10,16 @@ import tempfile
 import unittest
 from unittest import mock
 
-from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401
 from app.config import settings
 from app.core.errors import BizError
-from app.models import Base, File, Plan, Task, User, Version, Work
+from app.models import File, Plan, Task, User, Version, Work
 from app.models.base import utc_now_iso
 from app.services import generation as gen
+from tests.db import new_test_engine, reset_db, seed_plans
+
 
 class _QuotaTestCase(unittest.TestCase):
     def setUp(self):
@@ -49,7 +50,6 @@ class _QuotaTestCase(unittest.TestCase):
     def tearDown(self):
         self.db.close()
 
-class TestInflightLimit(_QuotaTestCase):
     _seq = 0
 
     def _mk_task(self, status: str) -> Task:
@@ -77,6 +77,8 @@ class TestInflightLimit(_QuotaTestCase):
         self.db.commit()
         return task
 
+class TestInflightLimit(_QuotaTestCase):
+
     def test_free_blocked_at_one_inflight(self):
         self._mk_task("running")
         with self.assertRaises(BizError) as ctx:
@@ -97,6 +99,24 @@ class TestInflightLimit(_QuotaTestCase):
         for s in ("succeeded", "failed", "canceled"):
             self._mk_task(s)
         gen.check_inflight_limit(self.db, self.user)
+
+
+class TestFreeDailyLimit(_QuotaTestCase):
+    """F-BE-13（2026-10-27）：免费档日限不含 failed/canceled（失败即退款，
+    失败也扣次数=对已退款请求二次收费——口径与退款对齐）。"""
+
+    def test_refunded_states_do_not_count(self):
+        self.db.get(Plan, "free").daily_generations = 2
+        self.db.commit()
+        self._mk_task("failed")
+        self._mk_task("canceled")
+        gen.check_free_daily_limit(self.db, self.user)  # 已退款状态不计入
+        self._mk_task("queued")
+        gen.check_free_daily_limit(self.db, self.user)  # 1 < 2
+        self._mk_task("succeeded")
+        with self.assertRaises(BizError) as ctx:  # 2 ≥ 2（失败单未占次数才可能触顶）
+            gen.check_free_daily_limit(self.db, self.user)
+        self.assertEqual(ctx.exception.code, 40201)
 
 class TestStorageQuota(_QuotaTestCase):
     def test_quota_blocks_when_full(self):

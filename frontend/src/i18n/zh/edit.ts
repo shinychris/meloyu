@@ -29,6 +29,7 @@ export const editZh: Record<keyof typeof editEn, string> = {
   'edit.save.hint': '非破坏：每次从原始母带重放操作；经混音回存通道保存并计入人类参与留痕',
   'edit.ops.title': '操作栈',
   'edit.toast.noAudio': '该候选没有音频文件',
+  'edit.toast.loadFailed': '母带音频下载失败，请稍后重试',
   'edit.toast.needSelection': '请先在波形上拖选一个区间',
   'edit.toast.opApplied': '已应用第 {n} 步操作',
   'edit.toast.saved': '已保存为新版本 {no}',

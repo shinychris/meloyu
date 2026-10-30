@@ -12,7 +12,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 REPO_DIR = BACKEND_DIR.parent
 
 API_PREFIX = "/api/v1"
-APP_VERSION = "0.17.0"
+APP_VERSION = "0.17.1"
 
 # ---- 买断制定价（D-1 定案，USD 分值；与前端 landing LICENSE_SKU / portal 一致）----
 # 原价锚 $399（划线展示）+ 折扣成交价；折扣支持：SALE ≥ PRICE 或非正时
@@ -120,7 +120,8 @@ class Settings(BaseSettings):
     admin_emails: str = ""
     # ---- 监控 ----
     sentry_dsn: str = ""
-    # 人声克隆同人校验余弦阈值（FR-5；0=用服务默认 0.55，运营可调）
+    # 人声克隆同人校验余弦阈值（FR-5；0=用服务默认 0.9——services/voice.py
+    # DEFAULT_VERIFY_THRESHOLD，实测同人≈1.0 / 异人≤0.84；运营可调）
     voice_verify_threshold: float = 0
     # 数据盘最低剩余空间（GB）：生成/导出/上传入口的前置水位线（P0-9），低于即拒绝
     disk_min_free_gb: float = 10.0

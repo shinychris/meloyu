@@ -1,6 +1,9 @@
 """版本路由（4 接口）+ 版本候选列表（candidates 列表归此处路径）。"""
 from __future__ import annotations
 
+from functools import partial
+
+from anyio import to_thread
 from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -10,6 +13,7 @@ from app.core.errors import err_conflict, err_not_found, err_validation
 from app.core.i18n import tr
 from app.core.responses import ok
 from app.core.security import get_current_user, get_current_user_optional
+from app.core.uploads import read_body_limited
 from app.database import get_db
 from app.models import File, User
 from app.services import certificate as cert_svc
@@ -19,21 +23,6 @@ from app.services import works as works_svc
 from app.services.serializers import version_to_dict
 
 router = APIRouter(tags=["versions"])
-
-
-async def yield_body(request: Request) -> bytes:
-    """octet-stream 请求体读取（上限 200MB，超限即拒）。"""
-    chunks: list[bytes] = []
-    total = 0
-    async for chunk in request.stream():
-        chunks.append(chunk)
-        total += len(chunk)
-        if total > 200 * 1024 * 1024:
-            from app.core.errors import err_validation
-            from app.core.i18n import tr
-            raise err_validation(tr("混音文件超过 200MB 上限",
-                                "Mixdown exceeds the 200MB limit"))
-    return b"".join(chunks)
 
 
 @router.get("/works/{work_id}/versions")
@@ -77,10 +66,17 @@ async def upload_mixdown(version_id: str, request: Request,
                          notes: str = Query(default="", max_length=500),
                          user: User = Depends(get_current_user),
                          db: Session = Depends(get_db)):
-    """V2 编辑器混音回存（octet-stream wav）→ 子版本 source=mixdown（人类参与留痕）。"""
-    body = await yield_body(request)
-    return ok(edit_svc.submit_mixdown(db, user, version_id, body, notes=notes),
-              status_code=201)
+    """V2 编辑器混音回存（octet-stream wav）→ 子版本 source=mixdown（人类参与留痕）。
+
+    请求体流式读取（超 200MB 即断）；wav 解析/转码为 CPU 密集，包进工作线程
+    执行（2026-10-27：此前整段跑在事件循环上，处理期间全部并发请求被冻结）。
+    """
+    body = await read_body_limited(request, 200 * 1024 * 1024,
+                                   "混音文件超过 200MB 上限",
+                                   "Mixdown exceeds the 200MB limit")
+    result = await to_thread.run_sync(
+        partial(edit_svc.submit_mixdown, db, user, version_id, body, notes=notes))
+    return ok(result, status_code=201)
 
 
 @router.get("/versions/{version_id}/leadsheet")

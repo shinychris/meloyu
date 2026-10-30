@@ -19,7 +19,7 @@ export default function InspireBox() {
   const t = useT()
   const inspiration = useMetaStore((s) => s.meta.inspiration)
   const inspire = useStudioStore((s) => s.inspire)
-  const { setInspire, applyInspireToPrompt, markStep, logOp } = useStudioStore()
+  const { setInspire, applyInspireToPrompt, markStep, randomizeInspire } = useStudioStore()
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   const pick = (group: (typeof GROUPS)[number], value: string) => {
@@ -32,19 +32,8 @@ export default function InspireBox() {
   }
 
   const random = () => {
-    const next = { scene: '', mood: '', genre: '', inst: '' }
-    for (const g of GROUPS) {
-      const list = inspiration[g.source]
-      if (list.length > 0) next[g.key] = list[Math.floor(Math.random() * list.length)]
-    }
-    useStudioStore.setState({ inspire: next })
-    applyInspireToPrompt(next)
-    markStep(1)
-    logOp(
-      t('studio.log.inspire', {
-        detail: [next.genre, next.mood, next.inst, next.scene].filter(Boolean).join(' / '),
-      }),
-    )
+    // F-FE-12：随机组合收敛为 store action（写回灵感/风格描述/步骤/日志）
+    randomizeInspire()
     toast(t('studio.toast.inspireRandom'))
   }
 

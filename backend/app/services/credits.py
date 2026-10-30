@@ -58,23 +58,45 @@ def atomic_deduct(db: Session, user_id: str, amount: int, reason: str,
 
 
 def refund(db: Session, user_id: str, amount: int, ref_task_id: str | None) -> int:
-    """退款（幂等：同任务至多一笔 refund）。"""
+    """退款（幂等：同任务至多一笔 refund）。
+
+    2026-10-27 原子化：原 exists 检查→插入的 check-then-act 在并发取消/异常
+    退款窗口可双双通过，产生两笔加款（积分双花）。改为先以 INSERT ... ON
+    CONFLICT DO NOTHING 抢占 uq_ct_refund_per_task（部分唯一索引 ref_task_id
+    WHERE reason='refund'，双方言）唯一占位——占位 0 行=并发已退款，分文不
+    加；占位成功才加款。数据库约束兜底，应用层竞态不再可能双发。
+    """
     if amount <= 0:
         return _get_balance(db, user_id)
-    exists = db.execute(
-        select(CreditTransaction.id).where(CreditTransaction.ref_task_id == ref_task_id,
-                                           CreditTransaction.reason == "refund")
-    ).fetchone() if ref_task_id else None
-    if exists:
-        return _get_balance(db, user_id)
+    if not ref_task_id:
+        # 无任务锚定（无幂等键）：维持直加语义（现行调用均带任务 id，防御分支）
+        db.execute(
+            text("UPDATE users SET credit_balance = credit_balance + :amt, updated_at = :now "
+                 "WHERE id = :uid"),
+            {"amt": amount, "uid": user_id, "now": utc_now_iso()},
+        )
+        new_balance = _get_balance(db, user_id)
+        _add_transaction(db, user_id, amount, "refund", ref_task_id, new_balance)
+        return new_balance
+    if db.bind.dialect.name == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert as dialect_insert
+    else:
+        from sqlalchemy.dialects.sqlite import insert as dialect_insert
+    balance_before = _get_balance(db, user_id)
+    claimed = db.execute(
+        dialect_insert(CreditTransaction)
+        .values(user_id=user_id, delta=amount, reason="refund", ref_task_id=ref_task_id,
+                balance_after=balance_before + amount)
+        .on_conflict_do_nothing()
+    )
+    if claimed.rowcount == 0:
+        return balance_before  # 唯一占位失败：并发退款已入账，本笔不加款
     db.execute(
         text("UPDATE users SET credit_balance = credit_balance + :amt, updated_at = :now "
              "WHERE id = :uid"),
         {"amt": amount, "uid": user_id, "now": utc_now_iso()},
     )
-    new_balance = _get_balance(db, user_id)
-    _add_transaction(db, user_id, amount, "refund", ref_task_id, new_balance)
-    return new_balance
+    return _get_balance(db, user_id)
 
 
 def grant(db: Session, user: User, amount: int, reason: str,

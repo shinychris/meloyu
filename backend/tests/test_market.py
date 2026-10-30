@@ -4,18 +4,19 @@ from __future__ import annotations
 import unittest
 
 from sqlalchemy import select
-from tests.db import new_test_engine, reset_db, seed_plans
 from sqlalchemy.orm import sessionmaker
 
 from app import models  # noqa: F401
 from app.core.errors import BizError
-from app.models import Base, Certificate, MarketListing, User, Work
+from app.models import Certificate, MarketListing, MarketOrder, User, Work
 from app.models.base import utc_now_iso
 from app.models.task import File
 from app.models.user import CreditTransaction
 from app.models.work import Candidate, Version
 from app.services import market as market_svc
 from app.services.team import role_for_work
+from tests.db import new_test_engine, reset_db, seed_plans
+
 
 class TestMarket(unittest.TestCase):
     def setUp(self):
@@ -74,15 +75,15 @@ class TestMarket(unittest.TestCase):
         self.db.close()
 
     def test_publish_browse_delist(self):
-        l = market_svc.publish(self.db, self.seller, self.work.id, 120)
-        self.assertEqual(l["status"], "active")
-        self.assertEqual(l["price_credits"], 120)
-        self.assertEqual(l["seller"]["nickname"], "seller")
+        item = market_svc.publish(self.db, self.seller, self.work.id, 120)
+        self.assertEqual(item["status"], "active")
+        self.assertEqual(item["price_credits"], 120)
+        self.assertEqual(item["seller"]["nickname"], "seller")
         # 非属主不能上架/下架
         with self.assertRaises(BizError):
             market_svc.publish(self.db, self.buyer, self.work.id, 100)
         with self.assertRaises(BizError):
-            market_svc.delist(self.db, self.buyer, l["id"])
+            market_svc.delist(self.db, self.buyer, item["id"])
         # 重复上架 40901；越界价 40001
         with self.assertRaises(BizError):
             market_svc.publish(self.db, self.seller, self.work.id, 100)
@@ -92,15 +93,15 @@ class TestMarket(unittest.TestCase):
         self.assertEqual(browse["total"], 1)
         self.assertEqual(browse["items"][0]["title"], "热卖节拍")
         # 下架后浏览不可见，重复购买路径守卫
-        market_svc.delist(self.db, self.seller, l["id"])
+        market_svc.delist(self.db, self.seller, item["id"])
         self.assertEqual(market_svc.browse(self.db)["total"], 0)
         # 重新上架（改价）
         l2 = market_svc.publish(self.db, self.seller, self.work.id, 80)
         self.assertEqual(l2["price_credits"], 80)
 
     def test_purchase_ledger_and_duplicate_guard(self):
-        l = market_svc.publish(self.db, self.seller, self.work.id, 100)
-        order = market_svc.purchase(self.db, self.buyer, l["id"])
+        item = market_svc.publish(self.db, self.seller, self.work.id, 100)
+        order = market_svc.purchase(self.db, self.buyer, item["id"])
         self.assertEqual(order["price_credits"], 100)
         self.assertEqual(order["seller_earnings"], 90)
         self.assertEqual(order["platform_fee"], 10)
@@ -126,12 +127,12 @@ class TestMarket(unittest.TestCase):
         self.assertEqual(role_for_work(self.db, self.work, self.seller), "owner")
         # 重复购买 40901；买自己 40901
         with self.assertRaises(BizError):
-            market_svc.purchase(self.db, self.buyer, l["id"])
+            market_svc.purchase(self.db, self.buyer, item["id"])
         with self.assertRaises(BizError):
-            market_svc.purchase(self.db, self.seller, l["id"])
+            market_svc.purchase(self.db, self.seller, item["id"])
         # 余额不足 40201
         with self.assertRaises(BizError):
-            market_svc.purchase(self.db, self.other, l["id"])
+            market_svc.purchase(self.db, self.other, item["id"])
         self.assertEqual(market_svc.my_orders(self.db, self.buyer)["total"], 1)
         self.assertEqual(market_svc.my_listings(self.db, self.seller)["total"], 1)
 
@@ -217,12 +218,12 @@ class TestMarketGovernance(unittest.TestCase):
         with self.assertRaises(BizError):  # 非商用证书 → 拒绝
             market_svc.publish(self.db, self.seller, self.work.id, 100)
         self._add_cert("commercial", issued_at="2026-02-01T00:00:00Z")  # 更近签发为商用 → 放行
-        l = market_svc.publish(self.db, self.seller, self.work.id, 100)
-        self.assertEqual(l["status"], "active")
+        item = market_svc.publish(self.db, self.seller, self.work.id, 100)
+        self.assertEqual(item["status"], "active")
 
     def test_purchase_rejects_deleted_work_and_delists(self):
         self._add_cert("commercial")
-        l = market_svc.publish(self.db, self.seller, self.work.id, 100)
+        item = market_svc.publish(self.db, self.seller, self.work.id, 100)
         # 模拟作品已被物理删除但 listing 残留 active（历史数据形态）
         from app.models.task import File as _F
         self.db.query(_F).filter(_F.work_id == self.work.id).delete()
@@ -230,8 +231,8 @@ class TestMarketGovernance(unittest.TestCase):
         self.db.delete(self.work)
         self.db.commit()
         with self.assertRaises(BizError):
-            market_svc.purchase(self.db, self.buyer, l["id"])
-        row = self.db.get(MarketListing, l["id"])
+            market_svc.purchase(self.db, self.buyer, item["id"])
+        row = self.db.get(MarketListing, item["id"])
         self.assertEqual(row.status, "delisted", "成交前发现作品已删 → 联动下架")
         self.db.refresh(self.buyer)
         self.assertEqual(self.buyer.credit_balance, 500, "买家积分未被扣")
@@ -245,6 +246,7 @@ class TestMarketGovernance(unittest.TestCase):
         self.db.commit()
         import tempfile
         from unittest import mock
+
         from app.config import settings
         wid = self.work.id
         with tempfile.TemporaryDirectory() as tmp, \
@@ -256,13 +258,65 @@ class TestMarketGovernance(unittest.TestCase):
 
     def test_admin_delist_governance(self):
         self._add_cert("commercial")
-        l = market_svc.publish(self.db, self.seller, self.work.id, 100)
+        item = market_svc.publish(self.db, self.seller, self.work.id, 100)
         with self.assertRaises(BizError):  # 非 admin 拒绝
-            market_svc.admin_delist(self.db, self.buyer, l["id"], "test")
+            market_svc.admin_delist(self.db, self.buyer, item["id"], "test")
         self.seller.is_admin = True
         self.db.commit()
-        out = market_svc.admin_delist(self.db, self.seller, l["id"], "violation test")
+        out = market_svc.admin_delist(self.db, self.seller, item["id"], "violation test")
         self.assertEqual(out["status"], "delisted")
+
+    def test_purchase_duplicate_blocked_by_unique_index(self):
+        """F-BE-24（2026-10-27）：并发双单由 uq_market_order_buyer 硬约束兜底。
+
+        绕过应用层已购查重直插第二单（模拟并发 double-click 的后提交者），
+        唯一索引必须拒绝；应用层 purchase 的 IntegrityError 转译为 409 业务码。
+        """
+        from sqlalchemy.exc import IntegrityError
+        self._add_cert("commercial")
+        item = market_svc.publish(self.db, self.seller, self.work.id, 100)
+        market_svc.purchase(self.db, self.buyer, item["id"])
+        self.db.commit()
+        dup = MarketOrder(listing_id=item["id"], work_id=self.work.id,
+                          buyer_user_id=self.buyer.id, seller_user_id=self.seller.id,
+                          price_credits=100, seller_earnings=90, platform_fee=10,
+                          created_at=utc_now_iso())
+        self.db.add(dup)
+        with self.assertRaises(IntegrityError):
+            self.db.commit()
+        self.db.rollback()
+        orders = self.db.execute(select(MarketOrder).where(
+            MarketOrder.buyer_user_id == self.buyer.id)).scalars().all()
+        self.assertEqual(len(orders), 1, "同买家同条目至多一单")
+
+    def test_purchase_unique_violation_translates_to_409(self):
+        """唯一索引兜底分支：已购查重被并发窗口绕过时，IntegrityError 转 409
+        且扣款/入账/订单同事务回滚（积分不丢）。"""
+        from unittest import mock
+        self._add_cert("commercial")
+        item = market_svc.publish(self.db, self.seller, self.work.id, 100)
+        self.db.commit()
+        # 预置「并发对手方已落单」的既成事实（等价于另一事务已提交的同键订单）
+        self.db.add(MarketOrder(listing_id=item["id"], work_id=self.work.id,
+                                buyer_user_id=self.buyer.id, seller_user_id=self.seller.id,
+                                price_credits=100, seller_earnings=90, platform_fee=10,
+                                created_at=utc_now_iso()))
+        self.db.commit()
+        self.db.expire_all()
+        # 绕过应用层已购查重（模拟两个事务都读到「未购买」的窗口），purchase
+        # 应在提交时撞唯一索引并转 40901
+        with mock.patch.object(market_svc, "_already_owned", return_value=False):
+            with self.assertRaises(BizError) as ctx:
+                market_svc.purchase(self.db, self.buyer, item["id"])
+        self.assertEqual(ctx.exception.code, 40901)
+        orders = self.db.execute(select(MarketOrder).where(
+            MarketOrder.buyer_user_id == self.buyer.id)).scalars().all()
+        self.assertEqual(len(orders), 1, "冲突后只保留先提交的一单")
+        self.db.refresh(self.buyer)
+        self.assertEqual(self.buyer.credit_balance, 500, "回滚后买家积分未被双扣")
+        rows = self.db.execute(select(CreditTransaction)).scalars().all()
+        buyer_tx = [r for r in rows if r.user_id == self.buyer.id]
+        self.assertEqual(buyer_tx, [], "被回滚事务的扣款流水不得残留")
 
 if __name__ == "__main__":
     unittest.main()

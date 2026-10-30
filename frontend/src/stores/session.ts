@@ -36,6 +36,10 @@ interface SessionState {
   setAuthenticated: (data: AuthData) => void
   /** 登出：清 token、停轮询、停播放器 */
   logout: () => void
+  /** P1-25 离线重试：回到「会话未就绪」态并重新 bootstrap（App.tsx 改调本 action） */
+  retryBootstrap: () => void
+  /** 登录页守卫用：本地无 token 时清空残留会话（401 后避免回跳循环） */
+  clearStaleSession: () => void
   /** 重新拉取 /auth/me（生成成功/切档后刷新积分） */
   refreshUser: () => Promise<void>
   /** 只刷新积分余额（提交生成即时扣分后同步侧栏，不等任务终态） */
@@ -68,6 +72,15 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     useStudioStore.getState().stopPolling()
     useStudioStore.getState().resetForNewWork()
     usePlayerStore.getState().stop()
+    set({ user: null, ready: true })
+  },
+
+  retryBootstrap() {
+    set({ ready: false, offline: false })
+    void get().bootstrap()
+  },
+
+  clearStaleSession() {
     set({ user: null, ready: true })
   },
 

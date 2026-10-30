@@ -194,12 +194,24 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
 
 @app.exception_handler(Exception)
 async def unhandled_error_handler(request: Request, exc: Exception):
-    logger.exception(f"unhandled error on {request.method} {request.url.path}: {exc}")
+    logger.exception(f"unhandled error on {request.method} {_log_url(request)}: {exc}")
     return JSONResponse(
         status_code=500,
         content={"code": 50001, "message": tr("服务内部错误", "Internal server error"),
                  "data": None, "request_id": _request_id.get()},
     )
+
+
+def _log_url(request: Request) -> str:
+    """日志侧请求 URL：query 的 st（stream-token 签名，15 分钟有效的播放凭证）
+    出日志前脱敏（2026-10-27）——日志可被采集/外发，签名入日志等于凭证入日志；
+    只影响日志呈现，不影响实际请求处理。"""
+    from urllib.parse import urlencode
+    params = [(k, v) for k, v in request.query_params.multi_items()]
+    if any(k == "st" for k, _ in params):
+        params = [(k, "***" if k == "st" else v) for k, v in params]
+    qs = urlencode(params)
+    return request.url.path + (f"?{qs}" if qs else "")
 
 
 app.include_router(api_router, prefix=API_PREFIX)

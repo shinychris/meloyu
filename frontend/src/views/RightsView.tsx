@@ -35,15 +35,21 @@ export default function RightsView() {
 
   const work = works.find((w) => w.id === workId) ?? null
 
-  // 切换作品仅重置展示，不自动拉取证书（浏览即签发会污染 FR-14 审计数据）
-  useEffect(() => {
+  /** 切换作品仅重置展示，不自动拉取证书（浏览即签发会污染 FR-14 审计数据） */
+  const changeWork = (id: string): void => {
+    setWorkId(id)
     setCert(null)
     setCertError(null)
-  }, [workId])
+  }
 
   const onViewCert = async () => {
     if (!work) return
+    // F-FE-30：防御空 active_version_id——未采用定稿时不再请求 /versions/undefined/certificate
     const versionId = work.active_version_id
+    if (!versionId) {
+      setCertError(t('rights.cert.errorNoVersion'))
+      return
+    }
     const cached = certCache.current.get(versionId)
     if (cached) {
       setCert(cached)
@@ -65,7 +71,7 @@ export default function RightsView() {
   }
 
   const onDownload = async () => {
-    if (!work || !cert) return
+    if (!work || !cert || !work.active_version_id) return
     try {
       await downloadCertificate(
         work.active_version_id,
@@ -79,11 +85,13 @@ export default function RightsView() {
 
   const onCopyLink = async () => {
     if (!cert) return
+    // F-FE-31：复制的是证书留痕事件的 API 取证引用（JSON 地址），非页面链接——
+    // 文案与提示如实说明语义，复制行为不变
     try {
       await navigator.clipboard.writeText(
         `${window.location.origin}${cert.human_participation.events_ref}`,
       )
-      toast(t('rights.cert.linkCopied'))
+      toast(t('rights.cert.apiRefCopied'))
     } catch {
       toast(t('rights.cert.copyFailed', { link: cert.human_participation.events_ref }), 'warn')
     }
@@ -114,7 +122,7 @@ export default function RightsView() {
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="label">{t('rights.cert.cardTitle')}{cert ? ` · ${cert.work.title} ${cert.version.version_no}` : ''}</div>
             <div className="w-[280px]">
-              <select value={workId} onChange={(e) => setWorkId(e.target.value)}>
+              <select value={workId} onChange={(e) => changeWork(e.target.value)}>
                 {works.length === 0 && <option value="">{t('rights.cert.noWorks')}</option>}
                 {works.map((w) => (
                   <option key={w.id} value={w.id}>
@@ -176,7 +184,7 @@ export default function RightsView() {
                   {t('rights.cert.download')}
                 </button>
                 <button className="btn btn-ghost text-xs" onClick={() => void onCopyLink()}>
-                  {t('rights.cert.copyLink')}
+                  {t('rights.cert.copyApiRef')}
                 </button>
               </div>
             </div>

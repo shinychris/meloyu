@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { completeTags, generateLyrics, polishLyrics, rhymeCheck } from '../api/lyrics'
 import { getModelsRuntime } from '../api/models'
@@ -8,7 +8,7 @@ import { toast } from '../stores/toast'
 import { useT, t as tt, useI18nStore, getLocale } from '../i18n'
 import { lyricsZh } from '../i18n/zh/lyrics'
 import { lyricsEn } from '../i18n/en/lyrics'
-import { detectSectionAtCaret, insertAtCaret } from '../lib/structure'
+import { detectSectionAtCaret, insertAtCaret, parseLyricsStructure } from '../lib/structure'
 import { sectionLabel } from '../lib/format'
 import { useMetaStore } from '../stores/meta'
 import AnalysisPanel from '../components/lyrics/AnalysisPanel'
@@ -72,6 +72,9 @@ export default function LyricsView() {
   }, [loadMeta])
   const vocalMarks = (meta.performance_marks ?? []).filter((m) => m.group === 'vocal')
   const musicMarks = (meta.performance_marks ?? []).filter((m) => m.group === 'music')
+  // F-04：结构面板随编辑内容实时解析（镜像后端 parse_lyrics 语义），
+  // 不再展示上一次生成响应的段落快照
+  const structure = useMemo(() => parseLyricsStructure(text), [text])
 
   // 草稿持久化：只有真正编辑过的内容才落 localStorage（样例态不落盘，
   // 避免旧语言样例锁死语言切换；顺带清掉历史残留）
@@ -317,7 +320,7 @@ export default function LyricsView() {
         </div>
 
         <AnalysisPanel
-          gen={gen}
+          structure={structure}
           rhyme={rhyme}
           tagInfo={tagInfo}
           changes={changes}

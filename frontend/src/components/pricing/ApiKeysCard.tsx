@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ApiKeyInfo } from '../../types/api'
-import { apiDelete, apiGet, apiPost } from '../../api/client'
+import { createApiKey, listApiKeys, revokeApiKey } from '../../api/apiKeys'
+import { confirmDialog } from '../../stores/confirm'
 import { toast } from '../../stores/toast'
 import { useT } from '../../i18n'
 
@@ -13,7 +14,7 @@ export default function ApiKeysCard() {
   const [busy, setBusy] = useState(false)
 
   const refresh = () => {
-    apiGet<{ items: ApiKeyInfo[]; total: number }>('/api-keys')
+    listApiKeys()
       .then((r) => setKeys(r.items))
       .catch(() => {})
   }
@@ -28,7 +29,7 @@ export default function ApiKeysCard() {
     }
     setBusy(true)
     try {
-      const k = await apiPost<ApiKeyInfo & { key: string }>('/api-keys', { name })
+      const k = await createApiKey(name)
       setFreshKey(k.key)
       setNameDraft('')
       refresh()
@@ -39,9 +40,17 @@ export default function ApiKeysCard() {
     }
   }
 
-  const revoke = async (id: string) => {
+  const revoke = async (id: string, name: string) => {
+    // F-FE-22：吊销密钥为破坏性操作（使用该 key 的集成立即失效），二次确认
+    const ok = await confirmDialog({
+      title: t('apikey.confirm.revokeTitle', { name }),
+      description: t('apikey.confirm.revokeDesc'),
+      confirmText: t('apikey.revoke'),
+      danger: true,
+    })
+    if (!ok) return
     try {
-      await apiDelete(`/api-keys/${id}`)
+      await revokeApiKey(id)
       refresh()
     } catch {
       /* 拦截器已 toast */
@@ -104,7 +113,7 @@ export default function ApiKeysCard() {
               <span className="text-2xs num text-dim">
                 {k.last_used_at ? k.last_used_at.slice(0, 16).replace('T', ' ') : '—'}
               </span>
-              <button className="btn btn-ghost !py-0.5 !px-2 text-2xs justify-self-end" onClick={() => void revoke(k.id)}>
+              <button className="btn btn-ghost !py-0.5 !px-2 text-2xs justify-self-end" onClick={() => void revoke(k.id, k.name)}>
                 {t('apikey.revoke')}
               </button>
             </div>

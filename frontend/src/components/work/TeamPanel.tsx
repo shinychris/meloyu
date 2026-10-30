@@ -2,17 +2,84 @@ import type { TeamSpaceInfo } from '../../types/api'
 import { addMember, changeMemberRole, createSpace, removeMember } from '../../api/team'
 import { toast } from '../../stores/toast'
 import { useT } from '../../i18n'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 /**
  * 团队空间面板（FR-13）：共享作品的成员与角色管理（所有者操作）。
  * 角色：editor 编辑 / commenter 评论 / viewer 查看（owner 不可降级）。
  */
+
+/** 新建空间弹窗（F-FE-21：替代 window.prompt，与全站 modal 体系一致；
+ *  Enter 提交 / Esc 取消 / 打开即聚焦输入框） */
+function CreateSpaceModal({ onClose, onCreate }: {
+  onClose: () => void
+  onCreate: (name: string) => void
+}) {
+  const t = useT()
+  const [name, setName] = useState('')
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const trimmed = name.trim()
+    if (!trimmed) return
+    onCreate(trimmed)
+  }
+
+  return (
+    <div className="modal-overlay">
+      <div className="card pop w-[380px] p-6">
+        <div className="text-md font-bold">{t('team.modal.createTitle')}</div>
+        <form onSubmit={submit} className="mt-4 space-y-3">
+          <div>
+            <div className="text-2xs mb-1 text-dim">{t('team.prompt.spaceName')}</div>
+            <input
+              ref={inputRef}
+              type="text"
+              value={name}
+              maxLength={60}
+              placeholder={t('team.prompt.spaceName')}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') onClose()
+              }}
+            />
+          </div>
+          <div className="flex gap-2 justify-end pt-1">
+            <button type="button" className="btn btn-ghost btn-md" onClick={onClose}>
+              {t('common.cancel')}
+            </button>
+            <button type="submit" className="btn btn-acc btn-md" disabled={!name.trim()}>
+              {t('team.modal.create')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export default function TeamPanel({ space, onChanged }: { space: TeamSpaceInfo; onChanged: () => void }) {
   const t = useT()
   const [emailDraft, setEmailDraft] = useState('')
   const [role, setRole] = useState('commenter')
   const [busy, setBusy] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+
+  const onCreateSpace = async (name: string) => {
+    setCreateOpen(false)
+    try {
+      await createSpace(name)
+      toast(t('team.toast.spaceCreated'))
+      onChanged()
+    } catch {
+      /* 拦截器已 toast */
+    }
+  }
 
   const onAdd = async () => {
     if (busy) return
@@ -34,8 +101,7 @@ export default function TeamPanel({ space, onChanged }: { space: TeamSpaceInfo; 
     }
   }
 
-  const onRemove = async (userId: string) => {
-    try {
+  const onRemove = async (userId: string) => {    try {
       await removeMember(space.id, userId)
       onChanged()
     } catch {
@@ -46,18 +112,6 @@ export default function TeamPanel({ space, onChanged }: { space: TeamSpaceInfo; 
   const onRole = async (userId: string, r: string) => {
     try {
       await changeMemberRole(space.id, userId, r)
-      onChanged()
-    } catch {
-      /* 拦截器已 toast */
-    }
-  }
-
-  const onCreateSpace = async () => {
-    const name = window.prompt(t('team.prompt.spaceName') ?? '')
-    if (!name || !name.trim()) return
-    try {
-      await createSpace(name.trim())
-      toast(t('team.toast.spaceCreated'))
       onChanged()
     } catch {
       /* 拦截器已 toast */
@@ -126,13 +180,16 @@ export default function TeamPanel({ space, onChanged }: { space: TeamSpaceInfo; 
       )}
 
       <div className="flex gap-2 mt-2">
-        <button className="btn btn-ghost w-full btn-sm" onClick={() => void onCreateSpace()}>
+        <button className="btn btn-ghost w-full btn-sm" onClick={() => setCreateOpen(true)}>
           {t('team.createSpace')}
         </button>
       </div>
       <div className="text-2xs mt-1.5 leading-relaxed text-dim">
         {t('team.roleHint')}
       </div>
+      {createOpen && (
+        <CreateSpaceModal onClose={() => setCreateOpen(false)} onCreate={(name) => void onCreateSpace(name)} />
+      )}
     </div>
   )
 }

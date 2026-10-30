@@ -81,12 +81,12 @@ def stats_dict(db: Session, user: User, days: int) -> dict:
             e["succeeded"] += 1
             e["units"] += cost
         if lyrics_engine:
-            l = lyrics_by_engine.setdefault(
+            le = lyrics_by_engine.setdefault(
                 lyrics_engine,
                 {"engine": lyrics_engine,
                  "kind": ("remote_api" if lyrics_engine in REMOTE_API_ENGINES else "local"),
                  "calls": 0})
-            l["calls"] += 1
+            le["calls"] += 1
 
     # 按天补零：从窗口首日到本机今日，序列完整便于前端画趋势
     day_list = []

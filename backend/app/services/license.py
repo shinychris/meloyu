@@ -73,8 +73,9 @@ def _b64url_decode(data: str) -> bytes:
     return base64.urlsafe_b64decode(data + "=" * (-len(data) % 4))
 
 
-def _public_key() -> Ed25519PublicKey:
-    raw = settings.license_public_key.strip()
+def _public_key(public_key_b64: str | None = None) -> Ed25519PublicKey:
+    raw = (public_key_b64 if public_key_b64 is not None
+           else settings.license_public_key).strip()
     if not raw:
         raise err_license_invalid(tr(
             "本实例未配置 License 公钥（LICENSE_PUBLIC_KEY），无法激活",
@@ -86,15 +87,20 @@ def _public_key() -> Ed25519PublicKey:
         raise err_license_invalid("LICENSE_PUBLIC_KEY 配置无效") from exc
 
 
-def verify_license_key(key: str) -> dict:
-    """验签并返回载荷 dict；格式/签名/tier 无效抛 40202。"""
+def verify_license_key(key: str, *, public_key_b64: str | None = None) -> dict:
+    """验签并返回载荷 dict；格式/签名/tier 无效抛 40202。
+
+    public_key_b64：显式公钥（portal 等独立部署的调用方传入各自公钥，
+    免去对全局 settings 的猴补——评审 F-PT-14）；缺省读 settings，
+    应用内调用路径行为不变。
+    """
     key = (key or "").strip()
     parts = key.split(".")
     if len(parts) != 3 or parts[0] != "v1":
         raise err_license_invalid(tr("License Key 格式无效", "Invalid license key format"))
     body, sig = parts[1], parts[2]
     try:
-        _public_key().verify(_b64url_decode(sig), body.encode("ascii"))
+        _public_key(public_key_b64).verify(_b64url_decode(sig), body.encode("ascii"))
         payload = json.loads(_b64url_decode(body))
     except InvalidSignature:
         raise err_license_invalid(tr(
@@ -165,7 +171,12 @@ def status_dict(db: Session) -> dict:
 
 
 def activate(db: Session, key: str, user: User | None = None) -> dict:
-    """激活：验签 → 写状态 → 本地用户升到全功能档（lifetime=studio / enterprise=team）。"""
+    """激活：验签 → 写状态 → 本地用户升到全功能档（lifetime=studio / enterprise=team）。
+
+    user.plan 写入仅限 desktop 单用户形态（2026-10-27）：enterprise 多用户下
+    「谁调用激活谁升档」是自我提权通道——集中授权与个人档位解耦（成员档位
+    由管理员另行分配）；desktop 本地档案即唯一用户，升档语义保留。
+    """
     payload = verify_license_key(key)
     state = get_state(db)
     if state.license_key == key.strip():
@@ -173,7 +184,7 @@ def activate(db: Session, key: str, user: User | None = None) -> dict:
     state.license_key = key.strip()
     state.license_payload = payload
     state.activated_at = utc_now_iso()
-    if user is not None:
+    if user is not None and settings.app_mode != "enterprise":
         user.plan = "studio" if payload["tier"] == "lifetime" else "team"
         user.updated_at = utc_now_iso()
     db.commit()
@@ -265,9 +276,9 @@ def ensure_generation_allowed(db: Session) -> None:
         return
     raise err_license_required(tr(
         f"试用期已结束——{LICENSE_TRIAL_DAYS} 天全功能试用到期后需终身授权才能继续创作。"
-        "请前往「定价与激活」输入 License Key 完成激活。",
+        "请前往「系统设置 → 授权」完成激活。",
         f"Your {LICENSE_TRIAL_DAYS}-day trial has ended — a lifetime license is "
-        "required to keep creating. Enter your license key under Pricing & Activation."))
+        "required to keep creating. Activate under Settings → License."))
 
 
 def assert_enterprise_license() -> None:

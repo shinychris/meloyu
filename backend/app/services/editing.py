@@ -6,6 +6,8 @@
 """
 from __future__ import annotations
 
+import io
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -106,6 +108,10 @@ def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
             if check_sensitive(style_prompt):
                 from app.core.errors import err_sensitive
                 raise err_sensitive()
+            # 义务②（与 POST /generations 同口径，2026-10-27 补齐）：风格变奏的
+            # 提示词同样不得冒用 in vivo 艺术家名义/声音
+            from app.services.ip_protection import check_ip_protection
+            check_ip_protection(style_prompt)
     elif op == "retune":
         # V2 多轨编辑器（v0.9.0）：变速/变调——确定性引擎同 seed 重渲染（素材一致）
         from app.models.enums import KEY_MODES, TONICS
@@ -165,12 +171,12 @@ def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
     seed = derive_op_seed(cand.seed, op, extra)
     now = utc_now_iso()
     child = Version(work_id=work.id, parent_version_id=version.id,
-                    version_no=f"v{work.version_count + 1}", source=op,
+                    version_no=works_svc.claim_next_version_no(db, work, now),
+                    source=op,
                     candidate_count=0, params=params,
                     lyrics=version.lyrics or "", created_at=now, updated_at=now)
     db.add(child)
     db.flush()
-    work.version_count += 1
     work.updated_at = now
 
     derived_spec: dict = {
@@ -280,11 +286,16 @@ def submit_mixdown(db: Session, user: User, version_id: str, wav: bytes,
     from app.models import File as FileRow
     work = db.get(Work, version.work_id)
     try:
-        with wav_mod.open(__import__("io").BytesIO(wav), "rb") as wf:
+        with wav_mod.open(io.BytesIO(wav), "rb") as wf:
             n, ch, sw, sr = wf.getnframes(), wf.getnchannels(), wf.getsampwidth(), wf.getframerate()
             raw = wf.readframes(n)
     except Exception as e:  # noqa: BLE001
         raise err_validation(tr(f"wav 无法解析：{e}", f"cannot parse wav: {e}")) from e
+    # 声道校验（2026-10-27）：下面的立体声拆分按 2 通道下采样，多声道 wav
+    # 会取错样本（>2 声道静默产出错位音频），入口即拒
+    if ch not in (1, 2):
+        raise err_validation(tr(f"混音声道数须为 1 或 2（收到 {ch} 声道）",
+                            f"Mixdown must be mono or stereo (got {ch} channels)"))
     duration = round(n / sr, 2)
     # 与 works.duration CHECK(30~240) 对齐——编辑器不改变歌曲时长量级
     if duration < 30 or duration > 240:
@@ -299,12 +310,12 @@ def submit_mixdown(db: Session, user: User, version_id: str, wav: bytes,
 
     now = utc_now_iso()
     child = Version(work_id=work.id, parent_version_id=version.id,
-                    version_no=f"v{work.version_count + 1}", source="mixdown",
+                    version_no=works_svc.claim_next_version_no(db, work, now),
+                    source="mixdown",
                     candidate_count=0, params=dict(version.params or {}),
                     lyrics=version.lyrics or "", created_at=now, updated_at=now)
     db.add(child)
     db.flush()
-    work.version_count += 1
     work.updated_at = now
     cand = Candidate(
         version_id=child.id, label="A", adopted=True, seed=0,

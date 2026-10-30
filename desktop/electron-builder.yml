@@ -6,6 +6,14 @@ appId: com.meloyu.desktop
 productName: Meloyu
 copyright: © 2026 Meloyu
 
+# meloyu:// 深链协议声明（评审 F-DT-02）：macOS 打包期写入 Info.plist
+# CFBundleURLTypes——缺失则成品 mac 包收不到深链（运行时
+# setAsDefaultProtocolClient 对打包后的 mac 应用无效，仅 win/linux 生效）
+protocols:
+  - name: Meloyu Activation
+    schemes:
+      - meloyu
+
 directories:
   output: release
   buildResources: build

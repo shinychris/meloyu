@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Work } from '../types/api'
 import { deleteWork, listWorks, patchWork, restoreWork } from '../api/works'
@@ -43,10 +43,20 @@ export default function LibraryView() {
 
   const commercial = user && user.plan !== 'free'
 
-  /** 稳定引用：SearchInput 依赖它做 memo 隔离，防抖期间视图重渲染不再触碰输入框 */
-  const onQueryChange = useCallback((v: string) => setQ(v), [])
+  /**
+   * 搜索回调（SearchInput 内部 400ms 防抖后回调写入）：保持引用稳定，
+   * 防抖期间视图重渲染不再触碰输入框；查询变更同时回到第 1 页。
+   */
+  const changeQuery = useCallback((v: string): void => {
+    setQ(v)
+    setPage(1)
+  }, [])
+
+  /** F-FE-02：请求序号守卫——筛选/翻页快速变更时旧响应不再覆盖新查询的结果 */
+  const loadSeqRef = useRef(0)
 
   const load = useCallback(async () => {
+    const seq = ++loadSeqRef.current
     setLoading(true)
     try {
       const res = await listWorks({
@@ -58,6 +68,7 @@ export default function LibraryView() {
         page,
         page_size: PAGE_SIZE,
       })
+      if (seq !== loadSeqRef.current) return
       setItems(res.items)
       setTotalPages(res.total_pages || 1)
       setTotal(res.total)
@@ -66,23 +77,24 @@ export default function LibraryView() {
       if (res.items.some((w) => !Array.isArray(w.exported_formats))) {
         try {
           const tasks = await listTasks({ type: 'export', page_size: 100 })
+          if (seq !== loadSeqRef.current) return
           const next: Record<string, string[]> = {}
-          for (const t of tasks.items) {
-            if (t.status === 'succeeded' && t.format && t.work_id) {
-              ;(next[t.work_id] ??= []).push(t.format)
+          for (const tk of tasks.items) {
+            if (tk.status === 'succeeded' && tk.format && tk.work_id) {
+              ;(next[tk.work_id] ??= []).push(tk.format)
             }
           }
           setExportFallback(next)
         } catch {
-          setExportFallback({}) // 徽标降级为「未导出」，不阻塞列表
+          if (seq === loadSeqRef.current) setExportFallback({}) // 徽标降级为「未导出」，不阻塞列表
         }
-      } else {
+      } else if (seq === loadSeqRef.current) {
         setExportFallback({})
       }
     } catch {
       /* 拦截器已 toast */
     } finally {
-      setLoading(false)
+      if (seq === loadSeqRef.current) setLoading(false)
     }
   }, [filter, page, q, sort, order])
 
@@ -90,9 +102,18 @@ export default function LibraryView() {
     void load()
   }, [load])
 
-  useEffect(() => {
+  const changeFilter = (f: Filter): void => {
+    setFilter(f)
     setPage(1)
-  }, [filter, q, sort, order])
+  }
+  const changeSort = (v: 'updated_at' | 'created_at' | 'title'): void => {
+    setSort(v)
+    setPage(1)
+  }
+  const changeOrder = (v: 'desc' | 'asc'): void => {
+    setOrder(v)
+    setPage(1)
+  }
 
   /** 某作品的已导出格式：新字段优先，缺失时回退批量推导 */
   const exportsOf = useCallback(
@@ -187,10 +208,10 @@ export default function LibraryView() {
         title={filter === 'trash' ? t('library.title.trash') : t('library.title.all')}
         actions={
           <div className="flex items-center gap-2 flex-wrap">
-            <SearchInput onQueryChange={onQueryChange} placeholder={t('library.search.placeholder')} />
+            <SearchInput onQueryChange={changeQuery} placeholder={t('library.search.placeholder')} />
             <select
               value={sort}
-              onChange={(e) => setSort(e.target.value as 'updated_at' | 'created_at' | 'title')}
+              onChange={(e) => changeSort(e.target.value as 'updated_at' | 'created_at' | 'title')}
               className="text-sm"
               title={t('library.sort.title')}
             >
@@ -200,7 +221,7 @@ export default function LibraryView() {
             </select>
             <select
               value={order}
-              onChange={(e) => setOrder(e.target.value as 'desc' | 'asc')}
+              onChange={(e) => changeOrder(e.target.value as 'desc' | 'asc')}
               className="text-sm"
               title={t('library.order.title')}
             >
@@ -208,7 +229,7 @@ export default function LibraryView() {
               <option value="asc">{t('library.order.asc')}</option>
             </select>
             {(['all', 'draft', 'fav', 'trash'] as Filter[]).map((f) => (
-              <button type="button" key={f} className={`chip ${filter === f ? 'on' : ''}`} onClick={() => setFilter(f)}>
+              <button type="button" key={f} className={`chip ${filter === f ? 'on' : ''}`} onClick={() => changeFilter(f)}>
                 {chipLabel[f]}
               </button>
             ))}

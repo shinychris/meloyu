@@ -20,6 +20,10 @@ from app.services.model_center import get_lyrics_provider
 def _guard(text: str) -> None:
     if check_sensitive(text):
         raise err_sensitive()
+    # 义务②（与 POST /generations 同口径，2026-10-27 补齐）：歌词生成/润色的
+    # 输入同样不得冒用 in vivo 艺术家名义/声音
+    from app.services.ip_protection import check_ip_protection
+    check_ip_protection(text)
 
 
 def generate(db: Session, theme: str, style_hint: str, mood: str | None, language: str,

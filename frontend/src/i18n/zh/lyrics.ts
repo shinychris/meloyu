@@ -57,6 +57,7 @@ export const lyricsZh: Record<keyof typeof lyricsEn, string> = {
   'lyrics.panel.stressOk': '重音落拍正常',
   'lyrics.panel.stressPending': '运行「押韵 / 重音检查」后显示',
   'lyrics.panel.rhyme': '韵脚',
+  'lyrics.panel.rhymeEmpty': '运行押韵检查后，此处展示韵脚分布',
   'lyrics.panel.rhymeMain': ' · 主韵 {group}',
   'lyrics.panel.backStudio': '返回工作台 →',
   'lyrics.defaultLyrics':

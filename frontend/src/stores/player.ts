@@ -82,15 +82,24 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       }
       el.src = url
       el.currentTime = 0
+      // F-FE-14：playing 不得在 play() 落定前置 true——自动播放被拒时按钮
+      // 会显示「暂停」却无声。play() resolve 后再置 true；catch 回置 false
+      // 并提示（play/pause 事件经 TransportBar 同步兜底）。
       set({
         current: track,
         queue,
         queueIndex: index,
         position: 0,
         duration: track.durationSec ?? 0,
-        playing: true,
+        playing: false,
       })
-      startPlayback(el)
+      try {
+        await el.play()
+        set({ playing: true })
+      } catch {
+        set({ playing: false })
+        toast(t('layout.player.autoplayBlocked'), 'warn')
+      }
     } catch {
       /* 拦截器已 toast（40401/40301 等） */
     }

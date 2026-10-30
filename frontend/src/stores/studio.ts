@@ -17,9 +17,12 @@ import type {
 import { cancelTask, getTask, listCandidates, submitGeneration } from '../api/generation'
 import { getVersionTree } from '../api/works'
 import { useSessionStore } from './session'
+import { useMetaStore } from './meta'
 import { toast } from './toast'
 import { composeStylePrompt } from '../lib/structure'
 import { t, getLocale } from '../i18n'
+import { studioEn } from '../i18n/en/studio'
+import { studioZh } from '../i18n/zh/studio'
 
 export interface StudioForm {
   mode: Mode
@@ -49,21 +52,38 @@ export interface InspireSelection {
   inst: string
 }
 
-/** 新会话默认风格描述（示例输入内容，按当前 locale 取文案；文件顶部已 import t，无初始化时序问题） */
-function initialStylePrompt(): string {
+/**
+ * F-FE-13：默认风格/歌词为「样例态」——表单字段存空串，展示与提交时按当前
+ * locale 现取 t()（LyricsView SAMPLE_TEXTS 同款模式）。模块加载时不再冻结
+ * i18n 文案，切换语言后样例自然跟随，不会把旧语言样例提交/回灌进草稿。
+ */
+export function defaultStylePrompt(): string {
   return t('studio.default.stylePrompt')
 }
 
-/** 新会话默认示例歌词（结构标签 [Verse]/[Chorus] 保留英文） */
-function initialLyrics(): string {
+/** 默认示例歌词（结构标签 [Verse]/[Chorus] 保留英文） */
+export function defaultLyrics(): string {
   return t('studio.default.lyrics')
+}
+
+/** 全部语言的样例文本（风格描述 + 歌词）：hydrateDraft 时剔除未修改过的旧语言样例 */
+const SAMPLE_TEXTS = new Set<string>([
+  studioEn['studio.default.stylePrompt'],
+  studioZh['studio.default.stylePrompt'],
+  studioEn['studio.default.lyrics'],
+  studioZh['studio.default.lyrics'],
+])
+
+/** 草稿字段是否为「未修改过的样例」（含样例态空串）：是则不回灌，跟随当前语言 */
+function isSampleText(v: string | undefined): boolean {
+  return v == null || v.trim() === '' || SAMPLE_TEXTS.has(v)
 }
 
 const DEFAULT_FORM: StudioForm = {
   mode: 'custom',
   simplePrompt: '',
-  stylePrompt: initialStylePrompt(),
-  lyrics: initialLyrics(),
+  stylePrompt: '',
+  lyrics: '',
   negativePrompt: '',
   model: 'v1_pro',
   bpm: 90,
@@ -90,6 +110,12 @@ interface StudioState {
   submitting: boolean
   failureMessage: string | null
   opLog: string[]
+  /**
+   * 初始「模板已载入」日志是否已被真实操作顶掉（F-FE-13 惰性求值）：
+   * opLog 本体只存真实操作；模板行由 VersionTree 在 baseLogged=false 时
+   * 以当前 locale 现取 t() 渲染，不再在模块加载时冻结文案。
+   */
+  opLogBaseLogged: boolean
   /** FR-4 参考音频：挂到本次生成的参考轨（特征级，提交时带 reference_track_id） */
   referenceTrack: ReferenceTrack | null
   setReferenceTrack: (track: ReferenceTrack) => void
@@ -98,6 +124,10 @@ interface StudioState {
   setInspire: (patch: Partial<InspireSelection>) => void
   /** 把灵感组合写回风格描述（原型 composePrompt） */
   applyInspireToPrompt: (full?: InspireSelection) => void
+  /** 随机灵感组合（工作台空态与灵感卡共用，F-FE-12 收敛为单一 action） */
+  randomizeInspire: () => void
+  /** 采用候选后本地同步 adopted 标记（F-FE-15：组件不再绕过 action 直改状态） */
+  markAdopted: (candidateId: string) => void
   markStep: (n: 1 | 2 | 3) => void
   logOp: (text: string) => void
   submitGeneration: (opts?: { simplified?: boolean }) => Promise<void>
@@ -217,8 +247,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   inferredStructure: false,
   submitting: false,
   failureMessage: null,
+  opLog: [],
+  opLogBaseLogged: false,
   referenceTrack: null,
-  opLog: [t('studio.log.templateLoaded')],
 
   setReferenceTrack(track) {
     set({ referenceTrack: track })
@@ -249,12 +280,32 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     }
   },
 
+  randomizeInspire() {
+    const inspiration = useMetaStore.getState().meta.inspiration
+    const pickFrom = (list: string[]) =>
+      list.length > 0 ? list[Math.floor(Math.random() * list.length)] : ''
+    const next = {
+      scene: pickFrom(inspiration.scenes),
+      mood: pickFrom(inspiration.moods),
+      genre: pickFrom(inspiration.genres),
+      inst: pickFrom(inspiration.instruments),
+    }
+    set({ inspire: next })
+    // applyInspireToPrompt 内部已写回风格描述、记日志（原先两处调用各自重复记了一条）
+    get().applyInspireToPrompt(next)
+    get().markStep(1)
+  },
+
+  markAdopted(candidateId) {
+    set({ candidates: get().candidates.map((c) => ({ ...c, adopted: c.id === candidateId })) })
+  },
+
   markStep(n) {
     set({ stepDone: { ...get().stepDone, [n]: true } })
   },
 
   logOp(text) {
-    set({ opLog: [text, ...get().opLog].slice(0, 30) })
+    set({ opLog: [text, ...get().opLog].slice(0, 30), opLogBaseLogged: true })
   },
 
   async submitGeneration(opts) {
@@ -263,10 +314,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     const { form } = s
     if (form.mode === 'simple' && !form.simplePrompt.trim()) {
       toast(t('studio.warn.simpleEmpty'), 'warn')
-      return
-    }
-    if (form.mode === 'custom' && !form.stylePrompt.trim()) {
-      toast(t('studio.warn.styleEmpty'), 'warn')
       return
     }
     const req: GenerationSubmitRequest = {
@@ -294,8 +341,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     if (form.mode === 'simple') {
       req.simple_prompt = form.simplePrompt.trim()
     } else {
-      req.style_prompt = form.stylePrompt.trim()
-      req.lyrics = form.lyrics
+      // 样例态（字段为空）按当前 locale 现取默认示例——与展示所见一致（F-FE-13）
+      req.style_prompt = form.stylePrompt.trim() || t('studio.default.stylePrompt')
+      req.lyrics = form.lyrics.trim() ? form.lyrics : t('studio.default.lyrics')
     }
     if (s.referenceTrack) {
       req.reference_track_id = s.referenceTrack.id
@@ -405,8 +453,15 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   hydrateDraft(userId) {
     const draft = readDraft(userId)
-    if (draft && Object.keys(draft).length > 0) {
-      set({ form: { ...DEFAULT_FORM, ...draft } })
+    // F-FE-13：未修改过的样例（任一语言的历史样例/样例态空串）不回灌——
+    // 显示值由当前 locale 的样例派生，切语言自然跟随，不锁死旧语言
+    const cleaned = Object.fromEntries(
+      Object.entries(draft ?? {}).filter(
+        ([k, v]) => !((k === 'stylePrompt' || k === 'lyrics') && isSampleText(v as string)),
+      ),
+    ) as Partial<StudioForm>
+    if (Object.keys(cleaned).length > 0) {
+      set({ form: { ...DEFAULT_FORM, ...cleaned } })
     }
   },
 }))

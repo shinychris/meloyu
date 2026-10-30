@@ -7,6 +7,7 @@ import { toast } from '../stores/toast'
 import { useT } from '../i18n'
 import LangSwitch from '../components/common/LangSwitch'
 import { Logo } from '../components/common/Logo'
+import { SITE_URL } from '../lib/constants'
 import type { AuthData } from '../types/api'
 
 type Tab = 'login' | 'register'
@@ -286,7 +287,7 @@ export default function LoginView() {
                 改为外链官网（原 navigate('/landing') 会弹回登录页成死按钮） */}
             <a
               className="mt-3 flex items-center gap-1 transition-colors hover:text-white"
-              href="https://meloyu.com"
+              href={SITE_URL}
               target="_blank"
               rel="noreferrer"
             >

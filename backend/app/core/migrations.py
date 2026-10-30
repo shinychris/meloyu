@@ -60,17 +60,55 @@ _ADD_COLUMNS: list[tuple[str, str, str]] = [
 ]
 
 
+# 唯一索引类迁移（2026-10-27）：双方言适用（PG/SQLite 均支持 CREATE INDEX IF
+# NOT EXISTS + 部分索引），存量库启动时补建；新库由 create_all 按模型产出，
+# IF NOT EXISTS 使两侧幂等。元素：(索引名, 表名, DDL)
+_UNIQUE_INDEXES: list[tuple[str, str, str]] = [
+    # M-20261027-a：退款幂等硬约束——同任务至多一笔 refund 流水（并发取消/
+    # 异常退款双发窗口的数据库侧兜底，见 services/credits.refund）
+    ("uq_ct_refund_per_task", "credit_transactions",
+     "CREATE UNIQUE INDEX IF NOT EXISTS uq_ct_refund_per_task "
+     "ON credit_transactions (ref_task_id) WHERE reason = 'refund'"),
+    # M-20261027-b：市场购买防双单——同买家同条目至多一单（并发 double-click
+    # 双扣窗口的数据库侧兜底；订单无取消态，业务上终身一单，见 services/market.purchase）
+    ("uq_market_order_buyer", "market_orders",
+     "CREATE UNIQUE INDEX IF NOT EXISTS uq_market_order_buyer "
+     "ON market_orders (listing_id, buyer_user_id)"),
+]
+
+
 def run(engine: Engine) -> list[str]:
     """执行全部未应用的迁移，返回应用清单（供启动日志与冒烟观测）。
 
-    v0.15.0 起：本文件的全部条目均针对存量 SQLite 库的增量演进，PostgreSQL
-    侧 schema 由 Base.metadata.create_all 直接产出终态（模型已包含全部历史
-    迁移结果），数据口径要么随 sqlite_to_pg 迁移带入、要么由种子写入——
-    PG 引擎直接跳过。
+    唯一索引类条目双方言适用（PG 存量库 create_all 不补建新索引，必须在此
+    兜底）；其余条目针对存量 SQLite 库的增量演进，PostgreSQL 侧 schema 由
+    Base.metadata.create_all 直接产出终态（模型已包含全部历史迁移结果），
+    数据口径要么随 sqlite_to_pg 迁移带入、要么由种子写入——列/表重建类 PG 直接跳过。
     """
-    if engine.dialect.name != "sqlite":
-        return []
     applied: list[str] = []
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        from sqlalchemy import inspect as sa_inspect
+        insp = sa_inspect(conn)
+        table_indexes: dict[str, set[str]] = {}
+        for name, table, ddl in _UNIQUE_INDEXES:
+            if table not in table_indexes:
+                try:
+                    # get_indexes 返回 [{"name": ..., "unique": ..., ...}]
+                    table_indexes[table] = {i["name"] for i in insp.get_indexes(table)}
+                except Exception:  # noqa: BLE001 —— 表尚不存在（create_all 前置保证，防御）
+                    table_indexes[table] = set()
+            if name in table_indexes[table]:
+                continue
+            try:
+                conn.execute(text(ddl))
+            except Exception as e:  # noqa: BLE001 —— 存量重复数据会让唯一索引建失败
+                logger.warning(f"migration index {name} not created: {e}")
+                continue
+            applied.append(name)
+    if engine.dialect.name != "sqlite":
+        if applied:
+            logger.info(f"db migrations applied: {', '.join(applied)}")
+        return applied
     with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
         table_cols: dict[str, set[str]] = {}
         for table, column, ddl in _ADD_COLUMNS:

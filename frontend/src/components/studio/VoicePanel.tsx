@@ -3,6 +3,7 @@ import type { VoiceProfile } from '../../types/api'
 import { deleteVoiceProfile, enrollVoiceProfile, listVoiceProfiles, submitVoiceSample } from '../../api/voice'
 import { startRecording, type RecordingSession } from '../../lib/audio'
 import { useStudioStore } from '../../stores/studio'
+import { confirmDialog } from '../../stores/confirm'
 import { toast } from '../../stores/toast'
 import { useT } from '../../i18n'
 
@@ -31,6 +32,17 @@ export default function VoicePanel() {
       .catch(() => {})
   }
   useEffect(refresh, [])
+
+  // F-FE-01（P1）：录音中途卸载组件时终止录音会话——停止 MediaRecorder 并释放
+  // getUserMedia 轨道，麦克风不再被占用（范式同 HumDialog 的卸载清理）
+  useEffect(
+    () => () => {
+      const rec = recRef.current
+      recRef.current = null
+      if (rec) void rec.stop()
+    },
+    [],
+  )
 
   const startEnroll = async () => {
     const name = nameDraft.trim()
@@ -95,13 +107,23 @@ export default function VoicePanel() {
     }
   }
 
-  const useProfile = (p: VoiceProfile) => {
+  // F-FE-16：普通事件处理函数不以 use 前缀命名（原 useProfile 触发 hooks 规则误报，
+  // 是 rules-of-hooks 全局降级的诱因之一）
+  const applyProfile = (p: VoiceProfile) => {
     patchForm({ vocal: 'voice_clone', voiceProfileId: p.id })
     markStep(3)
     toast(t('studio.voice.toast.selected', { name: p.name }))
   }
 
   const removeProfile = async (p: VoiceProfile) => {
+    // F-FE-22：删除音色档案为破坏性操作，接 confirmDialog({ danger: true }) 二次确认
+    const ok = await confirmDialog({
+      title: t('studio.voice.confirm.deleteTitle', { name: p.name }),
+      description: t('studio.voice.confirm.deleteDesc'),
+      confirmText: t('studio.voice.delete'),
+      danger: true,
+    })
+    if (!ok) return
     try {
       await deleteVoiceProfile(p.id)
       if (form.voiceProfileId === p.id) patchForm({ vocal: 'female_air', voiceProfileId: undefined })
@@ -127,7 +149,7 @@ export default function VoicePanel() {
             <div key={p.id} className="flex items-center gap-2">
               <button
                 className={`btn btn-sm ${form.voiceProfileId === p.id ? 'btn-acc' : 'btn-ghost'}`}
-                onClick={() => useProfile(p)}
+                onClick={() => applyProfile(p)}
               >
                 {p.name}
                 {form.voiceProfileId === p.id ? ' ✓' : ''}

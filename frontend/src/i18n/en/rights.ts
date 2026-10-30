@@ -17,8 +17,9 @@ export const rightsEn = {
   'rights.cert.view': 'View certificate',
   'rights.cert.download': 'Download certificate JSON',
   'rights.cert.downloadStarted': 'Certificate JSON download started',
-  'rights.cert.copyLink': 'Copy verification link',
-  'rights.cert.linkCopied': 'Verification link copied',
+  'rights.cert.copyApiRef': 'Copy forensic reference (API)',
+  'rights.cert.apiRefCopied': 'API forensic reference copied — it resolves to the certificate JSON for verification',
+  'rights.cert.errorNoVersion': 'This work has no adopted final version yet, so no certificate is available',
   'rights.cert.copyFailed': 'Copy failed — please copy manually: {link}',
   // 证书字段
   'rights.field.workId': 'Work ID',

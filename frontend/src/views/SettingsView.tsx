@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { UsageStats } from '../types/api'
 import { getUsageStats } from '../api/usage'
@@ -9,13 +9,13 @@ import { useSessionStore } from '../stores/session'
 import { useMetaStore } from '../stores/meta'
 import { toast } from '../stores/toast'
 import { formatDateTime, formatNum } from '../lib/format'
+import { useScrollSpy } from '../lib/useScrollSpy'
 import { LICENSE_SKU } from '../lib/landing-data'
+import { SITE_URL } from '../lib/constants'
 import UsageRecords from '../components/settings/UsageRecords'
 import { useI18nStore, useT, type TranslationKey } from '../i18n'
 import type { Locale } from '../i18n'
 
-/** 官网购买入口（P3 License Portal 就绪前的唯一购买通道） */
-const BUY_URL = 'https://meloyu.com'
 
 /** 美分 → $ 展示（价格单一事实源：后端下发/前端 LICENSE_SKU 同源） */
 const usd = (cents: number | null | undefined): string | null =>
@@ -82,29 +82,15 @@ export default function SettingsView() {
   const [deactivating, setDeactivating] = useState(false)
   const [exporting, setExporting] = useState(false)
 
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const [activeSection, setActiveSection] = useState(SECTIONS[0].id)
+  // scrollspy（F-FE-09 抽取共用 hook，与模型中心同源）：分区进入滚动视口上部
+  // 区域时高亮导航项（SSR/测试环境无 IO，防御跳过）
+  const { scrollRef, activeSection } = useScrollSpy(
+    SECTIONS.map((s) => s.id),
+    '-15% 0px -70% 0px',
+  )
 
   const jump = useCallback((id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [])
-
-  // scrollspy：分区进入滚动视口上部区域时高亮导航项（SSR/测试环境无 IO，防御跳过）
-  useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting) setActiveSection(e.target.id)
-        }
-      },
-      { root: scrollRef.current, rootMargin: '-15% 0px -70% 0px' },
-    )
-    for (const s of SECTIONS) {
-      const el = document.getElementById(s.id)
-      if (el) observer.observe(el)
-    }
-    return () => observer.disconnect()
   }, [])
 
   useEffect(() => {
@@ -438,8 +424,7 @@ export default function SettingsView() {
                             {t('license.status.activatedAt')}: {formatDateTime(license.license.activated_at)}
                           </span>
                         )}
-                        <span>Device: {license.device_id.slice(0, 12)}</span>
-                      </div>
+                        <span>{t('license.status.device')}: {license.device_id.slice(0, 12)}</span>                      </div>
                     </div>
                     <button
                       className="btn btn-ghost btn-sm"
@@ -520,7 +505,7 @@ export default function SettingsView() {
                     </ul>
                     <a
                       className="btn btn-acc w-full mt-5 block text-center"
-                      href={BUY_URL}
+                      href={SITE_URL}
                       target="_blank"
                       rel="noreferrer"
                     >

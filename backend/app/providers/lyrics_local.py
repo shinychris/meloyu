@@ -167,10 +167,16 @@ class LocalLyricsProvider:
                    theme: str, lang: str) -> str:
         templates = _TEMPLATES[lang].get(section) or _TEMPLATES[lang]["verse"]
         tpl = templates[rng.randrange(len(templates))]
-        words = _RHYMES["ending_words"][group]
-        ending = words[rng.randrange(len(words))]
+        if lang == "en":
+            # en 韵脚走词库自带 endings（拉丁尾词）——13 辙 ending_words 是中文词，
+            # 嵌进英文行会中英混排（2026-10-28 模拟用户测试 F-03）
+            endings = bank.get("endings") or _RHYMES["ending_words"][group]
+            ending = endings[rng.randrange(len(endings))]
+        else:
+            words = _RHYMES["ending_words"][group]
+            ending = words[rng.randrange(len(words))]
         nouns = bank["nouns"]
-        places = bank["places"]
+        places = bank.get("places") or nouns
         verbs = bank["verbs"]
         adjs = bank.get("adjs", ["温柔"])
         theme_word = self._theme_word(theme, rng)

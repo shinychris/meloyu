@@ -1,5 +1,5 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import { debounce, sanitizeQuery } from '../../lib/debounce'
+import { memo, useEffect, useRef, useState } from 'react'
+import { debounce, sanitizeQuery, type Cancelable } from '../../lib/debounce'
 import { useT } from '../../i18n'
 
 interface SearchInputProps {
@@ -24,22 +24,30 @@ interface SearchInputProps {
 function SearchInputImpl({ onQueryChange, delayMs = 400, maxLength = 50, placeholder }: SearchInputProps) {
   const t = useT()
   const [value, setValue] = useState('')
+  // latest-ref 模式：渲染期不写 ref（react-hooks/refs），提交后同步到 effect
   const cbRef = useRef(onQueryChange)
-  cbRef.current = onQueryChange
-
-  const emit = useMemo(
-    () => debounce((v: string) => cbRef.current(sanitizeQuery(v, maxLength)), delayMs),
-    [delayMs, maxLength],
-  )
-  useEffect(() => () => emit.cancel(), [emit])
+  useEffect(() => {
+    cbRef.current = onQueryChange
+  })
+  // 防抖器在 effect 中创建并存 ref（渲染期不创建/不触碰含 ref 闭包的函数）；
+  // 仅在事件回调中调用，effect 先于任何用户输入执行
+  const emitRef = useRef<(((v: string) => void) & Cancelable) | null>(null)
+  useEffect(() => {
+    const d = debounce((v: string) => cbRef.current(sanitizeQuery(v, maxLength)), delayMs)
+    emitRef.current = d
+    return () => {
+      emitRef.current = null
+      d.cancel()
+    }
+  }, [delayMs, maxLength])
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setValue(e.target.value)
-    emit(e.target.value)
+    emitRef.current?.(e.target.value)
   }
 
   const onClear = () => {
-    emit.cancel()
+    emitRef.current?.cancel()
     setValue('')
     cbRef.current('') // 清空立即生效，不等防抖
   }

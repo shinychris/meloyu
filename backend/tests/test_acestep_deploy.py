@@ -19,7 +19,6 @@ from __future__ import annotations
 import hashlib
 import sys
 import tempfile
-import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -29,7 +28,7 @@ from sqlalchemy.orm import sessionmaker
 from app import models  # noqa: F401 —— 注册全部表
 from app.config import settings
 from app.core.errors import BizError
-from app.models import ModelOp, SETTING_ID, LLMSetting
+from app.models import SETTING_ID, LLMSetting, ModelOp
 from app.services import acestep_deploy as dep
 from app.services import model_center as mc
 from tests.db import new_test_engine, reset_db

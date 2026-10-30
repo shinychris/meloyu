@@ -1,12 +1,13 @@
 """导出编排：格式路由（wav/mp3/midi/stems zip），复用候选产物转码打包。"""
 from __future__ import annotations
 
+import shutil
 import wave as wav_mod
 import zipfile
 from pathlib import Path
 
 import numpy as np
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import EXPORT_TASK_TIMEOUT_SEC, settings
@@ -176,21 +177,47 @@ def execute_export(task_id: str) -> None:
             if t and t.status not in ("succeeded", "canceled"):
                 t.status = "failed"
                 t.error_code = 50002
-                t.error_message = tr("导出失败：超时 ", "Export failed: timeout ") + str(e)
+                t.error_message = tr("导出失败：超时 ", "Export failed: timeout ") + type(e).__name__
                 t.finished_at = utc_now_iso()
                 t.updated_at = utc_now_iso()
                 db.commit()
+        _cleanup_failed_export_dir(task_id)
     except Exception as e:  # noqa: BLE001
         logger.exception(f"export {task_id} failed: {e}")
+        # 用户侧只回固定短语+异常类名（2026-10-27）：原始异常文本可能含路径/
+        # SQL 片段，经 task.error_message 下发即泄漏；完整异常仅入服务端日志
         with SessionLocal() as db:
             t = db.get(Task, task_id)
             if t and t.status not in ("succeeded", "canceled"):
                 t.status = "failed"
                 t.error_code = 50002
-                t.error_message = tr("导出失败：", "Export failed: ") + str(e)
+                t.error_message = tr("导出失败：", "Export failed: ") + type(e).__name__
                 t.finished_at = utc_now_iso()
                 t.updated_at = utc_now_iso()
                 db.commit()
+        _cleanup_failed_export_dir(task_id)
+
+
+def _cleanup_failed_export_dir(task_id: str) -> None:
+    """导出失败路径清扫 exports/ 目录（对齐 generation._cleanup_failed_audio）。
+
+    exports_dir 在产物校验前创建（2026-10-27 前行为），中途失败会残留孤儿
+    文件缓慢吃盘——本版本无任何 exports 登记文件（登记随失败事务回滚）时
+    整目录删除；已有登记（此前成功导出的复用记录）则不动。
+    """
+    try:
+        with SessionLocal() as db:
+            t = db.get(Task, task_id)
+            if t is None or t.work_id is None or t.version_id is None:
+                return
+            registered = db.execute(select(func.count()).select_from(File).where(
+                File.version_id == t.version_id,
+                File.path.like(f"{t.work_id}/{t.version_id}/exports/%"))).scalar_one()
+            dest = settings.audio_path / t.work_id / t.version_id / "exports"
+        if not registered and dest.exists():
+            shutil.rmtree(dest, ignore_errors=True)
+    except Exception as e:  # noqa: BLE001 —— 清扫失败不影响任务终态
+        logger.warning(f"export {task_id} orphan exports cleanup failed: {e}")
 
 
 def _candidate_file(db: Session, candidate_id: str, kind: str,

@@ -13,6 +13,7 @@ import wave as wav_mod
 from app.core.ratelimit import _RULES, _hit, _match_rule
 from app.synth.id3 import AIGC_MARK_TEXT, id3v2_tag, mark_mp3, mark_wav
 
+
 class TestAigcMp3Marking(unittest.TestCase):
     def test_tag_structure_and_payload_preserved(self):
         raw = b"\xff\xfb\x90\x00" + b"\x00" * 100
@@ -72,16 +73,17 @@ class TestRateLimit(unittest.TestCase):
         self.assertEqual(_match_rule("/api/v1/auth/register"), (3600, 20))
         self.assertEqual(_match_rule("/api/v1/auth/send-code"), (3600, 3))
         self.assertEqual(_match_rule("/api/v1/generations"), (3600, 30))
-        # webhook 显式豁免（0,0）
-        self.assertEqual(_match_rule("/api/v1/billing/webhook"), (0, 0))
+        # Stripe 拆除后 billing/webhook 端点已不存在，死豁免规则随之移除
+        # （2026-10-27）——同前缀请求落入全局兜底
+        self.assertEqual(_match_rule("/api/v1/billing/webhook"), (60, 300))
         # 其余 API 全局兜底
         self.assertEqual(_match_rule("/api/v1/works"), (60, 300))
         self.assertIsNone(_match_rule("/api/docs"))
 
     def test_rules_ordered_specific_before_global(self):
-        # 豁免/具体规则必须出现在 /api/v1/ 兜底之前
+        # 具体规则必须出现在 /api/v1/ 兜底之前
         prefixes = [r[0] for r in _RULES]
-        self.assertLess(prefixes.index("/api/v1/billing/webhook"),
+        self.assertLess(prefixes.index("/api/v1/public/generations"),
                         prefixes.index("/api/v1/"))
 
     def test_hit_window_exhaustion(self):
@@ -90,6 +92,26 @@ class TestRateLimit(unittest.TestCase):
             calls.append(_hit("k", 60, 3))
         self.assertEqual(calls, [True, True, True, False, False, False, False,
                                  False, False, False])
+
+    def test_overflow_evicts_oldest_keys_not_all(self):
+        """F-BE-07（2026-10-27）：_hits 超内存上限时淘汰最旧键，近期防护窗口保留
+        （原整体 clear() 可被故意撑爆后一次性清空全部计数，等于给爆破者开闸）。"""
+        from collections import deque
+
+        from app.core import ratelimit
+        saved = dict(ratelimit._hits)
+        ratelimit._hits.clear()
+        try:
+            for i in range(ratelimit._MAX_KEYS + 5):
+                ratelimit._hits[f"old-{i}"] = deque()
+            self.assertTrue(_hit("trigger", 60, 100))
+            self.assertNotIn("old-0", ratelimit._hits, "最旧键被淘汰")
+            self.assertIn(f"old-{ratelimit._MAX_KEYS + 4}", ratelimit._hits,
+                          "近期键保留")
+            self.assertIn("trigger", ratelimit._hits)
+        finally:
+            ratelimit._hits.clear()
+            ratelimit._hits.update(saved)
 
     def test_hit_recovery_after_window(self):
         from app.core import ratelimit
