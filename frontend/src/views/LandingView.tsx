@@ -32,7 +32,7 @@ export default function LandingView({ site = false }: { site?: boolean }) {
     <div className="h-screen overflow-y-auto scroll-smooth view bg-bg">
       <LandingNav />
       <LandingHero />
-      <div className="max-w-[1080px] mx-auto px-6 space-y-20 md:space-y-28 py-24">
+      <div className="px-4 sm:px-6 lg:px-10 2xl:px-16 space-y-20 md:space-y-28 py-24">
         <LandingWorkFlow />
         <LandingCapabilities />
         <LandingChannels />

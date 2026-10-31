@@ -1,7 +1,7 @@
 # Third-Party Notices
 
 Meloyu Desktop（© 2026 Meloyu）包含两个随包分发的运行时，其第三方组件许可如下。
-本文件由 `npm run notices` 生成（2026-10-15），随安装包分发并位于安装目录 resources/ 下；
+本文件由 `npm run notices` 生成（2026-10-31），随安装包分发并位于安装目录 resources/ 下；
 完整许可文本见各组件上游仓库（Repository 列）。
 
 ## 1. Electron 壳（Node.js 运行时依赖）
@@ -79,6 +79,7 @@ Replicate）为用户自有 Key 的外部服务，不在分发范围内。
 | pydantic_core | 2.46.5 | MIT | https://github.com/pydantic |
 | pydantic-settings | 2.15.0 | MIT | https://github.com/pydantic/pydantic-settings |
 | Pygments | 2.21.0 | BSD-2-Clause | https://pygments.org |
+| pyinstaller-hooks-contrib | 2026.8 | Apache Software License; GNU General Public License v2 (GPLv2) | https://github.com/pyinstaller/pyinstaller-hooks-contrib |
 | PyJWT | 2.13.0 | MIT | https://github.com/jpadilla/pyjwt |
 | pypinyin | 0.55.0 | MIT License | https://github.com/mozillazg/python-pinyin |
 | python-dotenv | 1.2.3 | BSD-3-Clause | https://github.com/theskumar/python-dotenv |

@@ -197,7 +197,7 @@ export default function SettingsView() {
 
   return (
     <div className="view h-full overflow-y-auto" ref={scrollRef}>
-      <div className="max-w-[1240px] mx-auto px-8 py-8">
+      <div className="px-4 md:px-8 py-8">
         <div className="label">{t('settings.label')}</div>
         <h1 className="text-3xl font-extrabold tracking-tight mt-2">{t('settings.title')}</h1>
 

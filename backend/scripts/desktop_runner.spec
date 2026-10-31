@@ -3,9 +3,9 @@
 
 a = Analysis(
     ['desktop_runner.py'],
-    pathex=['..'],
+    pathex=['D:/Codebase/Meloyu/backend'],
     binaries=[],
-    datas=[('../app', 'app')],
+    datas=[('../app', 'app'), ('../scripts/acestep_runner.py', 'scripts')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

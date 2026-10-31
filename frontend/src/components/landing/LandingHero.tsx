@@ -12,7 +12,7 @@ export default function LandingHero() {
   return (
     <section className="landing-hero-bg relative overflow-hidden">
       <div className="landing-grid absolute inset-0 pointer-events-none" />
-      <div className="relative max-w-[1080px] mx-auto px-6 pt-20 pb-0 text-center">
+      <div className="relative px-4 sm:px-6 lg:px-10 2xl:px-16 pt-20 pb-0 text-center">
         <div className="label" style={{ color: 'var(--acc)' }}>
           {t('landing.hero.eyebrow')}
         </div>
@@ -51,7 +51,7 @@ export default function LandingHero() {
           ))}
         </div>
       </div>
-      <div className="relative max-w-[1080px] mx-auto px-6 mt-14">
+      <div className="relative px-4 sm:px-6 lg:px-10 2xl:px-16 mt-14">
         <div className="grid grid-cols-2 md:grid-cols-5 border-y border-line">
           {LANDING_METRICS.map((m, i) => (
             <div
@@ -67,7 +67,7 @@ export default function LandingHero() {
         </div>
       </div>
       {/* Hero 主视觉：工作台真机截图 */}
-      <div className="relative max-w-[1080px] mx-auto px-6 pt-10 pb-16">
+      <div className="relative px-4 sm:px-6 lg:px-10 2xl:px-16 pt-10 pb-16">
         <div className="border border-line-2 shadow-shot">
           <div className="flex items-center gap-1.5 px-3 py-2 border-b border-line bg-bg-2">
             <span className="dot" style={{ background: 'var(--bad)' }} />

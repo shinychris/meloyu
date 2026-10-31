@@ -9,7 +9,7 @@ export default function LandingAudience() {
     <section>
       <div className="label flex items-center gap-2"><EqMark />{t('landing.audience.label')}</div>
       <h2 className="text-2xl font-extrabold tracking-tight mt-2">{t('landing.audience.title')}</h2>
-      <div className="grid md:grid-cols-3 gap-4 mt-8">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
         {AUDIENCES.map((a) => (
           <div key={a.title} className="card p-6 hover:border-line-2 transition-colors">
             <div className="text-lg font-extrabold">{t(a.title)}</div>

@@ -12,7 +12,7 @@ export default function LandingWorkFlow() {
       <p className="text-base mt-2 max-w-[560px] text-muted">
         {t('landing.workflow.desc')}
       </p>
-      <div className="grid md:grid-cols-4 gap-px mt-8" style={{ background: 'var(--line)' }}>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px mt-8" style={{ background: 'var(--line)' }}>
         {WORKFLOW_STEPS.map((s, i) => (
           <div key={s.no} className="p-6 relative group cursor-default transition-colors bg-bg">
             <div className="flex items-baseline justify-between">

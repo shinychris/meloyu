@@ -13,7 +13,7 @@ export default function LandingShowcase() {
       <p className="text-base mt-2 max-w-[560px] text-muted">
         {t('landing.showcase.desc')}
       </p>
-      <div className="grid md:grid-cols-2 gap-6 mt-8">
+      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6 mt-8">
         {SHOWCASE.map((s) => (
           <figure key={s.src} className="card overflow-hidden hover:border-line-2 transition-colors">
             <img src={prefix + s.src} alt={`${t(s.title)} — ${t(s.desc)}`} className="w-full block border-b border-line" />

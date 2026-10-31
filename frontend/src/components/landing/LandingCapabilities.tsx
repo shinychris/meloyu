@@ -55,7 +55,7 @@ export default function LandingCapabilities() {
       <p className="text-base mt-2 max-w-[560px] text-muted">
         {t('landing.capabilities.desc')}
       </p>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 mt-8">
         {CAPABILITIES.map((c, i) => (
           <div
             key={c.title}

@@ -24,7 +24,7 @@ export default function LandingNav() {
   const site = useSiteMode()
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-bg/90 backdrop-blur-md">
-      <div className="max-w-[1080px] mx-auto px-6 h-[60px] flex items-center gap-8">
+      <div className="px-4 sm:px-6 lg:px-10 2xl:px-16 h-[60px] flex items-center gap-8">
         <div className="flex items-center gap-2.5 flex-none">
           <Logo size={24} />
           <div>

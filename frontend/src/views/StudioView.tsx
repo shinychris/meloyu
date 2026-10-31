@@ -24,7 +24,8 @@ const MODE_HINTS: Record<string, TranslationKey> = {
   ref: 'studio.modeHint.ref',
 }
 
-/** 创作工作台（原型核心视图：左控制 / 中结果 / 右版本树） */
+/** 创作工作台（原型核心视图：左控制 / 歌词编辑 / 候选结果 / 右版本树）；
+ *  歌词编辑区自控制列独立成列，占据原候选列位置，候选列右移一列 */
 export default function StudioView() {
   const navigate = useNavigate()
   const t = useT()
@@ -130,7 +131,13 @@ export default function StudioView() {
         <StepBar />
       </PageHeader>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr_180px] xl:grid-cols-[360px_1fr_200px] rule-t flex-1 min-h-0">
+      <div
+        className={`grid grid-cols-1 rule-t flex-1 min-h-0 ${
+          form.mode === 'custom'
+            ? 'lg:grid-cols-[300px_1fr_1fr_180px] xl:grid-cols-[360px_1fr_1fr_200px]'
+            : 'lg:grid-cols-[300px_1fr_180px] xl:grid-cols-[360px_1fr_200px]'
+        }`}
+      >
         {/* 左：控制列 */}
         <div className="border-r border-line px-6 py-5 overflow-y-auto">
           <div className="label">{t('studio.mode')}</div>
@@ -211,61 +218,6 @@ export default function StudioView() {
             </>
           )}
 
-          {form.mode === 'custom' && (
-            <>
-              <div className="label mt-4">
-                {t('studio.lyrics.label')}{' '}
-                <span className="normal-case tracking-normal text-dim">
-                  {t('studio.lyrics.tagCount', { n: tagCount })}
-                  {markCount > 0 ? ` · ${t('studio.lyrics.markCount', { n: markCount })}` : ''}
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {meta.structure_tags.map((tg) => (
-                  <button
-                    type="button"
-                    key={tg.tag}
-                    className="chip"
-                    title={tg.desc ?? tg.label}
-                    onClick={() => insertTag(tg.tag)}
-                  >
-                    {tg.tag} {tg.label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-1.5 mt-2 mb-2">
-                {(meta.performance_marks ?? []).map((m) => (
-                  <button
-                    type="button"
-                    key={m.mark}
-                    className="chip"
-                    title={t('studio.lyrics.markTitle')}
-                    onClick={() => insertMark(m.mark, m.group)}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-              <textarea
-                id="lyricBox"
-                ref={lyricBoxRef}
-                rows={5}
-                maxLength={meta.generation_limits.max_lyrics}
-                value={lyricsText}
-                onChange={(e) => patchForm({ lyrics: e.target.value })}
-              />
-              <button
-                className="btn btn-ghost btn-sm w-full mt-2"
-                onClick={() => {
-                  navigate('/lyrics')
-                  toast(t('studio.toast.switchedToLyrics'))
-                }}
-              >
-                {t('studio.lyrics.openAssistant')}
-              </button>
-            </>
-          )}
-
           <div className="label mt-4">{t('studio.param.label')}</div>
           <ParamPanel />
 
@@ -284,7 +236,63 @@ export default function StudioView() {
           </div>
         </div>
 
-        {/* 中：结果列 */}
+        {/* 歌词编辑列（自控制列独立，占原候选列位置；custom 模式专属，id=lyricBox 供新手引导定位） */}
+        {form.mode === 'custom' && (
+          <div className="border-r border-line px-6 py-5 overflow-y-auto">
+            <div className="label">
+              {t('studio.lyrics.label')}{' '}
+              <span className="normal-case tracking-normal text-dim">
+                {t('studio.lyrics.tagCount', { n: tagCount })}
+                {markCount > 0 ? ` · ${t('studio.lyrics.markCount', { n: markCount })}` : ''}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {meta.structure_tags.map((tg) => (
+                <button
+                  type="button"
+                  key={tg.tag}
+                  className="chip"
+                  title={tg.desc ?? tg.label}
+                  onClick={() => insertTag(tg.tag)}
+                >
+                  {tg.tag} {tg.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1.5 mt-2 mb-2">
+              {(meta.performance_marks ?? []).map((m) => (
+                <button
+                  type="button"
+                  key={m.mark}
+                  className="chip"
+                  title={t('studio.lyrics.markTitle')}
+                  onClick={() => insertMark(m.mark, m.group)}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <textarea
+              id="lyricBox"
+              ref={lyricBoxRef}
+              rows={12}
+              maxLength={meta.generation_limits.max_lyrics}
+              value={lyricsText}
+              onChange={(e) => patchForm({ lyrics: e.target.value })}
+            />
+            <button
+              className="btn btn-ghost btn-sm w-full mt-2"
+              onClick={() => {
+                navigate('/lyrics')
+                toast(t('studio.toast.switchedToLyrics'))
+              }}
+            >
+              {t('studio.lyrics.openAssistant')}
+            </button>
+          </div>
+        )}
+
+        {/* 候选列（歌词编辑列独立后右移一列） */}
         <div className="px-6 py-5 min-h-[560px] overflow-y-auto">
           <div className="flex items-center justify-between">
             <div className="label">{t('studio.candidates.title')}</div>

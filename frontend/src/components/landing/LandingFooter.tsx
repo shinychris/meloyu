@@ -36,7 +36,7 @@ export default function LandingFooter() {
       </section>
 
       {/* 页脚主体 */}
-      <div className="max-w-[1080px] mx-auto px-6 py-14 grid md:grid-cols-[1.6fr_1fr] gap-10">
+      <div className="px-4 sm:px-6 lg:px-10 2xl:px-16 py-14 grid md:grid-cols-[1.6fr_1fr] gap-10">
         <div>
           <div className="flex items-center gap-2.5">
             <Logo size={22} />
@@ -71,7 +71,7 @@ export default function LandingFooter() {
       </div>
 
       <div className="border-t border-line">
-        <div className="max-w-[1080px] mx-auto px-6 py-5 flex flex-wrap items-center justify-between gap-3 text-xs text-dim">
+        <div className="px-4 sm:px-6 lg:px-10 2xl:px-16 py-5 flex flex-wrap items-center justify-between gap-3 text-xs text-dim">
           <span>{t('landing.footer.copyright', { n: CHANNELS.length })}</span>
           <span className="num">{LANDING_VERSION}</span>
         </div>
