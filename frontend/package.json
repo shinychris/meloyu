@@ -4,6 +4,7 @@
   "version": "0.18.0",
   "type": "module",
   "description": "Meloyu 旋律屿 · AI 音乐创作系统前端（React SPA）",
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

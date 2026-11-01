@@ -1,12 +1,11 @@
 # Meloyu License Portal（官网四合一轻服务，P3）
 
-> 2026-10-03 定位转型后的 meloyu.com 承载形态（方案 §6.4）：营销站 +
-> 购买（默认人工签发，Stripe Payment Link 可选）+ License 签发与设备治理
-> （含换机解绑）+ 桌面更新源。复用 backend 的 Ed25519 签名实现
-> （`backend/app/services/license.py`，单一事实源），运行在 backend venv 上，
-> 零新增 Python 依赖。
+> 官网轻服务：营销站托管 + 购买（默认人工签发，Stripe Payment Link 可选）+
+> License 签发与设备治理（含换机解绑）+ 桌面更新源。复用 backend 的 Ed25519
+> 签名实现（`backend/app/services/license.py`，单一事实源），运行在 backend
+> venv 上，零新增 Python 依赖。
 
-## 售卖双模式（2026-10-04 口径）
+## 售卖双模式
 
 - **人工签发（默认，零外部依赖）**：不配 `PAYMENT_LINK_URL`，`/buy` 展示联系购买页
   （`PORTAL_SALES_EMAIL` 定制邮箱）；管理员经 `POST /api/admin/licenses` 签发 Key
@@ -30,7 +29,7 @@ set PAYMENT_LINK_URL=https://buy.stripe.com/...
 ../backend/.venv/Scripts/python.exe -m uvicorn server:app --port 8900
 ```
 
-生产部署：Dokploy 上新建服务（复用现有栈的域名/TLS），或与官网静态站同机。
+生产部署：任意提供域名/TLS 的环境（自有反代，或与官网静态站同机）。
 
 ## 生产部署约束（必读）
 
@@ -89,7 +88,7 @@ admin/activate 端点均带进程内 IP 限流，见「生产部署约束」）�
 
 **可选（Stripe Payment Link，无 webhook）**：
 
-1. Stripe Dashboard 创建 **Payment Link**（$129，成功后跳转
+1. Stripe Dashboard 创建 **Payment Link**（成功后跳转
    `https://<portal>/thanks?session_id={CHECKOUT_SESSION_ID}`）→ 填 `PAYMENT_LINK_URL`。
 2. 用户付款 → 回跳 `/thanks` → 服务端凭 secret key 直查
    `GET /v1/checkout/sessions/{id}` 确认 `payment_status=paid` → 签发激活码

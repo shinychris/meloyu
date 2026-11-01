@@ -6,7 +6,7 @@ appId: com.meloyu.desktop
 productName: Meloyu
 copyright: © 2026 Meloyu
 
-# meloyu:// 深链协议声明（评审 F-DT-02）：macOS 打包期写入 Info.plist
+# meloyu:// 深链协议声明：macOS 打包期写入 Info.plist
 # CFBundleURLTypes——缺失则成品 mac 包收不到深链（运行时
 # setAsDefaultProtocolClient 对打包后的 mac 应用无效，仅 win/linux 生效）
 protocols:
@@ -42,7 +42,7 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  # 代码签名（2026-10-04 口径：不签名起步零成本；转正路径 Azure Trusted Signing，
+  # 代码签名（不签名起步零成本；转正路径 Azure Trusted Signing，
   # 见 desktop/README.md 签名策略表）
   # certificateSubjectName: "Meloyu"
   artifactName: Meloyu-Setup-${version}-${arch}.${ext}

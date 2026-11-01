@@ -18,7 +18,7 @@
 #   解除：PG 为 MVCC 多写入方模型，dev 起本地实例不受影响（仍应指向独立
 #   dev 库避免数据混淆）。
 # - Supabase 云库替代方案：注释掉本服务与 backend 的 depends_on.postgres，
-#   .env.prod 的 DATABASE_URL 指向 Supabase 连接串（见 docs/postgres-supabase.md）。
+#   .env.prod 的 DATABASE_URL 指向 Supabase 连接串。
 name: meloyu
 
 services:

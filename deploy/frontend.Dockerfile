@@ -6,7 +6,7 @@
 # - 运行镜像换 nginxinc/nginx-unprivileged：整进程以 uid 101 运行（非 root
 #   master），监听 8080（>1024 无需特权）；compose 侧配 cap_drop: ALL
 # 基础镜像按 digest 固定（2026-09-09 安审计 L3：tag 可被上游移动，digest 内容寻址不可变）
-# 注册表可参数化：本机默认 daocloud 加速；远程构建（Dokploy）覆写为 docker.io
+# 镜像注册表可参数化：默认国内加速源；远程构建可覆写为 docker.io
 # （与 backend.Dockerfile 同一约定，同一 digest 两注册表内容一致）
 # ⚠ 多阶段全局 ARG 必须全部置于第一个 FROM 之前——FROM 只解析全局作用域的
 # 变量，阶段内声明的 ARG 对后续 FROM 不可见（实测报 base name should not be blank）

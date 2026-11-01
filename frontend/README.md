@@ -1,12 +1,12 @@
 # Meloyu 旋律屿 · 前端（React SPA）
 
-AI 音乐创作系统的前端：Vite + React 19 + TypeScript(strict) + Tailwind CSS v4 + Zustand + React Router 7（library 模式，HashRouter）。视觉规范逐项对齐 `docs/AI音乐创作系统方案和原型/app/` 高保真原型（暗色 #0e0e0e / 荧光绿 #00ff2c / Inter + Noto Sans SC / 直角无圆角）。
+AI 音乐创作系统的前端：Vite + React 19 + TypeScript(strict) + Tailwind CSS v4 + Zustand + React Router 7（library 模式，HashRouter）。视觉规范：暗色 #0e0e0e / 荧光绿 #00ff2c / Inter + Noto Sans SC / 直角无圆角。
 
-**一份产物两处运行（2026-10-03 定位转型）**：
+**一份产物两处运行**：
 
 - **桌面版（主线）**：`dist/` 由 Electron 壳加载（sidecar 同源托管，见 `desktop/`）；桌面内免登录直达工作台——形态判定 = Electron 桥 `window.meloyuDesktop`（同步）+ 公开端点 `/system/meta` 的 `app_mode`（兜底），license 模式下侧栏积分条换授权徽标（试用剩余/已激活）、生成/导出到期未激活被 40203 拦截并跳「定价与激活」。
 - **官网营销站**：`npm run build:landing` 独立产出 `dist-landing/`（site 模式：登录入口隐藏、购买直链 /buy），由 `portal/` 托管；App 内不再含落地页路由。
-- cloud 形态（存量过渡）：登录/注册照常，订阅档位只读停售公告。
+- cloud 形态：登录/注册照常，订阅档位只读展示。
 
 ## 启动
 
@@ -16,7 +16,7 @@ npm install        # Node ≥ 20，npm ≥ 10
 npm run dev        # http://localhost:5173（/api 代理到 127.0.0.1:8000）
 ```
 
-后端（`backend/`，FastAPI :8000）需同时运行；无后端时页面会停在登录页，`/system/meta` 拉取失败会静默回退到与契约一致的本地枚举兜底。
+后端（`backend/`，FastAPI :8000）需同时运行；无后端时页面会停在登录页，`/system/meta` 拉取失败会静默回退到内置的本地枚举兜底。
 
 演示账号：`demo@meloyu.local / Meloyu2026`
 
@@ -74,21 +74,21 @@ src/
 | `#/library` | 作品库 | 筛选 chips / 收藏星标 / 回收站恢复与永久删除 / 行内试听 / 导出徽标(由导出任务推导) |
 | `#/works/:id` | 作品详情 | 版本树 + 候选（试听/采用定稿）+ 导出面板 + 证书 |
 | `#/rights` | 合规与权利中心 | 证书卡字段来自 /versions/{id}/certificate、合规检查清单、全局开关 |
-| `#/pricing` | 定价与激活（v0.16.0） | license 模式：试用状态卡 + 买断卡（$399 划线/$159）+ 账户+激活码在线兑换 + 离线整钥备用；cloud 模式：停售公告只读档位 |
+| `#/pricing` | 定价与激活（v0.16.0） | license 模式：试用状态卡 + 买断卡（划线原价/限时价）+ 账户+激活码在线兑换 + 离线整钥备用；cloud 模式：只读档位 |
 | `#/models` | 模型中心 | 七通道卡片（BYOK Key 配置）+ 开源目录（10 模型）+ 下载管理 + 「本地组件」三卡（内置/MusicGen/ACE-Step，许可/体积/显存如实标注） |
 | `#/market` | 作品市场 | D-6：桌面形态隐藏（守卫重定向） |
 
 ### 落地页（官网营销站，独立构建）
 
-- F7 迁移（2026-10-04）：组件保留在 `src/views/LandingView.tsx` + `src/components/landing/*`，经 `landing.html` 入口 + `vite.config-landing.ts` 独立构建为 `dist-landing/`（site 模式：登录入口隐藏、购买直链 /buy），由 `portal/` 官网托管；App 内不再注册 landing 路由。
+- 落地页组件保留在 `src/views/LandingView.tsx` + `src/components/landing/*`，经 `landing.html` 入口 + `vite.config-landing.ts` 独立构建为 `dist-landing/`（site 模式：登录入口隐藏、购买直链 /buy），由 `portal/` 官网托管；App 内不再注册 landing 路由。
 - 数据：`src/lib/landing-data.ts` 单一事实源（七通道/十模型目录/定价/FAQ/里程碑），**纯静态内嵌、不依赖后端**；有 `landing-data.test.ts` 完整性测试兜底（通道数量/排序/许可口径/定价与 seed_data 一致）。
-- 真机截图：`public/shots/`（来自 `reports/sim-sessions/shots` 已验收画面）。
-- 宣传口径：商用表述遵循商业化盘点 R-01——「商用权利跟随所选通道的模型许可」，NC 权重如实标注，不写绝对化承诺。
+- 真机截图：`public/shots/`。
+- 商用表述口径：「商用权利跟随所选通道的模型许可」，NC 权重如实标注，不写绝对化承诺。
 - 锚点导航在 HashRouter 下不能用 `href="#id"`，统一走 `scrollToSection()`（`components/landing/LandingNav.tsx`）。
 
-## 约定（给下游开发者/AI）
+## 开发约定
 
-- 接口字段以 `docs/01-技术架构/API接口契约.md` v1.1 为准，改契约先改文档再改 `types/api.ts`。
+- 接口类型以 `types/api.ts` 为准（与后端 schema 对齐），前后端改动需同步。
 - 服务端数据获取用 `src/api/*` 封装（统一解包与错误处理）；客户端状态用 Zustand。
 - 播放一律走 `playerStore.playTrack(fileId…)`（先取 stream-token，禁止把 JWT 拼进 URL）。
 - 生成/导出轮询 1.5s；终态自动停止；登出停止。

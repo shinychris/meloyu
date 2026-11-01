@@ -1,8 +1,7 @@
 # Meloyu Desktop（Electron 壳）
 
-> 2026-10-03 定位转型（P2）：SaaS → 桌面软件买断制。壳 = Electron 主进程 +
-> FastAPI sidecar（`APP_MODE=desktop`，SQLite + 免登录 + 试用期/License 激活）+
-> 同源托管的前端 SPA（`frontend/dist`）。方案：`docs/06-商业化/2026-10-03-定位调整方案-SaaS转桌面买断制.md`。
+> 壳 = Electron 主进程 + FastAPI sidecar（`APP_MODE=desktop`，SQLite + 免登录 +
+> 试用期/License 激活）+ 同源托管的前端 SPA（`frontend/dist`）。
 
 ## 架构
 
@@ -45,7 +44,7 @@ cd desktop && npm install && npm start
 cd desktop && npm test
 ```
 
-## 打包发布（按序三步；v0.16.2 Windows 链路实跑验证通过）
+## 打包发布（按序执行；Windows 链路已实跑验证）
 
 ```bash
 # ① sidecar（backend/dist-backend/meloyu-backend/）
@@ -68,7 +67,7 @@ cd desktop && npm run dist:mac           # dmg arm64 + x64（需 mac 主机）
 新 clone 无需预生成步骤）；品牌重制时用
 `python desktop/scripts/gen-icon.py` 重新生成（依赖 Pillow，见脚本头注释）。
 
-## 签名与公证（2026-10-04 口径：可零成本起步，**自签证书对分发无意义**）
+## 签名与公证（可零成本起步，**自签证书对分发无意义**）
 
 **先回答"能否自签"**：代码签名证书自签≠免警告——用户机器不信任自建根，
 SmartScreen/Gatekeeper 的提示与不签名完全一样；macOS 公证（notarytool）只认
@@ -82,7 +81,7 @@ Apple 签发的 Developer ID，自签根本走不通。因此签名策略按成�
 
 - 起步期缓解：Windows 提交微软误报分析降低 Defender 命中（PyInstaller 产物
   误报是已知问题）；macOS 可发 zip 并附一行 `xattr -cr` 引导。
-- **更新通道完整性现状（2026-10-27 更正）**：electron-updater 的 `latest.yml`
+- **更新通道完整性**：electron-updater 的 `latest.yml`
   中的 sha512 只是**构建产物校验和（checksum），不是签名**——它只能检测
   下载损坏，不能证明发布者身份；更新完整性当前仅由更新目录的 HTTPS 传输
   保障。**启用自动更新通道前必须先落实代码签名/公证**（Win 走 Azure
@@ -98,19 +97,18 @@ Apple 签发的 Developer ID，自签根本走不通。因此签名策略按成�
 
 ## 自动更新
 
-- 更新源：官网静态目录（P3，`https://meloyu.com/updates/`，Dokploy/nginx 或 R2 CDN）。
+- 更新源：官网静态目录或对象存储 CDN（如 `https://<your-domain>/updates/`）。
 - 打包机注入 `MELOYU_UPDATE_URL` 启用 electron-updater（generic provider），
   `latest.yml` 由 electron-builder 随包产出，直接上传更新目录即可。
   **仅接受 `https://` 前缀**（非 https 拒绝启用并告警，防中间人替换安装包）；
   且须先落实上节代码签名/公证（见「签名与公证」更新通道完整性条目）。
-- 更新权利随 License 验签放行（方案 §4.3：终身授权含全部版本更新）。
+- 更新权利随 License 验签放行（终身授权含全部版本更新）。
 
 ## 已知边界
 
-- **Electron 依赖时效纪律（2026-10-27 评审 F-XC-01 起）**：桌面客户端 Chromium
+- **Electron 依赖时效纪律**：桌面客户端 Chromium
   只能靠发版升级，每次发版前跑 `npm outdated` 检查 electron/electron-builder——
-  不得落后官方支持窗口（最近 3 个大版本）两个大版本以上。曾因 v0.16.x 起步时
-  钉 ^33 而失察，2026-10-27 评审时已落后两年（33→45 补升）。
+  不得落后官方支持窗口（最近 3 个大版本）两个大版本以上。
 - 本地大模型（ACE-Step / MusicGen 权重）不随包分发，首启后经模型中心
   「本地组件」区按需下载（组件中心 UI 已交付：许可/体积/显存如实标注，
   下载复用 ModelOp 进度管线）。
@@ -119,15 +117,15 @@ Apple 签发的 Developer ID，自签根本走不通。因此签名策略按成�
   密钥加密落库）。
 - macOS 本地推理以 MusicGen(CPU)+内置引擎保底；ACE-Step mac 构建未验证；
   **macOS dmg 需在 mac 主机构建**（electron-builder 不支持跨平台 dmg）。
-- EULA 待法务定稿（外部动作）：package.json license 暂为 Proprietary，
-  定稿后经 nsis.license 挂载安装器许可页；THIRD-PARTY-NOTICES.md 已随包分发。
+- 许可：本项目以 MIT 开源；桌面发行版可另行附加 EULA，经 nsis.license 挂载
+  安装器许可页；THIRD-PARTY-NOTICES.md 已随包分发。
 
 ## Windows 打包已知坑（无管理员权限的机器）
 
 - electron-builder 解压 winCodeSign 缓存时需创建 macOS 符号链接（7za 报
   「客户端没有所需的特权」，issue #4299），exe 图标嵌入（rcedit）因此中断。
   正式发布机任选其一：开启 Windows 开发者模式 / 管理员终端跑一次 / 补缓存。
-  临时绕过（v0.16.2 验证构建即此法，安装包/快捷方式图标不受影响，仅 exe
+  临时绕过（安装包/快捷方式图标不受影响，仅 exe
   本体图标为 Electron 默认）：
 
 ```bash

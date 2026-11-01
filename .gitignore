@@ -36,3 +36,17 @@ backend/build-desktop/
 # License Portal 运行数据（签发库/更新包）
 portal/data/
 dist-landing/
+
+# 私有内容（仅本地保留，永不入库）：部署配置 / 内部文档 / 开发工具 / 内部变更日志
+/deploy.config.json
+/.zcodeignore
+/.zcode/
+/CHANGELOG.md
+/docs/
+/reports/
+/scripts/gen_topology_diagram.py
+/frontend/AGENTS.md
+/deploy/docker-compose.dokploy.yml
+/deploy/nginx.dokploy.conf
+/deploy/README.local.md
+/deploy/scripts/

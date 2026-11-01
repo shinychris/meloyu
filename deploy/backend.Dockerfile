@@ -3,7 +3,7 @@
 # 运行时通过 bind 挂载进入容器，不打入镜像）
 # 基础镜像按 digest 固定（2026-09-09 安审计 L3：tag 可被上游移动，digest 内容寻址不可变）
 # 注册表可参数化：本机默认 daocloud 加速（Docker Hub 直连不可达）；远程构建
-# （Dokploy 服务器，Hub 直连可达）经 compose build args 覆写为 docker.io——
+# 远程构建环境可经 compose build args 覆写为 docker.io——
 # 同一 digest 内容寻址，两注册表拉到的是同一份镜像。
 ARG PYTHON_IMAGE=docker.m.daocloud.io/library/python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea
 FROM ${PYTHON_IMAGE}

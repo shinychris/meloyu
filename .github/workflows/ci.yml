@@ -1,4 +1,4 @@
-# Meloyu CI（P1-5）：backend lint + 单测 / frontend 类型检查 + 测试 + 构建，双 job 并行
+# Meloyu CI: backend lint + tests / frontend typecheck + tests + build
 name: CI
 
 on:
@@ -6,7 +6,7 @@ on:
     branches: [main]
   pull_request:
 
-# F-XC-06（2026-10-27 评审）：收敛 GITHUB_TOKEN 权限 + 并发去重，
+# 收敛 GITHUB_TOKEN 权限 + 并发去重，
 # 避免 PR 分支与 push 双跑、连续 push 堆积排队
 permissions:
   contents: read
@@ -70,7 +70,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          # F-XC-03（2026-10-27 评审）：PG job 按运行时 lock 安装——CI 至少一个
+          # PG job 按运行时 lock 安装——CI 至少一个
           # job 验证与生产镜像（backend.Dockerfile 按 lock 安装）相同的依赖集合
           cache-dependency-path: backend/requirements.lock
 
@@ -93,7 +93,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # F-XC-12（2026-10-27 评审）：与生产镜像（frontend.Dockerfile node:24）对齐
+          # 与生产镜像（frontend.Dockerfile node:24）对齐
           node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
@@ -102,7 +102,7 @@ jobs:
         run: npm ci && npm run typecheck && npm test && npm run build
 
   docker:
-    # P1-14/15（2026-09-26）：镜像可构建性门禁——Dockerfile 与 requirements.lock
+    # 镜像可构建性门禁——Dockerfile 与 requirements.lock
     # 变更若无构建验证，坏掉只会在下次发布时被发现。只 build 不 push。
     name: docker (build only)
     runs-on: ubuntu-latest

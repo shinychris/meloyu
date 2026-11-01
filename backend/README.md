@@ -2,15 +2,15 @@
 
 AI 音乐创作系统的后端：契约接口 + 七通道歌曲生成（本地合成 / Suno 网关 / Replicate 托管 / 本机 MusicGen / 本机 ACE-Step v1.5 / 自托管 MiniMax Music 3（SGLang-Omni）/ 自托管 SongGeneration（Studio））+ 歌词 LLM 双通道（Ollama / OpenAI 兼容）+ 任务/积分/作品库。
 
-**产品形态（`APP_MODE`，2026-10-03 定位转型）**——同一单体按 env 分流，桌面买断制为主线：
+**产品形态（`APP_MODE`）**——同一单体按 env 分流：
 
 | 形态 | 说明 |
 |---|---|
 | `desktop`（主线） | 桌面版 sidecar：SQLite + 本地档案免登录 + 14 天试用/License 激活（Ed25519）+ 积分纯计量 + 同源托管前端静态文件；数据目录 `~/Meloyu/`；首启自动生成实例密钥（jwt + BYOK Key 落库加密）。打包入口 `desktop/sidecar/build-sidecar.*`（PyInstaller → `scripts/desktop_runner.py`） |
-| `cloud`（存量过渡） | 原 SaaS 形态：多用户 + JWT 登录 + 订阅档位（付费档已停售，见 `services/billing.py` 转型公告） |
-| `enterprise` | 私有化部署：PG + 多用户 + 启动 License 断言（env `MELOYU_LICENSE_KEY`）+ admin 集中配 Key；交付见 `docs/06-商业化/企业交付与实施手册.md` |
+| `cloud` | SaaS 形态：多用户 + JWT 登录 + 订阅档位 |
+| `enterprise` | 私有化部署：PG + 多用户 + 启动 License 断言（env `MELOYU_LICENSE_KEY`）+ admin 集中配 Key |
 
-商业化基线：终身授权买断 $399（限时 $159）+ 激活码激活（在线兑换/离线整钥双通道）；试用到期未激活 40203 拦截生成/导出。License 签发/设备治理在 `portal/`（License Portal）。
+授权基线：终身授权买断 + 激活码激活（在线兑换/离线整钥双通道）；试用到期未激活 40203 拦截生成/导出。License 签发/设备治理在 `portal/`（License Portal）。
 
 ## 环境要求
 
@@ -81,14 +81,14 @@ master.wav SHA-256 一致」确定性验证与「simple 模式执行线程自动
 | 同上 | **Replicate 开源模型托管（V1.4）** | `music_backend=replicate` + `replicate_api_token` + 目录选模型（ACE-Step/YuE/DiffRhythm/MusicGen…） |
 | 同上 | **本机 MusicGen（V1.4，离线免 Key）** | `music_backend=musicgen_local` + 目录选 musicgen-small|medium + 下载权重 |
 | 同上 | **本机 ACE-Step v1.5（V1.5，人声成曲）** | 组件自动部署（v0.16.3：desktop 首启自动 / 模型中心「本地组件」一键 / `POST /models/acestep-deploy`；干净机器自动引导 uv+Python 3.12，约 4GB），再 `music_backend=acestep_local` + 目录选 ace-step + 下载权重（约 11GB，music-pull 未部署时自动先部署）。开发者/Docker 手动通道：`python scripts/setup_acestep.py` |
-| 同上 | **自托管推理服务（V1.5.1，ADR-017）** | MiniMax Music 3 双形态：①本机 audio.cpp（`data/audiocpp/`：CLI+GGUF Q4 约 8.4GB，Windows CUDA 可跑，实测 4060 Ti 约 16 分钟/10s 曲）优先；②SGLang-Omni 服务端点（Linux+双卡，速度快）。SongGeneration=SongGeneration-Studio model server（Windows 可跑）。均经 `music_backend=mmax_local`/`songgen_local` + 模型中心配置 |
+| 同上 | **自托管推理服务（V1.5.1）** | MiniMax Music 3 双形态：①本机 audio.cpp（`data/audiocpp/`：CLI+GGUF Q4 约 8.4GB，Windows CUDA 可跑，实测 4060 Ti 约 16 分钟/10s 曲）优先；②SGLang-Omni 服务端点（Linux+双卡，速度快）。SongGeneration=SongGeneration-Studio model server（Windows 可跑）。均经 `music_backend=mmax_local`/`songgen_local` + 模型中心配置 |
 | 同上 | 本地合成引擎（离线兜底） | `music_backend=localsynth`（默认） |
 
 - **开源模型目录**（GET /models/music-catalog）：10 个开源歌曲模型按**外部测评参考分**降序
   （ACE-Step v1.5 9.3 / MiniMax Music 3 8.8 / SongGeneration 2 8.7 / YuE 8.3 / Khala 8.2 / DiffRhythm 8.0 / MusicGen 大中小 / Stable Audio Open），
   含能力矩阵、来源与免责声明（分数综合自公开论文/技术报告，非本系统实测）；推荐
-  ACE-Step v1.5（本机 8GB 显存即可人声成曲，推荐）与 MusicGen Small（离线免 Key 器乐档）；MiniMax Music 3 / SongGeneration 走自托管服务通道（端点可配，环境/显存需求见 local_note——只标注不设门槛，用户测试时自行选择运行环境，ADR-017）。
-- **本机 ACE-Step v1.5 通道**：独立 venv 子进程桥（ADR-016）——其依赖钉死 torch 2.7.1+cu128
+  ACE-Step v1.5（本机 8GB 显存即可人声成曲，推荐）与 MusicGen Small（离线免 Key 器乐档）；MiniMax Music 3 / SongGeneration 走自托管服务通道（端点可配，环境/显存需求见 local_note——只标注不设门槛，用户测试时自行选择运行环境）。
+- **本机 ACE-Step v1.5 通道**：独立 venv 子进程桥——其依赖钉死 torch 2.7.1+cu128
   与后端 venv（MusicGen 用 torch 2.13+cu130）互斥，故部署于 `data/acestep/`（gitignored）；
   推理经 `scripts/acestep_runner.py` 子进程，stdout JSON Lines 回传进度，取消=terminate。
   部署链路（v0.16.3）实现在 `services/acestep_deploy.py`：源码钉版下载 + uv 双钉引导
@@ -138,7 +138,7 @@ app/
 ├── repositories/      # 发号器等 queries 封装
 └── seed_data.py       # 种子（真实渲染音频）
 scripts/
-├── smoke_test.py      # WP-B8 冒烟
+├── smoke_test.py      # 冒烟测试
 ├── seed_data.py       # 种子 CLI
 └── synth_check.py     # 合成引擎确定性快检
 data/                  # 运行时生成（gitignore）：meloyu.db + audio/{work}/{version}/…
