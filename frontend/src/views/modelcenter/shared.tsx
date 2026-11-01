@@ -26,9 +26,11 @@ export const SECTIONS: { id: string; labelKey: TranslationKey }[] = [
   { id: 'mc-ops', labelKey: 'models.nav.ops' },
 ]
 
-/** 通道元数据（按 id 查找；分组渲染见 LYRICS_GROUPS / MUSIC_GROUPS） */
+/** 通道元数据（按 id 查找；分组渲染见 LYRICS_GROUPS / MUSIC_GROUPS）。
+ *  none=未配置：不可选（歌词创作必须有真实 LLM 通道，无兜底引擎——ADR-019），
+ *  仅作为设置页/用量等处的通道展示名。 */
 export const BACKENDS: Record<LyricsBackend, { title: TranslationKey; desc: TranslationKey }> = {
-  localsynth: { title: 'models.backend.localsynth.title', desc: 'models.backend.localsynth.desc' },
+  none: { title: 'models.backend.none.title', desc: 'models.backend.none.desc' },
   ollama: { title: 'models.backend.ollama.title', desc: 'models.backend.ollama.desc' },
   openai_compat: { title: 'models.backend.openai_compat.title', desc: 'models.backend.openai_compat.desc' },
 }
@@ -43,10 +45,9 @@ export const MUSIC_BACKENDS: Record<MusicBackend, { title: TranslationKey; desc:
   musicgen_local: { title: 'models.mbackend.musicgen_local.title', desc: 'models.mbackend.musicgen_local.desc' },
 }
 
-/** 歌词引擎通道分组：推荐真实模型通道在前，离线兜底（非 AI）降级殿后 */
+/** 歌词引擎通道分组：真实模型通道（无兜底通道，未配置=none 不出卡） */
 export const LYRICS_GROUPS: { labelKey: TranslationKey; items: LyricsBackend[]; fallback?: boolean }[] = [
   { labelKey: 'models.group.recommended', items: ['openai_compat', 'ollama'] },
-  { labelKey: 'models.group.fallback', items: ['localsynth'], fallback: true },
 ]
 
 /** 歌曲引擎通道分组：云端 / 本机 GPU / 自托管服务 / 离线兜底 */

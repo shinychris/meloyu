@@ -6,7 +6,7 @@ export const modelsEn = {
   'models.label': 'Model Center · MODEL HUB',
   'models.title': 'AI engines & model management',
   'models.intro':
-    'Configure real AI channels for production: lyrics via an OpenAI-compatible API or local Ollama models; songs via cloud APIs, Replicate hosting, on-device GPU models or self-hosted services. Offline rule-based engines remain only as non-AI fallbacks. Use the left navigation to browse categories.',
+    'Configure real AI channels for production: lyrics via an OpenAI-compatible API or local Ollama models; songs via cloud APIs, Replicate hosting, on-device GPU models or self-hosted services. Use the left navigation to browse categories.',
   // 左侧分类导航
   'models.nav.overview': 'Overview',
   'models.nav.lyrics': 'Lyrics engine',
@@ -48,7 +48,7 @@ export const modelsEn = {
   'models.overview.checkTitle': 'Production readiness check',
   'models.overview.lyricsOk': 'A real model channel is active — production ready',
   'models.overview.lyricsFallback':
-    'Running on the offline rules fallback (non-AI template generation) — configure a real channel for production',
+    'No lyrics engine configured — the lyrics assistant and auto-written lyrics are unavailable. Set up Ollama or an external API below.',
   'models.overview.songOk': 'A real model channel is active — production ready',
   'models.overview.songFallback':
     'Running on the offline synth fallback (non-AI algorithmic composition) — configure a real channel for production',
@@ -78,14 +78,14 @@ export const modelsEn = {
   // 歌词引擎通道
   'models.lyrics.title': 'Lyrics engine channels',
   'models.lyrics.sectionDesc':
-    'Recommended: external API (OpenAI-compatible) or local Ollama models — both are real LLMs. The offline rules engine stays only as an automatic fallback when no channel is available.',
+    'External API (OpenAI-compatible) or local Ollama models — both are real LLMs. Lyrics generation requires a configured engine; there is no non-AI fallback.',
   'models.lyrics.needModel': 'Pick (or download) a local model below first',
   'models.lyrics.needExternal': 'Complete the external API configuration below first',
   'models.lyrics.noLocal': 'No local models on this machine yet — download one below first',
   'models.lyrics.switched': 'Lyrics engine switched: {engine}',
-  'models.backend.localsynth.title': 'Offline rules engine (fallback)',
-  'models.backend.localsynth.desc':
-    'Non-AI template/rule-based generation · offline fallback only — switch to a real model channel for production',
+  'models.backend.none.title': 'Not configured',
+  'models.backend.none.desc':
+    'No lyrics engine set up yet — lyrics generation/polish needs Ollama or an external API (OpenAI-compatible)',
   'models.backend.ollama.title': 'Local open-source model (Ollama)',
   'models.backend.ollama.desc': 'Real LLM · connects to your own Ollama service · speed depends on model and hardware',
   'models.backend.openai_compat.title': 'External API (OpenAI-compatible)',

@@ -43,12 +43,12 @@ describe('api/models 模型中心封装', () => {
     http.defaults.adapter = recordingAdapter({
       ollama: { host: 'http://localhost:11434', running: true, version: '0.33.1',
         models_count: 5, error: '', install_hint: '' },
-      active_backend: 'localsynth',
-      engine: '本地规则引擎（离线可用）',
+      active_backend: 'none',
+      engine: '未配置歌词引擎',
     })
     const rt = await getModelsRuntime()
     expect(rt.ollama.running).toBe(true)
-    expect(rt.engine).toContain('本地规则')
+    expect(rt.engine).toContain('未配置')
     expect(lastConfig?.url).toBe('/models/runtime')
     expect(lastConfig?.method).toBe('get')
   })

@@ -21,9 +21,11 @@ import type { Locale } from '../i18n'
 const usd = (cents: number | null | undefined): string | null =>
   cents == null ? null : `$${(cents / 100).toFixed(0)}`
 
-/** 引擎通道 → 展示名（复用模型中心通道词条；未知通道回退原始标识） */
+/** 引擎通道 → 展示名（复用模型中心通道词条；未知通道回退原始标识）。
+ *  localsynth=歌曲离线合成引擎（用量统计的歌曲通道维度）；none=歌词引擎未配置 */
 const ENGINE_LABEL: Record<string, TranslationKey> = {
-  localsynth: 'models.backend.localsynth.title',
+  localsynth: 'models.mbackend.localsynth.title',
+  none: 'models.backend.none.title',
   ollama: 'models.backend.ollama.title',
   openai_compat: 'models.backend.openai_compat.title',
   api: 'models.mbackend.api.title',

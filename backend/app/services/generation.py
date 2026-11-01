@@ -29,7 +29,8 @@ from app.database import SessionLocal
 from app.models import Candidate, File, Task, User, Version, Work
 from app.models.base import utc_now_iso
 from app.providers.base import SynthCancelled, stage_label
-from app.providers.lyrics_local import check_sensitive
+from app.providers.llm.base import LLMError
+from app.core.sensitive import check_sensitive
 from app.services import model_center
 from app.services import works as works_svc
 from app.services.serializers import candidate_to_dict, task_to_dict
@@ -38,7 +39,7 @@ from app.synth.ir import SongRequest
 # ---------- 提交 ----------
 
 def expand_simple_prompt(simple_prompt: str) -> str:
-    """simple 模式：一句话扩写为 style_prompt（规则引擎，LLM 不可用时的兜底）。"""
+    """simple 模式：一句话扩写为 style_prompt（确定性模板拼接，无 LLM 时的兜底）。"""
     base = (simple_prompt or "").strip().rstrip("。，,.")
     if current_locale() != "zh":
         return f"{base}, pop arrangement, piano with string pads, clear lead vocal, natural emotional flow"
@@ -58,7 +59,7 @@ _STYLE_EXPAND_SYSTEM_EN = (
 
 
 def expand_style_by_llm(chat, simple_prompt: str) -> str:
-    """simple 模式风格扩写（走歌词引擎同一 LLM 配置）；失败/坏输出返回空串由规则兜底。
+    """simple 模式风格扩写（走歌词引擎同一 LLM 配置）；失败/坏输出返回空串由模板扩写兜底。
 
     按提交请求的 locale 要求对应语言的风格描述（en 用户不产出中文风格文案）；
     长度校验/截断阈值随语言分别设定（zh 按字符、en 按词折算的字符量）。
@@ -73,8 +74,8 @@ def expand_style_by_llm(chat, simple_prompt: str) -> str:
         if en:
             return text[:240] if 20 <= len(text) <= 400 else ""
         return text[:120] if 8 <= len(text) <= 200 else ""
-    except Exception as e:  # noqa: BLE001 —— 扩写失败回退规则拼接，不阻断生成
-        logger.warning(f"LLM 风格扩写失败，回退规则引擎: {e}")
+    except Exception as e:  # noqa: BLE001 —— 扩写失败回退模板拼接，不阻断生成
+        logger.warning(f"LLM 风格扩写失败，回退模板扩写: {e}")
         return ""
 
 
@@ -82,7 +83,7 @@ def resolve_generation_request(payload: dict) -> dict:
     """规范化请求：simplified 减半、seed 派生，标记延迟任务。
 
     V1.3 起（ADR-011）：simple 扩写与歌词自动生成延迟到执行线程完成
-    （统一走模型中心配置的真实 LLM，本地规则仅作回退），提交接口保持快速返回；
+    （统一走模型中心配置的真实 LLM），提交接口保持快速返回；
     seed 以提交时的规范化参数派生，确定性语义不变。
     """
     mode = payload.get("mode", "simple")
@@ -250,6 +251,21 @@ def _check_maintenance() -> None:
                "The system is under maintenance; please try again shortly"))
 
 
+def ensure_lyrics_engine_for_auto(db: Session, resolved: dict) -> None:
+    """需要自动写词（未提供歌词且非器乐）时必须有真实 LLM 歌词引擎（40901）。
+
+    ADR-019：离线规则引擎移除后歌词创作无兜底，未配置在提交期即拒绝并引导
+    配置；用户自带歌词（含器乐请求）不受影响。
+    """
+    if resolved.get("auto_lyrics") and model_center.current_lyrics_backend(db) == "none":
+        raise err_conflict(tr(
+            "该请求需要自动写词，但歌词引擎未配置：请先在「模型中心 → 歌词引擎」"
+            "配置 Ollama 或外部 API（OpenAI 兼容），或直接填写歌词",
+            "This request needs auto-written lyrics but no lyrics engine is configured: "
+            "set up Ollama or an external API (OpenAI-compatible) under "
+            "Model Center → Lyrics engine first, or provide lyrics explicitly"))
+
+
 def submit_generation(db: Session, user: User, payload: dict,
                       via: dict | None = None) -> dict:
     """提交生成任务。
@@ -269,6 +285,10 @@ def submit_generation(db: Session, user: User, payload: dict,
 
     resolved = resolve_generation_request(payload)
     params = resolved["params"]
+
+    # 歌词引擎前置校验（ADR-019）：需要自动写词（未提供歌词且非器乐）时必须有
+    # 真实 LLM 歌词通道——原离线规则引擎已移除，未配置即在提交期明确拒绝
+    ensure_lyrics_engine_for_auto(db, resolved)
 
     # FR-4 参考音频（v0.8.1）：特征级参考——分析值覆盖 bpm/调性/器乐密度
     reference_info = None
@@ -420,15 +440,24 @@ def _derive_title(payload: dict, params: dict) -> str:
 
 # ---------- 执行（线程池内）----------
 
+class LyricsEngineUnconfigured(Exception):
+    """歌词引擎未配置（ADR-019 移除兜底引擎后无 AI 可写词）。
+
+    提交期已被 submit_generation 拦截；此处为执行线程的防御性兜底，
+    上抛后任务以 40901 失败并退款，message 直接下发用户可读指引。
+    """
+
+
 def _prepare_generation_inputs(db, task_id: str, payload_row: dict, resolved: dict) -> None:
     """执行前准备模型输入：simple 扩写 + 自动写词（V1.3 起走模型中心配置的真实引擎）。
 
-    LLM 失败时 provider 内部自动回退本地规则（响应带 fallback 留痕）；
-    引擎与回退信息写入任务快照 _resolved、歌词回填 version.lyrics，供审计与前端展示。
+    LLM 通道异常如实上抛（任务失败退款）；歌词引擎未配置防御性上抛
+    LyricsEngineUnconfigured（ADR-019 无兜底引擎）。引擎串写入任务快照
+    _resolved、歌词回填 version.lyrics，供审计与前端展示。
     """
     params = resolved["params"]
     changed = False
-    # 歌词 LLM 通道是否实际参与（本地规则扩写/兜底不计入自定义 API 用量统计）
+    # 歌词 LLM 通道是否实际参与（模板扩写不计入自定义 API 用量统计）
     lyrics_llm_used = False
     if payload_row.get("mode") == "simple" and payload_row.get("simple_prompt"):
         _write_progress(task_id, "writing", 2,
@@ -446,14 +475,16 @@ def _prepare_generation_inputs(db, task_id: str, payload_row: dict, resolved: di
     if resolved.get("auto_lyrics") and not resolved.get("lyrics"):
         _write_progress(task_id, "writing", 4,
                         tr("AI 创作歌词…", "Writing lyrics with AI…"))
+        provider = model_center.get_lyrics_provider(db)
+        if provider is None:
+            raise LyricsEngineUnconfigured()
         theme = payload_row.get("simple_prompt") or (params.get("style_prompt") or "")[:60]
-        gen = model_center.get_lyrics_provider(db).generate(
+        gen = provider.generate(
             theme=theme, style_hint=(params.get("style_prompt") or "")[:80],
             mood=None, language=params.get("language", "zh"))
         resolved["lyrics"] = gen.get("lyrics") or ""
         resolved["lyrics_engine"] = gen.get("engine", "")
-        resolved["lyrics_fallback"] = bool(gen.get("fallback"))
-        lyrics_llm_used = lyrics_llm_used or not gen.get("fallback")
+        lyrics_llm_used = True
         changed = True
     if not changed:
         return
@@ -464,7 +495,7 @@ def _prepare_generation_inputs(db, task_id: str, payload_row: dict, resolved: di
     # 完整引擎串（含模型名）仍留在 request_payload._resolved.lyrics_engine
     if lyrics_llm_used:
         engine_family = model_center.current_lyrics_backend(db)
-        if engine_family != "localsynth":
+        if engine_family != "none":
             task.lyrics_engine = engine_family
     task.request_payload = {**(task.request_payload or {}), "_resolved": resolved}
     version = db.get(Version, task.version_id)
@@ -549,6 +580,33 @@ def execute_generation(task_id: str) -> None:
         with SessionLocal() as db:
             _finish_task(db, task_id, "failed", 50002,
                          tr("生成失败：渲染超时 ", "Generation failed: render timeout ") + str(e))
+            _refund(db, task_id)
+            rollback_empty_current_version(db, task_id)
+            db.commit()
+        _cleanup_failed_audio(task_id)
+    except LyricsEngineUnconfigured:
+        # 歌词引擎未配置（提交期拦截的防御性兜底）：40901 + 可读指引 + 退款
+        logger.warning(f"generation {task_id} aborted: lyrics engine not configured")
+        with SessionLocal() as db:
+            _finish_task(db, task_id, "failed", 40901,
+                         tr("歌词引擎未配置：请先在「模型中心 → 歌词引擎」配置 "
+                            "Ollama 或外部 API（OpenAI 兼容）",
+                            "Lyrics engine not configured: set up Ollama or an external "
+                            "API (OpenAI-compatible) under Model Center → Lyrics engine"))
+            _refund(db, task_id)
+            rollback_empty_current_version(db, task_id)
+            db.commit()
+        _cleanup_failed_audio(task_id)
+    except LLMError as e:
+        # 自动写词的歌词模型通道异常（不可达/超时/坏输出）：message 本就用户可读
+        # （无路径/SQL 片段），如实下发；与通用兜底的脱敏口径不冲突
+        logger.warning(f"generation {task_id} lyrics LLM channel failed: {e.message}")
+        with SessionLocal() as db:
+            _finish_task(db, task_id, "failed", 50002,
+                         tr("生成失败：歌词模型通道异常（", "Generation failed: lyrics "
+                            "model channel error (") + e.message
+                         + tr("）——请检查歌词引擎配置与服务可用性",
+                              ") — check the lyrics engine configuration and availability"))
             _refund(db, task_id)
             rollback_empty_current_version(db, task_id)
             db.commit()
@@ -742,7 +800,6 @@ def _persist_success(db: Session, task_id: str, user_id: str, output, provider) 
                         detail={"task_id": task.id, "provider": provider.name,
                                 "provider_display": provider.display_name,
                                 "lyrics_engine": resolved_snapshot.get("lyrics_engine"),
-                                "lyrics_fallback": resolved_snapshot.get("lyrics_fallback"),
                                 # 器乐模型承接人声请求时的如实降级留痕（MusicGen）
                                 "vocals_downgraded": bool(getattr(provider, "vocals_downgraded", False)),
                                 "derived_op": derived_spec.get("op") if derived_spec else None,

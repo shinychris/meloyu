@@ -188,11 +188,11 @@ class TestEnglishOutputNoChinese(unittest.TestCase):
         set_locale("en")
 
     def test_rhyme_suggestion_en_uses_latin_finals(self):
-        from app.providers.lyrics_local import LocalLyricsProvider
+        from app.services import lyrics_analysis
         lyrics = ("[Verse]\n雨停在凌晨三点的窗台\n霓虹把影子拉得好长\n"
                   "[Chorus]\n我们把未来说得太轻\n像风穿过无人的巷口")
         set_locale("en")
-        res = LocalLyricsProvider().rhyme_check(lyrics)
+        res = lyrics_analysis.rhyme_check(lyrics)
         lines_by_no = {ln["line_no"]: ln for sec in res["sections"] for ln in sec["lines"]}
         for s in res["suggestions"]:
             if s["type"] != "rhyme":
@@ -202,7 +202,7 @@ class TestEnglishOutputNoChinese(unittest.TestCase):
             self.assertFalse(_has_cjk(stripped),
                              f"en rhyme message has Chinese: {s['message']!r}")
         set_locale("zh")
-        res_zh = LocalLyricsProvider().rhyme_check(lyrics)
+        res_zh = lyrics_analysis.rhyme_check(lyrics)
         self.assertTrue(any(_has_cjk(s["message"]) for s in res_zh["suggestions"]
                             if s["type"] == "rhyme"), "zh 侧应保持中文文案")
 

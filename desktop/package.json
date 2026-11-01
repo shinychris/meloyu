@@ -1,7 +1,7 @@
 {
   "name": "meloyu-desktop",
   "productName": "Meloyu",
-  "version": "0.17.1",
+  "version": "0.18.0",
   "description": "Meloyu — AI music desktop studio (lifetime license)",
   "private": true,
   "main": "src/main.js",

@@ -126,7 +126,7 @@ export const landingEn = {
   'landing.data.cap.3.title': 'DAW-grade export',
   'landing.data.cap.3.desc':'WAV 48k/24-bit, MP3 320k, 4-track MIDI and phase-aligned 4-stem splits — drag them straight into your DAW.',
   'landing.data.cap.4.title': 'Lyrics workshop',
-  'landing.data.cap.4.desc':'Generate, polish, rhyme-check and complete tags; the built-in rules engine works offline, and Ollama or any OpenAI-compatible API plugs right in.',
+  'landing.data.cap.4.desc':'Generate, polish, rhyme-check and complete tags; plug in Ollama or any OpenAI-compatible API, with deterministic offline rhyme analysis built in.',
   'landing.data.cap.5.title': 'Licensed & traceable',
   'landing.data.cap.5.desc':'Generation parameters, edit events and export records are archived end-to-end; download a license certificate from any work — the commercial chain is traceable.',
   'landing.data.cap.6.title': 'Seven-engine hot-swap',

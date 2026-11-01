@@ -1,15 +1,15 @@
-"""v0.12.3 歌词创作增强单测。
+"""歌词创作链路单测。
 
-覆盖：括号表演标记剥离（parse_lyrics 层，本地合成/韵脚/行号全线安全）；
-LLM 生成提示词（想法驱动 + 括号标记指令）；LyricGenerateRequest.theme 放宽
-到 600 字；/system/meta 下发段落 desc 与 performance_marks。
+覆盖：括号表演标记剥离（parse_lyrics 层，合成/韵脚/行号全线安全）；
+LLM 生成提示词（想法驱动 + 括号标记指令，坏输出如实上抛不静默兜底）；
+LyricGenerateRequest.theme 放宽到 600 字；/system/meta 下发段落 desc 与
+performance_marks。
 
 运行：.venv/Scripts/python.exe -m unittest tests.test_lyrics_creation -v
 """
 from __future__ import annotations
 
 import json
-import re
 import tempfile
 import unittest
 
@@ -21,8 +21,8 @@ from app.config import settings
 from app.database import get_db
 from app.main import app
 from app.models.enums import SECTIONS
+from app.providers.llm.base import LLMError
 from app.providers.lyrics_llm import LLMLyricsProvider
-from app.providers.lyrics_local import LocalLyricsProvider
 from app.schemas.auth import LyricGenerateRequest
 from app.synth.structure import parse_lyrics, plan_sections, strip_paren_marks
 from tests.db import new_test_engine, reset_db
@@ -104,7 +104,7 @@ class LLMPromptTest(unittest.TestCase):
         self.assertIn("创作想法", prompt)
         self.assertIn(long_idea, prompt)
         self.assertIn("（轻声吟唱）", prompt)  # 示例标记进入指令
-        self.assertFalse(out["fallback"])
+        self.assertNotIn("fallback", out)  # ADR-019：无兜底引擎，回退字段退役
         # 返回的歌词原文保留标记（供支持标记的歌唱引擎消费）
         self.assertIn("（轻声吟唱）", out["lyrics"])
         # structure 按剥离标记后的真实行计（chorus 4 行）
@@ -118,7 +118,7 @@ class LLMPromptTest(unittest.TestCase):
         provider, chat = self._provider(
             [json.dumps({"lyrics": lyrics, "alternatives": []}, ensure_ascii=False)])
         out = provider.generate("主题")
-        self.assertFalse(out["fallback"])
+        self.assertNotIn("fallback", out)
 
     def test_polish_prompt_keeps_marks(self):
         provider, chat = self._provider(
@@ -126,7 +126,13 @@ class LLMPromptTest(unittest.TestCase):
         out = provider.polish(SAMPLE_LYRICS)
         _, prompt = chat.calls[0]
         self.assertIn("括号表演标记", prompt)
-        self.assertFalse(out["fallback"])
+        self.assertNotIn("fallback", out)
+
+    def test_bad_output_raises_no_silent_fallback(self):
+        # ADR-019：坏输出不再静默回退规则引擎，如实上抛 LLMError 由服务层报错
+        provider, _ = self._provider(["这不是 JSON"])
+        with self.assertRaises(LLMError):
+            provider.generate("主题")
 
 class ThemeSchemaTest(unittest.TestCase):
     """LyricGenerateRequest.theme：1~600 字（v0.12.3 想法输入）。"""
@@ -144,33 +150,6 @@ class ThemeSchemaTest(unittest.TestCase):
         from pydantic import ValidationError
         with self.assertRaises(ValidationError):
             LyricGenerateRequest(theme="")
-
-class LocalProviderLanguageBankTest(unittest.TestCase):
-    """F-03 回归（2026-10-28 模拟用户测试）：en 词库曾缺 places 键致
-    _fill_line KeyError（英文界面歌词生成 500），且 {E} 曾嵌中文辙尾词
-    （中英混排）。en 生成必须全程拉丁字符；zh 路径与 mood 词库不受影响。"""
-
-    def test_en_generation_latin_only(self):
-        out = LocalLyricsProvider().generate(
-            theme="midnight convenience store, last bus in the rain", language="en")
-        self.assertTrue(out["lyrics"].strip())
-        self.assertFalse(re.search(r"[\u4e00-\u9fff]", out["lyrics"]),
-                         f"en 歌词混入中文: {out['lyrics'][:120]}")
-        for alt in out["alternatives"]:
-            self.assertFalse(re.search(r"[\u4e00-\u9fff]", alt["lyrics"]))
-
-    def test_en_generation_with_mood_bank(self):
-        out = LocalLyricsProvider().generate(theme="urban loneliness",
-                                             mood="孤独", language="en")
-        self.assertFalse(re.search(r"[\u4e00-\u9fff]", out["lyrics"]))
-
-    def test_zh_generation_unaffected(self):
-        out = LocalLyricsProvider().generate(theme="深夜便利店的城市孤独感",
-                                             mood="孤独", language="zh")
-        self.assertTrue(re.search(r"[\u4e00-\u9fff]", out["lyrics"]))
-        sections = [s["section"] for s in out["structure"]]
-        self.assertIn("chorus", sections)
-
 
 class MetaLyricsCreationTest(unittest.TestCase):
     """/system/meta：段落 desc 说明 + performance_marks 词表（zh 默认 locale）。"""

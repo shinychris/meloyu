@@ -6,7 +6,7 @@ export const lyricsZh: Record<keyof typeof lyricsEn, string> = {
   'lyrics.header.label': 'Lyrics / 歌词助手',
   'lyrics.header.headline': '写词，并与旋律对齐',
   'lyrics.engine.badge': '引擎：{engine} ⇄',
-  'lyrics.engine.title': '在模型中心切换 AI 引擎（本地规则 / 本地开源模型 / 外部 API）',
+  'lyrics.engine.title': '在模型中心切换 AI 引擎（本地开源模型 / 外部 API）',
   // ===== 生成参数 =====
   'lyrics.theme.label': '创作想法 / 主题描述（生成用，必填）',
   'lyrics.theme.placeholder': '例：雨夜便利店等待的故事，城市孤独感，副歌要有记忆点（可多行，最多 600 字）',
@@ -18,8 +18,7 @@ export const lyricsZh: Record<keyof typeof lyricsEn, string> = {
   'lyrics.chips.marksHint': '括号表演标记写在歌词行内或独立成行，描述演唱方式、情感变化与配器；AI 生成会参考，演唱引擎消费，不会被当作歌词哼唱',
   // ===== 操作按钮 =====
   'lyrics.action.generate': 'AI 生成歌词',
-  'lyrics.action.generating': '生成中…',
-  'lyrics.action.generatingLLM': 'AI 生成中（最长约 3 分钟）…',
+  'lyrics.action.generating': 'AI 生成中（最长约 3 分钟）…',
   'lyrics.action.generateTitle': 'LLM 引擎生成中，视模型 10s~3min',
   'lyrics.action.polish': '润色选中段',
   'lyrics.action.polishing': '润色中…',
@@ -34,7 +33,6 @@ export const lyricsZh: Record<keyof typeof lyricsEn, string> = {
   // ===== 提示 =====
   'lyrics.toast.themeRequired': '先写下你的创作想法或主题（1~600 字）',
   'lyrics.toast.empty': '歌词为空',
-  'lyrics.toast.fallback': '引擎不可用已回退本地规则：{reason}',
   'lyrics.toast.generated': 'AI 已生成歌词草稿（{engine}），可继续润色',
   'lyrics.toast.polishedSection': '已润色{section}（{n} 处修改）',
   'lyrics.toast.polishedAll': '已润色全文（{n} 处修改）',

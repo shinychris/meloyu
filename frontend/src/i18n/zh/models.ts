@@ -6,7 +6,7 @@ export const modelsZh: Record<keyof typeof modelsEn, string> = {
   'models.label': '模型中心 · MODEL HUB',
   'models.title': 'AI 引擎与模型管理',
   'models.intro':
-    '为生产环境配置真实 AI 通道：歌词走外部 API（OpenAI 兼容）或本地 Ollama 模型；歌曲走云端 API / Replicate 托管 / 本机 GPU 模型 / 自托管推理服务。离线规则引擎仅作非 AI 兜底。使用左侧导航浏览分类。',
+    '为生产环境配置真实 AI 通道：歌词走外部 API（OpenAI 兼容）或本地 Ollama 模型；歌曲走云端 API / Replicate 托管 / 本机 GPU 模型 / 自托管推理服务。使用左侧导航浏览分类。',
   // 左侧分类导航
   'models.nav.overview': '概览',
   'models.nav.lyrics': '歌词引擎',
@@ -48,7 +48,7 @@ export const modelsZh: Record<keyof typeof modelsEn, string> = {
   'models.overview.checkTitle': '生产就绪检查',
   'models.overview.lyricsOk': '已启用真实模型通道，生产就绪',
   'models.overview.lyricsFallback':
-    '当前使用离线规则引擎兜底（非 AI 模板生成）——生产环境建议配置真实通道',
+    '歌词引擎未配置——歌词助手与自动写词不可用，请在下方配置 Ollama 或外部 API',
   'models.overview.songOk': '已启用真实模型通道，生产就绪',
   'models.overview.songFallback':
     '当前使用离线合成引擎兜底（非 AI 算法作曲）——生产环境建议配置真实通道',
@@ -78,14 +78,14 @@ export const modelsZh: Record<keyof typeof modelsEn, string> = {
   // 歌词引擎通道
   'models.lyrics.title': '歌词引擎通道',
   'models.lyrics.sectionDesc':
-    '推荐外部 API（OpenAI 兼容）或本地 Ollama 模型——均为真实大模型。离线规则引擎仅在无可用通道时自动兜底。',
+    '外部 API（OpenAI 兼容）或本地 Ollama 模型——均为真实大模型。歌词生成/润色必须配置引擎，无非 AI 兜底。',
   'models.lyrics.needModel': '请先在下方选择（或下载）一个本地模型',
   'models.lyrics.needExternal': '请先在下方完成外部 API 配置',
   'models.lyrics.noLocal': '本机还没有本地模型，请先在下方下载',
   'models.lyrics.switched': '歌词引擎已切换：{engine}',
-  'models.backend.localsynth.title': '离线规则引擎（兜底）',
-  'models.backend.localsynth.desc':
-    '非 AI 模型 · 模板规则生成 · 仅作离线兜底，生产建议切换真实模型通道',
+  'models.backend.none.title': '未配置',
+  'models.backend.none.desc':
+    '尚未设置歌词引擎——歌词生成/润色需要 Ollama 或外部 API（OpenAI 兼容）',
   'models.backend.ollama.title': '本地开源模型（Ollama）',
   'models.backend.ollama.desc': '真实大模型 · 连接你自建的 Ollama 服务 · 速度视模型与硬件',
   'models.backend.openai_compat.title': '外部 API（OpenAI 兼容）',

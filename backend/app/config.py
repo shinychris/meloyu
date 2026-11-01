@@ -12,7 +12,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 REPO_DIR = BACKEND_DIR.parent
 
 API_PREFIX = "/api/v1"
-APP_VERSION = "0.17.1"
+APP_VERSION = "0.18.0"
 
 # ---- 买断制定价（D-1 定案，USD 分值；与前端 landing LICENSE_SKU / portal 一致）----
 # 原价锚 $399（划线展示）+ 折扣成交价；折扣支持：SALE ≥ PRICE 或非正时

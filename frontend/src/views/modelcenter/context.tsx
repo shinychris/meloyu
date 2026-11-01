@@ -105,7 +105,7 @@ export function ModelCenterProvider({ children }: { children: ReactNode }) {
   const [ops, setOps] = useState<ModelOpInfo[]>([])
   const [catalog, setCatalog] = useState<MusicCatalog | null>(null)
 
-  const [backend, setBackend] = useState<LyricsBackend>('localsynth')
+  const [backend, setBackend] = useState<LyricsBackend>('none')
   const [pickedModel, setPickedModel] = useState('')
 
   const [musicBackend, setMusicBackend] = useState<MusicBackend>('localsynth')

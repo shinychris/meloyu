@@ -128,7 +128,7 @@ export const landingZh: Record<keyof typeof landingEn, string> = {
   'landing.data.cap.3.title': 'DAW 级导出',
   'landing.data.cap.3.desc': 'WAV 48k/24bit、MP3 320k、MIDI 4 轨、4 Stems 相位对齐分轨——直接拖进你的 DAW 继续做。',
   'landing.data.cap.4.title': '歌词工坊',
-  'landing.data.cap.4.desc': '生成 / 润色 / 押韵检查 / 标签补全四件套；内置规则引擎离线可用，也可接 Ollama 或 OpenAI 兼容 API。',
+  'landing.data.cap.4.desc': '生成 / 润色 / 押韵检查 / 标签补全四件套；接 Ollama 或 OpenAI 兼容 API 即用，押韵分析离线确定性可用。',
   'landing.data.cap.5.title': '授权留痕',
   'landing.data.cap.5.desc': '生成参数、编辑事件、导出记录全程上链存档；作品详情一键下载授权证书，商用链路可回溯。',
   'landing.data.cap.6.title': '七通道热切换',

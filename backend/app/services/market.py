@@ -93,7 +93,7 @@ def publish(db: Session, user: User, work_id: str, price_credits: int) -> dict:
     if not 1 <= int(price_credits) <= 100000:
         raise err_validation(tr("价格须为 1~100000 积分", "Price must be 1-100000 credits"))
     # P1-2：标题/标签过敏感词（与生成侧同库），防市场上架内容裸奔
-    from app.providers.lyrics_local import check_sensitive
+    from app.core.sensitive import check_sensitive
     if check_sensitive(f"{work.title} {' '.join(work.tags or [])}".strip()):
         from app.core.errors import err_sensitive
         raise err_sensitive()

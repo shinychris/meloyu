@@ -6,8 +6,9 @@ export default function OverviewSection({ jump }: { jump: (id: string) => void }
   const t = useT()
   const { runtime, local, settings } = useModelCenter()
   const ollama = runtime?.ollama
-  // 生产就绪检查：任一引擎仍在离线兜底（非 AI 规则/算法引擎）即提示配置真实模型通道
-  const lyricsReady = !!settings && settings.lyrics_backend !== 'localsynth'
+  // 生产就绪检查：歌词引擎未配置（none，无兜底引擎）或歌曲引擎仍在离线合成兜底
+  // （非 AI 算法引擎）即提示配置真实模型通道
+  const lyricsReady = !!settings && settings.lyrics_backend !== 'none'
   const songReady = !!settings && settings.music_backend !== 'localsynth'
 
   const checkRows: Array<{

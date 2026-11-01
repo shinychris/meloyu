@@ -542,10 +542,8 @@ export interface LyricsGenerateResult {
   lyrics: string
   structure: { section: Section; line_count: number }[]
   alternatives: { lyrics: string }[]
-  /** V1.2：实际执行引擎（如 ollama:qwen3.5:4b / openai-compat:gpt-4o-mini） */
+  /** 实际执行引擎（如 ollama:qwen3.5:4b / openai-compat:gpt-4o-mini） */
   engine?: string
-  fallback?: boolean
-  fallback_reason?: string
 }
 
 export interface LyricsPolishRequest {
@@ -560,8 +558,6 @@ export interface LyricsPolishResult {
   changes: { line_no: number; before: string; after: string }[]
   polished_sections: string[]
   engine?: string
-  fallback?: boolean
-  fallback_reason?: string
 }
 
 export interface RhymeLine {
@@ -787,7 +783,8 @@ export interface WorkDeleteResult {
 }
 
 /* ============ models（V1.2 模型中心，契约 §5.8） ============ */
-export type LyricsBackend = 'localsynth' | 'ollama' | 'openai_compat'
+/** 歌词引擎通道：none=未配置（无兜底引擎，ADR-019） */
+export type LyricsBackend = 'none' | 'ollama' | 'openai_compat'
 
 /** 歌曲生成引擎通道：本地合成 / Suno 兼容网关 / Replicate 托管 / 本机 MusicGen /
  *  本机 ACE-Step v1.5 / 自托管推理服务（MiniMax=SGLang-Omni、SongGeneration=Studio） */

@@ -104,7 +104,7 @@ def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
         params["mode"] = "custom"
         extra = style_prompt or ""
         if style_prompt:
-            from app.providers.lyrics_local import check_sensitive
+            from app.core.sensitive import check_sensitive
             if check_sensitive(style_prompt):
                 from app.core.errors import err_sensitive
                 raise err_sensitive()

@@ -39,4 +39,4 @@ cd portal && ../backend/.venv/Scripts/python.exe -m unittest test_portal  # 18 �
 cd desktop && npm test                                             # node:test 18 用例
 ```
 
-版本：**v0.17.1**（版本事实源五处一致：config.APP_VERSION / 前后端+壳 package.json / pyproject / CHANGELOG + git tag；2026-10-27 评审 F-XC-02 更正——本行曾滞留 v0.16.2、价格滞留 $159）。
+版本：**v0.18.0**（版本事实源五处一致：config.APP_VERSION / 前后端+壳 package.json / pyproject / CHANGELOG + git tag；2026-10-27 评审 F-XC-02 更正——本行曾滞留 v0.16.2、价格滞留 $159）。

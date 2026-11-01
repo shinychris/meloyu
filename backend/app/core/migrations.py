@@ -77,6 +77,15 @@ _UNIQUE_INDEXES: list[tuple[str, str, str]] = [
 ]
 
 
+# 数据口径类迁移（双方言执行；SQL 自身幂等，重复执行无副作用）
+# M-20261101-a：v0.18.0——歌词引擎原离线规则引擎通道（localsynth）随 ADR-019 移除，
+# 存量行归一为 none（未配置）
+_DATA_MIGRATIONS: list[tuple[str, str]] = [
+    ("m_20261101_a_lyrics_backend_none",
+     "UPDATE llm_settings SET lyrics_backend = 'none' WHERE lyrics_backend = 'localsynth'"),
+]
+
+
 def run(engine: Engine) -> list[str]:
     """执行全部未应用的迁移，返回应用清单（供启动日志与冒烟观测）。
 
@@ -105,6 +114,14 @@ def run(engine: Engine) -> list[str]:
                 logger.warning(f"migration index {name} not created: {e}")
                 continue
             applied.append(name)
+        for name, sql in _DATA_MIGRATIONS:
+            try:
+                changed = conn.execute(text(sql)).rowcount
+            except Exception as e:  # noqa: BLE001 —— 表尚不存在（create_all 前置保证，防御）
+                logger.warning(f"migration data {name} skipped: {e}")
+                continue
+            if changed:
+                applied.append(f"{name}({changed} rows)")
     if engine.dialect.name != "sqlite":
         if applied:
             logger.info(f"db migrations applied: {', '.join(applied)}")

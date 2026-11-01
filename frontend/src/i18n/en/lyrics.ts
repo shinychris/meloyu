@@ -5,7 +5,7 @@ export const lyricsEn = {
   'lyrics.header.headline': 'Write lyrics that lock to the melody',
   'lyrics.engine.badge': 'Engine: {engine} ⇄',
   'lyrics.engine.title':
-    'Switch the AI lyrics engine in Model Center (local rules / local open-source model / external API)',
+    'Switch the AI lyrics engine in Model Center (local open-source model / external API)',
   // 生成参数
   'lyrics.theme.label': 'Creative idea / theme (required to generate)',
   'lyrics.theme.placeholder': 'e.g. waiting at a convenience store on a rainy night, urban loneliness, a catchy chorus (multi-line, up to 600 chars)',
@@ -17,8 +17,7 @@ export const lyricsEn = {
   'lyrics.chips.marksHint': 'Parenthetical marks sit inline or on their own line to describe vocal delivery, emotion, and instrumentation; AI generation references them and singing engines consume them — they are never sung as lyric text',
   // 操作按钮
   'lyrics.action.generate': 'Generate with AI',
-  'lyrics.action.generating': 'Generating…',
-  'lyrics.action.generatingLLM': 'AI generating (up to ~3 min)…',
+  'lyrics.action.generating': 'AI generating (up to ~3 min)…',
   'lyrics.action.generateTitle': 'LLM generation may take 10s–3min depending on the model',
   'lyrics.action.polish': 'Polish selected section',
   'lyrics.action.polishing': 'Polishing…',
@@ -33,7 +32,6 @@ export const lyricsEn = {
   // 提示
   'lyrics.toast.themeRequired': 'Write down your creative idea or theme first (1–600 characters)',
   'lyrics.toast.empty': 'The lyrics are empty',
-  'lyrics.toast.fallback': 'Engine unavailable, fell back to local rules: {reason}',
   'lyrics.toast.generated': 'AI lyrics draft generated ({engine}) — ready to polish',
   'lyrics.toast.polishedSection': 'Polished {section} ({n} edits)',
   'lyrics.toast.polishedAll': 'Polished the full lyric ({n} edits)',

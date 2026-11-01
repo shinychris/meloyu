@@ -25,9 +25,6 @@ export function resolveDraftText(saved: string | null): string | null {
   return saved != null && !SAMPLE_TEXTS.has(saved) ? saved : null
 }
 
-/** 本地规则引擎判定（后端 engine 字段按 Accept-Language 本地化，中英都要匹配） */
-const LOCAL_RULE_RE = /本地规则|local rule/i
-
 /** 编辑器初始示例歌词（按当前 locale） */
 function defaultLyrics(): string {
   return tt('lyrics.defaultLyrics')
@@ -119,11 +116,7 @@ export default function LyricsView() {
       setRhyme(null)
       setChanges([])
       setUserText(res.lyrics)
-      if (res.fallback && res.fallback_reason) {
-        toast(t('lyrics.toast.fallback', { reason: res.fallback_reason }), 'warn')
-      } else {
-        toast(t('lyrics.toast.generated', { engine: res.engine || engine }))
-      }
+      toast(t('lyrics.toast.generated', { engine: res.engine || engine }))
       useStudioStore.getState().logOp(t('lyrics.log.generated'))
     })
 
@@ -138,15 +131,11 @@ export default function LyricsView() {
       const res = await polishLyrics({ lyrics: text, ...(section ? { target_section: section } : {}) })
       setChanges(res.changes)
       setUserText(res.lyrics)
-      if (res.fallback && res.fallback_reason) {
-        toast(t('lyrics.toast.fallback', { reason: res.fallback_reason }), 'warn')
-      } else {
-        toast(
-          section
-            ? t('lyrics.toast.polishedSection', { section: sectionLabel(section), n: res.changes.length })
-            : t('lyrics.toast.polishedAll', { n: res.changes.length }),
-        )
-      }
+      toast(
+        section
+          ? t('lyrics.toast.polishedSection', { section: sectionLabel(section), n: res.changes.length })
+          : t('lyrics.toast.polishedAll', { n: res.changes.length }),
+      )
     })
 
   const onRhyme = () =>
@@ -229,10 +218,8 @@ export default function LyricsView() {
           </div>
           <div className="flex gap-2 mb-3 flex-wrap">
             <button className="btn btn-ghost btn-sm" disabled={busy !== null} onClick={onGenerate}
-              title={engine && !LOCAL_RULE_RE.test(engine) ? t('lyrics.action.generateTitle') : undefined}>
-              {busy === 'gen'
-                ? engine && !LOCAL_RULE_RE.test(engine) ? t('lyrics.action.generatingLLM') : t('lyrics.action.generating')
-                : t('lyrics.action.generate')}
+              title={engine ? t('lyrics.action.generateTitle') : undefined}>
+              {busy === 'gen' ? t('lyrics.action.generating') : t('lyrics.action.generate')}
             </button>
             <button className="btn btn-ghost btn-sm" disabled={busy !== null} onClick={onPolish}>
               {busy === 'polish' ? t('lyrics.action.polishing') : t('lyrics.action.polish')}

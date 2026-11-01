@@ -24,7 +24,6 @@ from app.models import SETTING_ID, LLMSetting, ModelOp
 from app.models.base import new_uuid, utc_now_iso
 from app.providers.llm import LLMError, OllamaClient, OpenAICompatClient
 from app.providers.lyrics_llm import LLMLyricsProvider, valid_model_tag
-from app.providers.lyrics_local import LocalLyricsProvider
 from app.providers.music_acestep import (
     ACEStepLocalError,
     ACEStepLocalProvider,
@@ -204,9 +203,11 @@ _SELFHOSTED_BACKENDS = ("mmax_local", "songgen_local")
 def update_settings(db: Session, patch: dict) -> dict:
     s = _setting_row(db)
     backend = patch.get("lyrics_backend", s.lyrics_backend)
-    if backend not in ("localsynth", "ollama", "openai_compat"):
-        raise err_validation(tr("lyrics_backend 必须为 localsynth/ollama/openai_compat",
-                                "lyrics_backend must be localsynth/ollama/openai_compat"))
+    if backend == "localsynth":  # 历史遗留值（原离线规则引擎通道，ADR-019 移除）→ 未配置
+        backend = "none"
+    if backend not in ("none", "ollama", "openai_compat"):
+        raise err_validation(tr("lyrics_backend 必须为 none/ollama/openai_compat",
+                                "lyrics_backend must be none/ollama/openai_compat"))
     if backend == "ollama" and not (patch.get("ollama_model") or s.ollama_model):
         raise err_validation(tr("ollama 通道需要先选择本地模型",
                                 "The Ollama channel needs a local model selected first"))
@@ -401,7 +402,7 @@ def engine_label(db: Session) -> str:
         return f"Ollama · {s.ollama_model}"
     if s.lyrics_backend == "openai_compat" and s.external_model:
         return tr("外部API · ", "External API · ") + s.external_model
-    return tr("离线规则引擎（兜底·非 AI 模型）", "Offline rules engine (fallback, non-AI)")
+    return tr("未配置歌词引擎", "No lyrics engine configured")
 
 
 def song_engine_label(db: Session) -> str:
@@ -531,8 +532,8 @@ def run_delete(db: Session, user_id: str, model: str) -> dict:
         db.commit()
         db.refresh(op)
         return op.to_dict()
-    if s.ollama_model == model:  # 删掉当前选用模型 → 引擎回退本地规则
-        s.lyrics_backend, s.ollama_model = "localsynth", ""
+    if s.ollama_model == model:  # 删掉当前选用模型 → 歌词引擎回到未配置
+        s.lyrics_backend, s.ollama_model = "none", ""
         db.commit()
     op.status, op.progress, op.message = "succeeded", 100, \
         tr(f"已删除 {model}", f"Deleted {model}")
@@ -610,14 +611,18 @@ def test_music(base_url: str, api_key: str, model: str = "") -> dict:
 # ---------- 歌词引擎工厂（services/lyrics 与 generation 消费） ----------
 
 def get_lyrics_provider(db: Session):
-    """按全局配置返回歌词 provider；配置异常一律回退本地规则引擎。"""
+    """按全局配置返回歌词 provider；未配置/配置不完整返回 None（无兜底通道）。
+
+    历史遗留值 lyrics_backend="localsynth"（原本地规则引擎，ADR-019 移除）
+    视同未配置。
+    """
     s = db.get(LLMSetting, SETTING_ID)
-    if s is None or s.lyrics_backend == "localsynth":
-        return LocalLyricsProvider()
+    if s is None:
+        return None
     try:
         if s.lyrics_backend == "ollama":
             if not s.ollama_model:
-                return LocalLyricsProvider()
+                return None
             client = _ollama_client(db, s)
             return LLMLyricsProvider(
                 chat=lambda sys, p: client.chat(s.ollama_model, sys, p),
@@ -625,7 +630,7 @@ def get_lyrics_provider(db: Session):
                 display_name=f"Ollama · {s.ollama_model}")
         if s.lyrics_backend == "openai_compat":
             if not (s.external_base_url and s.external_model):
-                return LocalLyricsProvider()
+                return None
             client = OpenAICompatClient(s.external_base_url,
                                        decrypt_secret(s.external_api_key),
                                         s.external_model)
@@ -633,13 +638,14 @@ def get_lyrics_provider(db: Session):
                 chat=lambda sys, p: client.chat(sys, p),
                 engine=f"openai-compat:{s.external_model}",
                 display_name=tr("外部API · ", "External API · ") + s.external_model)
-    except Exception as e:  # noqa: BLE001 —— 配置构造失败不阻断歌词功能
-        logger.warning(f"lyrics provider 构造失败，回退本地引擎: {e}")
-    return LocalLyricsProvider()
+    except Exception as e:  # noqa: BLE001 —— 配置构造失败按未配置处理（日志留痕）
+        logger.warning(f"lyrics provider 构造失败，按未配置处理: {e}")
+        return None
+    return None
 
 
 def get_lyrics_chat(db: Session):
-    """当前歌词引擎的底层 chat 函数（LLM 通道）；localsynth 返回 None。
+    """当前歌词引擎的底层 chat 函数（LLM 通道）；未配置返回 None。
 
     供生成管线做 simple 模式风格扩写等轻量文本任务复用同一模型配置。
     """
@@ -649,20 +655,20 @@ def get_lyrics_chat(db: Session):
 
 
 def current_lyrics_backend(db: Session) -> str:
-    """留痕/用量统计用：当前生效的歌词引擎通道族（配置不完整按回退本地计）。
+    """留痕/用量统计用：当前生效的歌词引擎通道族（未配置/配置不完整 = "none"）。
 
-    与 get_lyrics_provider 的回退口径一致（ollama 缺模型 / openai_compat 缺
-    端点+模型 → localsynth）；完整引擎串（含模型名）见任务快照 _resolved.lyrics_engine。
+    与 get_lyrics_provider 的判定口径一致（ollama 缺模型 / openai_compat 缺
+    端点+模型 → none）；完整引擎串（含模型名）见任务快照 _resolved.lyrics_engine。
     """
     s = db.get(LLMSetting, SETTING_ID)
     if s is None:
-        return "localsynth"
+        return "none"
     if s.lyrics_backend == "ollama" and s.ollama_model:
         return "ollama"
     if (s.lyrics_backend == "openai_compat"
             and s.external_base_url and s.external_model):
         return "openai_compat"
-    return "localsynth"
+    return "none"
 
 
 # ---------- 歌曲引擎工厂（services/generation 消费） ----------

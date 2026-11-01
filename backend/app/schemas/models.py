@@ -53,8 +53,11 @@ class LLMSettingsRequest(BaseModel):
     @field_validator("lyrics_backend")
     @classmethod
     def _backend(cls, v: str | None) -> str | None:
-        if v is not None and v not in ("localsynth", "ollama", "openai_compat"):
-            raise ValueError(tr("lyrics_backend 必须为 localsynth/ollama/openai_compat", "lyrics_backend must be localsynth/ollama/openai_compat"))
+        if v == "localsynth":  # 历史遗留值（原离线规则引擎通道，ADR-019 移除）→ 未配置
+            return "none"
+        if v is not None and v not in ("none", "ollama", "openai_compat"):
+            raise ValueError(tr("lyrics_backend 必须为 none/ollama/openai_compat",
+                                "lyrics_backend must be none/ollama/openai_compat"))
         return v
 
     @field_validator("music_backend")

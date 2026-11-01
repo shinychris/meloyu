@@ -1,7 +1,8 @@
 """v0.12.1 段落扩全与灵感词表扩充单测。
 
 覆盖：段落别名/基础小节/能量/枚举/标签映射一致性；新段落解析与结构规划；
-本地歌词引擎新段落组装；词谱段落归一化；/system/meta 下发（段落 15 + 灵感词表）。
+歌词标签补全（确定性分析）；词谱段落归一化；/system/meta 下发（段落 15 +
+灵感词表）。
 
 运行：.venv/Scripts/python.exe -m unittest discover -s tests -v
 """
@@ -18,7 +19,7 @@ from app.config import settings
 from app.database import get_db
 from app.main import app
 from app.models.enums import SECTIONS
-from app.providers.lyrics_local import LocalLyricsProvider
+from app.services import lyrics_analysis
 from app.services.leadsheet import _syllable_lines
 from app.synth.structure import (
     SECTION_ALIASES,
@@ -101,29 +102,12 @@ class SectionRegistryTest(unittest.TestCase):
         self.assertLessEqual(total_sec, 180 * 1.05)
         self.assertGreaterEqual(total_sec, 180 * 0.95)
 
-class LyricsEngineSectionsTest(unittest.TestCase):
-    """本地歌词引擎：新段落组装（[Rap] 标签 / 器乐段不出歌词行）。"""
-
-    def setUp(self):
-        self.provider = LocalLyricsProvider()
-
-    def test_generate_with_new_sections(self):
-        out = self.provider.generate(
-            "夜航", sections=["intro", "verse", "chorus", "rap", "solo", "outro"])
-        self.assertIn("[Rap]", out["lyrics"])
-        self.assertIn("[Solo]", out["lyrics"])
-        structure = {s["section"]: s["line_count"] for s in out["structure"]}
-        self.assertEqual(structure["solo"], 0, "solo 器乐段不应生成歌词行")
-        self.assertGreaterEqual(structure["rap"], 1)
-
-    def test_rap_section_polish_keeps_tag(self):
-        lyrics = "[Verse]\n夜色落在肩上\n[Chorus]\n让灯全都点亮\n[Rap]\n凌晨三点街道空"
-        out = self.provider.polish(lyrics, target_section="chorus")
-        self.assertIn("[Rap]", out["lyrics"])
+class LyricsAnalysisSectionsTest(unittest.TestCase):
+    """歌词确定性分析：标签补全识别新段落（[Drop] 等别名全量经统一别名表）。"""
 
     def test_complete_tags_unparsed_new_tag_preserved(self):
         lyrics = "[Verse]\n行一\n行二\n[Drop]\n行三\n行四"
-        out = self.provider.complete_tags(lyrics)
+        out = lyrics_analysis.complete_tags(lyrics)
         self.assertFalse(out["inferred"])
         secs = [d["section"] for d in out["detected"]]
         self.assertEqual(secs, ["verse", "drop"])

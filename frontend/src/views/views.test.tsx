@@ -215,10 +215,10 @@ describe('views render smoke', () => {
     expect(html).toContain('On-device GPU channels')
     expect(html).toContain('Self-hosted service channels')
     expect(html).toContain('Offline fallback (non-AI)')
-    // 兜底通道明确标注非 AI
-    expect(html).toContain('Offline rules engine (fallback)')
+    // 兜底通道明确标注非 AI（歌曲离线合成引擎保留兜底；歌词规则引擎已移除 ADR-019）
     expect(html).toContain('Offline synth engine (fallback)')
     expect(html).toContain('non-AI · fallback')
+    expect(html).not.toContain('Offline rules engine')
   })
 })
 

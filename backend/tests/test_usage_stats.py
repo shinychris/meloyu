@@ -126,19 +126,24 @@ class TestUsageStatsAggregation(_UsageTestCase):
 
 
 class TestCurrentLyricsBackend(_UsageTestCase):
-    """通道族判定与 get_lyrics_provider 的回退口径一致。"""
+    """通道族判定与 get_lyrics_provider 的未配置口径一致（ADR-019 无兜底引擎）。"""
 
     def _set(self, **kw):
         row = LLMSetting(id=SETTING_ID, **kw)
         self.db.add(row)
         self.db.commit()
 
-    def test_no_row_defaults_to_local(self):
-        self.assertEqual(model_center.current_lyrics_backend(self.db), "localsynth")
+    def test_no_row_defaults_to_none(self):
+        self.assertEqual(model_center.current_lyrics_backend(self.db), "none")
 
     def test_ollama_requires_model(self):
         self._set(lyrics_backend="ollama", ollama_model="")
-        self.assertEqual(model_center.current_lyrics_backend(self.db), "localsynth")
+        self.assertEqual(model_center.current_lyrics_backend(self.db), "none")
+
+    def test_legacy_localsynth_reads_as_none(self):
+        # 存量行历史值 localsynth（原离线规则引擎，ADR-019 移除）读作未配置
+        self._set(lyrics_backend="localsynth")
+        self.assertEqual(model_center.current_lyrics_backend(self.db), "none")
 
     def test_ollama_with_model(self):
         self._set(lyrics_backend="ollama", ollama_model="qwen2.5:7b")
@@ -147,7 +152,7 @@ class TestCurrentLyricsBackend(_UsageTestCase):
     def test_openai_compat_requires_endpoint_and_model(self):
         self._set(lyrics_backend="openai_compat", external_base_url="",
                   external_model="")
-        self.assertEqual(model_center.current_lyrics_backend(self.db), "localsynth")
+        self.assertEqual(model_center.current_lyrics_backend(self.db), "none")
 
     def test_openai_compat_configured(self):
         self._set(lyrics_backend="openai_compat",

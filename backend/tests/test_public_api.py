@@ -16,7 +16,7 @@ from app import models  # noqa: F401
 from app.config import settings
 from app.database import get_db
 from app.main import app
-from app.models import Plan, User
+from app.models import Plan, SETTING_ID, LLMSetting, User
 from app.models.base import utc_now_iso
 from app.services import api_keys as keys_svc
 from tests.db import new_test_engine, reset_db, seed_plans
@@ -43,6 +43,9 @@ class _ApiTestCase(unittest.TestCase):
                          monthly_credits=10000, max_export="wav",
                          commercial_license=True, watermark=False, features=[],
                          switchable=True, sort_order=2, created_at=ts, updated_at=ts))
+        # 歌词引擎守卫（ADR-019）：开放 API 生歌需自动写词，须配置真实 LLM 通道
+        self.db.add(LLMSetting(id=SETTING_ID, lyrics_backend="ollama",
+                               ollama_model="qwen2.5:7b"))
         self.db.commit()
 
         # TestClient 注入测试库 session（override get_db）

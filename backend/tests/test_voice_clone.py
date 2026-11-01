@@ -17,7 +17,7 @@ from sqlalchemy.orm import sessionmaker
 from app import models  # noqa: F401 —— 注册全部表
 from app.config import settings
 from app.core.errors import BizError
-from app.models import User
+from app.models import SETTING_ID, LLMSetting, User
 from app.models.base import utc_now_iso
 from app.services import voice as voice_svc
 from tests.db import new_test_engine, reset_db, seed_plans
@@ -97,6 +97,9 @@ class _VoiceTestCase(unittest.TestCase):
                          nickname="v", plan="studio", credit_balance=10000,
                          created_at=ts, updated_at=ts)
         self.db.add(self.user)
+        # 歌词引擎守卫（ADR-019）：生成用例需自动写词，须配置真实 LLM 通道
+        self.db.add(LLMSetting(id=SETTING_ID, lyrics_backend="ollama",
+                               ollama_model="qwen2.5:7b"))
         self.db.commit()
 
     def tearDown(self):

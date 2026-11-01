@@ -17,7 +17,7 @@ PAREN_MARK_RE = re.compile(r"[（(][^（）()]{0,30}[）)]")
 SECTION_ORDER = ("intro", "verse", "pre_chorus", "chorus", "post_chorus", "refrain",
                  "bridge", "interlude", "drop", "breakdown", "rap", "spoken",
                  "ad_lib", "solo", "outro")
-# 段落 → 规范标签（lyrics_local/_llm 组装与 meta 下发共用；未知段不做映射）
+# 段落 → 规范标签（lyrics_llm 组装与 meta 下发共用；未知段不做映射）
 SECTION_TAG: dict[str, str] = {
     "intro": "[Intro]", "verse": "[Verse]", "pre_chorus": "[Pre-Chorus]",
     "chorus": "[Chorus]", "post_chorus": "[Post-Chorus]", "refrain": "[Refrain]",
