@@ -185,7 +185,7 @@ export default function LyricsView() {
         actions={
           engine ? (
             <span
-              className="text-2xs font-bold px-2 py-1 cursor-pointer border border-line bg-bg-2 text-dim"
+              className="text-2xs font-bold px-2 py-1 cursor-pointer border border-line bg-bg-2 text-muted"
               title={t('lyrics.engine.title')}
               onClick={() => navigate('/models')}
             >

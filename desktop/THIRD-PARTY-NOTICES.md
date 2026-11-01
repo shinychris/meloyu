@@ -1,7 +1,7 @@
 # Third-Party Notices
 
 Meloyu Desktop（© 2026 Meloyu）包含两个随包分发的运行时，其第三方组件许可如下。
-本文件由 `npm run notices` 生成（2026-10-31），随安装包分发并位于安装目录 resources/ 下；
+本文件由 `npm run notices` 生成（2026-11-01），随安装包分发并位于安装目录 resources/ 下；
 完整许可文本见各组件上游仓库（Repository 列）。
 
 ## 1. Electron 壳（Node.js 运行时依赖）

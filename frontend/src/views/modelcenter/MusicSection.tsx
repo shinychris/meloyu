@@ -128,7 +128,7 @@ export default function MusicSection() {
   }
 
   return (
-    <section id="mc-music" className="mt-10 scroll-mt-4">
+    <section id="mc-music">
       <div className="label mb-1">{t('models.music.title')}</div>
       <p className="text-xs mb-3 text-dim">
         {t('models.music.sectionDesc')}

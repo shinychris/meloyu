@@ -75,7 +75,7 @@ export default function TransportBar() {
   }
 
   return (
-    <footer className="fixed bottom-0 left-0 right-0 h-[68px] border-t flex items-center gap-4 px-5 z-50 border-line bg-bg">
+    <footer className="fixed bottom-0 left-0 right-0 h-[68px] border-t flex items-center gap-3 px-3 sm:gap-4 sm:px-5 z-50 border-line bg-bg">
       <audio ref={audioRef} preload="metadata" />
       <div className="flex items-center gap-2">
         <button className="iconbtn" title={t('layout.player.prev')} onClick={() => void prev()}>
@@ -85,7 +85,7 @@ export default function TransportBar() {
         </button>
         <button
           className={`iconbtn !w-10 !h-10 ${current ? 'on' : ''}`}
-          style={{ borderColor: 'var(--acc)', color: 'var(--acc)' }}
+          style={current ? undefined : { borderColor: 'var(--acc)', color: 'var(--acc)' }}
           onClick={toggle}
           title={playing ? t('layout.player.pause') : t('layout.player.play')}
         >
@@ -105,7 +105,8 @@ export default function TransportBar() {
           </svg>
         </button>
       </div>
-      <div className={`w-[170px] min-w-0 ${playing ? 'playing' : ''}`} style={{ visibility: current ? 'visible' : 'hidden' }}>
+      {/* 曲名区：窄屏隐藏（播放栏放不下，进度条与控制键优先） */}
+      <div className={`w-[170px] min-w-0 hidden sm:block ${playing ? 'playing' : ''}`} style={{ visibility: current ? 'visible' : 'hidden' }}>
         <div className="text-sm font-semibold truncate marquee">
           <span>{current?.title ?? ''}</span>
         </div>
@@ -127,8 +128,9 @@ export default function TransportBar() {
           {formatDuration(dur)}
         </span>
       </div>
+      {/* 响度目标信息：窄屏隐藏（防止换行堆叠/挤出导出按钮），悬停有完整 title */}
       <div
-        className="flex items-center gap-2 text-2xs text-dim"
+        className="hidden md:flex items-center gap-2 text-2xs text-dim"
         title={t('layout.player.lufsTitle')}
       >
         <span>{t('layout.player.target')}</span>

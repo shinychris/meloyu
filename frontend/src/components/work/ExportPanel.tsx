@@ -191,7 +191,8 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
               onClick={() => void runExport(f.code)}
             >
               <span className="font-bold">{t('work.export.run', { format: f.label })}</span>
-              <span className="block text-2xs font-normal mt-0.5 text-dim">
+              {/* 副文字继承按钮前景色（ghost 白 / hover 黑底白底自适应 / acc 黑），仅降不透明度 */}
+              <span className="block text-2xs font-normal mt-0.5 opacity-70">
                 {pct !== undefined ? t('work.export.processing', { n: pct }) : t(f.noteKey)}
               </span>
             </button>
@@ -229,7 +230,7 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
                   disabled={releasePct !== undefined}
                 >
                   <span className="font-bold">{t(p.labelKey)}</span>
-                  <span className="block text-2xs font-normal mt-0.5" style={{ color: platform === p.code ? '#000' : 'var(--dim)' }}>
+                  <span className="block text-2xs font-normal mt-0.5 opacity-70">
                     {t(p.noteKey)}
                   </span>
                 </button>

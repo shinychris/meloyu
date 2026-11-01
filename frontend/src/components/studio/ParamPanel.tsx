@@ -58,7 +58,7 @@ export default function ParamPanel() {
     <>
       <div className="flex items-center justify-between mt-2">
         <span className="text-2xs text-dim">{t('studio.param.label')}</span>
-        <button className="text-2xs underline text-dim" onClick={() => void applyTaste()}>
+        <button className="text-2xs underline text-muted" onClick={() => void applyTaste()}>
           {t('studio.taste.apply')}
         </button>
       </div>
@@ -82,7 +82,7 @@ export default function ParamPanel() {
             <div className="text-2xs mt-1 text-bad">{t('studio.voice.pickFirst')}</div>
           )}
           {form.vocal !== 'voice_clone' && !voiceOpen && (
-            <button className="text-2xs mt-1 underline text-dim" onClick={() => setVoiceOpen(true)}>
+            <button className="text-2xs mt-1 underline text-muted" onClick={() => setVoiceOpen(true)}>
               {t('studio.voice.manage')}
             </button>
           )}

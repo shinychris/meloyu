@@ -113,7 +113,7 @@ export default function Onboarding() {
           <span className="label" style={{ color: 'var(--acc)' }}>
             {t('layout.ob.progress', { current: onboardingStep + 1, total: OB_STEPS.length })}
           </span>
-          <button className="text-2xs text-dim" onClick={endOnboarding}>
+          <button className="text-2xs text-muted" onClick={endOnboarding}>
             {t('layout.ob.skip')}
           </button>
         </div>

@@ -87,7 +87,7 @@ export default function CatalogSection() {
   }
 
   return (
-    <section id="mc-catalog" className="mt-10 scroll-mt-4">
+    <section id="mc-catalog">
       <div className="label mb-1">{t('models.catalog.title')}</div>
       <p className="text-xs mb-3 text-dim">
         {t('models.catalog.sectionDesc')}

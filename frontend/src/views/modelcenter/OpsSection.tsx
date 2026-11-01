@@ -9,7 +9,7 @@ export default function OpsSection() {
   const { ops } = useModelCenter()
 
   return (
-    <section id="mc-ops" className="mt-10 mb-10 scroll-mt-4">
+    <section id="mc-ops">
       <div className="label mb-3">{t('models.ops.title')}</div>
       {ops.length > 0 ? (
         <div className="card p-4">

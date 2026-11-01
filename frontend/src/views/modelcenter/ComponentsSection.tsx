@@ -58,7 +58,7 @@ export default function ComponentsSection() {
   )
 
   return (
-    <section id="mc-components" className="mt-10 scroll-mt-4">
+    <section id="mc-components">
       <div className="label mb-1">{t('models.comp.label')}</div>
       <div className="text-xs mb-3 max-w-[720px] text-dim leading-relaxed">
         {t('models.comp.desc')}

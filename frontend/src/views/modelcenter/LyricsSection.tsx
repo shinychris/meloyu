@@ -88,7 +88,7 @@ export default function LyricsSection() {
   }
 
   return (
-    <section id="mc-lyrics" className="mt-10 scroll-mt-4">
+    <section id="mc-lyrics">
       <div className="label mb-1">{t('models.lyrics.title')}</div>
       <p className="text-xs mb-3 text-dim">
         {t('models.lyrics.sectionDesc')}

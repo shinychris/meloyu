@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { UsageStats } from '../types/api'
 import { getUsageStats } from '../api/usage'
@@ -9,7 +9,6 @@ import { useSessionStore } from '../stores/session'
 import { useMetaStore } from '../stores/meta'
 import { toast } from '../stores/toast'
 import { formatDateTime, formatNum } from '../lib/format'
-import { useScrollSpy } from '../lib/useScrollSpy'
 import { LICENSE_SKU } from '../lib/landing-data'
 import { SITE_URL } from '../lib/constants'
 import UsageRecords from '../components/settings/UsageRecords'
@@ -47,7 +46,7 @@ function engineLabel(engine: string, t: (k: TranslationKey) => string): string {
   return key ? t(key) : engine
 }
 
-/** 左侧分区导航（锚点 + scrollspy 高亮，模式对齐模型中心） */
+/** 左侧分区导航（点选切换，一次只渲染选中分区） */
 const SECTIONS: { id: string; labelKey: TranslationKey }[] = [
   { id: 'set-general', labelKey: 'settings.nav.general' },
   { id: 'set-usage', labelKey: 'settings.nav.usage' },
@@ -66,8 +65,10 @@ const desktopShell =
  * 通用（语言/应用信息/数据管理）、用量统计与分析（用户自定义 API 口径，
  * 无官方积分消耗）、授权与激活（自定价页迁入）、引擎与 API 快捷入口。
  * cloud 存量形态由路由守卫回定价页（本视图不可达）。
+ * 分区为点选切换：一次只渲染选中分区，不滚动；initialSection 供深链/测试
+ * 指定初始分区（非法值回退首分区）。
  */
-export default function SettingsView() {
+export default function SettingsView({ initialSection }: { initialSection?: string }) {
   const navigate = useNavigate()
   const t = useT()
   const setLocale = useI18nStore((s) => s.setLocale)
@@ -84,16 +85,10 @@ export default function SettingsView() {
   const [deactivating, setDeactivating] = useState(false)
   const [exporting, setExporting] = useState(false)
 
-  // scrollspy（F-FE-09 抽取共用 hook，与模型中心同源）：分区进入滚动视口上部
-  // 区域时高亮导航项（SSR/测试环境无 IO，防御跳过）
-  const { scrollRef, activeSection } = useScrollSpy(
-    SECTIONS.map((s) => s.id),
-    '-15% 0px -70% 0px',
+  // 点选分区状态：一次只渲染选中分区（替代原 scrollspy 滚动高亮）
+  const [active, setActive] = useState(() =>
+    SECTIONS.some((s) => s.id === initialSection) ? initialSection! : SECTIONS[0].id,
   )
-
-  const jump = useCallback((id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [])
 
   useEffect(() => {
     void getUsageStats(USAGE_WINDOW_DAYS)
@@ -198,35 +193,52 @@ export default function SettingsView() {
   ] as const
 
   return (
-    <div className="view h-full overflow-y-auto" ref={scrollRef}>
+    <div className="view h-full overflow-y-auto">
       <div className="px-4 md:px-8 py-8">
         <div className="label">{t('settings.label')}</div>
         <h1 className="text-3xl font-extrabold tracking-tight mt-2">{t('settings.title')}</h1>
 
-        <div className="flex items-start gap-8 mt-6">
-          {/* 左侧分区导航 */}
-          <aside className="w-[168px] flex-none sticky top-6 hidden lg:block">
-            <div className="py-1">
+        <div className="flex flex-col lg:flex-row lg:items-start gap-5 lg:gap-8 mt-6">
+          {/* 分区点选导航：移动端横向 chips（点选切换后无滚动，必须有切换入口），lg+ 左侧竖排 */}
+          <nav className="lg:w-[168px] lg:flex-none lg:sticky lg:top-6">
+            <div className="flex flex-wrap gap-2 lg:hidden">
               {SECTIONS.map((s) => {
-                const active = activeSection === s.id
+                const on = active === s.id
                 return (
                   <button
                     key={s.id}
-                    className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 border-l-2 ${
-                      active ? 'text-acc font-bold bg-bg-2 border-acc' : 'text-muted font-normal border-transparent'
-                    }`}
-                    onClick={() => jump(s.id)}
+                    className={`chip ${on ? 'on' : ''}`}
+                    aria-pressed={on}
+                    onClick={() => setActive(s.id)}
                   >
                     {t(s.labelKey)}
                   </button>
                 )
               })}
             </div>
-          </aside>
+            <div className="hidden lg:block py-1">
+              {SECTIONS.map((s) => {
+                const on = active === s.id
+                return (
+                  <button
+                    key={s.id}
+                    aria-current={on || undefined}
+                    className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 border-l-2 ${
+                      on ? 'text-acc font-bold bg-bg-2 border-acc' : 'text-muted font-normal border-transparent'
+                    }`}
+                    onClick={() => setActive(s.id)}
+                  >
+                    {t(s.labelKey)}
+                  </button>
+                )
+              })}
+            </div>
+          </nav>
 
           <div className="flex-1 min-w-0">
             {/* ============ 通用 ============ */}
-            <section id="set-general" className="scroll-mt-4">
+            {active === 'set-general' && (
+            <section id="set-general">
               <div className="label mb-3">{t('settings.nav.general')}</div>
 
               {/* 语言 */}
@@ -287,9 +299,11 @@ export default function SettingsView() {
                 </button>
               </div>
             </section>
+            )}
 
             {/* ============ 用量统计与分析 ============ */}
-            <section id="set-usage" className="scroll-mt-4 mt-10">
+            {active === 'set-usage' && (
+            <section id="set-usage">
               <div className="label mb-3">{t('settings.nav.usage')}</div>
 
               <div className="card p-5">
@@ -387,9 +401,11 @@ export default function SettingsView() {
                 <div className="text-2xs mt-3 text-dim">{t('pricing.usage.footnote')}</div>
               </div>
             </section>
+            )}
 
             {/* ============ 授权与激活 ============ */}
-            <section id="set-license" className="scroll-mt-4 mt-10">
+            {active === 'set-license' && (
+            <section id="set-license">
               <div className="label mb-3">{t('settings.nav.license')}</div>
 
               {/* 授权状态卡 */}
@@ -560,7 +576,7 @@ export default function SettingsView() {
                     </div>
                     {/* 离线激活（备用）：完整授权密钥 */}
                     <details className="mt-5 max-w-[460px]">
-                      <summary className="text-2xs cursor-pointer text-dim hover:text-muted select-none">
+                      <summary className="text-2xs cursor-pointer text-muted hover:text-txt select-none">
                         {t('license.offline.fold')}
                       </summary>
                       <div className="text-xs mt-2 leading-relaxed text-dim">
@@ -586,9 +602,11 @@ export default function SettingsView() {
                 </div>
               )}
             </section>
+            )}
 
             {/* ============ 引擎与 API ============ */}
-            <section id="set-engines" className="scroll-mt-4 mt-10 pb-8">
+            {active === 'set-engines' && (
+            <section id="set-engines" className="pb-8">
               <div className="label mb-3">{t('settings.nav.engines')}</div>
               <div className="card p-5 flex items-center justify-between gap-4 flex-wrap">
                 <div className="text-xs text-dim max-w-[520px] leading-relaxed">
@@ -599,6 +617,7 @@ export default function SettingsView() {
                 </button>
               </div>
             </section>
+            )}
           </div>
         </div>
       </div>

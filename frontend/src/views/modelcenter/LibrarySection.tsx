@@ -59,7 +59,7 @@ export default function LibrarySection() {
   }
 
   return (
-    <section id="mc-library" className="mt-10 scroll-mt-4">
+    <section id="mc-library">
       <div className="label mb-3">{t('models.local.title')}</div>
       <div className="card">
         {local && local.models.length > 0 ? (

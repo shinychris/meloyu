@@ -118,7 +118,7 @@ export default function StudioView() {
             </span>
             {songEngine && (
               <span
-                className="text-2xs font-bold px-2 py-1 cursor-pointer border border-line bg-bg-2 text-dim"
+                className="text-2xs font-bold px-2 py-1 cursor-pointer border border-line bg-bg-2 text-muted"
                 title={t('studio.view.songEngineTitle')}
                 onClick={() => navigate('/models')}
               >

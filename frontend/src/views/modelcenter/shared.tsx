@@ -74,7 +74,7 @@ export const OP_TYPE_LABEL: Record<ModelOpInfo['op_type'], TranslationKey> = {
 export function localStatusText(m: MusicCatalogModel): { text: string; cls: string } {
   if (m.local_status === 'ready') return { text: t('models.status.ready'), cls: 'text-acc' }
   if (m.local_status === 'deps_missing') return { text: t('models.status.depsMissing'), cls: 'text-bad' }
-  if (m.local_status === 'not_downloaded') return { text: t('models.status.notDownloaded'), cls: 'text-dim' }
+  if (m.local_status === 'not_downloaded') return { text: t('models.status.notDownloaded'), cls: 'text-muted' }
   if (m.local_status === 'not_running') return { text: t('models.status.notRunning'), cls: 'text-bad' }
   return { text: t('models.status.hostedOnly'), cls: 'text-dim' }
 }

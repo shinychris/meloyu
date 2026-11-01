@@ -121,26 +121,38 @@ describe('views render smoke', () => {
     expect(html).not.toContain('Credit top-up pack')
   })
 
-  it('SettingsView 渲染四分区设置页（v0.17.0：授权/用量统计收口到系统设置）', () => {
+  it('SettingsView 分区点选切换：四分区导航全渲染，默认只显示通用区', () => {
     const html = render(<SettingsView />)
-    // 页头 + 四分区导航（SSR 快照为 store 初始态：license 未就绪时授权区局部加载，
-    // 其余分区照常渲染——设置内容不被授权状态阻塞）
+    // 页头 + 四分区导航（点选入口全量渲染，移动端 chips + 桌面侧栏同词条）
     expect(html).toContain('System settings')
     expect(html).toContain('General')
     expect(html).toContain('Usage &amp; analytics')
     expect(html).toContain('License')
     expect(html).toContain('Engines &amp; API')
-    // 用量口径声明：单次买断、无官方积分消耗
-    expect(html).toContain('No official credits are consumed')
-    // 通用区：语言切换 + 引擎入口
+    // 默认分区 = 通用：语言切换 + 引擎入口词条在通用区内
     expect(html).toContain('Language')
     expect(html).toContain('English')
-    expect(html).toContain('Open model center')
-    // 授权分区文案（分区标题 + 加载态/词条齐备性）
-    expect(html).toContain('Loading…')
+    // 点选切换：未选中分区不渲染（用量口径/引擎入口/授权加载态均不在初始输出）
+    expect(html).not.toContain('No official credits are consumed')
+    expect(html).not.toContain('Open model center')
+    // 授权词条齐备性（纯 i18n 断言）
     expect(t('license.trial.title')).toBe('Free trial')
     expect(t('license.trial.daysLeft', { n: 10 })).toBe('10 days left')
     expect(t('settings.general.edition.desktop')).toBe('Desktop (one-time license)')
+  })
+
+  it('SettingsView initialSection 直达指定分区；非法值回退首分区', () => {
+    const usageHtml = render(<SettingsView initialSection="set-usage" />)
+    expect(usageHtml).toContain('No official credits are consumed')
+    expect(usageHtml).not.toContain('English')
+    // SSR license 未就绪 → 授权分区加载态
+    const licenseHtml = render(<SettingsView initialSection="set-license" />)
+    expect(licenseHtml).toContain('Loading…')
+    const enginesHtml = render(<SettingsView initialSection="set-engines" />)
+    expect(enginesHtml).toContain('Open model center')
+    // 非法 initialSection → 回退首分区（通用）
+    const fallbackHtml = render(<SettingsView initialSection="set-nope" />)
+    expect(fallbackHtml).toContain('English')
   })
 
   it('ResetPasswordView 无 token 时提示链接无效；有 token 时渲染表单', () => {
@@ -160,7 +172,7 @@ describe('views render smoke', () => {
   })
 
   it('ModelCenterView 渲染本地组件中心（v0.16.0 桌面按需下载：内置/MusicGen/ACE-Step）', () => {
-    const html = render(<ModelCenterView />)
+    const html = render(<ModelCenterView initialSection="mc-components" />)
     expect(html).toContain('Local component center')
     expect(html).toContain('Built-in synth engine')
     expect(html).toContain('On-device MusicGen')
@@ -170,55 +182,63 @@ describe('views render smoke', () => {
     expect(html).toContain('8GB VRAM recommended')
   })
 
-  it('ModelCenterView 渲染双引擎通道区（V1.3 歌词生成引擎）', () => {
-    const html = render(<ModelCenterView />)
-    expect(html).toContain('Lyrics engine channels')
-    expect(html).toContain('Song generation engine channels')
-    expect(html).toContain('External song API (Suno-compatible)')
-    expect(html).toContain('BASE URL (Suno-compatible gateway root; /api/v1 is appended automatically)')
-    expect(html).toContain('Test connection')
+  it('ModelCenterView 渲染双引擎通道区（V1.3 歌词生成引擎；点选分区一次一个）', () => {
+    const lyricsHtml = render(<ModelCenterView initialSection="mc-lyrics" />)
+    expect(lyricsHtml).toContain('Lyrics engine channels')
+    const musicHtml = render(<ModelCenterView initialSection="mc-music" />)
+    expect(musicHtml).toContain('Song generation engine channels')
+    expect(musicHtml).toContain('External song API (Suno-compatible)')
+    expect(musicHtml).toContain('BASE URL (Suno-compatible gateway root; /api/v1 is appended automatically)')
+    expect(musicHtml).toContain('Test connection')
   })
 
   it('ModelCenterView 渲染开源歌曲模型目录区（V1.4 外部测评排序）', () => {
-    const html = render(<ModelCenterView />)
-    expect(html).toContain('Open-source song model catalog (ranked by third-party benchmarks)')
-    expect(html).toContain('REPLICATE API TOKEN')
-    expect(html).toContain('Replicate open-source model hosting')
-    expect(html).toContain('On-device MusicGen (open source)')
+    // SSR 目录数据未加载 → 目录列表为空，分区标题/说明照常渲染
+    const catalogHtml = render(<ModelCenterView initialSection="mc-catalog" />)
+    expect(catalogHtml).toContain('Open-source song model catalog (ranked by third-party benchmarks)')
+    // Replicate Token 配置卡与本机通道卡在歌曲引擎分区
+    const musicHtml = render(<ModelCenterView initialSection="mc-music" />)
+    expect(musicHtml).toContain('REPLICATE API TOKEN')
+    expect(musicHtml).toContain('Replicate open-source model hosting')
+    expect(musicHtml).toContain('On-device MusicGen (open source)')
   })
 
   it('ModelCenterView 渲染本机 ACE-Step 通道卡（V1.5 人声成曲）', () => {
-    const html = render(<ModelCenterView />)
+    const html = render(<ModelCenterView initialSection="mc-music" />)
     expect(html).toContain('On-device ACE-Step v1.5 (open-source · vocal songs)')
     expect(html).toContain('Lyrics → full songs sung by realistic vocals')
   })
 
   it('ModelCenterView 渲染自托管服务通道卡（V1.5.1 MiniMax/SongGeneration）', () => {
-    const html = render(<ModelCenterView />)
+    const html = render(<ModelCenterView initialSection="mc-music" />)
     expect(html).toContain('MiniMax Music 3')
     expect(html).toContain('SongGeneration')
   })
 
-  it('ModelCenterView 左侧分类导航 + 生产就绪检查 + Ollama 服务地址（v0.12.0 重构）', () => {
+  it('ModelCenterView 分区点选导航 + 概览默认分区 + Ollama 服务地址（v0.12.0 重构）', () => {
     const html = render(<ModelCenterView />)
-    // 左侧分类导航（六分区）
-    for (const nav of ['Overview', 'Lyrics engine', 'Song engine', 'Open-source catalog',
+    // 分类导航（七分区点选入口全量渲染，默认分区 = 概览）
+    for (const nav of ['Overview', 'Local components', 'Lyrics engine', 'Song engine', 'Open-source catalog',
       'Local model library', 'Operations']) {
       expect(html).toContain(nav)
     }
-    // 生产就绪检查（settings 未加载前区块不渲染，导航文案仍在）
-    expect(html).toContain('Lyrics engine channels')
-    // Ollama 服务地址卡 + 通道分组标签
-    expect(html).toContain('Ollama service address')
-    expect(html).toContain('http://localhost:11434 (Docker deployment: http://host.docker.internal:11434)')
-    expect(html).toContain('Cloud channels')
-    expect(html).toContain('On-device GPU channels')
-    expect(html).toContain('Self-hosted service channels')
-    expect(html).toContain('Offline fallback (non-AI)')
-    // 兜底通道明确标注非 AI（歌曲离线合成引擎保留兜底；歌词规则引擎已移除 ADR-019）
-    expect(html).toContain('Offline synth engine (fallback)')
-    expect(html).toContain('non-AI · fallback')
-    expect(html).not.toContain('Offline rules engine')
+    // 点选切换：未选中分区内容不渲染
+    expect(html).not.toContain('Song generation engine channels')
+    // 歌词引擎分区：分区标题 + Ollama 服务地址卡
+    const lyricsHtml = render(<ModelCenterView initialSection="mc-lyrics" />)
+    expect(lyricsHtml).toContain('Lyrics engine channels')
+    expect(lyricsHtml).toContain('Ollama service address')
+    expect(lyricsHtml).toContain('http://localhost:11434 (Docker deployment: http://host.docker.internal:11434)')
+    // 歌曲引擎分区：通道分组标签 + 兜底通道明确标注非 AI
+    // （歌曲离线合成引擎保留兜底；歌词规则引擎已移除 ADR-019）
+    const musicHtml = render(<ModelCenterView initialSection="mc-music" />)
+    expect(musicHtml).toContain('Cloud channels')
+    expect(musicHtml).toContain('On-device GPU channels')
+    expect(musicHtml).toContain('Self-hosted service channels')
+    expect(musicHtml).toContain('Offline fallback (non-AI)')
+    expect(musicHtml).toContain('Offline synth engine (fallback)')
+    expect(musicHtml).toContain('non-AI · fallback')
+    expect(musicHtml).not.toContain('Offline rules engine')
   })
 })
 

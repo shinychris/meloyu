@@ -35,7 +35,7 @@ export default function OverviewSection({ jump }: { jump: (id: string) => void }
   ]
 
   return (
-    <section id="mc-overview" className="scroll-mt-4">
+    <section id="mc-overview">
       <div className="label mb-3">{t('models.nav.overview')}</div>
 
       {/* 运行时状态 */}

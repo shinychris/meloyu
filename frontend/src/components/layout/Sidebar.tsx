@@ -125,9 +125,10 @@ export default function Sidebar() {
         <button className="btn btn-ghost w-full btn-sm mb-3" onClick={startOnboarding}>
           {t('app.sidebar.onboarding')}
         </button>
+        {/* 积分/授权信息块：≤1024 折叠态由 .sidebar-credits 隐藏（48px 放不下数字） */}
         {isLicense ? (
           /* license 模式：授权徽标（试用剩余 / 终身 / 已到期），点击进系统设置的授权分区 */
-          <button className="block w-full text-left" onClick={() => navigate('/settings')}>
+          <button className="sidebar-credits block w-full text-left" onClick={() => navigate('/settings')}>
             <div className="flex items-center justify-between">
               <span className="label">{t('license.sidebar.label')}</span>
               <span className="text-xs font-bold num text-acc">
@@ -146,7 +147,7 @@ export default function Sidebar() {
             </div>
           </button>
         ) : (
-          <>
+          <div className="sidebar-credits">
             <div className="flex items-center justify-between">
               <span className="label">{t('app.sidebar.credits')}</span>
               <span className="text-xs font-bold num text-acc">
@@ -156,7 +157,7 @@ export default function Sidebar() {
             <div className="h-[3px] mt-2 bg-bg-3">
               <div className="h-full bg-acc" style={{ width: `${barPct}%` }}></div>
             </div>
-          </>
+          </div>
         )}
         {/* 账号管理区：档位行 + 弹出菜单（改密/导出/登出全部/删号/登出） */}
         <AccountMenu />

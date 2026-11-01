@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { SECTIONS } from './modelcenter/shared'
 import { ModelCenterProvider } from './modelcenter/context'
 import OverviewSection from './modelcenter/OverviewSection'
@@ -7,7 +8,6 @@ import MusicSection from './modelcenter/MusicSection'
 import CatalogSection from './modelcenter/CatalogSection'
 import LibrarySection from './modelcenter/LibrarySection'
 import OpsSection from './modelcenter/OpsSection'
-import { useScrollSpy } from '../lib/useScrollSpy'
 import { useT } from '../i18n'
 
 /**
@@ -15,22 +15,21 @@ import { useT } from '../i18n'
  * 开源目录/本地模型库/操作记录。
  * F-FE-09：按 section 拆分为 modelcenter/ 下子组件，共享状态收敛到
  * ModelCenterProvider（行为与视觉与拆分前一致）。
+ * 分区为点选切换：一次只渲染选中分区，不滚动；initialSection 供深链/测试
+ * 指定初始分区（非法值回退首分区）。
  */
-export default function ModelCenterView() {
+export default function ModelCenterView({ initialSection }: { initialSection?: string }) {
   const t = useT()
-  const { scrollRef, activeSection, setActiveSection } = useScrollSpy(
-    SECTIONS.map((s) => s.id),
-    '-8% 0px -80% 0px',
+  const [active, setActive] = useState(() =>
+    SECTIONS.some((s) => s.id === initialSection) ? initialSection! : SECTIONS[0].id,
   )
 
-  const jump = (id: string) => {
-    setActiveSection(id)
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
+  // 分区内跳转（概览「去配置」等）：与导航点选同语义，切分区而非滚动
+  const jump = (id: string) => setActive(id)
 
   return (
     <ModelCenterProvider>
-      <div className="view h-full overflow-y-auto" ref={scrollRef}>
+      <div className="view h-full overflow-y-auto">
         <div className="px-4 md:px-8 py-8">
           <div className="label">{t('models.label')}</div>
           <h1 className="text-3xl font-extrabold tracking-tight mt-2">{t('models.title')}</h1>
@@ -38,35 +37,51 @@ export default function ModelCenterView() {
             {t('models.intro')}
           </p>
 
-          <div className="flex items-start gap-8 mt-6">
-            {/* 左侧分类导航 */}
-            <aside className="w-[168px] flex-none sticky top-6 hidden lg:block">
-              <div className="py-1">
+          <div className="flex flex-col lg:flex-row lg:items-start gap-5 lg:gap-8 mt-6">
+            {/* 分区点选导航：移动端横向 chips（点选切换后无滚动，必须有切换入口），lg+ 左侧竖排 */}
+            <nav className="lg:w-[168px] lg:flex-none lg:sticky lg:top-6">
+              <div className="flex flex-wrap gap-2 lg:hidden">
                 {SECTIONS.map((s) => {
-                  const active = activeSection === s.id
+                  const on = active === s.id
                   return (
                     <button
                       key={s.id}
-                      className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 border-l-2 ${
-                        active ? 'text-acc font-bold bg-bg-2 border-acc' : 'text-muted font-normal border-transparent'
-                      }`}
-                      onClick={() => jump(s.id)}
+                      className={`chip ${on ? 'on' : ''}`}
+                      aria-pressed={on}
+                      onClick={() => setActive(s.id)}
                     >
                       {t(s.labelKey)}
                     </button>
                   )
                 })}
               </div>
-            </aside>
+              <div className="hidden lg:block py-1">
+                {SECTIONS.map((s) => {
+                  const on = active === s.id
+                  return (
+                    <button
+                      key={s.id}
+                      aria-current={on || undefined}
+                      className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2 border-l-2 ${
+                        on ? 'text-acc font-bold bg-bg-2 border-acc' : 'text-muted font-normal border-transparent'
+                      }`}
+                      onClick={() => setActive(s.id)}
+                    >
+                      {t(s.labelKey)}
+                    </button>
+                  )
+                })}
+              </div>
+            </nav>
 
             <div className="flex-1 min-w-0">
-              <OverviewSection jump={jump} />
-              <ComponentsSection />
-              <LyricsSection />
-              <MusicSection />
-              <CatalogSection />
-              <LibrarySection />
-              <OpsSection />
+              {active === 'mc-overview' && <OverviewSection jump={jump} />}
+              {active === 'mc-components' && <ComponentsSection />}
+              {active === 'mc-lyrics' && <LyricsSection />}
+              {active === 'mc-music' && <MusicSection />}
+              {active === 'mc-catalog' && <CatalogSection />}
+              {active === 'mc-library' && <LibrarySection />}
+              {active === 'mc-ops' && <OpsSection />}
             </div>
           </div>
         </div>

@@ -107,11 +107,12 @@ export default function CommentsPanel({ workId, canComment }: { workId: string; 
             value={body}
             onChange={(e) => setBody(e.target.value)}
           />
-          <div className="flex items-center justify-between mt-1">
+          {/* 窄卡（团队共享栏 ~176px）：按钮 whitespace-nowrap + 整行可换行，防止「发表评论」被挤成两行 */}
+          <div className="flex items-center justify-between gap-2 flex-wrap mt-1">
             <span className="text-2xs text-dim">
               {t('comments.anchorHint', { time: formatDuration(position) })}
             </span>
-            <button className="btn btn-acc btn-sm" disabled={busy} onClick={() => void submit()}>
+            <button className="btn btn-acc btn-sm whitespace-nowrap flex-none" disabled={busy} onClick={() => void submit()}>
               {t('comments.submit')}
             </button>
           </div>

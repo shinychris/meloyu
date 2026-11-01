@@ -11,6 +11,7 @@
   --color-line: #2c2c2c;
   --color-line-2: #383838;
   --color-txt: #ffffff;
+  --color-soft: #c2c2c2;
   --color-muted: #9a9a9a;
   --color-dim: #8a8a8a;
   /* 色彩：品牌/语义 */
@@ -52,7 +53,7 @@
   color-scheme: dark;
   --bg: var(--color-bg); --bg2: var(--color-bg-2); --bg3: var(--color-bg-3); --bg4: var(--color-bg-4);
   --line: var(--color-line); --line2: var(--color-line-2);
-  --txt: var(--color-txt); --muted: var(--color-muted); --dim: var(--color-dim);
+  --txt: var(--color-txt); --soft: var(--color-soft); --muted: var(--color-muted); --dim: var(--color-dim);
   --acc: var(--color-acc); --acc-dim: var(--color-acc-dim); --acc-glow: var(--color-acc-glow); --acc-line: var(--color-acc-line);
   --warn: var(--color-warn); --bad: var(--color-bad);
   --trk-vox: var(--color-trk-vox); --trk-drm: var(--color-trk-drm); --trk-bas: var(--color-trk-bas);
@@ -76,17 +77,17 @@ input[type=checkbox], input[type=radio] { accent-color: var(--acc) }
 ::selection { background: var(--acc); color: #000 }
 
 /* ---------- chips / buttons ---------- */
-.chip { border: 1px solid var(--line); padding: 4px 10px; font-size: 11px; font-family: inherit; font-weight: inherit; line-height: inherit; text-align: inherit; color: var(--muted); cursor: pointer; transition: color .15s ease, background-color .15s ease, border-color .15s ease, opacity .15s ease; user-select: none; white-space: nowrap; background: transparent }
+.chip { border: 1px solid var(--line); padding: 4px 10px; font-size: 11px; font-family: inherit; font-weight: inherit; line-height: inherit; text-align: inherit; color: var(--soft); cursor: pointer; transition: color .15s ease, background-color .15s ease, border-color .15s ease, opacity .15s ease; user-select: none; white-space: nowrap; background: transparent }
 .chip:hover { border-color: var(--txt); color: var(--txt) }
 .chip.on { background: var(--acc); border-color: var(--acc); color: #000; font-weight: 700 }
 .chip.acc-on { border-color: var(--acc); color: var(--acc) }
-.chip[disabled], .chip.disabled { opacity: .35; pointer-events: none }
+.chip[disabled], .chip.disabled { opacity: .5; pointer-events: none }
 .btn { border: 1px solid var(--line); background: transparent; color: var(--txt); font-size: 12px; font-weight: 600; padding: 9px 16px; cursor: pointer; transition: color .15s ease, background-color .15s ease, border-color .15s ease, box-shadow .15s ease, opacity .15s ease; position: relative; overflow: hidden }
 .btn:hover { border-color: var(--txt) }
 .btn-acc { background: var(--acc); border-color: var(--acc); color: #000 }
 .btn-acc:hover { background: #4dff6e; border-color: #4dff6e; box-shadow: 0 0 20px var(--acc-glow) }
 .btn-ghost:hover { background: var(--txt); color: #000 }
-.btn[disabled] { opacity: .4; pointer-events: none }
+.btn[disabled] { opacity: .5; pointer-events: none }
 /* 按钮尺寸族：替代散落的 !py/!px/!text-[..] 覆盖（置于 .btn 之后，同特异性按源序覆盖） */
 .btn-sm { padding: 5px 10px; font-size: 11px }
 .btn-md { padding: 7px 14px; font-size: 12px }
@@ -94,10 +95,11 @@ input[type=checkbox], input[type=radio] { accent-color: var(--acc) }
 .iconbtn { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); background: transparent; color: var(--txt); cursor: pointer; transition: color .15s ease, background-color .15s ease, border-color .15s ease; flex: none }
 .iconbtn:hover { background: var(--txt); color: #000 }
 .iconbtn.on { background: var(--acc); border-color: var(--acc); color: #000 }
+.iconbtn[disabled] { opacity: .5; pointer-events: none }
 .iconbtn svg { width: 14px; height: 14px }
 
 /* ---------- 徽章 ---------- */
-.badge { --badge-bg: var(--bg3); --badge-fg: var(--muted); display: inline-flex; align-items: center; gap: 4px; font-size: 10px; line-height: 1.4; padding: 2px 6px; font-weight: 700; background: var(--badge-bg); color: var(--badge-fg); white-space: nowrap }
+.badge { --badge-bg: var(--bg3); --badge-fg: var(--soft); display: inline-flex; align-items: center; gap: 4px; font-size: 10px; line-height: 1.4; padding: 2px 6px; font-weight: 700; background: var(--badge-bg); color: var(--badge-fg); white-space: nowrap }
 .badge-acc { --badge-bg: var(--acc-dim); --badge-fg: var(--acc) }
 .badge-solid { --badge-bg: var(--acc); --badge-fg: #000 }
 .badge-warn { --badge-bg: rgba(255, 176, 44, .14); --badge-fg: var(--warn) }
@@ -143,17 +145,18 @@ select {
 .card { background: var(--bg2); border: 1px solid var(--line) }
 
 /* ---------- studio steps guide ---------- */
-.stepbar { display: flex; align-items: center; gap: 0 }
-.step { display: flex; align-items: center; gap: 8px; padding: 7px 14px; border: 1px solid var(--line); font-size: 11px; color: var(--dim); cursor: pointer; transition: color .15s ease, background-color .15s ease, border-color .15s ease; background: var(--bg) }
+/* 窄屏横向滚动（step 文字 nowrap，禁止逐字竖排折叠） */
+.stepbar { display: flex; align-items: center; gap: 0; overflow-x: auto }
+.step { display: flex; align-items: center; gap: 8px; padding: 7px 14px; border: 1px solid var(--line); font-size: 11px; color: var(--soft); cursor: pointer; transition: color .15s ease, background-color .15s ease, border-color .15s ease; background: var(--bg); white-space: nowrap; flex: none }
 .step b { font-weight: 800; font-size: 12px }
-.step:hover { border-color: var(--muted); color: var(--muted) }
+.step:hover { border-color: var(--muted); color: var(--txt) }
 .step.on { border-color: var(--acc); color: var(--txt) }
 .step.on b { color: var(--acc) }
 .step.done { border-color: var(--line2); color: var(--muted) }
 .step-arrow { width: 18px; height: 1px; background: var(--line2); flex: none }
 
 /* ---------- candidates ---------- */
-.segmini { height: 26px; border: 1px solid var(--line2); font-size: 10px; display: flex; align-items: center; justify-content: center; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; flex: none }
+.segmini { height: 26px; border: 1px solid var(--line2); font-size: 10px; display: flex; align-items: center; justify-content: center; color: var(--soft); letter-spacing: .1em; text-transform: uppercase; flex: none }
 
 /* ---------- toast / overlay ---------- */
 .toast-stack { position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none }
@@ -250,6 +253,7 @@ details.faq[open] .faq-plus { transform: rotate(45deg) }
   .sidebar .nav-item .kbd { display: none }
   .sidebar-bottom { padding: 12px 6px 84px; display: flex; flex-direction: column; align-items: center }
   .sidebar-bottom > .btn { display: none } /* 新手引导按钮折叠态隐藏 */
+  .sidebar-credits { display: none } /* 积分余额/授权徽标数字 48px 放不下：折叠态隐藏（菜单与导航仍可操作） */
   .sidebar-lang { display: none } /* 折叠态放不下语言切换：登录/落地页仍有入口 */
   /* 档位文字隐藏，账号入口缩为「···」，弹出的菜单加宽贴左，仍可操作 */
   .accmenu { left: 6px; width: 176px; right: auto }

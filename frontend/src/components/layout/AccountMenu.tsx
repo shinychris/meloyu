@@ -259,7 +259,7 @@ export default function AccountMenu() {
         {!isDesktop && (
           <button
             className="acc-trigger font-bold flex-none ml-1"
-            style={{ color: open ? 'var(--acc)' : 'var(--dim)' }}
+            style={{ color: open ? 'var(--acc)' : 'var(--muted)' }}
             title={t('app.sidebar.logoutTitle')}
             onClick={() => setOpen((v) => !v)}
           >
@@ -269,7 +269,7 @@ export default function AccountMenu() {
         {isDesktop && (
           <button
             className="acc-trigger font-bold flex-none ml-1"
-            style={{ color: 'var(--dim)' }}
+            style={{ color: 'var(--muted)' }}
             title={t('auth.menu.exportData')}
             onClick={() => void onExport()}
           >
