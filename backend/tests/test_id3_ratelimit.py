@@ -1,4 +1,4 @@
-"""AIGC 标识写入（P0-3）与限流中间件（P0-6）单测。
+"""AIGC 标识写入与限流中间件单测。
 
 运行：.venv/Scripts/python.exe -m unittest discover -s tests -v
 """
@@ -94,7 +94,7 @@ class TestRateLimit(unittest.TestCase):
                                  False, False, False])
 
     def test_overflow_evicts_oldest_keys_not_all(self):
-        """F-BE-07（2026-10-27）：_hits 超内存上限时淘汰最旧键，近期防护窗口保留
+        """（2026-10-27）：_hits 超内存上限时淘汰最旧键，近期防护窗口保留
         （原整体 clear() 可被故意撑爆后一次性清空全部计数，等于给爆破者开闸）。"""
         from collections import deque
 

@@ -12,11 +12,11 @@ export default tseslint.config(
   // ESLint 10 要求 plugins 为对象形式，用插件的 flat 变体（recommended 的等价 flat 导出）
   reactHooks.configs.flat.recommended,
   {
-    // F-FE-16/29 整改：rules-of-hooks 与 refs 已恢复 error（诱因——use 前缀普通函数、
+    // rules-of-hooks 与 refs 已恢复 error（诱因——use 前缀普通函数、
     // 条件 hook 调用、渲染期读写 ref——已修复，见 VoicePanel/CandidateCard/
     // SearchInput/AccountMenu/ArrangementView 等）。
     // 仍暂降级 warn 的规则：既有「effect 内拉数据」模式（拦截器统一 toast 口径），
-    // 本批已清理可安全清理者，剩余告警清单见评审整改记录。
+    // 本批已清理可安全清理者，剩余告警保持为 error。
     rules: {
       'react-hooks/set-state-in-effect': 'warn',
     },

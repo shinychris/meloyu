@@ -1,4 +1,4 @@
-"""P0-7 回归（2026-09-26 商业化审查）：外部通道 preview/master 同源 relpath 落库。
+""" 回归（2026-09-26）：外部通道 preview/master 同源 relpath 落库。
 
 修复前契约破坏：music_api / music_replicate(mp3 输出模型) 对同一物理文件注册
 preview+master 两条元数据，_persist_success 无条件登记两行 File 同 path →

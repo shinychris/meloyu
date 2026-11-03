@@ -53,7 +53,7 @@ export const workZh: Record<keyof typeof workEn, string> = {
   'work.export.failed': '导出失败',
   'work.export.toast.pollBroken': '导出任务查询中断',
   'work.export.toast.certStarted': '授权证书 JSON 已开始下载',
-  // ===== 发行导出预设（FR-11）=====
+  // ===== 发行导出预设=====
   'work.export.release.title': '发行导出',
   'work.export.release.sub': '按平台模板打包：音频 + 封面占位 + metadata.json + README',
   'work.export.release.douyin': '抖音音乐人',
@@ -76,7 +76,7 @@ export const workZh: Record<keyof typeof workEn, string> = {
   'work.export.release.coverHint': '可选：不小于 600x600 的 PNG 将替换系统生成的占位图',
   'work.export.release.titleRequired': '发行曲名必填（1~80 字符）',
   'work.export.release.artistRequired': '艺人名必填（1~60 字符）',
-  // ===== 团队协作（FR-13，v0.8.1）=====
+  // ===== 团队协作（v0.8.1）=====
   'share.title': '团队共享',
   'share.sharedTo': '已共享到团队空间',
   'share.unshare': '取消共享',

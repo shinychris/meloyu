@@ -35,7 +35,7 @@ function activateRequestFromParams(params) {
 }
 
 /**
- * 深链派发决策（评审 F-DT-01：深链冷启动静默丢失修复）。
+ * 深链派发决策（深链冷启动静默丢失修复）。
  * 冷启动时模块顶层解析 argv 时 sidecarBase 尚未就绪，激活请求必须先挂起，
  * 待健康检查通过后重放；sidecarBase 就绪则立即派发；非激活深链忽略。
  * main.js 侧「后到的挂起请求覆盖先到的」由此函数 + pendingDeepLink 变量实现。
@@ -45,7 +45,7 @@ function planDeepLink(request, sidecarBase) {
   return sidecarBase ? { action: 'dispatch' } : { action: 'park' }
 }
 
-// ---------- 外链白名单（评审 F-DT-04） ----------
+// ---------- 外链白名单 ----------
 
 /** 回环 host 判定（http:// 仅放行本机；IPv6 字面量去方括号后比较） */
 function isLoopbackHost(hostname) {
@@ -67,7 +67,7 @@ function isExternalOpenAllowed(rawUrl) {
 }
 
 /**
- * 新窗口分类（评审 F-DT-03/04）：
+ * 新窗口分类：
  * - allow：sidecarBase 前缀（本机 SPA 自身弹窗；由任意回环端口收紧为同源前缀）
  * - external：白名单外链 → 调用方转交系统浏览器
  * - deny：其余一律拒绝（不打开也不外抛）
@@ -78,7 +78,7 @@ function classifyWindowOpen(url, sidecarBase) {
   return 'deny'
 }
 
-// ---------- 权限来源校验（评审 F-DT-05） ----------
+// ---------- 权限来源校验 ----------
 
 /**
  * 权限请求判定：media/audioCapture（麦克风）仅 sidecarBase 来源
@@ -92,7 +92,7 @@ function isPermissionAllowed(permission, requestingUrl, sidecarBase) {
     && requestingUrl.startsWith(sidecarBase)
 }
 
-// ---------- 深链激活响应解析（评审 F-DT-14） ----------
+// ---------- 深链激活响应解析 ----------
 
 /**
  * 激活响应解析：后端统一信封 {code, message, data, request_id}，HTTP 200 且
@@ -107,7 +107,7 @@ function parseActivationResponse(statusCode, bodyText) {
   return { ok, reason: ok ? '' : ((body && body.message) || `HTTP ${statusCode}`) }
 }
 
-// ---------- 自动更新源校验（评审 F-DT-16） ----------
+// ---------- 自动更新源校验 ----------
 
 /** 更新 feed 指向可执行安装包，非 https 明文可被中间人替换——必须 https 才启用 */
 function isHttpsUpdateUrl(url) {
@@ -115,7 +115,7 @@ function isHttpsUpdateUrl(url) {
 }
 
 /**
- * 应用页 CSP（方案 §6.3 承诺项，2026-10-16 补全）。
+ * 应用页 CSP（承诺项，2026-10-16 补全）。
  * SPA 静态资源与全部接口同源（sidecar 回环），故 default-src 'self'；
  * style 'unsafe-inline' = React 内联样式；Google Fonts 为 frontend/index.html
  * 既有外链（离线时请求失败自然回退系统字体，不阻断渲染）。

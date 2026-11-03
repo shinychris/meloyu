@@ -19,7 +19,7 @@ class LLMSetting(BaseModel):
     """全局模型通道配置（单行）。
 
     lyrics_backend ∈ none|ollama|openai_compat（none=未配置；歌词创作必须有真实
-    LLM 通道，无兜底引擎——原 localsynth 规则引擎已移除，ADR-019）；
+    LLM 通道，无兜底引擎——原 localsynth 规则引擎已移除）；
     music_backend ∈ localsynth|api|replicate|musicgen_local
     （V1.3 增 api=Suno 兼容网关；V1.4 增 replicate=Replicate 托管开源模型、
     musicgen_local=本机 MusicGen，二者共用 music_model 从目录选择）。

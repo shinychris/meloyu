@@ -1,7 +1,7 @@
 # Meloyu Desktop 打包配置（electron-builder）
 # 前置：sidecar 与前端产物已就位（见 desktop/README.md 构建顺序）：
-#   backend/dist-backend/meloyu-backend/   （PyInstaller --onedir 产物）
-#   frontend/dist/                          （vite build 产物）
+# backend/dist-backend/meloyu-backend/   （PyInstaller --onedir 产物）
+# frontend/dist/                          （vite build 产物）
 appId: com.meloyu.desktop
 productName: Meloyu
 copyright: © 2026 Meloyu
@@ -54,7 +54,7 @@ nsis:
   createDesktopShortcut: true
   shortcutName: Meloyu
   # EULA 待法务定稿后经 nsis.license 挂载（安装器许可页）；当前随包携带
-  # resources/THIRD-PARTY-NOTICES.md 履行三方声明义务（方案 §8）
+  # resources/THIRD-PARTY-NOTICES.md 履行三方声明义务
 
 mac:
   # build/icon.png（512+）由 electron-builder 自动转换为 .icns
@@ -77,5 +77,5 @@ dmg:
 
 # 自动更新源（P3 官网更新目录；发布时经 MELOYU_UPDATE_URL 注释解除或 CLI 覆盖）
 # publish:
-#   - provider: generic
-#     url: https://meloyu.com/updates
+# - provider: generic
+# url: https://meloyu.com/updates

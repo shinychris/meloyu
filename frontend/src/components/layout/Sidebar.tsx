@@ -65,7 +65,7 @@ export default function Sidebar() {
   const trialPct = activated
     ? 100
     : Math.min(100, Math.max(3, (daysLeft / Math.max(1, license?.trial.days ?? 14)) * 100))
-  // D-6：desktop 形态隐藏作品市场（云社区非本阶段重点；路由侧亦有 MarketGuard 兜底）；
+  // ：desktop 形态隐藏作品市场（云社区非本阶段重点；路由侧亦有 MarketGuard 兜底）；
   // v0.17.0：license（买断）形态「定价与积分」换「系统设置」（授权/用量/引擎入口
   // 收口到 /settings，定价页 cloud 存量专用）
   const navGroups = NAV_GROUPS.map((g) => {

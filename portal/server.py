@@ -1,12 +1,12 @@
-"""Meloyu License Portal（P3，2026-10-03 定位转型 · 官网四合一轻服务）。
+"""Meloyu License Portal（官网四合一轻服务）。
 
-职责（方案 §6.4）：
-1. 营销站（/）——买断制定价 + 购买入口（正式营销站由官网批次细化，此处可运行基座）
-2. 购买（/buy）——Stripe Payment Link 跳转；履约（/thanks）凭 checkout session
+职责：
+1. 营销站——买断制定价 + 购买入口（正式营销站由官网批次细化，此处可运行基座）
+2. 购买（buy）——Stripe Payment Link 跳转；履约（thanks）凭 checkout session
    现场签发 License Key（REST 直查 Stripe，无 webhook 依赖；同 session 幂等）
-3. License Portal（/api/admin/*）——人工签发/吊销/激活设备治理（在线层可选，
+3. License Portal（api/admin/*）——人工签发/吊销/激活设备治理（在线层可选，
    桌面端离线验签不依赖本服务；签名私钥一律离线 license_tools 生成，不经 HTTP）
-4. 更新源（/updates/）——静态目录托管桌面安装包与 latest.yml
+4. 更新源（updates/）——静态目录托管桌面安装包与 latest.yml
 
 签名实现复用 backend（sys.path 注入），单一事实源：app/services/license.py。
 运行：python -m uvicorn server:app --port 8900（在 backend venv 下）。
@@ -56,11 +56,11 @@ SMTP_FROM = os.environ.get("PORTAL_SMTP_FROM", "Meloyu <no-reply@meloyu.com>")
 # 激活码字母表：去易混字符（I/L/O/0/1）
 _CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
-# /thanks 的 checkout session 强格式（评审 F-PT-10）：拼入 Stripe API 路径前校验，
+# /thanks 的 checkout session 强格式：拼入 Stripe API 路径前校验，
 # 防路径注入/任意 session 探测
 _SESSION_ID_RE = re.compile(r"^cs_(test|live)_[A-Za-z0-9]+$")
 
-# /thanks 页（展示激活码与账户）禁止任何缓存留底（评审 F-PT-05）
+# /thanks 页（展示激活码与账户）禁止任何缓存留底
 _NO_STORE = {"Cache-Control": "no-store"}
 
 
@@ -68,7 +68,7 @@ def mask_code(code: str) -> str:
     """激活码日志脱敏：前5后3（如 MELOYU-XXXX…XXX）。
 
     完整码形如 MELOYU-XXXXXXXX-XXXXXXXX（25 字符）；短于安全长度的输入整体
-    打码。日志/工单里不再出现可兑换的完整激活码（评审 F-PT-08）。
+    打码。日志/工单里不再出现可兑换的完整激活码。
     """
     if not code or len(code) < 12:
         return "MELOYU-***"
@@ -85,7 +85,7 @@ def send_activation_email(account: str, code: str, tier: str = "lifetime") -> bo
     """发送激活邮件（账户+激活码+激活步骤）。SMTP 未配置时返回 False（管理员人工交付兜底）。"""
     if not SMTP_HOST:
         # 兜底邮件行为保持（此处日志即人工交付载体，账户必须可读）；
-        # 激活码仍脱敏——完整码只进邮件/交付渠道，不进日志（评审 F-PT-08）
+        # 激活码仍脱敏——完整码只进邮件/交付渠道，不进日志
         print(f"[portal] SMTP not configured; activation email skipped "
               f"(deliver manually): account={account} code={mask_code(code)}")
         return False
@@ -129,7 +129,7 @@ background:#0d0f10;color:#e8ece9;margin:0;padding:40px 16px">
 <p style="color:#5c666b;font-size:13px">Works fully offline after activation. Questions? Just reply.</p>
 </div></body></html>""", subtype="html")
     try:
-        # 评审 F-PT-01：STARTTLS 必须带证书/主机名校验上下文——否则 SMTP 凭据
+        # STARTTLS 必须带证书/主机名校验上下文——否则 SMTP 凭据
         # 可被中间人截获（激活码同通道，等于接管交付链）
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as smtp:
             smtp.starttls(context=ssl.create_default_context())
@@ -147,7 +147,7 @@ STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 PAYMENT_LINK_URL = os.environ.get("PAYMENT_LINK_URL", "")
 # 无在线支付模式（默认）：售卖走人工渠道（邮箱联系 → 人工签发 Key）
 SALES_EMAIL = os.environ.get("PORTAL_SALES_EMAIL", "")
-# 价格单一事实源：backend/app/config.py（评审 F-PT-11：删除本地重复定义，
+# 价格单一事实源：backend/app/config.py（删除本地重复定义，
 # 调价只改 config.py 一处，portal 随 sys.path 同源生效）
 PRICE_USD = LICENSE_PRICE_USD
 SALE_PRICE_USD = LICENSE_SALE_PRICE_USD
@@ -165,13 +165,13 @@ _PRICE_STRIKE = (
 )
 
 
-# ---------------- 限流（评审 F-PT-02/03） ----------------
+# ---------------- 限流 ----------------
 
 class SlidingWindowLimiter:
     """进程内 IP 滑动窗口限流（独立轻量实现，思路同 backend/app/core/ratelimit.py）。
 
-    - admin 防Bearer token 爆破（评审 F-PT-02）；activate 防激活码枚举与
-      签名密钥刷取（评审 F-PT-03）。
+    - admin 防Bearer token 爆破；activate 防激活码枚举与
+      签名密钥刷取。
     - 被拒请求同样计入（持续攻击不缩窗）；键按访问惰性过期，键数超上限整体
       清空兜底（内存护栏；最坏=限流窗口重置，无安全影响）。
     - 单进程内存态：portal 必须单进程单 worker 运行（README 部署节）；反代
@@ -223,7 +223,7 @@ app = FastAPI(title="Meloyu License Portal", docs_url=None)
 
 @app.on_event("startup")
 async def _startup() -> None:
-    """评审 F-PT-14：DB init / 数据目录创建等副作用移出 import 期，延后到
+    """DB init / 数据目录创建等副作用移出 import 期，延后到
     服务启动（uvicorn 会执行 lifespan）；模块可被测试与工具安全导入
     （测试自管 portal_db.init 指向临时库）。"""
     portal_db.init(DATA_DIR / "portal.db")
@@ -234,13 +234,13 @@ async def _startup() -> None:
 
 def require_admin(request: Request) -> None:
     client_ip = _client_ip(request)
-    # 限流前置：鉴权失败路径同样计数（爆破窗口不被 401 重置，评审 F-PT-02）
+    # 限流前置：鉴权失败路径同样计数（爆破窗口不被 401 重置）
     if not ADMIN_LIMITER.check(client_ip):
         raise HTTPException(429, "too many requests; retry later")
     if not ADMIN_TOKEN:
         raise HTTPException(503, "admin API disabled: PORTAL_ADMIN_TOKEN not configured")
     auth = request.headers.get("Authorization", "")
-    # 常量时间比较（评审 F-PT-02；bytes 形态避免非 ASCII 头触发 TypeError）
+    # 常量时间比较（bytes 形态避免非 ASCII 头触发 TypeError）
     if not hmac.compare_digest(auth.encode("utf-8"), f"Bearer {ADMIN_TOKEN}".encode("utf-8")):
         raise HTTPException(401, "invalid admin token")
 
@@ -276,7 +276,7 @@ def issue_license(tier: str, account: str, note: str, devices: int, seats: int |
                      stripe_session_id, portal_db.now_iso()))
                 break
             except sqlite3.IntegrityError as exc:
-                # 评审 F-PT-06：按唯一约束字段区分真实原因，不再宽吞一切 DB 错
+                # 按唯一约束字段区分真实原因，不再宽吞一切 DB 错
                 msg = str(exc)
                 if "stripe_session_id" in msg and stripe_session_id:
                     # 并发 /thanks 同 session 撞唯一约束：回查已有签发直接复用
@@ -309,9 +309,9 @@ def license_row(c, lid: str):
 # ---------------- Admin API（人工签发/治理） ----------------
 
 class AdminIssueRequest(BaseModel):
-    """人工签发请求体（评审 F-PT-07：pydantic 显式校验，非法输入 422 而非 500）。
+    """人工签发请求体（pydantic 显式校验，非法输入 422 而非 500）。
 
-    devices = 单码可绑定设备数（/buy 口径 up to 3，上限放宽到 10）；
+    devices = 单码可绑定设备数（buy 口径 up to 3，上限放宽到 10）；
     seats = 企业版席位（仅 enterprise 档生效），合理上界 500。
     """
     tier: str = "lifetime"
@@ -369,7 +369,7 @@ async def admin_activations(request: Request, lid: str | None = None):
 
 @app.delete("/api/admin/activations/{lid}/{device_id}")
 async def admin_unbind(lid: str, device_id: str, request: Request):
-    """换机解绑（方案 §6.4 设备治理补全，2026-10-16）：移除单台设备的激活
+    """换机解绑（设备治理，2026-10-16）：移除单台设备的激活
     记录、释放设备额度；与整码吊销（revoke）互补，旧设备遗失/退役场景用。"""
     require_admin(request)
     with portal_db.conn() as c:
@@ -380,7 +380,7 @@ async def admin_unbind(lid: str, device_id: str, request: Request):
         return {"lid": lid, "device_id": device_id, "unbound": True}
 
 
-# （评审 F-PT-04：/api/admin/keygen 端点已删除——经 HTTP 下发签名私钥违背
+# （api/admin/keygen 端点已删除——经 HTTP 下发签名私钥违背
 # 「私钥离线保管」纪律；keypair 一律离线经 backend/scripts/license_tools.py
 # keygen 生成，公钥经环境变量注入）
 
@@ -390,7 +390,7 @@ async def admin_unbind(lid: str, device_id: str, request: Request):
 @app.post("/api/activate-report")
 async def activate_report(request: Request):
     """桌面端可选上报：验签 + 吊销检查 + 设备数治理。离线验签不依赖本端点。"""
-    if _rate_limited(request, ACTIVATE_LIMITER):  # 评审 F-PT-03：10/min/IP
+    if _rate_limited(request, ACTIVATE_LIMITER):  # 10/min/IP
         raise HTTPException(429, "too many requests; retry later")
     body = await request.json()
     key = (body.get("license_key") or "").strip()
@@ -400,7 +400,7 @@ async def activate_report(request: Request):
     if PUBLIC_KEY:
         from app.core.errors import BizError
         try:
-            # 评审 F-PT-14：显式传公钥，消除对全局 settings 的猴补
+            # 显式传公钥，消除对全局 settings 的猴补
             verify_license_key(key, public_key_b64=PUBLIC_KEY)
         except BizError:
             return {"ok": False, "reason": "invalid_key"}
@@ -436,7 +436,7 @@ async def activate(request: Request):
     桌面 App 提交 {account, code, device_id} → 校验激活码/账户/吊销/设备数 →
     返回完整签名密钥（App 侧 Ed25519 验签后离线持有，此后不再依赖本服务）。
     """
-    if _rate_limited(request, ACTIVATE_LIMITER):  # 评审 F-PT-03：10/min/IP
+    if _rate_limited(request, ACTIVATE_LIMITER):  # 10/min/IP
         raise HTTPException(429, "too many requests; retry later")
     body = await request.json()
     account = (body.get("account") or "").strip().lower()
@@ -484,7 +484,7 @@ async def buy():
     """
     if PAYMENT_LINK_URL:
         return RedirectResponse(PAYMENT_LINK_URL)
-    contact = html.escape(SALES_EMAIL or "support@meloyu.com")  # 评审 F-PT-05
+    contact = html.escape(SALES_EMAIL or "support@meloyu.com")  # 
     return HTMLResponse(f"""<!doctype html><html><head><meta charset="utf-8">
 <title>Meloyu — Get your license</title>
 <style>body{{font-family:ui-monospace,Consolas,monospace;background:#0d0f10;
@@ -508,7 +508,7 @@ a{{color:#8be9c0}}li{{margin:8px 0;color:#9aa3a7;font-size:14px}}</style></head>
 async def thanks(session_id: str = ""):
     """Payment Link 支付完成回跳：直查 Stripe 校验已付 → 幂等签发 → 页面展示 Key。"""
     if not _SESSION_ID_RE.fullmatch(session_id):
-        # 评审 F-PT-10：session_id 拼入 Stripe API 路径前强格式校验
+        # session_id 拼入 Stripe API 路径前强格式校验
         # （cs_test_/cs_live_ 前缀 + 字母数字，防路径注入与任意 id 探测）
         raise HTTPException(422, "invalid checkout session id")
     if not (STRIPE_SECRET_KEY and PRIVATE_KEY):
@@ -542,7 +542,7 @@ async def thanks(session_id: str = ""):
     else:
         key = row["code"] or row["key"]
         note = row["account"] or row["note"]
-    # 评审 F-PT-05：页面展示完整激活码 + 账户——插值全部 html.escape（防御纵深），
+    # 页面展示完整激活码 + 账户——插值全部 html.escape（防御纵深），
     # 且响应 no-store，防浏览器/代理缓存留底
     return HTMLResponse(f"""<!doctype html><html><head><meta charset="utf-8">
 <title>Meloyu — Your license key</title>
@@ -562,7 +562,7 @@ word-break:break-all;font-size:12px;line-height:1.6}}</style></head><body>
 
 
 # ---------------- 更新源（静态：latest.yml + 安装包上传至此） ----------------
-# check_dir=False：目录创建已移入 startup 钩子（评审 F-PT-14），import 期不落盘
+# check_dir=False：目录创建已移入 startup 钩子，import 期不落盘
 app.mount("/updates", StaticFiles(directory=str(DATA_DIR / "updates"), check_dir=False),
           name="updates")
 

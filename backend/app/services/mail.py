@@ -1,10 +1,10 @@
-"""邮件发送（stdlib smtplib，零新依赖）与注册验证码（P0-6/P1-7/P1-16）。
+"""邮件发送（stdlib smtplib，零新依赖）与注册验证码。
 
 - SMTP 未配置（settings.smtp_host 为空）时：邮件相关功能整体不可用，
   forgot-password / send-code 返回 40901 明确提示需管理员配置 SMTP。
-- 发送健壮性（P1-16，2026-09-26）：SMTP 异常不再裸抛 500——转 40901
+- 发送健壮性（2026-09-26）：SMTP 异常不再裸抛 500——转 40901
   "邮件服务暂不可用"业务错误，并做一次退避重试（网络抖动自愈）。
-- 验证码（P1-7）：落库 email_codes（仅存 sha256，TTL 10 分钟，重发节流
+- 验证码：落库 email_codes（仅存 sha256，TTL 10 分钟，重发节流
   60 秒），重启/多副本可用；注册成功或验证通过即删行。
 """
 from __future__ import annotations
@@ -52,7 +52,7 @@ def _deliver(to: str, subject: str, body: str) -> None:
 
 
 def _send(to: str, subject: str, body: str) -> None:
-    """发送 + 一次退避重试；两次都失败转 40901 业务错误（P1-16）。"""
+    """发送 + 一次退避重试；两次都失败转 40901 业务错误。"""
     _require_smtp()
     last_exc: Exception | None = None
     for attempt in (1, 2):

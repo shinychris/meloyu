@@ -1,4 +1,4 @@
-"""阶段⑤：合成人声（共振峰合成，vocoder/hum 风格——诚实定位见架构 §7.7）。
+"""阶段⑤：合成人声（共振峰合成，vocoder/hum 风格——诚实定位见）。
 
 锯齿波源（加法合成限谐波）+ 两个共振峰带通（频域实现）+ 音高轨迹（颤音/滑音）
 + 音节包络 + 气声噪声。随机性全部来自传入的 seeded rng。
@@ -10,7 +10,7 @@ import numpy as np
 from app.synth.ir import SAMPLE_RATE, SongIR
 from app.synth.melody import vowel_of_syllable
 
-# 元音共振峰对 (F1, F2) Hz（架构 §7.7 查表）
+# 元音共振峰对 (F1, F2) Hz（查表）
 FORMANTS: dict[str, tuple[float, float]] = {
     "a": (800.0, 1200.0),
     "i": (300.0, 2300.0),
@@ -64,7 +64,7 @@ def _syllable_wave(f0: float, dur: float, vowel: str, rng: np.random.Generator,
     n_fft = 1 << max(9, int(np.ceil(np.log2(n))))
     spec = np.fft.rfft(wave, n=n_fft)
     f1, f2 = FORMANTS.get(vowel, FORMANTS["a"])
-    # FR-5：voice_clone 按档案实测共振峰比例缩放（参数级适配，非采样）
+    # voice_clone 按档案实测共振峰比例缩放（参数级适配，非采样）
     spec *= _formant_response(n_fft, f1 * formant_scale[0], f2 * formant_scale[1])
     wave = np.fft.irfft(spec, n=n_fft)[:n]
 
@@ -90,7 +90,7 @@ def synth_vocal(ir: SongIR, rng: np.random.Generator, bus: np.ndarray) -> None:
     if req.vocal == "instrumental" or not ir.vocal_notes:
         return
     n_harm = 28 if req.model == "v1_pro" else 16
-    # FR-5：voice_clone 谐波数按档案亮度系数调整（限 12~40）
+    # voice_clone 谐波数按档案亮度系数调整（限 12~40）
     timbre = req.voice_timbre or {}
     formant_scale = (float(timbre.get("f1_scale", 1.0)), float(timbre.get("f2_scale", 1.0)))
     if timbre.get("harm_scale"):

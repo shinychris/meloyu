@@ -1,4 +1,4 @@
-"""ACE-Step v1.5 本地开源模型 Provider（V1.5「本地开源音乐大模型」批，ADR-016）。
+"""ACE-Step v1.5 本地开源模型 Provider（V1.5「本地开源音乐大模型」批）。
 
 ACE-Step v1.5（MIT，5Hz LM + DiT 混合架构，2B turbo + 0.6B LM）：歌词→完整
 歌曲（真人声演唱），8GB 显存档可用（pt 后端 + CPU offload），是本机 4060 Ti
@@ -409,7 +409,7 @@ class ACEStepLocalProvider:
             progress(_stage_key(pct), max(1, min(99, pct)),
                      message or tr("ACE-Step 生成中", "Generating with ACE-Step"))
 
-        # GPU 单卡互斥（2026-09-26 商业化审查 P1-17）：8GB 显存跑不下两个 ACE-Step
+        # GPU 单卡互斥（2026-09-26 商业化）：8GB 显存跑不下两个 ACE-Step
         # 子进程（batch 2 各自拉 torch），并发必双双 OOM 失败退款——与 musicgen
         # _GEN_LOCK / selfhosted _AUDIOCPP_SEMAPHORE 同款串行化。等待期间持续上报
         # 进度与查取消：排队等待计入任务超时预算，防止排到队首时已被超时熔断误杀。

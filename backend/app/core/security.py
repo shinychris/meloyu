@@ -1,6 +1,6 @@
-"""JWT 签发/校验、bcrypt、get_current_user 依赖（架构 ADR-007：PyJWT + bcrypt）。
+"""JWT 签发/校验、bcrypt、get_current_user 依赖（PyJWT + bcrypt）。
 
-P1-3（v0.7.0）：access 24h + refresh 30d 轮换（单设备会话语义：新 refresh 覆写
+（v0.7.0）：access 24h + refresh 30d 轮换（单设备会话语义：新 refresh 覆写
 users.refresh_token_hash，旧 refresh 自动失效；登出/改密/重置/注销清空即吊销全部）。
 """
 from __future__ import annotations
@@ -24,7 +24,7 @@ from app.database import get_db
 from app.models import User
 
 JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_TTL_SEC = 24 * 3600          # access 24 小时（契约 §1.2，v0.7.0 由 7 天收紧）
+ACCESS_TOKEN_TTL_SEC = 24 * 3600          # access 24 小时（v0.7.0 由 7 天收紧）
 REFRESH_TOKEN_TTL_SEC = 30 * 24 * 3600    # refresh 30 天，轮换式
 TOKEN_TTL_SEC = ACCESS_TOKEN_TTL_SEC      # 兼容旧引用（expires_in 等展示口径）
 BCRYPT_ROUNDS = 12
@@ -161,7 +161,7 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
 
 
 def get_user_from_api_key(request: Request, db: Session = Depends(get_db)) -> tuple[User, object]:
-    """开放 API 鉴权（FR-19）：Authorization: Bearer meloyu_sk_* 或 X-API-Key 头。
+    """开放 API 鉴权：Authorization: Bearer meloyu_sk_* 或 X-API-Key 头。
 
     返回 (User, ApiKey 行)；密钥即账号身份的机器代理——计费走账号积分账本，
     商用授权随账号档位×通道许可（证书同源），任务留痕 via=api_key。
@@ -191,7 +191,7 @@ def get_current_user_optional(request: Request, db: Session = Depends(get_db)) -
     return user
 
 
-# ---- 短时流地址签名（契约 §9.4：<audio> 标签无法携带 Authorization 头）----
+# ---- 短时流地址签名（<audio> 标签无法携带 Authorization 头）----
 
 
 def _b64url(data: bytes) -> str:

@@ -1,4 +1,4 @@
-"""FR-11 发行导出预设单测（v0.8.0）：schema 校验 + 打包内容 + 平台分流。
+""" 发行导出预设单测（v0.8.0）：schema 校验 + 打包内容 + 平台分流。
 
 运行：.venv/Scripts/python.exe -m unittest discover -s tests -v
 内存 SQLite + 临时 audio 目录（settings.data_dir 覆盖），services 层直调。

@@ -27,8 +27,8 @@ const TAB_KEYS: Record<Tab, 'market.tab.browse' | 'market.tab.mine' | 'market.ta
 }
 
 /**
- * 作品市场（V2-c，v0.10.1）：浏览/购买（积分分账 90/10 + 非独占授权）+
- * 我的作品上架管理 + 发行清单（分发对接指引；发行打包走作品页发行导出 FR-11）。
+ * 作品市场（v0.10.1）：浏览/购买（积分分账 90/10 + 非独占授权）+
+ * 我的作品上架管理 + 发行清单（分发对接指引；发行打包走作品页发行导出）。
  */
 export default function MarketView() {
   const t = useT()
@@ -126,7 +126,7 @@ export default function MarketView() {
   }
 
   const onDelist = async (l: MarketListingInfo) => {
-    // F-FE-22：下架为破坏性操作（买家不可再购），二次确认
+    // ：下架为破坏性操作（买家不可再购），二次确认
     const ok = await useConfirmStore.getState().confirm({
       title: t('market.confirm.delistTitle', { title: l.title }),
       description: t('market.confirm.delistDesc'),

@@ -2,7 +2,7 @@ import { AUDIENCES } from '../../lib/landing-data'
 import { useT } from '../../i18n'
 import { EqMark } from './EqMark'
 
-/** 目标用户三场景 + 合规口径说明条（对齐 R-01 红线：不绝对化商用承诺） */
+/** 目标用户三场景 + 合规口径说明条（对齐  红线：不绝对化商用承诺） */
 export default function LandingAudience() {
   const t = useT()
   return (

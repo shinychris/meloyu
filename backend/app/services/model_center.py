@@ -1,7 +1,7 @@
 """模型中心服务：本地开源模型（Ollama）下载/删除/列举 + 外部 API 配置
 + 歌词引擎工厂（V1.2）+ 外部歌曲生成 API 通道（V1.3）
 + 开源歌曲模型目录/Replicate 托管/本机 MusicGen（V1.4）
-+ 本机 ACE-Step v1.5 人声成曲通道（V1.5，ADR-016）。
++ 本机 ACE-Step v1.5 人声成曲通道（V1.5）。
 
 进度写库节流（≥2% 或 ≥1s 才落一次），拉取线程与生成任务线程池隔离（各 1 worker）。
 """
@@ -143,7 +143,7 @@ def external_presets() -> list[dict]:
                     "model_hint": tr(*p["model_hint"])})
     return out
 
-# 外部歌曲生成 API 预设（Suno 兼容协议，ADR-010）：base 填网关根，自动补 /api/v1
+# 外部歌曲生成 API 预设（Suno 兼容协议）：base 填网关根，自动补 /api/v1
 MUSIC_API_PRESETS: list[dict] = [  # vendor 为 (zh, en) 双语
     {"vendor": ("GoAPI（Suno 中转）", "GoAPI (Suno relay)"),
      "base_url": "https://api.goapi.ai/suno", "model_hint": ""},
@@ -196,14 +196,14 @@ def get_settings(db: Session) -> dict:
 
 _MUSIC_BACKENDS = ("localsynth", "api", "replicate", "musicgen_local", "acestep_local",
                    "mmax_local", "songgen_local")
-# 自托管推理服务通道（V1.5.1，ADR-017）：模型装在用户环境，端点可配置
+# 自托管推理服务通道（V1.5.1）：模型装在用户环境，端点可配置
 _SELFHOSTED_BACKENDS = ("mmax_local", "songgen_local")
 
 
 def update_settings(db: Session, patch: dict) -> dict:
     s = _setting_row(db)
     backend = patch.get("lyrics_backend", s.lyrics_backend)
-    if backend == "localsynth":  # 历史遗留值（原离线规则引擎通道，ADR-019 移除）→ 未配置
+    if backend == "localsynth":  # 历史遗留值（原离线规则引擎通道，已移除）→ 未配置
         backend = "none"
     if backend not in ("none", "ollama", "openai_compat"):
         raise err_validation(tr("lyrics_backend 必须为 none/ollama/openai_compat",
@@ -284,7 +284,7 @@ def update_settings(db: Session, patch: dict) -> dict:
             if len(v) > 300:
                 raise err_validation(tr(f"{field} 过长", f"{field} is too long"))
             setattr(s, field, v)
-    # P1-2：key/token 落库一律 Fernet 加密（KEY_ENCRYPTION_SECRET 未配置时明文直通）
+    # key/token 落库一律 Fernet 加密（KEY_ENCRYPTION_SECRET 未配置时明文直通）
     if patch.get("external_api_key"):  # 空串=保持不变（脱敏读回无法回显）
         s.external_api_key = encrypt_secret(str(patch["external_api_key"]).strip())
     if patch.get("music_api_key"):
@@ -613,7 +613,7 @@ def test_music(base_url: str, api_key: str, model: str = "") -> dict:
 def get_lyrics_provider(db: Session):
     """按全局配置返回歌词 provider；未配置/配置不完整返回 None（无兜底通道）。
 
-    历史遗留值 lyrics_backend="localsynth"（原本地规则引擎，ADR-019 移除）
+    历史遗留值 lyrics_backend="localsynth"（原本地规则引擎，已移除）
     视同未配置。
     """
     s = db.get(LLMSetting, SETTING_ID)
@@ -800,7 +800,7 @@ def _execute_music_pull(op_id: str, model_id: str) -> None:
     try:
         # v0.16.3：acestep 依赖未部署时先应用内自动部署（源码+uv 引导+venv，
         # 约 4GB，进度占 0~30%），再下权重（30~100%）——桌面用户单按钮走完
-        # 全链路，不再要求跑脚本（方案 §3.2 组件中心 + 默认安装即部署）
+        # 全链路，不再要求跑脚本（组件中心 + 默认安装即部署）
         if is_acestep and not acestep_deps_installed():
             deploy_acestep(lambda pct, msg: on_progress(int(pct * 0.3), msg))
 

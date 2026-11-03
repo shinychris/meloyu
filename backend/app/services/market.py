@@ -1,4 +1,4 @@
-"""市场服务（V2-c，v0.10.1）：上架/下架/浏览/购买（分账+非独占授权记录）。"""
+"""市场服务（v0.10.1）：上架/下架/浏览/购买（分账+非独占授权记录）。"""
 from __future__ import annotations
 
 from sqlalchemy import func, select, text
@@ -63,7 +63,7 @@ def listing_to_dict(db: Session, listing: MarketListing, sales: int | None = Non
 
 
 def _require_commercial_license(db: Session, work: Work) -> None:
-    """P1-2（2026-09-26）：上架售卖前置商用授权校验。
+    """（2026-09-26）：上架售卖前置商用授权校验。
 
     非商用许可产物（免费档证书 / 非商用通道如社区许可模型）被平台参与
     转售=许可违约；以该作品最近一次签发证书的 license_type 为准，无证书
@@ -92,7 +92,7 @@ def publish(db: Session, user: User, work_id: str, price_credits: int) -> dict:
                           "No adopted candidate (missing preview); adopt a candidate on the work page before listing"))
     if not 1 <= int(price_credits) <= 100000:
         raise err_validation(tr("价格须为 1~100000 积分", "Price must be 1-100000 credits"))
-    # P1-2：标题/标签过敏感词（与生成侧同库），防市场上架内容裸奔
+    # 标题/标签过敏感词（与生成侧同库），防市场上架内容裸奔
     from app.core.sensitive import check_sensitive
     if check_sensitive(f"{work.title} {' '.join(work.tags or [])}".strip()):
         from app.core.errors import err_sensitive
@@ -131,7 +131,7 @@ def delist(db: Session, user: User, listing_id: str) -> dict:
 
 
 def admin_delist(db: Session, admin: User, listing_id: str, reason: str = "") -> dict:
-    """平台治理下架（P1-2：admin 专用，违规/投诉处置入口）。
+    """平台治理下架（admin 专用，违规/投诉处置入口）。
 
     留痕在卖家视角的 listing 状态与事件流；reason 必填口径由 API 层约束。
     """
@@ -151,7 +151,7 @@ def admin_delist(db: Session, admin: User, listing_id: str, reason: str = "") ->
 
 
 def delist_for_work(db: Session, work_id: str) -> int:
-    """作品被物理删除/注销清扫时联动下架（P1-1：防买家买到已删作品的空气）。
+    """作品被物理删除/注销清扫时联动下架（防买家买到已删作品的空气）。
 
     MarketListing.work_id 无外键（历史设计），删除路径必须显式调用本函数。
     返回下架条数。
@@ -202,7 +202,7 @@ def purchase(db: Session, user: User, listing_id: str) -> dict:
         raise err_not_found(tr("市场条目不存在或已下架", "Listing not found or delisted"))
     if listing.seller_user_id == user.id:
         raise err_conflict(tr("不能购买自己上架的作品", "Cannot buy your own listing"))
-    # P1-1（2026-09-26）：作品物理删除/回收站清扫不联动下架曾使买家买到空气——
+    # （2026-09-26）：作品物理删除/回收站清扫不联动下架曾使买家买到空气——
     # 成交前校验作品与试听文件仍然存在（market 表无外键，显式校验兜底）
     from app.models import File
     if db.get(Work, listing.work_id) is None or (

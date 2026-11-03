@@ -20,9 +20,9 @@ from app.models import Base
 
 setup_logging()
 
-# P0-5：生产环境关闭交互式 API 文档（信息收敛）；dev 保持可用
+# 生产环境关闭交互式 API 文档（信息收敛）；dev 保持可用
 _is_production = settings.env.strip().lower() == "production"
-# 2026-10-03 定位转型：desktop（单机 sidecar）/ enterprise（私有化）形态标记
+# desktop（单机 sidecar）/ enterprise（私有化）形态标记
 _is_desktop = settings.app_mode == "desktop"
 _is_enterprise = settings.app_mode == "enterprise"
 
@@ -32,7 +32,7 @@ app = FastAPI(title="Meloyu API", version=APP_VERSION,
 
 
 def _assert_production() -> None:
-    """P0-5 生产启动断言：弱密钥/危险 CORS 直接拒启（fail-fast 而非静默生效）。"""
+    """ 生产启动断言：弱密钥/危险 CORS 直接拒启（fail-fast 而非静默生效）。"""
     problems: list[str] = []
     if settings.jwt_secret in ("meloyu-dev-secret-do-not-use-in-production", ""):
         problems.append("JWT_SECRET 仍为开发默认值/为空——生产必须配置强随机密钥")
@@ -41,7 +41,7 @@ def _assert_production() -> None:
     origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
     if "*" in origins:
         problems.append("CORS_ORIGINS 含 * 且 allow_credentials=True——禁止，请列明来源域名")
-    # 安审计 M-2（2026-09-09）：第三方 API Key 落库加密密钥漏配时静默明文存储
+    #（2026-09-09）：第三方 API Key 落库加密密钥漏配时静默明文存储
     if not settings.key_encryption_secret:
         problems.append("KEY_ENCRYPTION_SECRET 为空——llm_settings 中的第三方 API Key "
                         "将明文落库；生产必须配置 Fernet 密钥（openssl rand -base64 32）")
@@ -56,7 +56,7 @@ def _assert_production() -> None:
         problems.append("DATABASE_URL 未配置 PostgreSQL 连接串——v0.15.0 起生产强制 "
                         "PostgreSQL（本地栈由 compose 的 postgres 服务提供，云端可用 "
                         "Supabase；SQLite 仅限本机开发回退）")
-    # v0.13.0 审计 M-2 延伸（2026-09-26 P2-13）：邮件"半配置"静默通过是
+    # v0.13.0 审计延伸（2026-09-26）：邮件"半配置"静默通过是
     # 公网配置期的高危窗口——开了邮箱验证没配 SMTP 时注册入口直接不可用。
     if settings.email_verification_enabled and not settings.smtp_host:
         problems.append("EMAIL_VERIFICATION_ENABLED=true 但 SMTP_HOST 为空——"
@@ -75,12 +75,12 @@ app.add_middleware(
 # locale 中间件（纯 ASGI，最后注册=最外层）：contextvar 先于一切下游设置
 app.add_middleware(LocaleMiddleware)
 
-# P0-6：接口限流（IP+路径滑动窗口；生产/开发一致启用，豁免见表）
+# 接口限流（IP+路径滑动窗口；生产/开发一致启用，豁免见表）
 from app.core.ratelimit import rate_limit_middleware  # noqa: E402
 
 app.middleware("http")(rate_limit_middleware)
 
-# P1-7：Sentry 接缝（可选依赖：pip install sentry-sdk 并配 SENTRY_DSN 后生效）
+# Sentry 接缝（可选依赖：pip install sentry-sdk 并配 SENTRY_DSN 后生效）
 if settings.sentry_dsn:
     try:
         import sentry_sdk
@@ -90,7 +90,7 @@ if settings.sentry_dsn:
         logger.warning("SENTRY_DSN configured but sentry-sdk not installed; skipping")
 
 
-# 安审计 H-1（2026-09-09）：dev 形态来源守卫——非回环请求一律拒绝。
+#（2026-09-09）：dev 形态来源守卫——非回环请求一律拒绝。
 # dev 实例带固定密码 demo 管理员账号、开放 /api/docs，仅应本机可达；绑定地址
 # 无法可靠探测（uvicorn CLI 可脱离 settings.host 传 --host 0.0.0.0），故按
 # 实际到达的客户端来源拦截：LAN 联调需显式配置 ALLOW_LAN_DEV=true 自担风险。
@@ -234,7 +234,7 @@ def _startup() -> None:
     from app.services.works import purge_expired
 
     Base.metadata.create_all(engine)
-    # 安审计 H-1（2026-09-09）：生产库若复用自 dev，固定密码 demo 账号仍可登录
+    #（2026-09-09）：生产库若复用自 dev，固定密码 demo 账号仍可登录
     # ——启动即禁用（随机密码+摘除 admin+吊销刷新令牌；账号行保留不破坏外键）
     from app.seed_data import disable_seed_demo_accounts
     if _is_production:
@@ -244,7 +244,7 @@ def _startup() -> None:
                            "seed demo account(s) (dev-DB reuse residue)")
     from app.core.migrations import run as run_migrations
     run_migrations(engine)
-    # 安审计 M-2：配置了加密密钥时，把历史明文 API Key 行升级为密文
+    # 配置了加密密钥时，把历史明文 API Key 行升级为密文
     from app.core.crypto import reencrypt_plaintext_secrets
     reencrypted = reencrypt_plaintext_secrets()
     if reencrypted:
@@ -280,7 +280,7 @@ def _startup() -> None:
                         logger.info("desktop mode: ACE-Step component auto-deploy started")
                 except Exception as e:  # noqa: BLE001 —— 已有操作进行中/库异常不拦启动
                     logger.warning(f"acestep auto-deploy not started: {e}")
-    # P0-9（2026-09-26）：清扫不再挂列表读路径，改守护线程定时全量触发
+    # （2026-09-26）：清扫不再挂列表读路径，改守护线程定时全量触发
     from app.services.works import start_periodic_purge
     start_periodic_purge()
     # v0.14.0：应用内每日备份（GPU 容器 docker exec 受 seccomp 限制不可用，
@@ -290,7 +290,7 @@ def _startup() -> None:
     if recovered:
         logger.info(f"startup: recovered {recovered} zombie tasks")
     # 首次启动（无 demo 账号）时后台线程灌种子（渲染音频耗时数分钟，不阻塞启动）
-    # P0-5/D-6：生产环境禁用演示账号自动播种（固定密码账号=后门）
+    # 生产环境禁用演示账号自动播种（固定密码账号=后门）
     # 2026-10-03：desktop 形态跳过演示播种（首启秒级、无固定密码账号）
     from app.seed_data import ensure_seeded_in_background
     if _is_production or _is_desktop:

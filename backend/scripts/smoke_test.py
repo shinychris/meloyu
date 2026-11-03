@@ -1,4 +1,4 @@
-"""WP-B8 冒烟测试：38+ 契约接口 + V1.1 派生生成（extend/variant/regen-section）+ 确定性验证。
+"""冒烟测试：38+ 接口 + V1.1 派生生成（extend/variant/regen-section）+ 确定性验证。
 
 用法（后端需已在 127.0.0.1:8000 运行，且已灌种子）：
     ./.venv/Scripts/python scripts/smoke_test.py [--base http://127.0.0.1:8000]
@@ -49,7 +49,7 @@ def auth_headers(token: str) -> dict:
 
 
 def _make_admin_via_db(email: str) -> None:
-    """v0.7.0 冒烟辅助：注册账号提权管理员（模型中心写操作需 admin，P1-2）。"""
+    """v0.7.0 冒烟辅助：注册账号提权管理员（模型中心写操作需 admin）。"""
     from app.database import SessionLocal
     from app.models import User
     with SessionLocal() as db:
@@ -94,7 +94,7 @@ def wait_task(client: httpx.Client, task_id: str, token: str, timeout: float = 2
 def wav_segment_sha(content: bytes, start_sec: float, end_sec: float) -> str | None:
     """按 structure 暴露的秒边界（2 位小数 → int(round(sec*48000))）切片求 sha256。
 
-    与引擎 regen-section 的采样区间公式一致，用于 FR-6 非选区段字节级比对。
+    与引擎 regen-section 的采样区间公式一致，用于  非选区段字节级比对。
     """
     try:
         with wave.open(io.BytesIO(content), "rb") as wf:
@@ -173,7 +173,7 @@ def main() -> int:
     r = client.post(f"{API}/auth/login", json={"email": email, "password": password})
     b = unwrap(r)
     token = b["data"]["access_token"]
-    check("3.1(前置) 冒烟账号提权 admin 后重登（P1-2 收权适配）",
+    check("3.1(前置) 冒烟账号提权 admin 后重登（收权适配）",
           r.status_code == 200 and token, json.dumps(b)[:120])
 
     r = client.post(f"{API}/auth/register",
@@ -355,11 +355,11 @@ def main() -> int:
     # 超出免费档每日 5 次限额 → 提前切 studio（原派生节前置步骤移此）
     r = client.get(f"{API}/credits/balance", headers=auth_headers(token))
     pre_switch_balance = unwrap(r)["data"]["balance"]
-    # v0.7.0：付费档不再可免费直切（P0-4）——先验证被拒，再模拟 Stripe webhook 激活
+    # v0.7.0：付费档不再可免费直切——先验证被拒，再模拟 Stripe webhook 激活
     r = client.post(f"{API}/subscriptions/switch", headers=auth_headers(token),
                     json={"plan": "studio"})
     b = unwrap(r)
-    check("11.2(前置) 免费直切 studio 被拒（P0-4，40901）",
+    check("11.2(前置) 免费直切 studio 被拒（40901）",
           r.status_code == 409 and b["code"] == 40901)
     _activate_plan_via_db(email, "studio")
     r = client.get(f"{API}/auth/me", headers=auth_headers(token))
@@ -638,7 +638,7 @@ def main() -> int:
             check("15.10 acestep 执行终态（未就绪→fail-fast 指引；就绪→人声成曲成功）",
                   ac_end, json.dumps(t.get("error") or t.get("result"))[:200])
 
-    # 自托管推理服务通道（V1.5.1，ADR-017）：服务在用户自己的环境跑，端点可配；
+    # 自托管推理服务通道（V1.5.1）：服务在用户自己的环境跑，端点可配；
     # 本机无服务时 fail-fast 可读指引并退款，有服务时（smoke 机器装了 Studio/SGLang）
     # 真实生成——两侧皆为合法终态
     svc_models = {"mmax_local": ("minimax-music-3", "SGLang"), "songgen_local": ("songgeneration-2", "Studio")}
@@ -959,7 +959,7 @@ def main() -> int:
           and regen_version["active_candidate_id"] == regen_cand["id"],
           json.dumps(regen_version)[:200])
 
-    # FR-6 验收：非目标段 sha256 不变、目标段变化（按 structure 秒边界切片比对）
+    # 验收：非目标段 sha256 不变、目标段变化（按 structure 秒边界切片比对）
     chorus_idx = [i for i, s in enumerate(orig_structure) if s["section"] == "chorus"]
 
     def compare_segments(new_bytes: bytes, target_index: int) -> tuple[bool, bool, str]:
@@ -980,8 +980,8 @@ def main() -> int:
         f"{API}/files/{master_file_id(regen_cand['id'])}/download",
         headers=auth_headers(token)).content
     keep_ok, changed_ok, seg_detail = compare_segments(regen_master_bytes, chorus_idx[0])
-    check("5.7 FR-6：非目标段 sha256 逐段不变（含第 2 次 chorus）", keep_ok, seg_detail)
-    check("5.7 FR-6：目标段（chorus#1）音频已变化", changed_ok)
+    check("5.7 ：非目标段 sha256 逐段不变（含第 2 次 chorus）", keep_ok, seg_detail)
+    check("5.7 ：目标段（chorus#1）音频已变化", changed_ok)
 
     # ---- 5.7 occurrence=2：仅第 2 次出现的 chorus 重生成 ----
     r = client.post(f"{API}/candidates/{cand_a['id']}/regen-section",
@@ -1139,7 +1139,7 @@ def main() -> int:
     b = unwrap(r)
     check("8.4 证书非法 format → 40001", r.status_code == 422 and b["code"] == 40001)
 
-    # ============ 导出（4 格式 + FR-11 发行导出预设） ============
+    # ============ 导出（4 格式 +  发行导出预设） ============
     for fmt in ("mp3", "wav", "midi", "stems"):
         r = client.post(f"{API}/exports", headers=auth_headers(token),
                         json={"version_id": version_id, "format": fmt})
@@ -1167,7 +1167,7 @@ def main() -> int:
                   and r.content[:2] == b"PK")
             globals()["downloaded_zip_sha"] = hashlib.sha256(r.content).hexdigest()
 
-    # ---- FR-11 发行导出预设（v0.8.0）：douyin/streaming 两平台 ----
+    # ----  发行导出预设（v0.8.0）：douyin/streaming 两平台 ----
     r = client.post(f"{API}/exports", headers=auth_headers(token),
                     json={"version_id": version_id, "format": "release"})
     b = unwrap(r)
@@ -1211,7 +1211,7 @@ def main() -> int:
         check(f"9.4 release/{platform} 包内容（音频+封面{cover_w}+metadata+README）",
               ok, f"names={names}")
 
-    # 契约 §14 R1 转正：exported_formats 派生字段（succeeded 导出格式去重升序）
+    # 转正：exported_formats 派生字段（succeeded 导出格式去重升序）
     r = client.get(f"{API}/works/{work_id}", headers=auth_headers(token))
     b = unwrap(r)
     check("R1 work.exported_formats（详情：含 release 去重升序）",
@@ -1324,7 +1324,7 @@ def main() -> int:
 
     # ============ 16. v0.7.0 商业化批（账号体系/支付门/证书分流） ============
     # 16.1 refresh 轮换与吊销（v0.13.0：refresh 走 HttpOnly Cookie，body 不再回显；
-    #     从 Set-Cookie 头取值验证 + 请求体通道兼容旧客户端）
+    # 从 Set-Cookie 头取值验证 + 请求体通道兼容旧客户端）
     def _refresh_from_setcookie(resp) -> str:
         for part in resp.headers.get("set-cookie", "").split(","):
             kv = part.split(";", 1)[0].strip()
@@ -1393,7 +1393,7 @@ def main() -> int:
     check("16.4 重新激活 studio（后续节依赖付费档）",
           unwrap(r)["data"]["plan"] == "studio")
 
-    # 16.5 证书 license 分流（P0-1：license 段含 grade/basis，披露固定双语）
+    # 16.5 证书 license 分流（license 段含 grade/basis，披露固定双语）
     r = client.get(f"{API}/works?page=1&page_size=1", headers=auth_headers(token))
     items = (unwrap(r).get("data") or {}).get("items") or []
     if r.status_code != 200:
@@ -1441,12 +1441,12 @@ def main() -> int:
                                                "password": "DelMe12345"})
     check("16.6 注销后原账号无法登录", r.status_code == 401)
 
-    # 16.7 防侵权防护（MiniMax 义务②：在世艺术家名义/声音冒用 → 42202，服务端强制）
+    # 16.7 防侵权防护（MiniMax ：在世艺术家名义/声音冒用 → 42202，服务端强制）
     r = client.post(f"{API}/generations", headers=auth_headers(token), json={
         "mode": "simple", "simple_prompt": "a song in the style of Taylor Swift",
         "params": {"duration_sec": 30},
     })
-    check("16.7 生成请求艺术家冒用 → 42202（义务②防护）",
+    check("16.7 生成请求艺术家冒用 → 42202（防护）",
           r.status_code == 422 and unwrap(r)["code"] == 42202,
           json.dumps(unwrap(r))[:120])
     r = client.post(f"{API}/generations", headers=auth_headers(token), json={
@@ -1456,7 +1456,7 @@ def main() -> int:
     check("16.7 正常风格描述不被误拦（201）", r.status_code == 201,
           json.dumps(unwrap(r))[:120])
 
-    # ============ 17. FR-4 参考音频（v0.8.1） ============
+    # ============ 17.  参考音频（v0.8.1） ============
     import io as _io
     import wave as _wave
 
@@ -1543,7 +1543,7 @@ def main() -> int:
     check("17.6 删除后读取 → 40401", r.status_code == 404
           and unwrap(r)["code"] == 40401)
 
-    # ============ 18. FR-5 我的音色（v0.8.2） ============
+    # ============ 18.  我的音色（v0.8.2） ============
     np_ = __import__("numpy")
 
     def _smoke_voice_wav(f0: float, formant: float, seed: int, sr: int = 22050,
@@ -1649,7 +1649,7 @@ def main() -> int:
     check("18.6 DELETE /voice-profiles/{id}（删除=吊销）", r.status_code == 200
           and unwrap(r)["data"]["ok"] is True)
 
-    # ============ 19. FR-13 团队空间与协作评论（v0.8.1） ============
+    # ============ 19.  团队空间与协作评论（v0.8.1） ============
     mate_email = f"mate_{uuid.uuid4().hex[:8]}@meloyu.test"
     r = client.post(f"{API}/auth/register", json={"email": mate_email,
                                                   "password": "Smoke1234",
@@ -1730,7 +1730,7 @@ def main() -> int:
     client.patch(f"{API}/works/{work_id}", headers=auth_headers(token),
                  json={"title": "冒烟作品改名"})
 
-    # ============ 20. FR-19 开放 API β（v0.8.2） ============
+    # ============ 20.  开放 API β（v0.8.2） ============
     r = client.post(f"{API}/api-keys", headers=auth_headers(token),
                     json={"name": "冒烟密钥"})
     b = unwrap(r)
@@ -1894,7 +1894,7 @@ def main() -> int:
     check("23.2 非法 format → 40001", r.status_code == 422
           and unwrap(r)["code"] == 40001)
 
-    # ============ 24. V2-c 作品市场（v0.10.1） ============
+    # ============ 24.  作品市场（v0.10.1） ============
     r = client.post(f"{API}/market/listings", headers=auth_headers(token),
                     json={"work_id": work_id, "price_credits": 100})
     b = unwrap(r)

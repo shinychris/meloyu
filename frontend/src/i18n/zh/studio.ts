@@ -162,7 +162,7 @@ export const studioZh: Record<keyof typeof studioEn, string> = {
 
   // ===== 操作日志（opLog） =====
 
-// ===== 参考音频（FR-4，v0.8.1）=====
+// ===== 参考音频（v0.8.1）=====
 'studio.ref.title': '参考音频',
 'studio.ref.pick': '选择音频文件（mp3 / wav / m4a）',
 'studio.ref.analyzing': '上传并分析中…',
@@ -179,7 +179,7 @@ export const studioZh: Record<keyof typeof studioEn, string> = {
 'studio.ref.toast.ready': '参考就绪：{name}',
 'studio.ref.log.applied': '参考特征应用：{bpm} BPM · {key}',
 
-// ===== 我的音色（FR-5，v0.8.2）=====
+// ===== 我的音色（v0.8.2）=====
 'studio.voice.title': '我的音色（人声克隆）',
 'studio.voice.hint': '双随机短语活体验证（仅本人声音）：朗读两段系统随机下发的不同短语，通过同人校验后可在生成中使用你的音色。',
 'studio.voice.manage': '注册 / 管理我的音色',

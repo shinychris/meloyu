@@ -4,7 +4,7 @@ enterprise 形态多用户，权益档位由管理员指派（无自助订阅）
     python -m scripts.set_user_plan <email> <free|pro|studio|team> [--credits N]
     python -m scripts.set_user_plan --list
 
-档位语义（方案 §3.1）：enterprise 席位建议 team（空间/席位配额放开）；
+档位语义：enterprise 席位建议 team（空间/席位配额放开）；
 studio=全功能个人档。配额读 plans 表，随档位生效。
 """
 from __future__ import annotations

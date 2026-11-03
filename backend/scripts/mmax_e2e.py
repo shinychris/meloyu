@@ -2,7 +2,7 @@
 
 前置：backend/data/audiocpp/ 已部署（audiocpp_cli.exe + MiniMax-Music3-GGUF），
 后端运行中。本机 Q4 量化实测 RTF~94：API 层验证提交→进度→取消→退款链路
-（契约时长下限 30s，走完整双候选需 90 分钟+，不宜阻塞）；出歌验证直接调
+（接口时长下限 30s，走完整双候选需 90 分钟+，不宜阻塞）；出歌验证直接调
 provider 用 10s 曲跑双候选（约 30~35 分钟）。
 用法：./.venv/Scripts/python scripts/mmax_e2e.py
 """

@@ -1,7 +1,7 @@
 """License 激活态与试用状态（desktop/enterprise 形态，单行表 id=1）。
 
-2026-10-03 定位转型（D-1/D-2）：买断制终身授权 + 14 天全功能试用。
-- trial_started_at：首次启动落库（试用起点，D-2：无免费层）
+买断制终身授权 + 14 天全功能试用（desktop/enterprise 形态基线）。
+- trial_started_at：首次启动落库（试用起点；无免费层）
 - license_key/payload/activated_at：激活后写入（Ed25519 离线验签）
 - device_id：本机设备指纹（在线激活治理用；离线使用不受影响）
 """

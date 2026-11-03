@@ -39,9 +39,9 @@ export interface StudioForm {
   vocal: VocalType
   language: Language
   density: number
-  /** FR-5：vocal=voice_clone 时必填（已验证音色档案 id） */
+  /** ：vocal=voice_clone 时必填（已验证音色档案 id） */
   voiceProfileId?: string
-  /** 哼唱成歌（v0.11.0）：[[相对半音, 拍长], ...]（/hum/analyze 应用后写入） */
+  /** 哼唱成歌（v0.11.0）：[[相对半音, 拍长], ...]（hum/analyze 应用后写入） */
   humMelody?: number[][]
 }
 
@@ -53,7 +53,7 @@ export interface InspireSelection {
 }
 
 /**
- * F-FE-13：默认风格/歌词为「样例态」——表单字段存空串，展示与提交时按当前
+ * ：默认风格/歌词为「样例态」——表单字段存空串，展示与提交时按当前
  * locale 现取 t()（LyricsView SAMPLE_TEXTS 同款模式）。模块加载时不再冻结
  * i18n 文案，切换语言后样例自然跟随，不会把旧语言样例提交/回灌进草稿。
  */
@@ -111,12 +111,12 @@ interface StudioState {
   failureMessage: string | null
   opLog: string[]
   /**
-   * 初始「模板已载入」日志是否已被真实操作顶掉（F-FE-13 惰性求值）：
+   * 初始「模板已载入」日志是否已被真实操作顶掉（惰性求值）：
    * opLog 本体只存真实操作；模板行由 VersionTree 在 baseLogged=false 时
    * 以当前 locale 现取 t() 渲染，不再在模块加载时冻结文案。
    */
   opLogBaseLogged: boolean
-  /** FR-4 参考音频：挂到本次生成的参考轨（特征级，提交时带 reference_track_id） */
+  /**  参考音频：挂到本次生成的参考轨（特征级，提交时带 reference_track_id） */
   referenceTrack: ReferenceTrack | null
   setReferenceTrack: (track: ReferenceTrack) => void
   clearReferenceTrack: () => void
@@ -124,9 +124,9 @@ interface StudioState {
   setInspire: (patch: Partial<InspireSelection>) => void
   /** 把灵感组合写回风格描述（原型 composePrompt） */
   applyInspireToPrompt: (full?: InspireSelection) => void
-  /** 随机灵感组合（工作台空态与灵感卡共用，F-FE-12 收敛为单一 action） */
+  /** 随机灵感组合（工作台空态与灵感卡共用， 收敛为单一 action） */
   randomizeInspire: () => void
-  /** 采用候选后本地同步 adopted 标记（F-FE-15：组件不再绕过 action 直改状态） */
+  /** 采用候选后本地同步 adopted 标记（组件不再绕过 action 直改状态） */
   markAdopted: (candidateId: string) => void
   markStep: (n: 1 | 2 | 3) => void
   logOp: (text: string) => void
@@ -139,15 +139,15 @@ interface StudioState {
   refreshVersionTree: () => Promise<void>
   resetForNewWork: () => void
   setLyricsFromAssistant: (lyrics: string) => void
-  /** 登录/会话就绪后水合该用户的本地草稿（P1-23） */
+  /** 登录/会话就绪后水合该用户的本地草稿 */
   hydrateDraft: (userId: string) => void
 }
 
-/* 轮询句柄放模块级：视图卸载也持续轮询（契约 §13.2），终态/登出停止 */
+/* 轮询句柄放模块级：视图卸载也持续轮询，终态/登出停止 */
 let pollTimer: number | null = null
 let pollErrors = 0
 
-/* P1-23：工作台表单草稿（防误刷新/关标签丢内容）——按用户维度落 localStorage，
+/* ：工作台表单草稿（防误刷新/关标签丢内容）——按用户维度落 localStorage，
  * 500ms 防抖写入；提交成功不清（用户常基于上次参数迭代）。 */
 const draftKey = (userId: string) => `meloyu:studio-draft:v1:${userId}`
 let draftTimer: number | null = null
@@ -341,7 +341,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     if (form.mode === 'simple') {
       req.simple_prompt = form.simplePrompt.trim()
     } else {
-      // 样例态（字段为空）按当前 locale 现取默认示例——与展示所见一致（F-FE-13）
+      // 样例态（字段为空）按当前 locale 现取默认示例——与展示所见一致
       req.style_prompt = form.stylePrompt.trim() || t('studio.default.stylePrompt')
       req.lyrics = form.lyrics.trim() ? form.lyrics : t('studio.default.lyrics')
     }
@@ -453,7 +453,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   hydrateDraft(userId) {
     const draft = readDraft(userId)
-    // F-FE-13：未修改过的样例（任一语言的历史样例/样例态空串）不回灌——
+    // ：未修改过的样例（任一语言的历史样例/样例态空串）不回灌——
     // 显示值由当前 locale 的样例派生，切语言自然跟随，不锁死旧语言
     const cleaned = Object.fromEntries(
       Object.entries(draft ?? {}).filter(

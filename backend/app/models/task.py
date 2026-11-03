@@ -59,7 +59,7 @@ class Task(BaseModel):
     version_id: Mapped[str | None] = mapped_column(
         String(32), ForeignKey("versions.id", ondelete="SET NULL")
     )
-    format: Mapped[str | None] = mapped_column(String(10))  # release=7字符（FR-11）
+    format: Mapped[str | None] = mapped_column(String(10))  # release=7字符
     provider: Mapped[str | None] = mapped_column(String(16))
     # 歌词引擎快照（auto_lyrics / simple 扩写实际通道，用量统计维度）
     lyrics_engine: Mapped[str | None] = mapped_column(String(16))

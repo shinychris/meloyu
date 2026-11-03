@@ -1,6 +1,6 @@
-"""团队空间与协作评论（FR-13，v0.8.3）。
+"""团队空间与协作评论（v0.8.3）。
 
-角色（PRD §5.3 FR-13）：owner（所有者）/ editor（编辑）/ commenter（评论）/ viewer（查看），
+角色：owner（所有者）/ editor（编辑）/ commenter（评论）/ viewer（查看），
 按 rank 判权（owner 4 > editor 3 > commenter 2 > viewer 1）：
 - viewer：作品/版本/候选/文件读取
 - commenter：+ 时间轴锚定评论
@@ -71,7 +71,7 @@ class TeamMember(BaseModel):
 
 
 class WorkComment(BaseModel):
-    """协作评论：锚定作品时间轴 time_sec（FR-13 验收口径）。"""
+    """协作评论：锚定作品时间轴 time_sec（验收口径）。"""
 
     __tablename__ = "work_comments"
     __table_args__ = (

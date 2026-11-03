@@ -13,7 +13,7 @@ import { useT } from '../../i18n'
 import { formatDuration } from '../../lib/format'
 
 /**
- * 协作评论面板（FR-13）：评论锚定作品时间轴——发评时默认取播放器当前时间，
+ * 协作评论面板：评论锚定作品时间轴——发评时默认取播放器当前时间，
  * 点击锚点跳转播放定位；可标记 resolved / 删除（按角色与作者判定，服务端校验）。
  */
 export default function CommentsPanel({ workId, canComment }: { workId: string; canComment: boolean }) {
@@ -72,7 +72,7 @@ export default function CommentsPanel({ workId, canComment }: { workId: string; 
   }
 
   const onDelete = async (c: WorkCommentItem) => {
-    // F-FE-22：删除评论为破坏性操作，接 confirmDialog({ danger: true }) 二次确认
+    // ：删除评论为破坏性操作，接 confirmDialog({ danger: true }) 二次确认
     const ok = await confirmDialog({
       title: t('comments.confirm.deleteTitle'),
       description: t('comments.confirm.deleteDesc'),

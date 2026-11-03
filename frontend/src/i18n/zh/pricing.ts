@@ -34,7 +34,7 @@ export const pricingZh: Record<keyof typeof pricingEn, string> = {
   'pricing.tx.balance': '余额',
   'pricing.tx.task': '关联任务',
   'pricing.tx.empty': '暂无记录',
-  // ===== 开放 API 密钥（FR-19，v0.8.2）=====
+  // ===== 开放 API 密钥（v0.8.2）=====
   'apikey.title': '开放 API（β）',
   'apikey.hint': '文本生歌 / 任务查询 / 作品列表 / 文件下载四个机器接口，密钥鉴权；用量按本账号计量（与站内同价：v1_pro=12 / v1_fast=6），商用授权随账号档位×通道许可（证书同源）。',
   'apikey.namePlaceholder': '密钥名（如 production）',

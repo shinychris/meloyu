@@ -1,4 +1,4 @@
-"""FR-19 开放 API β 单测（v0.8.2）：密钥生命周期 + 密钥鉴权生歌/查询/下载。
+""" 开放 API β 单测（v0.8.2）：密钥生命周期 + 密钥鉴权生歌/查询/下载。
 
 运行：.venv/Scripts/python.exe -m unittest discover -s tests -v
 FastAPI TestClient（httpx）+ 内存库 + 临时 audio 目录；生成执行 mock 调度。
@@ -43,7 +43,7 @@ class _ApiTestCase(unittest.TestCase):
                          monthly_credits=10000, max_export="wav",
                          commercial_license=True, watermark=False, features=[],
                          switchable=True, sort_order=2, created_at=ts, updated_at=ts))
-        # 歌词引擎守卫（ADR-019）：开放 API 生歌需自动写词，须配置真实 LLM 通道
+        # 歌词引擎守卫：开放 API 生歌需自动写词，须配置真实 LLM 通道
         self.db.add(LLMSetting(id=SETTING_ID, lyrics_backend="ollama",
                                ollama_model="qwen2.5:7b"))
         self.db.commit()

@@ -51,7 +51,7 @@ test('参数不全返回 null（account 缺 code / 全空 / null）', () => {
   assert.equal(activateRequestFromParams(null), null)
 })
 
-// ---------- F-DT-01：深链冷启动挂起/重放决策 ----------
+// ---------- ：深链冷启动挂起/重放决策 ----------
 
 test('planDeepLink：无有效请求 → ignore', () => {
   assert.deepEqual(planDeepLink(null, ''), { action: 'ignore' })
@@ -68,7 +68,7 @@ test('planDeepLink：sidecarBase 就绪 → dispatch（立即派发）', () => {
   assert.deepEqual(planDeepLink(req, 'http://127.0.0.1:54321'), { action: 'dispatch' })
 })
 
-// ---------- F-DT-04：openExternal 白名单 ----------
+// ---------- ：openExternal 白名单 ----------
 
 test('isLoopbackHost：仅接受回环主机名（IPv6 字面量去括号）', () => {
   assert.equal(isLoopbackHost('127.0.0.1'), true)
@@ -95,7 +95,7 @@ test('isExternalOpenAllowed：https 放行，http 仅回环，其余协议拒绝
   assert.equal(isExternalOpenAllowed('not a url'), false)
 })
 
-// ---------- F-DT-03/04：新窗口分类 ----------
+// ---------- ：新窗口分类 ----------
 
 test('classifyWindowOpen：仅 sidecarBase 前缀可窗口内打开（收紧自任意回环端口）', () => {
   const base = 'http://127.0.0.1:54321'
@@ -113,7 +113,7 @@ test('classifyWindowOpen：sidecarBase 为空时什么都不允许进窗口', ()
   assert.equal(classifyWindowOpen('file:///x', ''), 'deny')
 })
 
-// ---------- F-DT-05：权限来源校验 ----------
+// ---------- ：权限来源校验 ----------
 
 test('isPermissionAllowed：麦克风仅 sidecarBase 来源，其余权限照旧/拒绝', () => {
   const base = 'http://127.0.0.1:54321'
@@ -131,7 +131,7 @@ test('isPermissionAllowed：麦克风仅 sidecarBase 来源，其余权限照旧
   assert.equal(isPermissionAllowed('notifications', `${base}/x`, base), false)
 })
 
-// ---------- F-DT-14：激活响应解析 ----------
+// ---------- ：激活响应解析 ----------
 
 test('parseActivationResponse：HTTP 200 + code===0 为成功', () => {
   const r = parseActivationResponse(200, '{"code":0,"message":"ok","data":{}}')
@@ -154,7 +154,7 @@ test('parseActivationResponse：非 200 / 非 JSON / 空体一律失败', () => 
   assert.equal(parseActivationResponse(500, '{"code":0}').ok, false)
 })
 
-// ---------- F-DT-16：更新源校验 ----------
+// ---------- ：更新源校验 ----------
 
 test('isHttpsUpdateUrl：仅 https 放行（feed 含可执行更新）', () => {
   assert.equal(isHttpsUpdateUrl('https://meloyu.com/updates/'), true)

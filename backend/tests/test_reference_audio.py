@@ -1,4 +1,4 @@
-"""FR-4 参考音频单测（v0.8.1）：分析器精度 + 上传/补传/删除 + 生成参数应用。
+""" 参考音频单测（v0.8.1）：分析器精度 + 上传/补传/删除 + 生成参数应用。
 
 运行：.venv/Scripts/python.exe -m unittest discover -s tests -v
 内存 SQLite + 临时 audio 目录；生成集成用例 mock 掉调度（不起真实合成）。

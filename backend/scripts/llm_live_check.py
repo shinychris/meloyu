@@ -15,7 +15,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="repla
 
 API = "http://localhost:8000/api/v1"
 MODEL = "qwen3.5:4b"  # 本地通道：think 可关、直出快
-EXTERNAL_MODEL = "qwen2.5:1.5b"  # 外部通道验证：非思考型（/v1 上无法关思考）
+EXTERNAL_MODEL = "qwen2.5:1.5b"  # 外部通道验证：非思考型（v1 上无法关思考）
 
 
 def call(method: str, path: str, token: str | None = None, body: dict | None = None,

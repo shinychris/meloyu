@@ -21,7 +21,7 @@ interface SessionState {
   /** v0.16.0 买断制：试用/激活状态（bootstrap 时并行拉取；cloud 模式 mode=cloud） */
   license: LicenseStatus | null
   ready: boolean
-  /** 后端不可达（网络故障）：token 仍在，不踢登录，展示重试（P1-25） */
+  /** 后端不可达（网络故障）：token 仍在，不踢登录，展示重试 */
   offline: boolean
   /**
    * 桌面形态判定（F3 修复，2026-10-16）：壳桥或桌面后端 app_mode 命中即为 true。
@@ -36,7 +36,7 @@ interface SessionState {
   setAuthenticated: (data: AuthData) => void
   /** 登出：清 token、停轮询、停播放器 */
   logout: () => void
-  /** P1-25 离线重试：回到「会话未就绪」态并重新 bootstrap（App.tsx 改调本 action） */
+  /**  离线重试：回到「会话未就绪」态并重新 bootstrap（App.tsx 改调本 action） */
   retryBootstrap: () => void
   /** 登录页守卫用：本地无 token 时清空残留会话（401 后避免回跳循环） */
   clearStaleSession: () => void
@@ -48,7 +48,7 @@ interface SessionState {
   refreshLicense: () => Promise<void>
   /** 应用形态探测：桌面后端（裸浏览器直连）兜底判定 + 桌面态立即拉本地档案会话 */
   detectDesktopShell: () => Promise<void>
-  /** 契约 §13.5：登录后首屏并行 /auth/me + /credits/balance */
+  /** ：登录后首屏并行 /auth/me + /credits/balance */
   bootstrap: () => Promise<void>
 }
 
@@ -145,7 +145,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
           getCreditsBalance(),
           getLicenseStatus().catch(() => null),
         ])
-        // 侧边栏积分数以 /auth/me 的 credits.balance 为准（契约 §13.5）；
+        // 侧边栏积分数以 /auth/me 的 credits.balance 为准；
         // license 状态拉取失败不阻塞会话（cloud 未登录语义下 401 由前两者兜底）
         set({
           user: { ...user, credits: { ...user.credits, balance: balance.balance } },
@@ -155,7 +155,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         })
         return
       } catch (e) {
-        // P1-25：只有真正的鉴权失效才踢登录；网络抖动/后端暂不可达时保留
+        // ：只有真正的鉴权失效才踢登录；网络抖动/后端暂不可达时保留
         // token 进入 offline 重试态——否则付费用户 30 秒断网刷新就被要求重输密码
         if (isAuthReject(e)) {
           clearToken()

@@ -1,4 +1,4 @@
-/** FR-5 人声音色档案：注册/双短语采样（octet-stream 协议，与参考音频一致） */
+/**  人声音色档案：注册/双短语采样（octet-stream 协议，与参考音频一致） */
 import type { VoiceProfile } from '../types/api'
 import { apiDelete, apiGet, apiPost } from './client'
 

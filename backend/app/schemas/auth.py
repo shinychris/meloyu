@@ -1,4 +1,4 @@
-"""Pydantic 请求模型（与契约一一对应；响应走 serializers 组装 dict）。"""
+"""Pydantic 请求模型（与后端路由一一对应；响应走 serializers 组装 dict）。"""
 from __future__ import annotations
 
 import re
@@ -24,7 +24,7 @@ class RegisterRequest(BaseModel):
     email: str = Field(max_length=120)
     password: str = Field(min_length=8, max_length=64)
     nickname: str = Field(min_length=1, max_length=24)
-    # P0-6：email_verification_enabled 开启时必填（6 位数字验证码）
+    # email_verification_enabled 开启时必填（6 位数字验证码）
     code: str | None = Field(default=None, max_length=6)
 
     @field_validator("email")
@@ -55,7 +55,7 @@ class LoginRequest(BaseModel):
         return v.lower()
 
 
-# ---- P1-3 账号体系补全（v0.7.0）----
+# ----  账号体系补全（v0.7.0）----
 
 
 class RefreshRequest(BaseModel):
@@ -144,7 +144,7 @@ class GenerationParams(BaseModel):
     vocal: str = Field(default="female_air")
     language: str = Field(default="zh")
     instrument_density: int = Field(default=65, ge=0, le=100)
-    # FR-5（v0.8.2）：vocal=voice_clone 时必填（已验证的本人音色档案）
+    # （v0.8.2）：vocal=voice_clone 时必填（已验证的本人音色档案）
     voice_profile_id: str | None = Field(default=None, max_length=32)
     # v0.11.0 哼唱成歌：[[semi_rel(-24..24), dur_beats(0.25..4)], ...] ≤64 项，
     # 仅本地引擎；来自 POST /hum/analyze 的音高轮廓（前端展示确认后透传）
@@ -211,7 +211,7 @@ class GenerationRequest(BaseModel):
     simplified: bool = False
     seed: int | None = Field(default=None, ge=0, le=4294967295)
     params: GenerationParams = Field(default_factory=GenerationParams)
-    # FR-4 参考音频（v0.8.1）：特征级参考——分析值覆盖 bpm/调性/器乐密度
+    # 参考音频（v0.8.1）：特征级参考——分析值覆盖 bpm/调性/器乐密度
     reference_track_id: str | None = Field(default=None, max_length=32)
 
     @field_validator("mode")
@@ -256,7 +256,7 @@ class GenerationRequest(BaseModel):
 
 
 class ReleaseMeta(BaseModel):
-    """FR-11 发行导出元数据表单（metadata.json 的 track 段；发行方人工确认项）。"""
+    """ 发行导出元数据表单（metadata.json 的 track 段；发行方人工确认项）。"""
     title: str = Field(min_length=1, max_length=80)
     artist: str = Field(min_length=1, max_length=60)
     album: str = Field(default="", max_length=80)
@@ -275,7 +275,7 @@ class ReleaseMeta(BaseModel):
 class ExportRequest(BaseModel):
     version_id: str
     format: str
-    # FR-11 发行导出预设：format=release 时必填 platform（douyin/streaming），
+    # 发行导出预设：format=release 时必填 platform（douyin/streaming），
     # meta 为发行元数据表单（缺省 title/artist 由作品标题/账号邮箱前缀兜底）
     # validate_default：platform 缺省也要跑校验（release 时 None 必须报错）
     platform: str | None = Field(default=None, validate_default=True)
@@ -308,12 +308,12 @@ class ExportRequest(BaseModel):
 
 
 class ExtendRequest(BaseModel):
-    """契约 §5.5：从候选结尾续写 15~60 秒。"""
+    """从候选结尾续写 15~60 秒。"""
     seconds: int = Field(ge=15, le=60)
 
 
 class VariantRequest(BaseModel):
-    """契约 §5.6：同结构换编曲风格（style_prompt ≤500 字）。"""
+    """同结构换编曲风格（style_prompt ≤500 字）。"""
     style_prompt: str = Field(min_length=1, max_length=500)
 
 
@@ -346,7 +346,7 @@ class PitchEditRequest(BaseModel):
 
 
 class RegenSectionRequest(BaseModel):
-    """契约 v1.2 §5.7：仅重生成指定段落的第 occurrence 次出现（1 起始，默认 1）。"""
+    """仅重生成指定段落的第 occurrence 次出现（1 起始，默认 1）。"""
     section: str
     occurrence: int = Field(default=1, ge=1)
 

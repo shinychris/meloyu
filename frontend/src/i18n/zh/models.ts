@@ -13,7 +13,7 @@ export const modelsZh: Record<keyof typeof modelsEn, string> = {
   'models.nav.music': '歌曲引擎',
   'models.nav.catalog': '开源模型目录',
   'models.nav.components': '本地组件',
-  // ===== 组件中心（v0.16.0 桌面按需下载，方案 §3.2）=====
+  // ===== 组件中心（v0.16.0 桌面按需下载）=====
   'models.comp.label': 'Components · 本地组件中心',
   'models.comp.desc':
     '可选的本机引擎——需要哪个下哪个。硬件与体积要求如实标注；云通道（自带 Key）无需下载。',

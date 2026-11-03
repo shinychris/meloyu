@@ -1,5 +1,5 @@
 /**
- * axios 统一封装（架构文档 §11 / 契约 §1）：
+ * axios 统一封装：
  * - baseURL /api/v1（Vite 代理 → 127.0.0.1:8000）
  * - 请求自动注入 Authorization: Bearer <token>
  * - 成功解包 {code,message,data} → 直接返回 data
@@ -32,7 +32,7 @@ const instance = axios.create({
 
 /**
  * 大文件下载（数据导出 zip / 母带 wav / 词谱 PDF / 证书）专用超时：
- * 20s 全局默认对慢网大文件必失败（F-FE-07），下载类接口统一放宽到 300s。
+ * 20s 全局默认对慢网大文件必失败，下载类接口统一放宽到 300s。
  */
 export const DOWNLOAD_TIMEOUT_MS = 300000
 

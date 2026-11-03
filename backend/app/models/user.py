@@ -13,7 +13,7 @@ _REFUND_WHERE = text("reason = 'refund'")
 
 
 class User(BaseModel):
-    """用户账户（/auth/*、/credits/balance 数据源）。"""
+    """用户账户（auth/*、/credits/balance 数据源）。"""
 
     __tablename__ = "users"
     __table_args__ = (
@@ -26,11 +26,11 @@ class User(BaseModel):
     email: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String(60), nullable=False)  # bcrypt cost=12
     nickname: Mapped[str] = mapped_column(String(24), nullable=False)
-    # P1-2：模型中心写操作需管理员（settings.admin_emails 注册自动授予；demo 种子同）
+    # 模型中心写操作需管理员（settings.admin_emails 注册自动授予；demo 种子同）
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    # P0-6：注册邮箱验证（email_verification_enabled 开启时必须先验证）
+    # 注册邮箱验证（email_verification_enabled 开启时必须先验证）
     email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    # P1-3：刷新令牌（随机串的 sha256；轮换即覆写=单设备会话，登出/改密/注销置空）。
+    # 刷新令牌（随机串的 sha256；轮换即覆写=单设备会话，登出/改密/注销置空）。
     # 实际存储 "expires_iso|sha256hex" = 20+1+64 = 85 字符——v0.15.0 切 PG 暴露
     # 原 String(64) 过窄（SQLite 不校验长度静默收下，PG 直接拒写→刷新令牌必炸），
     # 放宽到 96

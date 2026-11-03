@@ -3,7 +3,7 @@ import type { MusicCatalogModel } from '../../types/api'
 import { useT } from '../../i18n'
 
 /**
- * 本地组件中心分区（v0.16.0 桌面按需下载，方案 §3.2；F-FE-09 拆分）：
+ * 本地组件中心分区（v0.16.0 桌面按需下载，； 拆分）：
  * 内置引擎 / MusicGen / ACE-Step 三卡；部署进度与下载动作共享 context 执行态。
  */
 export default function ComponentsSection() {

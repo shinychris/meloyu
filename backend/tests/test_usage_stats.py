@@ -1,6 +1,6 @@
 """用量统计服务单测（v0.17.0）：按天/按引擎聚合 + 歌词通道族判定。
 
-定位转型配套：积分已转纯计量（B5），/usage/stats 面向用户自定义 API 的
+配套：积分已转纯计量（B5），/usage/stats 面向用户自定义 API 的
 调用做统计与分析——本文件验证聚合口径（calls 计提交、units 只计成功、
 按天补零、远程/本地通道分类）与 current_lyrics_backend 回退判定。
 """
@@ -126,7 +126,7 @@ class TestUsageStatsAggregation(_UsageTestCase):
 
 
 class TestCurrentLyricsBackend(_UsageTestCase):
-    """通道族判定与 get_lyrics_provider 的未配置口径一致（ADR-019 无兜底引擎）。"""
+    """通道族判定与 get_lyrics_provider 的未配置口径一致（无兜底引擎）。"""
 
     def _set(self, **kw):
         row = LLMSetting(id=SETTING_ID, **kw)
@@ -141,7 +141,7 @@ class TestCurrentLyricsBackend(_UsageTestCase):
         self.assertEqual(model_center.current_lyrics_backend(self.db), "none")
 
     def test_legacy_localsynth_reads_as_none(self):
-        # 存量行历史值 localsynth（原离线规则引擎，ADR-019 移除）读作未配置
+        # 存量行历史值 localsynth（原离线规则引擎，已移除）读作未配置
         self._set(lyrics_backend="localsynth")
         self.assertEqual(model_center.current_lyrics_backend(self.db), "none")
 

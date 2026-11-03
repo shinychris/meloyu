@@ -1,4 +1,4 @@
-"""参考音轨服务（FR-4，v0.8.1）：上传、特征分析、列表、删除与生成参数应用。
+"""参考音轨服务（v0.8.1）：上传、特征分析、列表、删除与生成参数应用。
 
 上传协议（octet-stream，零新依赖——不引入 python-multipart）：
 - POST /reference-tracks?filename=xx.mp3&ack_rights=true   body=原始音频字节
@@ -24,7 +24,7 @@ from app.models import ReferenceTrack, User
 from app.models.base import utc_now_iso
 from app.services import reference_analysis
 
-# 上传约束（FR-4：≤8min；大小上限防滥用）
+# 上传约束（≤8min；大小上限防滥用）
 ALLOWED_EXTS = (".mp3", ".wav", ".m4a")
 MIME_BY_EXT = {".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/mp4"}
 MAX_BYTES = 50 * 1024 * 1024
@@ -60,7 +60,7 @@ def track_to_dict(t: ReferenceTrack) -> dict:
 
 
 def create_track(db: Session, user: User, *, filename: str, content: bytes) -> dict:
-    # 安审计 L-2（2026-09-09）：文件名入库前消毒——去路径分量（../、盘符、
+    #（2026-09-09）：文件名入库前消毒——去路径分量（../、盘符、
     # 目录分隔符）与控制字符（CRLF 等），防元数据污染；落盘名本就是服务端
     # UUID，此处仅影响展示与后续 Content-Disposition 回显
     name = Path((filename or "").replace("\\", "/")).name.strip()

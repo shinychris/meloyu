@@ -1,4 +1,4 @@
-"""API Key 落库加密（P1-2，盘点报告 R-12 修复：Fernet 对称加密）。
+"""API Key 落库加密（Fernet 对称加密）。
 
 - KEY_ENCRYPTION_SECRET 未配置（dev 默认）：明文直通 + 单次警告——本地单机自用
   可接受；生产部署应配置（openssl rand -base64 32）。
@@ -42,7 +42,7 @@ def decrypt_secret(stored: str) -> str:
 
 
 def reencrypt_plaintext_secrets() -> int:
-    """启动自愈：把历史明文密钥字段升级为密文（安审计 M-2，2026-09-09）。
+    """启动自愈：把历史明文密钥字段升级为密文（2026-09-09）。
 
     判定与 decrypt 的兼容口径一致：当前密钥解不开（InvalidToken）即视为
     明文，重新加密落库——否则存量明文行除非用户重新保存，将永远明文。

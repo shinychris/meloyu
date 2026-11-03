@@ -30,7 +30,7 @@ export default function StudioView() {
   const navigate = useNavigate()
   const t = useT()
   const [songEngine, setSongEngine] = useState('')
-  /** FR-4 参考音频面板开合（参考轨挂上后常显，可在面板内移除） */
+  /**  参考音频面板开合（参考轨挂上后常显，可在面板内移除） */
   const [humOpen, setHumOpen] = useState(false)
   const [refOpen, setRefOpen] = useState(false)
   const lyricBoxRef = useRef<HTMLTextAreaElement | null>(null)
@@ -47,12 +47,12 @@ export default function StudioView() {
   // license（桌面买断）模式：用量纯计量——按钮/失败提示不再出现积分语义（v0.17.0）
   const isLicense = useSessionStore((s) => s.license?.billing_mode === 'license')
 
-  // F-FE-24：价目与型号一律信任 /system/meta（含 stores/meta.ts 的 defaultMeta 兜底），
+  // ：价目与型号一律信任 /system/meta（含 stores/meta.ts 的 defaultMeta 兜底），
   // 不再做字面量兜底；模型档位异常缺失时展示文案走 i18n
   const model = meta.models.find((m) => m.value === form.model)
   const creditCost = model?.credit_cost ?? 0
   const modelLabel = model?.label ?? t('studio.view.modelUnknown')
-  // F-FE-13：样例态（字段为空）显示当前 locale 的默认样例，切语言自然跟随
+  // ：样例态（字段为空）显示当前 locale 的默认样例，切语言自然跟随
   const stylePromptText = form.stylePrompt || defaultStylePrompt()
   const lyricsText = form.lyrics || defaultLyrics()
   const tagCount = countStructureTags(lyricsText)

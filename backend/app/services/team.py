@@ -1,4 +1,4 @@
-"""团队空间与协作评论服务（FR-13，v0.8.3）。
+"""团队空间与协作评论服务（v0.8.3）。
 
 权限模型：作品属主恒为 owner；作品共享到空间后，成员按 rank 判权
 （viewer 读 / commenter 评论 / editor 写 / owner 全权=空间所有者）。
@@ -90,7 +90,7 @@ def require_space_owner(db: Session, user: User, space_id: str) -> TeamSpace:
 
 
 def _seat_gate(db: Session, user: User) -> tuple[int, int]:
-    """P1-3（2026-09-26）：团队席位与档位挂钩。
+    """（2026-09-26）：团队席位与档位挂钩。
 
     free 档：1 个空间 × 3 席位（体验协作）；pro：3 空间 × 8 席位；
     studio/team/admin：不受限（team 档走联系销售的企业口径）。

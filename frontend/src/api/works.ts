@@ -64,7 +64,7 @@ export async function fetchCertificate(versionId: string): Promise<Certificate> 
   return JSON.parse(text) as Certificate
 }
 
-/** 下载证书 JSON 文件（契约 §8.4：attachment 文件名由后端定，此处前端命名兜底；300s 下载超时） */
+/** 下载证书 JSON 文件（attachment 文件名由后端定，此处前端命名兜底；300s 下载超时） */
 export async function downloadCertificate(versionId: string, filename: string): Promise<void> {
   const blob = await apiBlob(`/versions/${versionId}/certificate`, { timeout: DOWNLOAD_TIMEOUT_MS })
   saveBlob(blob, filename)

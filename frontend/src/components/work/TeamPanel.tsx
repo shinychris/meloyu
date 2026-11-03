@@ -5,11 +5,11 @@ import { useT } from '../../i18n'
 import { useEffect, useRef, useState } from 'react'
 
 /**
- * 团队空间面板（FR-13）：共享作品的成员与角色管理（所有者操作）。
+ * 团队空间面板：共享作品的成员与角色管理（所有者操作）。
  * 角色：editor 编辑 / commenter 评论 / viewer 查看（owner 不可降级）。
  */
 
-/** 新建空间弹窗（F-FE-21：替代 window.prompt，与全站 modal 体系一致；
+/** 新建空间弹窗（替代 window.prompt，与全站 modal 体系一致；
  *  Enter 提交 / Esc 取消 / 打开即聚焦输入框） */
 function CreateSpaceModal({ onClose, onCreate }: {
   onClose: () => void

@@ -15,7 +15,7 @@ export interface PlayerTrack {
 
 /**
  * 全局播放器（单例 <audio> 挂在 TransportBar，状态在 store）。
- * 播放地址统一走 POST /files/{id}/stream-token（契约 §9.4，禁止 JWT 拼 URL）。
+ * 播放地址统一走 POST /files/{id}/stream-token（禁止 JWT 拼 URL）。
  */
 interface PlayerState {
   current: PlayerTrack | null
@@ -67,7 +67,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       return
     }
     try {
-      // 公开资产（市场试听）直连；私有文件走 stream-token（契约 §9.4，禁止 JWT 拼 URL）
+      // 公开资产（市场试听）直连；私有文件走 stream-token（禁止 JWT 拼 URL）
       const url = track.url ?? (await getStreamToken(track.fileId)).url
       const el = get().audio
       if (!el) return
@@ -82,7 +82,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       }
       el.src = url
       el.currentTime = 0
-      // F-FE-14：playing 不得在 play() 落定前置 true——自动播放被拒时按钮
+      // playing 不得在 play() 落定前置 true——自动播放被拒时按钮
       // 会显示「暂停」却无声。play() resolve 后再置 true；catch 回置 false
       // 并提示（play/pause 事件经 TransportBar 同步兜底）。
       set({

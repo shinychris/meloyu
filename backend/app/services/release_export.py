@@ -1,6 +1,6 @@
-"""FR-11 发行导出预设（v0.8.0）：按平台模板打包发行物。
+""" 发行导出预设（v0.8.0）：按平台模板打包发行物。
 
-平台预设（PRD §4.2 V1.1「抖音/流媒体发行导出预设」）：
+平台预设（V1.1「抖音/流媒体发行导出预设」）：
 - douyin（抖音音乐人）：mp3 320k CBR + 1400×1400 封面占位 + 中文向 metadata 模板
 - streaming（通用流媒体：Spotify/Apple/…）：WAV 48k/24bit + 3000×3000 封面占位
   + DistroKid 风格 metadata 模板（ISRC/UPC/发行日期/explicit）
@@ -8,7 +8,7 @@
 包内产物：音频（AIGC 标识已写）+ cover.png（确定性占位封面，发行方自行替换）
 + metadata.json（表单回填 + 作品快照 + AI 参与披露）+ README.txt（双语上传指引）。
 
-合规接缝：metadata.json 的 aigc 段复用证书披露口径（FR-16 披露协助），
+合规接缝：metadata.json 的 aigc 段复用证书披露口径（披露协助），
 explicit 标记由发行方勾选并原样写入（不做内容审核判定）。
 """
 from __future__ import annotations
@@ -98,7 +98,7 @@ def cover_png(size: tuple[int, int], cover_color: str | None) -> bytes:
 
 def build_metadata(*, platform: str, preset: dict, meta: dict, work: dict,
                    aigc: dict) -> str:
-    """metadata.json 内容：表单回填 + 作品快照 + AI 参与披露（FR-16）。"""
+    """metadata.json 内容：表单回填 + 作品快照 + AI 参与披露。"""
     doc = {
         "schema": "meloyu.release/1.0",
         "platform": platform,

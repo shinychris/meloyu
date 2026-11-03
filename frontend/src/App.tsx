@@ -95,7 +95,7 @@ function AppLayout() {
     return () => window.clearTimeout(t)
   }, [ready, user, startAsk])
 
-  // P1-23：工作台表单草稿按用户水合（防误刷新丢失创作内容）
+  // ：工作台表单草稿按用户水合（防误刷新丢失创作内容）
   useEffect(() => {
     if (ready && user) void useStudioStore.getState().hydrateDraft(user.id)
   }, [ready, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -107,7 +107,7 @@ function AppLayout() {
       </div>
     )
   }
-  // P1-25：后端不可达 ≠ 未登录——token 仍在，展示重试而非踢到登录页重输密码
+  // ：后端不可达 ≠ 未登录——token 仍在，展示重试而非踢到登录页重输密码
   if (!user && offline) {
     return (
       <div className="h-full flex items-center justify-center bg-bg">
@@ -210,7 +210,7 @@ function LoginGuard() {
   return <LoginView />
 }
 
-/** 市场守卫（D-6）：desktop 形态隐藏作品市场（云社区非本阶段重点）。 */
+/** 市场守卫：desktop 形态隐藏作品市场（云社区非本阶段重点）。 */
 function MarketGuard() {
   const desktop = useSessionStore((s) => s.desktopShell || s.license?.mode === 'desktop')
   if (desktop) {
@@ -269,7 +269,7 @@ function RootRoutes() {
         <Route element={<AppLayout />}>
           <Route path="/studio" element={<StudioView />} />
           <Route path="/lyrics" element={<LyricsView />} />
-          {/* 编排视图以 URL search（?work=&version=&candidate=）为装载契约：
+          {/* 编排视图以 URL search（?work=&version=&candidate=）为装载约定：
               参数变化即 remount 重新装载目标，工作台可重复「送往编曲」 */}
           <Route path="/arrange" element={<ArrangeRoute />} />
           <Route path="/market" element={<MarketGuard />} />

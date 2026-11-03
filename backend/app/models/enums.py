@@ -1,4 +1,4 @@
-"""全部枚举值。字符串值不得增删改——修改必须先改契约 §1.5 再改此处。"""
+"""全部枚举值。字符串值不得增删改——修改枚举值需同步前端类型镜像（frontend/src/types/api.ts）。"""
 
 # 生成参数
 MODES = ("simple", "custom")
@@ -9,10 +9,10 @@ TIME_SIGNATURES = ("4/4", "3/4", "6/8")
 VOCALS = (
     "female_air", "female_bright", "female_deep",
     "male_magnetic", "male_clear", "choir", "instrumental",
-    "voice_clone",  # v0.8.2（FR-5）：本人音色档案（须 voice_profile_id，仅本地引擎）
+    "voice_clone",  # v0.8.2：本人音色档案（须 voice_profile_id，仅本地引擎）
 )
 LANGUAGES = ("zh", "yue", "en", "ja")
-# v0.12.1 扩全主流段落：前 6 值为 v1.1 既有值，后 9 值为 v1.20 新增（契约 §1.5），
+# v0.12.1 扩全主流段落：前 6 值为 v1.1 既有值，后 9 值为 v1.20 新增，
 # 解析别名见 synth/structure.SECTION_ALIASES
 SECTIONS = ("intro", "verse", "pre_chorus", "chorus", "bridge", "outro",
             "post_chorus", "refrain", "interlude", "drop", "breakdown",
@@ -23,7 +23,7 @@ PLANS = ("free", "pro", "studio", "team")
 MAX_EXPORTS = ("mp3", "wav")
 SUBSCRIPTION_STATUSES = ("active", "canceled")
 # v0.7.0 商业化批增 stripe（webhook 激活订阅来源，历史行保留）——2026-10-03
-# 定位转型后 Stripe 已拆除，不再产生新 stripe 行
+# 后 Stripe 已拆除，不再产生新 stripe 行
 SUBSCRIPTION_SOURCES = ("signup", "switch", "stripe")
 
 # 任务
@@ -37,7 +37,7 @@ STAGE_KEYS = (
     "api_submit", "api_queue", "api_render", "api_download",
     "model_load", "model_sample", "model_export",
 )
-EXPORT_FORMATS = ("mp3", "wav", "midi", "stems", "release")  # v0.8.0 增 release（FR-11 发行导出预设）——需 tasks 表重建迁移
+EXPORT_FORMATS = ("mp3", "wav", "midi", "stems", "release")  # v0.8.0 增 release（发行导出预设）——需 tasks 表重建迁移
 
 # 积分
 # v0.7.0 增 topup（Stripe 充值包发放）——需 credit_transactions 表重建迁移
@@ -58,7 +58,7 @@ EVENT_ACTORS = ("human", "ai", "system")
 FILE_KINDS = (
     "preview", "master", "stem", "midi",
     "export_mp3", "export_wav", "export_midi", "export_stems_zip",
-    "export_release_zip",  # v0.8.0 发行导出预设打包（FR-11）——需 files 表重建迁移
+    "export_release_zip",  # v0.8.0 发行导出预设打包——需 files 表重建迁移
     "certificate",
 )
 STEM_NAMES = ("vocals", "drums", "bass", "other")
@@ -67,7 +67,7 @@ STEM_NAMES = ("vocals", "drums", "bass", "other")
 WORK_STATUSES = ("active", "trash")
 VERSION_SOURCES = ("generate", "extend", "variant", "regen_section",
                     "retune", "mixdown", "pitch_edit")
-# v0.9.0 增 retune/mixdown（V2 编辑器）；v0.11.0 增 pitch_edit（/pitch 旋律修调）——需 versions 表重建迁移
+# v0.9.0 增 retune/mixdown（V2 编辑器）；v0.11.0 增 pitch_edit（pitch 旋律修调）——需 versions 表重建迁移
 CANDIDATE_LABELS = ("A", "B")
 LICENSE_TYPES = ("commercial", "non_commercial")
 

@@ -1,7 +1,7 @@
-"""licensing 证书×许可分流单测（P0-1）。
+"""licensing 证书×许可分流单测。
 
 运行：.venv/Scripts/python.exe -m unittest discover -s tests -v
-事实源对齐 docs/06-商业化/2026-09-02-通道许可核验.md。
+事实源对齐 。
 """
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ class TestLicenseForGeneration(unittest.TestCase):
         self.assertTrue(lic["basis_zh"] and lic["basis_en"])
 
     def test_paid_nc_model_still_non_commercial(self):
-        # 付费档 + NC 模型 → 非商用（R-01 核心分流）
+        # 付费档 + NC 模型 → 非商用（核心分流）
         lic = licensing.license_for_generation("studio", "musicgen_local", "musicgen-small")
         self.assertEqual(lic["type"], "non_commercial")
         self.assertEqual(lic["grade"], "nc")

@@ -1,4 +1,4 @@
-"""歌词引擎守卫单测（v0.18.0，ADR-019）：离线规则引擎移除后的无兜底口径。
+"""歌词引擎守卫单测（v0.18.0）：离线规则引擎移除后的无兜底口径。
 
 覆盖：
 - current_lyrics_backend/get_lyrics_provider 的未配置判定（含历史遗留值归一）；
@@ -66,7 +66,7 @@ class LyricsEngineGateTest(_GateTestCase):
         self.assertEqual(model_center.current_lyrics_backend(self.db), "none")
 
     def test_legacy_localsynth_reads_as_none(self):
-        # 存量行历史值 localsynth（原离线规则引擎，ADR-019 移除）视同未配置
+        # 存量行历史值 localsynth（原离线规则引擎，已移除）视同未配置
         self._set(lyrics_backend="localsynth")
         self.assertIsNone(model_center.get_lyrics_provider(self.db))
         self.assertEqual(model_center.current_lyrics_backend(self.db), "none")

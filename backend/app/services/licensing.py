@@ -1,4 +1,4 @@
-"""证书授权×许可分流（P0-1，盘点报告 R-01 修复；D-3 决策 B：目录保留、证书分流）。
+"""证书授权×许可分流（目录保留、证书分流）。
 
 授权类型不再只看用户档位，而是「用户档位 × 生成通道/模型许可」双重判定：
 - 用户 plan=free → 恒 non_commercial；
@@ -6,18 +6,18 @@
   其余（nc / conditional / tos / unverified）一律 non_commercial，证书 basis 字段
   写明判定依据，用户可据此换通道重新生成。
 
-许可事实来源：docs/06-商业化/2026-09-02-通道许可核验.md（联网核验记录）。
+许可事实来源：各通道模型 LICENSE 原文的联网核验记录（2026-09-02）。
 核验结论变化时更新 COMMERCIAL_USE / PROVIDER_DEFAULT 即可，证书判定自动跟随。
 """
 from __future__ import annotations
 
 # 各通道的商用许可缺省判定（模型目录未覆盖/无模型概念时的兜底）：
-#   allowed      = 许可干净，付费档可签商用证书
-#   nc           = 权重/服务为非商业许可
-#   conditional  = 许可方允许符合条件的商用（如收入门槛），需用户自行核验
-#   tos          = 商用权利取决于第三方服务条款（外部网关）
-#   unverified   = 许可未核验/存疑，保守按非商用处理
-# 事实源：docs/06-商业化/2026-09-02-通道许可核验.md（联网核验 LICENSE 原文）
+# allowed      = 许可干净，付费档可签商用证书
+# nc           = 权重/服务为非商业许可
+# conditional  = 许可方允许符合条件的商用（如收入门槛），需用户自行核验
+# tos          = 商用权利取决于第三方服务条款（外部网关）
+# unverified   = 许可未核验/存疑，保守按非商用处理
+# 事实源：各通道模型 LICENSE 原文（2026-09-02 联网核验）
 PROVIDER_DEFAULT: dict[str, str] = {
     "localsynth": "allowed",       # 自研确定性合成引擎，无外部权重
     "acestep_local": "allowed",    # ACE-Step v1.5：MIT（代码+权重，GitHub LICENSE 核验）
@@ -79,9 +79,8 @@ def commercial_grade(provider: str, model_id: str | None = None) -> str:
     return PROVIDER_DEFAULT.get(provider, "unverified")
 
 
-# MiniMax 社区许可义务落实后的商用开放口径（义务清单见 docs/06-商业化/
-# 2026-09-02-通道许可核验.md「义务落实记录」）：义务①UI 署名/②防侵权防护+
-# 持续测试/③AUP 机器生成内容披露均已产品化，mmax_local 可对付费用户签商用证书；
+# MiniMax 社区许可商用开放口径（义务清单见上游 LICENSE）：
+# 署名、防侵权防护+持续测试、AUP 机器生成内容披露均已产品化，mmax_local 可对付费用户签商用证书；
 # 证书 basis 明示 $20M 年营收门槛（用户自行确认）与义务落实状态。
 # 运营回退开关（如 MiniMax 条款修订/营收接近门槛）：MMAX_COMMERCIAL_ENABLED=false。
 _BASIS_MMAX_COMMERCIAL = (

@@ -1,4 +1,4 @@
-/** market 命名空间：作品市场（V2-c，v0.10.1） */
+/** market 命名空间：作品市场（v0.10.1） */
 export const marketZh = {
   'market.view.label': '资产 / 作品市场',
   'market.view.headline': '作品买卖——积分结算、分账与授权凭证',

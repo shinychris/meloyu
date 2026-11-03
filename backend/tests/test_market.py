@@ -1,4 +1,4 @@
-"""V2-c 市场单测（v0.10.1）：上架/浏览/购买分账/防重/下架。"""
+""" 市场单测（v0.10.1）：上架/浏览/购买分账/防重/下架。"""
 from __future__ import annotations
 
 import unittest
@@ -61,7 +61,7 @@ class TestMarket(unittest.TestCase):
                   sha256="0" * 64, created_at=ts, updated_at=ts)
         self.db.add(pf)
         self.work.preview_file_id = pf.id
-        # P1-2（v0.14.0）：上架需最近一次签发证书为商用授权
+        # （v0.14.0）：上架需最近一次签发证书为商用授权
         self.db.add(Certificate(
             certificate_code="MY-CERT-T1", work_id=self.work.id, version_id=ver.id,
             provider="localsynth", provider_display="Local", model="v1_pro", seed=1,
@@ -157,7 +157,7 @@ class TestMarket(unittest.TestCase):
             market_svc.listing_preview(self.db, "x" * 32, None)
 
 class TestMarketGovernance(unittest.TestCase):
-    """v0.14.0 市场治理回归（P1-1/P1-2）。"""
+    """v0.14.0 市场治理回归。"""
 
     def setUp(self):
         self.engine = new_test_engine()
@@ -267,7 +267,7 @@ class TestMarketGovernance(unittest.TestCase):
         self.assertEqual(out["status"], "delisted")
 
     def test_purchase_duplicate_blocked_by_unique_index(self):
-        """F-BE-24（2026-10-27）：并发双单由 uq_market_order_buyer 硬约束兜底。
+        """（2026-10-27）：并发双单由 uq_market_order_buyer 硬约束兜底。
 
         绕过应用层已购查重直插第二单（模拟并发 double-click 的后提交者），
         唯一索引必须拒绝；应用层 purchase 的 IntegrityError 转译为 409 业务码。

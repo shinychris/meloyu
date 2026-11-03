@@ -54,7 +54,7 @@ export function adoptCandidate(candidateId: string): Promise<Version> {
   return apiPost<Version>(`/candidates/${candidateId}/adopt`)
 }
 
-/* ============ V1.1 候选派生操作（契约 §5.5~5.7） ============ */
+/* ============ V1.1 候选派生操作 ============ */
 // 三接口响应复用 POST /generations 的 { task, work, cost_credits } 形态，
 // 提交后由 stores/studio.ts 复用生成轮询；后端未升级时返回 501/50101（拦截器 toast）。
 

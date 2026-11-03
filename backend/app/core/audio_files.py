@@ -32,7 +32,7 @@ def abs_path(f: File) -> Path:
     """相对路径 → 绝对路径；resolve 后必须仍在 data/audio 下（防穿越）。"""
     p = (settings.audio_path / f.path).resolve()
     root = settings.audio_path.resolve()
-    # 安审计 L-1：is_relative_to 做路径边界判定——startswith 会放过
+    # is_relative_to 做路径边界判定——startswith 会放过
     # /data/audio-evil 这类同前缀目录（纵深防御，当前无用户可控路径段）
     if not p.is_relative_to(root):
         raise err_forbidden(tr("非法文件路径", "Illegal file path"))
@@ -42,7 +42,7 @@ def abs_path(f: File) -> Path:
 
 
 def check_owner(db: Session, f: File, user: User) -> None:
-    """文件访问校验（FR-13 角色化：共享作品成员 viewer 即可读流）。"""
+    """文件访问校验（角色化：共享作品成员 viewer 即可读流）。"""
     work = db.get(Work, f.work_id)
     if not work:
         raise err_forbidden()
@@ -53,9 +53,9 @@ def check_owner(db: Session, f: File, user: User) -> None:
 def user_from_request_or_token(db: Session, request: Request,
                                current_user: User | None,
                                file_id: str | None = None) -> User:
-    """文件端点鉴权：Bearer 或 ?st= 短时签名（契约 §9.4）。
+    """文件端点鉴权：Bearer 或 ?st= 短时签名。
 
-    st 与单个文件绑定（payload.f）——传入 file_id 时强制比对（安审计 L-3：
+    st 与单个文件绑定（payload.f）——传入 file_id 时强制比对（
     签名绑定字段此前形同虚设），不匹配即拒绝。
     """
     if current_user is not None:

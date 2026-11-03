@@ -17,7 +17,7 @@ import { landingEn } from '../i18n/en/landing'
 import { landingZh } from '../i18n/zh/landing'
 import pkg from '../../package.json'
 
-/** 双语言截图资产（/shots/{en|zh}/*.png），glob 键为相对本文件的路径 */
+/** 双语言截图资产（shots/{en|zh}/*.png），glob 键为相对本文件的路径 */
 const shotFiles = import.meta.glob('../../public/shots/*/*.png', {
   query: '?url',
   import: 'default',

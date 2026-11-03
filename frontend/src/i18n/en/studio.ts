@@ -173,7 +173,7 @@ export const studioEn = {
 
   // ===== 操作日志（opLog） =====
 
-// ===== Reference audio (FR-4, v0.8.1) =====
+// ===== Reference audio (, v0.8.1) =====
 'studio.ref.title': 'Reference audio',
 'studio.ref.pick': 'Choose an audio file (mp3 / wav / m4a)',
 'studio.ref.analyzing': 'Uploading & analyzing…',
@@ -190,7 +190,7 @@ export const studioEn = {
 'studio.ref.toast.ready': 'Reference ready: {name}',
 'studio.ref.log.applied': 'Reference features applied: {bpm} BPM · {key}',
 
-// ===== My voice (FR-5, v0.8.2) =====
+// ===== My voice (, v0.8.2) =====
 'studio.voice.title': 'My voice (voice cloning)',
 'studio.voice.hint': 'Two-random-phrase liveness check (your own voice only): read two different server-issued phrases; after the same-speaker check your voice becomes usable in generation.',
 'studio.voice.manage': 'Enroll / manage my voice',

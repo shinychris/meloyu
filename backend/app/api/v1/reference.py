@@ -1,4 +1,4 @@
-"""参考音轨路由（FR-4，v0.8.1）：octet-stream 上传（零新依赖，无 python-multipart）。
+"""参考音轨路由（v0.8.1）：octet-stream 上传（零新依赖，无 python-multipart）。
 
 请求体流式读取（超 50MB 即断）；wav 特征分析为 CPU 密集，包进工作线程执行
 （2026-10-27：此前 async 端点把分析跑在事件循环上，处理期间全部并发请求被冻结）。

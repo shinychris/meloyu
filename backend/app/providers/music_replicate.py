@@ -1,4 +1,4 @@
-"""Replicate 托管开源歌曲模型 Provider（V1.4「多类开源模型接入」，ADR-014）。
+"""Replicate 托管开源歌曲模型 Provider（V1.4「多类开源模型接入」）。
 
 统一走 Replicate HTTP API（一个 API Token 接全部目录模型）：
   POST {base}/v1/models/{owner}/{name}/predictions   创建推理（官方/社区模型均可，

@@ -1,4 +1,4 @@
-"""确定性种子派生（架构 §7.9）。
+"""确定性种子派生。
 
 规则：canonical_json(params) + ":" + server_nonce → SHA-256 → 低 32 位 uint32。
 候选 A 用 seed，候选 B 用 seed XOR 0x9E3779B9。
@@ -30,7 +30,7 @@ def candidate_seed(seed: int, label: str) -> int:
 
 
 def cover_color_for_seed(seed: int) -> str:
-    """封面色块：种子派生调色板取色（契约 work.cover_color）。"""
+    """封面色块：种子派生调色板取色（work.cover_color 字段）。"""
     palette = [
         "#232323", "#1c2b1f", "#2b2118", "#1f2430", "#262626",
         "#2a1a22", "#1a2a26", "#221a2a", "#1d2032", "#2d2418",

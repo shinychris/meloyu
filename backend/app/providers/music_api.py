@@ -1,4 +1,4 @@
-"""外部歌曲生成 Provider：Suno 兼容协议（V1.3 真实模型通道，ADR-010）。
+"""外部歌曲生成 Provider：Suno 兼容协议（V1.3 真实模型通道）。
 
 协议为社区通行事实标准（GoAPI / suno-api / 各类中转站兼容）：
   POST {base}/api/v1/generate    提交生成（custom 模式：prompt=歌词，tags=风格）
@@ -10,7 +10,7 @@ base_url 允许填网关根（自动补 /api/v1）或完整 …/api/v1 前缀（
   - 产物为整曲 mp3（preview 与 master 同源），无分轨、无 MIDI → 派生编辑与
     stems/MIDI/WAV 导出对外部候选不可用，MP3 导出直接复制母带；
   - 外部黑盒无确定性 seed 语义（seed 仅用于本系统派生/封面色）；
-  - quality_score 置空——外部模型不返回质量分，不造假分（ADR-012）；
+  - quality_score 置空——外部模型不返回质量分，不造假分；
   - 整曲生成 1~5 分钟，任务超时阈值放大到 MUSIC_API_TASK_TIMEOUT_SEC。
 """
 from __future__ import annotations

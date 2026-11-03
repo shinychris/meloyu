@@ -1,4 +1,4 @@
-"""FR-5 人声克隆单测（v0.8.2）：活体流程门禁 + 声纹一致性 + 音色映射 + 生成接驳。
+""" 人声克隆单测（v0.8.2）：活体流程门禁 + 声纹一致性 + 音色映射 + 生成接驳。
 
 运行：.venv/Scripts/python.exe -m unittest discover -s tests -v
 合成「说话人」：谐波源 + 固定共振峰峰（同一人=同一 f0 中心与共振峰；不同人=显著错开）。
@@ -97,7 +97,7 @@ class _VoiceTestCase(unittest.TestCase):
                          nickname="v", plan="studio", credit_balance=10000,
                          created_at=ts, updated_at=ts)
         self.db.add(self.user)
-        # 歌词引擎守卫（ADR-019）：生成用例需自动写词，须配置真实 LLM 通道
+        # 歌词引擎守卫：生成用例需自动写词，须配置真实 LLM 通道
         self.db.add(LLMSetting(id=SETTING_ID, lyrics_backend="ollama",
                                ollama_model="qwen2.5:7b"))
         self.db.commit()

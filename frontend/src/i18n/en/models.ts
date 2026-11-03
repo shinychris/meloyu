@@ -13,7 +13,7 @@ export const modelsEn = {
   'models.nav.music': 'Song engine',
   'models.nav.catalog': 'Open-source catalog',
   'models.nav.components': 'Local components',
-  // ===== 组件中心（v0.16.0 桌面按需下载，方案 §3.2）=====
+  // ===== 组件中心（v0.16.0 桌面按需下载）=====
   'models.comp.label': 'Components · Local component center',
   'models.comp.desc':
     'Optional on-device engines — download only what you need. Requirements are labeled honestly; cloud channels (BYOK) need no downloads.',

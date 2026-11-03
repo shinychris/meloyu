@@ -1,6 +1,6 @@
 """auth 路由（v0.7.0：3 → 10 接口——刷新/登出/验证码/找回重置/改密/注销/导出）。
 
-安审计 M-1/M-2（2026-09-09）：refresh token 改经 HttpOnly+SameSite=Strict
+（2026-09-09）：refresh token 改经 HttpOnly+SameSite=Strict
 Cookie 下发（Path 限定 /api/v1/auth），不再出现在响应体——localStorage 中的
 refresh 可被任意同源 JS 窃取，XSS 后即 30 天凭据失陷；HttpOnly 域内 JS 不可
 读，XSS 至多窃取 24h access。/auth/refresh 兼容从 Cookie 或请求体取令牌

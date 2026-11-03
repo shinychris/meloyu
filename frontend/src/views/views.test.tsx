@@ -94,7 +94,7 @@ describe('views render smoke', () => {
     expect(html).toContain('Commercial rights follow the model license')
   })
 
-  it('RightsView checklist 为真实数据驱动（P0-2 去虚还实）', () => {
+  it('RightsView checklist 为真实数据驱动', () => {
     const html = render(<RightsView />)
     // AI 披露 = 真（证书真实能力）
     expect(html).toContain('AI generation disclosure written into every license certificate')
@@ -230,7 +230,7 @@ describe('views render smoke', () => {
     expect(lyricsHtml).toContain('Ollama service address')
     expect(lyricsHtml).toContain('http://localhost:11434 (Docker deployment: http://host.docker.internal:11434)')
     // 歌曲引擎分区：通道分组标签 + 兜底通道明确标注非 AI
-    // （歌曲离线合成引擎保留兜底；歌词规则引擎已移除 ADR-019）
+    // （歌曲离线合成引擎保留兜底；歌词规则引擎已移除）
     const musicHtml = render(<ModelCenterView initialSection="mc-music" />)
     expect(musicHtml).toContain('Cloud channels')
     expect(musicHtml).toContain('On-device GPU channels')

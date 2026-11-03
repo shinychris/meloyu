@@ -26,13 +26,13 @@ def create_export(db: Session, user: User, version_id: str, fmt: str,
                   platform: str | None = None, meta: dict | None = None) -> dict:
     from app.services.generation import _check_maintenance
     _check_maintenance()
-    # B12（2026-10-03）：license 模式试用到期未激活 → 导出一并拦截（方案 §3.1：
+    # B12（2026-10-03）：license 模式试用到期未激活 → 导出一并拦截（
     # 仅保留浏览与激活入口；已有作品的浏览/播放不受影响）
     from app.services.generation import check_generation_entitlement
     check_generation_entitlement(db, user)
     from app.core.disk_guard import ensure_disk_available
     ensure_disk_available()
-    # P0-4（2026-09-26 商业化审查）：付费档核心权益后端强制——Plan.max_export
+    # （2026-09-26）：付费档核心权益后端强制——Plan.max_export
     # 此前无任何消费点，free 用户可直导 WAV/MIDI/Stems/发行包，付费档价值被架空。
     # 口径：max_export=="mp3"（free）仅允许 mp3；"wav"（pro/studio）放开全部格式。
     # 通道物理限制（外部通道候选无分轨/母带为 mp3 等）仍由执行期校验兜底。
@@ -45,7 +45,7 @@ def create_export(db: Session, user: User, version_id: str, fmt: str,
             tr(f"{fmt.upper()} 导出为 Pro/Studio 档权益；免费档仅支持 MP3 导出",
                f"{fmt.upper()} export is a Pro/Studio benefit; "
                "the free plan exports MP3 only"))
-    # P1-8：存储配额（导出产物同样计入占用）+ 每用户在途导出上限
+    # 存储配额（导出产物同样计入占用）+ 每用户在途导出上限
     # （导出 0 积分，无上限可刷满导出池拖慢所有人）
     from sqlalchemy import func as _func
     from sqlalchemy import select as _select
@@ -65,7 +65,7 @@ def create_export(db: Session, user: User, version_id: str, fmt: str,
         raise err_conflict(tr("该版本尚未采用候选", "No candidate adopted for this version yet"))
     payload = {"version_id": version_id, "format": fmt}
     if fmt == "release":
-        # FR-11 发行导出预设：platform 已由 schema 校验（douyin/streaming）
+        # 发行导出预设：platform 已由 schema 校验（douyin/streaming）
         payload["platform"] = platform
         payload["meta"] = meta or {}
         payload["meta"].setdefault("title", work_title_of(db, version))
@@ -276,7 +276,7 @@ def _wav_sample_rate(path: Path) -> int | None:
 
 
 def _mark_aigc(path: Path, fmt: str, attribution: str | None = None) -> None:
-    """P0-3/义务③：导出产物写入 AIGC 显式标识（mp3=ID3v2 / wav=RIFF LIST）。
+    """/：导出产物写入 AIGC 显式标识（mp3=ID3v2 / wav=RIFF LIST）。
 
     attribution 为引擎署名（如 "MiniMax-Music3 (self-hosted)"）——AUP 第 11 条
     机器生成内容披露含生成来源。标识写入失败不阻断导出（记日志）。
@@ -324,7 +324,7 @@ def _make_export_wav(exports_dir: Path, master: File) -> Path:
 
 
 def _check_deadline(deadline: float | None) -> None:
-    """导出软超时（P1-10）：阶段边界检查，超时抛 TimeoutError 判失败。"""
+    """导出软超时：阶段边界检查，超时抛 TimeoutError 判失败。"""
     import time as _time
     if deadline is not None and _time.monotonic() > deadline:
         raise TimeoutError(f"exceeded {EXPORT_TASK_TIMEOUT_SEC}s export budget")
@@ -343,7 +343,7 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
     # 模型整曲候选（Suno 兼容 API / Replicate / 本机 MusicGen）无分轨与 MIDI；
     # wav 母带是否可导出取决于产物格式（Replicate/MusicGen 有 wav，Suno 网关仅 mp3）
     master = _candidate_file(db, cand.id, "master")
-    # 义务①③：导出标识带生成引擎署名（固定英文，不随请求 locale 漂移）
+    # ③：导出标识带生成引擎署名（固定英文，不随请求 locale 漂移）
     from app.services.certificate import _version_provider, provider_attribution
     _, provider_name = _version_provider(db, version)
     attribution = provider_attribution(provider_name)
@@ -424,7 +424,7 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
                              name=f"{work.display_code}_{version.version_no}_stem_{stem}.wav")
             out.append(file_ref(srow))
     elif fmt == "release":
-        # FR-11 发行导出预设（v0.8.0）：平台模板打包（音频+封面占位+metadata+README）
+        # 发行导出预设（v0.8.0）：平台模板打包（音频+封面占位+metadata+README）
         _check_deadline(deadline)
         from app.services.release_export import (
             build_metadata,
@@ -463,7 +463,7 @@ def _export_artifacts(db: Session, work: Work, version: Version, cand: Candidate
         aigc = {
             "engine_attribution": attribution,
             "ai_generated": True,
-            # FR-16 披露协助：双语披露语与证书同口径（不随下载者 locale 漂移）
+            # 披露协助：双语披露语与证书同口径（不随下载者 locale 漂移）
             "disclosure": (f"本作品由 AI 辅助生成（{attribution}），人类创作参与记录见授权证书。"
                            f"This work was created with AI assistance ({attribution}); "
                            f"see the license certificate for human participation records."),

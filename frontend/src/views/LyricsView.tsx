@@ -14,7 +14,7 @@ import { useMetaStore } from '../stores/meta'
 import AnalysisPanel from '../components/lyrics/AnalysisPanel'
 import { PageHeader } from '../components/common/PageHeader'
 
-const DRAFT_KEY = 'meloyu:lyric-draft:v1' // 契约 §14 R2：草稿由前端 localStorage 承载
+const DRAFT_KEY = 'meloyu:lyric-draft:v1' //  R2：草稿由前端 localStorage 承载
 
 /** 全部语言的默认样例文本：判定编辑器里是否仍是「未被改动的样例」 */
 export const SAMPLE_TEXTS = new Set([lyricsZh['lyrics.defaultLyrics'], lyricsEn['lyrics.defaultLyrics']])
@@ -45,7 +45,7 @@ interface ChangeEntry {
   after: string
 }
 
-/** 歌词助手：AI 生成 / 润色选中段 / 押韵重音检查 / 标签补全（契约 §6 四接口全接） */
+/** 歌词助手：AI 生成 / 润色选中段 / 押韵重音检查 / 标签补全（四接口全接） */
 export default function LyricsView() {
   const t = useT()
   /** userText=null 表示样例态：显示值派生自当前 locale 的样例，语言切换自动跟随 */
@@ -110,7 +110,7 @@ export default function LyricsView() {
         toast(t('lyrics.toast.themeRequired'), 'warn')
         return
       }
-      // P1-22：语言跟随界面 locale（zh 用户默认中文；英文界面不再产出中文歌词）
+      // ：语言跟随界面 locale（zh 用户默认中文；英文界面不再产出中文歌词）
       const res = await generateLyrics({ theme: theme.trim(), mood: mood.trim() || null, language: getLocale() === 'en' ? 'en' : 'zh' })
       setGen(res)
       setRhyme(null)

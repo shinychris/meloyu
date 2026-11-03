@@ -20,8 +20,8 @@ const work: Work = {
   exported_formats: [],
 } as unknown as Work
 
-/** SSR 冒烟：发行导出预设（FR-11）区块渲染 + i18n 键存在性（en 默认 locale） */
-describe('ExportPanel release presets (FR-11)', () => {
+/** SSR 冒烟：发行导出预设区块渲染 + i18n 键存在性（en 默认 locale） */
+describe('ExportPanel release presets', () => {
   it('渲染四格式 + 发行导出折叠区（副标题可见）', () => {
     const html = renderToString(<ExportPanel versionId="v1" work={work} />)
     expect(html).toContain('Export WAV')

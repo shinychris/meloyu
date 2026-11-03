@@ -4,7 +4,7 @@
 - licenses：签发记录（lid 主键；stripe_session_id 唯一——Payment Link 履约幂等）
 - activations：在线激活上报（lid×device_id 唯一；仅治理数据，离线验签不依赖）
 
-并发约束（评审 F-PT-09）：SQLite 单写入方，portal **必须单进程单 worker 运行**
+并发约束：SQLite 单写入方，portal **必须单进程单 worker 运行**
 （README 部署节同款约束）；连接带 30s busy timeout + WAL 缓解偶发并写，
 但不构成多 worker 许可。
 """
@@ -30,7 +30,7 @@ def init(db_path: Path) -> None:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with conn() as c:
         # WAL（持久属性，库级一次设置、幂等重设无害）：读写不互斥；
-        # 写写冲突由 conn() 的 30s busy timeout 兜底（评审 F-PT-09）
+        # 写写冲突由 conn() 的 30s busy timeout 兜底
         c.execute("PRAGMA journal_mode=WAL")
         c.executescript("""
         CREATE TABLE IF NOT EXISTS licenses (
@@ -71,7 +71,7 @@ def conn():
     if _DB_PATH is None:
         raise RuntimeError("portal.db not initialised (call init())")
     with _LOCK:
-        # timeout=30：写锁占用时等待而非立刻 OperationalError（评审 F-PT-09：
+        # timeout=30：写锁占用时等待而非立刻 OperationalError（
         # CLI 工具/管理操作偶发并写的兜底；单进程约束见模块 docstring）
         c = sqlite3.connect(_DB_PATH, timeout=30)
         c.row_factory = sqlite3.Row

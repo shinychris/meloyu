@@ -176,7 +176,7 @@ class TestMixdown(_EditorTestCase):
             edit_svc.submit_mixdown(self.db, self.user, self.version.id, _tone_wav(3.0))
 
     def test_multichannel_wav_rejected(self):
-        """F-BE-26（2026-10-27）：>2 声道 wav 入口即拒（立体声拆分会取错样本）。"""
+        """（2026-10-27）：>2 声道 wav 入口即拒（立体声拆分会取错样本）。"""
         t = np.arange(int(35.0 * 48000)) / 48000
         x = (0.5 * np.sin(2 * np.pi * 440 * t) * 32767).astype("<i2")
         buf = io.BytesIO()
@@ -192,7 +192,7 @@ class TestMixdown(_EditorTestCase):
 
 class TestVariantGuards(_EditorTestCase):
     def test_variant_blocks_artist_impersonation(self):
-        """F-BE-28（2026-10-27）：variant 提示词过防侵权（与 POST /generations 同口径）。"""
+        """（2026-10-27）：variant 提示词过防侵权（与 POST /generations 同口径）。"""
         with self.assertRaises(BizError) as ctx:
             edit_svc.submit_variant(self.db, self.user, self.cand.id,
                                     "a dreamy ballad in the style of Taylor Swift")

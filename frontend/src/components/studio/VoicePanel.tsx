@@ -8,7 +8,7 @@ import { toast } from '../../stores/toast'
 import { useT } from '../../i18n'
 
 /**
- * 我的音色面板（FR-5）：双随机短语活体验证注册 → 已验证档案选用。
+ * 我的音色面板：双随机短语活体验证注册 → 已验证档案选用。
  * 流程：注册（命名）→ 朗读短语1（录音）→ 朗读短语2（防重放）→ 同人校验通过 →
  * 可在生成中使用「我的音色」（参数级音色适配：音域/共振峰/亮度）。
  * 边界如实标注：一致性校验为统计特征启发式，非神经网络声纹模型。
@@ -33,7 +33,7 @@ export default function VoicePanel() {
   }
   useEffect(refresh, [])
 
-  // F-FE-01（P1）：录音中途卸载组件时终止录音会话——停止 MediaRecorder 并释放
+  // （P1）：录音中途卸载组件时终止录音会话——停止 MediaRecorder 并释放
   // getUserMedia 轨道，麦克风不再被占用（范式同 HumDialog 的卸载清理）
   useEffect(
     () => () => {
@@ -107,7 +107,7 @@ export default function VoicePanel() {
     }
   }
 
-  // F-FE-16：普通事件处理函数不以 use 前缀命名（原 useProfile 触发 hooks 规则误报，
+  // ：普通事件处理函数不以 use 前缀命名（原 useProfile 触发 hooks 规则误报，
   // 是 rules-of-hooks 全局降级的诱因之一）
   const applyProfile = (p: VoiceProfile) => {
     patchForm({ vocal: 'voice_clone', voiceProfileId: p.id })
@@ -116,7 +116,7 @@ export default function VoicePanel() {
   }
 
   const removeProfile = async (p: VoiceProfile) => {
-    // F-FE-22：删除音色档案为破坏性操作，接 confirmDialog({ danger: true }) 二次确认
+    // ：删除音色档案为破坏性操作，接 confirmDialog({ danger: true }) 二次确认
     const ok = await confirmDialog({
       title: t('studio.voice.confirm.deleteTitle', { name: p.name }),
       description: t('studio.voice.confirm.deleteDesc'),

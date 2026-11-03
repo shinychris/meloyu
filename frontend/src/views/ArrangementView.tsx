@@ -141,7 +141,7 @@ export default function ArrangementView() {
       const loaded: Lane[] = []
       for (const f of toLoad) {
         const { url } = await getStreamToken(f.file_id)
-        // F-FE-06：音频字节下载收敛进 api/files（r.ok 校验）；失败显式 toast
+        // ：音频字节下载收敛进 api/files（r.ok 校验）；失败显式 toast
         let raw: ArrayBuffer
         try {
           raw = await fetchAudioBytes(url)
@@ -188,7 +188,7 @@ export default function ArrangementView() {
     }
   }, [lanes])
 
-  // 时间轴 rAF（P1-21）：进度条由 rAF 直接改 DOM——每帧 setPosition 会把整个
+  // 时间轴 rAF：进度条由 rAF 直接改 DOM——每帧 setPosition 会把整个
   // 视图（含全部轨道卡/滑杆）拖进 60fps 重渲染；时间标签降到 4Hz、playing
   // 只在变化时 setState
   useEffect(() => {

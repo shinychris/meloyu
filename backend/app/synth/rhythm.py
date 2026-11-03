@@ -1,4 +1,4 @@
-"""阶段④：鼓组模式 + 贝斯线（架构 §7.6，密度参数与负向提示调制）。"""
+"""阶段④：鼓组模式 + 贝斯线（密度参数与负向提示调制）。"""
 from __future__ import annotations
 
 import numpy as np

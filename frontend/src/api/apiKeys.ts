@@ -1,6 +1,6 @@
 /**
- * 开放 API 密钥 API（FR-19）。
- * F-FE-08：从 ApiKeysCard 组件内联请求收敛到 api/ 分层。
+ * 开放 API 密钥 API。
+ * ：从 ApiKeysCard 组件内联请求收敛到 api/ 分层。
  */
 import { apiDelete, apiGet, apiPost } from './client'
 import type { ApiKeyInfo } from '../types/api'

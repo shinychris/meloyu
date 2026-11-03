@@ -1,6 +1,6 @@
 """积分服务：原子扣减/退款/发放 + 流水查询。
 
-2026-10-03 定位转型（B5）：license 模式（desktop/enterprise）下积分转为
+（B5）：license 模式（desktop/enterprise）下积分转为
 **纯用量计量**——只记流水不扣减不拒绝（本地引擎成本=用户本机算力，云通道
 成本=用户自有 Key，平台无需成本对冲）；subscription 模式（cloud 存量）保持
 真实扣减语义。
@@ -118,7 +118,7 @@ def grant(db: Session, user: User, amount: int, reason: str,
 def lazy_monthly_grant(db: Session, user: User) -> None:
     """月度发放惰性触发：next_grant_at 已过则按当前档位发放并顺延。
 
-    安审计 L-2（2026-09-09）：check-then-act 在并发下（同时 login+refresh）
+（2026-09-09）：check-then-act 在并发下（同时 login+refresh）
     可能读到同一过期水位而双发。改为先原子占位——UPDATE ... WHERE
     credit_next_grant_at <= now 仅首个请求能顺延水位（rowcount=0 即并发已
     发放，直接返回），再入账。

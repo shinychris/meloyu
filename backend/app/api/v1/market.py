@@ -1,4 +1,4 @@
-"""作品市场路由（V2-c，v0.10.1；v0.10.2 增公开试听）。"""
+"""作品市场路由（v0.10.1；v0.10.2 增公开试听）。"""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -73,5 +73,5 @@ def my_orders(user: User = Depends(get_current_user), db: Session = Depends(get_
 @router.post("/admin/listings/{listing_id}/delist")
 def admin_delist(listing_id: str, body: AdminDelistRequest,
                  user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """平台治理下架（admin；P1-2 违规/投诉处置入口）。"""
+    """平台治理下架（admin； 违规/投诉处置入口）。"""
     return ok(market_svc.admin_delist(db, user, listing_id, body.reason))

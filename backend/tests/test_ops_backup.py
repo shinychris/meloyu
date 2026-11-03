@@ -55,7 +55,7 @@ class TestBackupSchedule(unittest.TestCase):
     def test_scripts_path_points_at_backend_dir(self):
         """desktop 形态（数据目录在 ~/Meloyu）下 sys.path 必须注入代码根
         BACKEND_DIR 而非数据目录父目录——否则 scripts.backup 永不可导入，
-        每日备份静默失效（2026-10-27 评审 F-BE-02）。"""
+        每日备份静默失效（2026-10-27）。"""
         from app.config import BACKEND_DIR
         with mock.patch.object(settings, "data_dir", self._tmp.name):
             ops_backup._scripts_on_path()

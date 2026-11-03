@@ -1,4 +1,4 @@
-"""契约资源对象的组装（schemas 层白名单式输出，模型 to_dict 只出扁平列）。"""
+"""API 资源对象的组装（schemas 层白名单式输出，模型 to_dict 只出扁平列）。"""
 from __future__ import annotations
 
 from app.models import Candidate, EditEvent, File, Task, User, Version, Work
@@ -97,7 +97,7 @@ def work_to_dict(w: Work, exported_formats: list[str] | None = None) -> dict:
         "version_count": w.version_count,
         "active_version_id": w.active_version_id,
         "preview_file_id": w.preview_file_id,
-        # 派生字段（契约 §14 R1 转正）：该 work 全部 succeeded 导出任务 format 去重升序
+        # 派生字段（转正）：该 work 全部 succeeded 导出任务 format 去重升序
         "exported_formats": sorted(set(exported_formats or [])),
         "created_at": w.created_at,
         "updated_at": w.updated_at,

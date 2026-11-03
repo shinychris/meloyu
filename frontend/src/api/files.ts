@@ -12,7 +12,7 @@ export function getStreamToken(fileId: string): Promise<StreamTokenResult> {
 }
 
 /** GET /files/{id}/download —— 鉴权下载（blob 方式携带 Bearer，规避 <a> 标签无法带头）。
- *  大文件下载：超时放宽到 300s（F-FE-07），不受全局 20s 网关超时约束。 */
+ *  大文件下载：超时放宽到 300s，不受全局 20s 网关超时约束。 */
 export async function downloadFileRef(file: FileRef, fallbackName: string): Promise<void> {
   const blob = await apiBlob(`/files/${file.file_id}/download`, { timeout: DOWNLOAD_TIMEOUT_MS })
   saveBlob(blob, file.name || fallbackName)
@@ -20,7 +20,7 @@ export async function downloadFileRef(file: FileRef, fallbackName: string): Prom
 
 /**
  * 下载音频字节并解码用（stream-token 短时 URL，带签名 query，非 /api/v1 通道）。
- * F-FE-06：组件不再裸 fetch——此处统一校验 r.ok，非 2xx（403/404/错误页 HTML）
+ * ：组件不再裸 fetch——此处统一校验 r.ok，非 2xx（403/404/错误页 HTML）
  * 抛错，由调用方显式 toast，不再把错误页字节喂给 decodeAudioData 静默失败。
  */
 export async function fetchAudioBytes(url: string): Promise<ArrayBuffer> {

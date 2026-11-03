@@ -93,7 +93,7 @@ def ensure_local_user(db: Session) -> User:
     user = db.execute(select(User).where(User.email == LOCAL_USER_EMAIL)).scalars().first()
     if user is not None:
         return user
-    get_state(db)  # 首启即记录试用起点（D-2：14 天全功能试用）
+    get_state(db)  # 首启即记录试用起点（14 天全功能试用）
     now = utc_now_iso()
     user = User(email=LOCAL_USER_EMAIL, password_hash=hash_password(new_local_password()),
                 nickname="Meloyu", plan="studio", credit_balance=0,

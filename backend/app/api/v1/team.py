@@ -1,4 +1,4 @@
-"""团队空间与协作评论路由（FR-13，v0.8.3）。"""
+"""团队空间与协作评论路由（v0.8.3）。"""
 from __future__ import annotations
 
 from fastapi import APIRouter, Body, Depends

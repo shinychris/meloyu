@@ -37,7 +37,7 @@ function scalePitchClasses(key: string): Set<number> {
 }
 
 /**
- * 旋律修调（/pitch，v0.11.0）：钢琴卷帘（词谱 json 的旋律音符）→
+ * 旋律修调（pitch，v0.11.0）：钢琴卷帘（词谱 json 的旋律音符）→
  * 选中音符 ↑/↓ 移调（半音）→ 可选吸附音阶 / 节奏量化（1/8·1/16）→
  * POST /candidates/{id}/pitch-edit（同 seed 确定性重渲染，子版本 source=pitch_edit）。
  */
@@ -53,7 +53,7 @@ export default function PitchView() {
   const [quantize, setQuantize] = useState<'off' | '8' | '16'>('off')
   const [submitting, setSubmitting] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  /** F-FE-04：卸载守卫——修调轮询在视图卸载后立即停止，不再空转 60s */
+  /** ：卸载守卫——修调轮询在视图卸载后立即停止，不再空转 60s */
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -260,7 +260,7 @@ export default function PitchView() {
         if (!mountedRef.current) return
         if (task.status === 'succeeded') {
           setEdits({})
-          // F-FE-05：完成提示使用真实版本号（version_no），轮询次数不再是版本号；
+          // ：完成提示使用真实版本号（version_no），轮询次数不再是版本号；
           // 版本号取不到时回退为不含占位符的词条
           if (task.version_id && workId) {
             try {

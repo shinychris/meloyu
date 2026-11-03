@@ -1,17 +1,17 @@
 /**
- * Meloyu Desktop — Electron 主进程（P2，2026-10-03 定位转型）。
+ * Meloyu Desktop — Electron 主进程。
  *
  * 职责：
  * - 单实例锁（第二实例聚焦已有窗口并转发命令行深度链接；锁失败分支完全隔离，
- *   不做任何协议/菜单/事件注册——评审 F-DT-13）
+ *   不做任何协议/菜单/事件注册）
  * - 选取空闲回环端口 → 拉起后端 sidecar（FastAPI 单体，APP_MODE=desktop）
  * - 健康检查就绪后加载 http://127.0.0.1:<port>（sidecar 同源托管前端 SPA，
- *   HttpOnly Cookie 刷新机制原样工作）；冷启动收到的深链在此刻重放（F-DT-01）
+ *   HttpOnly Cookie 刷新机制原样工作）；冷启动收到的深链在此刻重放
  * - 深度链接 meloyu://activate?account=..&code=..（在线）/ ?key=..（离线备用）
- *   → 主进程代为激活 → 读响应结果区分提示后跳授权设置页（F-DT-14）
- * - 导航/新窗口守卫 + openExternal 白名单（F-DT-03/04）+ 权限来源校验（F-DT-05）
+ *   → 主进程代为激活 → 读响应结果区分提示后跳授权设置页
+ * - 导航/新窗口守卫 + openExternal 白名单+ 权限来源校验
  * - sidecar 优雅退出：HTTP /_sidecar/shutdown → SIGTERM 宽限 → Windows
- *   taskkill /T 树杀兜底（F-DT-06/07）
+ *   taskkill /T 树杀兜底
  * - CSP 响应头（默认同源；Google Fonts 为既有外链白名单）
  * - 托盘（显示窗口/退出）+ 应用图标
  * - 自动更新（electron-updater + generic 更新源，仅接受 https；未配置时静默跳过）
@@ -49,7 +49,7 @@ let sidecarBase = ''
 let quitting = false
 let pendingDeepLink = null  // 冷启动挂起的激活请求（后到覆盖先到，就绪后重放）
 
-// ---------- 深度链接 meloyu://（评审 F-DT-01） ----------
+// ---------- 深度链接 meloyu:// ----------
 
 function handleDeepLinkArgs(argv) {
   const req = activateRequestFromParams(extractLinkFromArgv(argv))
@@ -71,7 +71,7 @@ function replayPendingDeepLink() {
   dispatchActivation(req)
 }
 
-/** mainWindow 使用前的销毁守卫 + loadURL 同步异常捕获（窗口销毁竞态，F-DT-14） */
+/** mainWindow 使用前的销毁守卫 + loadURL 同步异常捕获（窗口销毁竞态） */
 function safeLoad(url) {
   const win = mainWindow
   if (!win || win.isDestroyed()) return
@@ -81,7 +81,7 @@ function safeLoad(url) {
 }
 
 function activationFailed(reason) {
-  // F-DT-14：失败显式提示，不再导航设置页假装成功
+  // ：失败显式提示，不再导航设置页假装成功
   dialog.showMessageBox({
     type: 'error',
     title: 'Meloyu',
@@ -150,7 +150,7 @@ function startSidecar() {
   fs.mkdirSync(userDataData, { recursive: true })
   const env = {
     ...process.env,
-    // F-DT-17 调研结论（2026-10-27）：app_mode=desktop 即现值（pydantic 的
+    //  调研结论（2026-10-27）：app_mode=desktop 即现值（pydantic 的
     // app_mode 字段读 APP_MODE env）——license gate/试用闸门/本地档案链路照常
     // 生效；数据路径由 DATA_DIR 接管（config.data_path 中 data_dir 非空时优先
     // 于 desktop 默认的 ~/Meloyu，无冲突，config.py 无需改动）。
@@ -158,7 +158,7 @@ function startSidecar() {
     MELOYU_PORT: String(sidecarPort),
     DATA_DIR: userDataData,
     // ENV=dev 为刻意保留的「desktop 档」leniency：桌面形态无强随机密钥/PG，
-    // 生产启动断言不适用；dev 语义残留面（/api/docs、CORS）由 desktop_runner.py
+    // 生产启动断言不适用；dev 语义残留面（api/docs、CORS）由 desktop_runner.py
     // 在桌面专属入口收敛（见 backend/scripts/desktop_runner.py）
     ENV: 'dev',
     ALLOW_LAN_DEV: 'false',
@@ -175,7 +175,7 @@ function startSidecar() {
   })
   sidecar.stdout.on('data', (d) => process.stdout.write(`[sidecar] ${d}`))
   sidecar.stderr.on('data', (d) => process.stderr.write(`[sidecar] ${d}`))
-  // 评审 F-DT-06：spawn 失败（ENOENT 等）此前变未捕获异常 + 等满 30s 健康检查
+  // ：spawn 失败（ENOENT 等）此前变未捕获异常 + 等满 30s 健康检查
   // 超时——补 error 监听，与 exit 共用清理/退出逻辑，失败即刻可见
   sidecar.on('exit', (code) => sidecarDied(`exited unexpectedly (code ${code})`))
   sidecar.on('error', (err) => sidecarDied(`failed to start: ${err.message}`))
@@ -191,7 +191,7 @@ function sidecarDied(reason) {
   }
 }
 
-// ---------- sidecar 优雅退出（评审 F-DT-07） ----------
+// ---------- sidecar 优雅退出 ----------
 const SHUTDOWN_TIMEOUT_MS = 2500  // HTTP 优雅关停请求等待
 const KILL_GRACE_MS = 3000        // 信号后宽限
 const KILL_WAIT_MS = 2000         // 强杀后等待
@@ -315,7 +315,7 @@ function createWindow() {
   mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(LOADING_HTML)}`)
     .catch(() => {})
 
-  // 导航守卫（评审 F-DT-03）：SPA 内 location.href 指向非 sidecarBase 的导航
+  // 导航守卫：SPA 内 location.href 指向非 sidecarBase 的导航
   // 一律拦下——任意页面不得被载入主窗口（绕过 CSP 且可请求麦克风）；
   // 白名单外链转交系统浏览器
   mainWindow.webContents.on('will-navigate', (e, url) => {
@@ -324,7 +324,7 @@ function createWindow() {
     if (isExternalOpenAllowed(url)) shell.openExternal(url).catch(() => {})
   })
 
-  // 新窗口（评审 F-DT-03/04）：仅同源前缀可在窗口内打开；白名单外链走系统
+  // 新窗口：仅同源前缀可在窗口内打开；白名单外链走系统
   // 浏览器；其余（file:/smb:/自定义协议等）一律拒绝
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     const kind = classifyWindowOpen(url, sidecarBase)
@@ -339,13 +339,13 @@ function createWindow() {
 // ---------- 权限（麦克风：哼唱/人声克隆） ----------
 function installPermissionHandlers() {
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback, details) => {
-    // 评审 F-DT-05：media/audioCapture 仅 sidecarBase 来源（requestingUrl）
+    // ：media/audioCapture 仅 sidecarBase 来源（requestingUrl）
     // 放行，其余来源拒绝——麦克风不外借给导航守卫漏进来的页面
     callback(isPermissionAllowed(permission, details?.requestingUrl, sidecarBase))
   })
 }
 
-// ---------- CSP（方案 §6.3：sidecar 回环页面的内容安全策略） ----------
+// ---------- CSP（sidecar 回环页面的内容安全策略） ----------
 function installCsp() {
   // 只作用于回环 sidecar 的响应；data: 装载页（启动 loading）无响应头，不受影响
   session.defaultSession.webRequest.onHeadersReceived(
@@ -361,7 +361,7 @@ function installCsp() {
   )
 }
 
-// ---------- 托盘（方案 §6.3：窗口/托盘/菜单） ----------
+// ---------- 托盘（窗口/托盘/菜单） ----------
 function trayIconPath() {
   return IS_DEV
     ? path.join(__dirname, '../build/icon.png')
@@ -393,7 +393,7 @@ function setupAutoUpdater() {
   const updateUrl = process.env.MELOYU_UPDATE_URL || ''
   if (IS_DEV || !updateUrl) return
   if (!isHttpsUpdateUrl(updateUrl)) {
-    // 评审 F-DT-16：feed 含可执行更新，非 https 明文可被中间人替换——拒绝启用
+    // ：feed 含可执行更新，非 https 明文可被中间人替换——拒绝启用
     console.warn('[meloyu] MELOYU_UPDATE_URL must start with https:// — auto-update disabled')
     return
   }
@@ -429,11 +429,11 @@ app.whenReady().then(async () => {
     app.quit()
     return
   }
-  // F-DT-01：健康检查通过（sidecarBase 就绪）后重放冷启动挂起的激活深链
+  // ：健康检查通过（sidecarBase 就绪）后重放冷启动挂起的激活深链
   replayPendingDeepLink()
   setupAutoUpdater()
 
-  // F-DT-08：createWindow 同步返回 undefined，原 `createWindow().catch?.(...)`
+  // createWindow 同步返回 undefined，原 `createWindow().catch?.(...)`
   // 对 undefined 取 .catch 必崩 TypeError
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -456,7 +456,7 @@ app.on('before-quit', async (e) => {
 })
 
 // 基础菜单（mac 需要 About 项；win 菜单栏自动隐藏）
-// 评审 F-DT-11：reload/toggleDevTools 仅 dev 注入，生产构建不暴露调试入口
+// ：reload/toggleDevTools 仅 dev 注入，生产构建不暴露调试入口
 const template = [
   ...(process.platform === 'darwin' ? [{
     label: app.name,
@@ -478,7 +478,7 @@ const template = [
   },
 ]
 
-// ---------- 单实例锁（评审 F-DT-13：失败分支完全隔离） ----------
+// ---------- 单实例锁（失败分支完全隔离） ----------
 // 第二实例仅退出，不做协议注册/菜单/事件挂载；全部注册收敛进 gotLock 分支
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {

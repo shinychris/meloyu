@@ -4,14 +4,14 @@ V1.5.1 增自托管推理服务通道）。
 收录可经本系统五条通道使用的开源歌曲/音乐生成模型：
   - acestep_local：ACE-Step v1.5 本机子进程推理（歌词→人声成曲，8GB 显存档）
   - musicgen_local：本机 transformers 直跑 MusicGen（真实 HF 下载，器乐）
-  - mmax_local / songgen_local：自托管推理服务（V1.5.1，ADR-017）——模型装在
+  - mmax_local / songgen_local：自托管推理服务（V1.5.1）——模型装在
     用户自己的环境（SGLang-Omni / SongGeneration-Studio），端点可配置
   - replicate：Replicate 托管推理（统一 HTTP 协议，一个 Token 接全部模型）
 
 benchmark.score 为**公开论文/技术报告/社区横评的综合参考分（0-10）**，仅用于选型
 排序，非本系统实测；来源见 benchmark.source。分数与结论随来源公开资料整理，
-不声称本系统复测结果（ADR-015）。环境/显存需求仅为标注信息，不构成接入门槛
-（用户测试时自行选择，ADR-017）。
+不声称本系统复测结果。环境/显存需求仅为标注信息，不构成接入门槛
+（用户测试时自行选择）。
 
 replicate_slug：平台默认 slug；多数模型的社区托管 slug 变动频繁，默认留空，
 由用户在模型中心填写（存 llm_settings.replicate_slugs）。

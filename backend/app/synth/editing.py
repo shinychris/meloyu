@@ -1,6 +1,6 @@
 """V1.1 派生编辑引擎：extend 续写 / variant 同构变奏 / regen-section 段落重生成。
 
-设计要点（契约 §5.5~5.7 计划语义）：
+设计要点（计划语义）：
 - 确定性：派生种子 = SHA-256("{base_seed}:{op}:{extra}") 低 32 位；全程 seeded PCG64，
   音频内容路径禁 random/time。同（源候选, 操作, 参数）→ 逐字节相同产物。
 - extend：续写段独立渲染（同 key/BPM/风格/人声设定，首小节沿用原曲末小节和弦），
@@ -8,7 +8,7 @@
 - variant：段落划分/时长逐段复用原候选（重建结构并校验一致），和声/旋律/编曲
   以新 style_prompt（换和弦库/鼓型/配器）整曲重渲染。
 - regen-section：整曲重渲染后，非目标段时间范围逐样本复制回原候选采样（字节级不变，
-  同名其他出现同属非目标段）；边界融合窗只落在目标段内部，保证非目标段 sha256 不变（FR-6）。
+  同名其他出现同属非目标段）；边界融合窗只落在目标段内部，保证非目标段 sha256 不变。
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from app.synth import rhythm as rhythm_mod
 from app.synth import structure as structure_mod
 from app.synth.ir import SAMPLE_RATE, SectionPlan, SongIR, SongRequest
 
-# extend 拼接交叉淡化时长（契约要求 ≥50ms）
+# extend 拼接交叉淡化时长（要求 ≥50ms）
 CROSSFADE_SEC = 0.064
 # regen-section 选区边界融合窗（只覆盖选区内部，不触碰非选区字节）
 BLEND_SEC = 0.06

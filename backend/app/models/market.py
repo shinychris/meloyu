@@ -1,10 +1,10 @@
-"""作品市场（V2-c，v0.10.1）：站内上架/浏览/积分购买与非独占授权记录。
+"""作品市场（v0.10.1）：站内上架/浏览/积分购买与非独占授权记录。
 
 分账口径：卖家得 90%、平台 10%（落 market_orders + credit_transactions 双向
 流水，reason=market_purchase（买家扣减）/ market_sale（卖家入账），积分账本
 可审计）；买家获**非独占、不可转让**使用授权（订单即凭证，AIGC 署名随产物
 保留）；上架须属主确认持有该作品的商用授权（ack_commercial 落库合规留痕）。
-发行分发对接：发行打包见 FR-11 release 导出，外部平台提交为人工路径
+发行分发对接：发行打包见 release 导出预设，外部平台提交为人工路径
 （发行清单在 marketplace UI 提供）。
 """
 from __future__ import annotations

@@ -1,6 +1,6 @@
 """内容安全：敏感词检测（生成/歌词/市场等全端口共用的统一入口）。
 
-词库 = 内置 sensitive_words.json + 部署方外置扩展词库（P1-4，
+词库 = 内置 sensitive_words.json + 部署方外置扩展词库（
 backend/data/content_policy/extra_words.json，自动合并，无需改代码）。
 """
 from __future__ import annotations
@@ -17,7 +17,7 @@ def _load_builtin() -> list[str]:
 
 
 def _load_extra_words() -> list[str]:
-    """外置扩展词库（P1-4）：backend/data/content_policy/extra_words.json 自动合并。
+    """外置扩展词库：backend/data/content_policy/extra_words.json 自动合并。
 
     部署方按目标市场监管要求放置运营词库（结构 {"words": [...]}），无需改代码；
     文件不存在/格式错误时静默跳过。

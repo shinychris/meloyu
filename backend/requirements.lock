@@ -1,8 +1,8 @@
-# 依赖锁定——运行时集合（2026-10-27 评审 F-XC-03 拆分：仅含 requirements.txt
+# 依赖锁定——运行时集合（2026-10-27 拆分：仅含 requirements.txt
 # 及其传递依赖，ML 可选栈（torch/transformers 等）已拆至 requirements-musicgen.lock，
 # 开发工具（ruff）不再混入。镜像构建按本文件安装，不再拉取多 GB 的 CUDA torch 轮子。
 #
-# 版本来源：原 dev venv 全量 freeze（2026-09-09 安审计 L-4 起，2026-09-26 P1-14 起
+# 版本来源：原 dev venv 全量 freeze（2026-09-09 起，2026-09-26 起
 # 镜像按 lock 安装）剔除 ML 闭包后的同一套版本——与已测试的 dev venv 完全一致，
 # 未做重新解析。升级依赖后请重新生成，并保证 requirements.txt 的每个包都被本文件钉住。
 # ML 本地通道（可选）：先装本文件，再装 requirements-musicgen.lock。

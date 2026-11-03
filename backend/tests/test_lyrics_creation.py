@@ -104,7 +104,7 @@ class LLMPromptTest(unittest.TestCase):
         self.assertIn("创作想法", prompt)
         self.assertIn(long_idea, prompt)
         self.assertIn("（轻声吟唱）", prompt)  # 示例标记进入指令
-        self.assertNotIn("fallback", out)  # ADR-019：无兜底引擎，回退字段退役
+        self.assertNotIn("fallback", out)  # 无兜底引擎，回退字段退役
         # 返回的歌词原文保留标记（供支持标记的歌唱引擎消费）
         self.assertIn("（轻声吟唱）", out["lyrics"])
         # structure 按剥离标记后的真实行计（chorus 4 行）
@@ -129,7 +129,7 @@ class LLMPromptTest(unittest.TestCase):
         self.assertNotIn("fallback", out)
 
     def test_bad_output_raises_no_silent_fallback(self):
-        # ADR-019：坏输出不再静默回退规则引擎，如实上抛 LLMError 由服务层报错
+        # 坏输出不再静默回退规则引擎，如实上抛 LLMError 由服务层报错
         provider, _ = self._provider(["这不是 JSON"])
         with self.assertRaises(LLMError):
             provider.generate("主题")

@@ -1,4 +1,4 @@
-"""阶段⑥⑦：混音与分轨渲染（架构 §7.8）。
+"""阶段⑥⑦：混音与分轨渲染。
 
 - 四总线 vocals/drums/bass/other 在同一采样网格分别求和 → stems 相位对齐由构造保证。
 - 简单混响（指数衰减噪声 IR，FFT overlap-add 卷积，仅 vocal/other，12% 湿声）。

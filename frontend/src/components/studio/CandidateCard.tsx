@@ -34,7 +34,7 @@ export default function CandidateCard({
   const workId = useStudioStore((s) => s.workId)
   const markAdopted = useStudioStore((s) => s.markAdopted)
   /** 生成中（含延长/变体/段落重生成等派生任务）：禁用派生操作，避免并发扣积分
-   *  （F-FE-16：单 selector 内完成派生，不再出现「|| 右侧调 hook」的规则违规） */
+   *  （单 selector 内完成派生，不再出现「|| 右侧调 hook」的规则违规） */
   const generating = useStudioStore(
     (s) =>
       s.submitting ||

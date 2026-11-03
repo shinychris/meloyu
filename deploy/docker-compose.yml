@@ -2,23 +2,23 @@
 #
 # 网络隔离设计（与其他容器互不可达）：
 # - 独立 bridge 网络 meloyu-prod-net：与 aisag-prod-net / fastgpt_* / lmts-prod-net 等
-#   其他自定义网络二层隔离，跨网络容器互相无法 DNS 解析 / 直连；
+# 其他自定义网络二层隔离，跨网络容器互相无法 DNS 解析 / 直连；
 # - 对宿主机发布前端入口 0.0.0.0:8180（局域网可达；2026-09-06 应用户要求从
-#   仅回环放开；后端仍不发布端口，仅经 nginx 反代对外）；
+# 仅回环放开；后端仍不发布端口，仅经 nginx 反代对外）；
 # - 后端不发布任何宿主机端口，仅经 nginx 反代对外；
 # - 出网不受限（MiniMax / Stripe / SMTP 等云端通道正常）。
 #
 # 数据策略（v0.15.0 起）：
 # - PostgreSQL 为主库：postgres 服务 + 命名卷 meloyu-pgdata（WSL ext4，勿用
-#   Windows bind mount——NTFS 上 PG 的 fsync/权限语义不可靠）；连接串在
-#   .env.prod 的 DATABASE_URL 配置（生产启动断言强制 PG）。
+# Windows bind mount——NTFS 上 PG 的 fsync/权限语义不可靠）；连接串在
+# .env.prod 的 DATABASE_URL 配置（生产启动断言强制 PG）。
 # - backend/data 仍 bind 挂载 → /app/data（音频产物 + 日志 + backups/；
-#   应用内每日 03:30 PG COPY 转储与音频增量镜像都落这里）。
+# 应用内每日 03:30 PG COPY 转储与音频增量镜像都落这里）。
 # - 旧 SQLite 单写入方红线（dev uvicorn 与本栈不得同时写 meloyu.db）随切库
-#   解除：PG 为 MVCC 多写入方模型，dev 起本地实例不受影响（仍应指向独立
-#   dev 库避免数据混淆）。
+# 解除：PG 为 MVCC 多写入方模型，dev 起本地实例不受影响（仍应指向独立
+# dev 库避免数据混淆）。
 # - Supabase 云库替代方案：注释掉本服务与 backend 的 depends_on.postgres，
-#   .env.prod 的 DATABASE_URL 指向 Supabase 连接串。
+# .env.prod 的 DATABASE_URL 指向 Supabase 连接串。
 name: meloyu
 
 services:
@@ -62,7 +62,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # P1-13：默认 10s 后 SIGKILL 对写库线程太粗暴（可能留脏 WAL）；给足
+    # 默认 10s 后 SIGKILL 对写库线程太粗暴（可能留脏 WAL）；给足
     # 优雅退出窗口（uvicorn SIGTERM → 在写事务提交后退出）
     stop_grace_period: 60s
     env_file: .env.prod
@@ -72,7 +72,7 @@ services:
       PORT: "8000"
       ENV: production
       DATA_DIR: /app/data
-      # 2026-09-09 安审计 H1：限流取信反代注入的客户端 IP（nginx 已以
+      # 2026-09-09  H1：限流取信反代注入的客户端 IP（nginx 已以
       # $remote_addr 覆写 X-Forwarded-For / X-Real-IP，客户端不可伪造）。
       # 直连部署（无反代）时必须为 false——否则伪造 XFF 可绕过全部 IP 限流
       TRUST_PROXY: "true"

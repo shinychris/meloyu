@@ -1,5 +1,5 @@
 /**
- * license 命名空间（v0.16.0 定位转型）：买断制激活 / 试用状态 / 侧栏徽标。
+ * license 命名空间（v0.16.0）：买断制激活 / 试用状态 / 侧栏徽标。
  * 原 billing（Stripe）命名空间已随订阅拆除移除。
  */
 export const licenseEn = {

@@ -35,7 +35,7 @@ export default function RightsView() {
 
   const work = works.find((w) => w.id === workId) ?? null
 
-  /** 切换作品仅重置展示，不自动拉取证书（浏览即签发会污染 FR-14 审计数据） */
+  /** 切换作品仅重置展示，不自动拉取证书（浏览即签发会污染  审计数据） */
   const changeWork = (id: string): void => {
     setWorkId(id)
     setCert(null)
@@ -44,7 +44,7 @@ export default function RightsView() {
 
   const onViewCert = async () => {
     if (!work) return
-    // F-FE-30：防御空 active_version_id——未采用定稿时不再请求 /versions/undefined/certificate
+    // ：防御空 active_version_id——未采用定稿时不再请求 /versions/undefined/certificate
     const versionId = work.active_version_id
     if (!versionId) {
       setCertError(t('rights.cert.errorNoVersion'))
@@ -85,7 +85,7 @@ export default function RightsView() {
 
   const onCopyLink = async () => {
     if (!cert) return
-    // F-FE-31：复制的是证书留痕事件的 API 取证引用（JSON 地址），非页面链接——
+    // ：复制的是证书留痕事件的 API 取证引用（JSON 地址），非页面链接——
     // 文案与提示如实说明语义，复制行为不变
     try {
       await navigator.clipboard.writeText(

@@ -37,7 +37,7 @@ export function debounce<A extends unknown[]>(
   return wrapped
 }
 
-/** 搜索词清洗：trim + 截断（契约 §7.1 q ≤50 字） */
+/** 搜索词清洗：trim + 截断（q ≤50 字） */
 export function sanitizeQuery(value: string, max = 50): string {
   return value.trim().slice(0, max)
 }

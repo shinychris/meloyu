@@ -129,7 +129,7 @@ export function eventActorLabel(actor: string): string {
   return label(ACTOR_KEYS, actor)
 }
 
-/** 版本来源标签（契约 §1.6 source 枚举：generate/extend/variant/regen_section）；未知值原样显示 */
+/** 版本来源标签（source 枚举：generate/extend/variant/regen_section）；未知值原样显示 */
 const SOURCE_KEYS: Record<string, TranslationKey> = {
   generate: 'app.format.source.generate',
   extend: 'app.format.source.extend',

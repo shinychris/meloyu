@@ -1,4 +1,4 @@
-"""License 服务（2026-10-03 定位转型：买断制终身授权 + 14 天试用，D-1/D-2）。
+"""License 服务（买断制终身授权 + 14 天试用，/）。
 
 Key 格式（离线可验，Ed25519）：
     v1.<body_b64url>.<sig_b64url>
@@ -91,7 +91,7 @@ def verify_license_key(key: str, *, public_key_b64: str | None = None) -> dict:
     """验签并返回载荷 dict；格式/签名/tier 无效抛 40202。
 
     public_key_b64：显式公钥（portal 等独立部署的调用方传入各自公钥，
-    免去对全局 settings 的猴补——评审 F-PT-14）；缺省读 settings，
+    免去对全局 settings 的猴补）；缺省读 settings，
     应用内调用路径行为不变。
     """
     key = (key or "").strip()

@@ -1,4 +1,4 @@
-"""档位/授权服务（2026-10-03 定位转型 B4：订阅切换 → License 激活口径）。
+"""档位/授权服务（B4：订阅切换 → License 激活口径）。
 
 - license 模式（desktop/enterprise）：档位不可切换——权益由 License 激活决定，
   switch 一律引导去激活入口；list_plans 下发买断价与模式标记。
@@ -59,7 +59,7 @@ def list_plans(db: Session, user: User) -> dict:
         "features": [_feature_label(f) for f in (p.features or [])
                      if not _is_credit_feature(_feature_label(f))],
     } for p in rows]
-    # 2026-10-03：模式与买断价随 plans 一并下发（价格单一事实源；currency 恒 usd，D-7）
+    # 2026-10-03：模式与买断价随 plans 一并下发（价格单一事实源；currency 恒 usd）
     return {"plans": plans, "sales_contact": settings.sales_contact_email,
             "currency": "usd",
             "mode": settings.billing_mode,

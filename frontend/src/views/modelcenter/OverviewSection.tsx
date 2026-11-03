@@ -1,7 +1,7 @@
 import { useModelCenter } from './context'
 import { useT, type TranslationKey } from '../../i18n'
 
-/** 概览分区（F-FE-09 拆分）：运行时状态 + 生产就绪检查。跳转由父视图传入。 */
+/** 概览分区（拆分）：运行时状态 + 生产就绪检查。跳转由父视图传入。 */
 export default function OverviewSection({ jump }: { jump: (id: string) => void }) {
   const t = useT()
   const { runtime, local, settings } = useModelCenter()

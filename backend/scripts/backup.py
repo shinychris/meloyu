@@ -1,4 +1,4 @@
-r"""Meloyu 数据备份脚本（P1-8；v0.15.0 增 PostgreSQL 通道）。
+r"""Meloyu 数据备份脚本（v0.15.0 增 PostgreSQL 通道）。
 
 功能：
 1a. PostgreSQL 备份（DATABASE_URL 已配置时的主通道）：逐表 COPY ... TO STDOUT
@@ -13,7 +13,7 @@ r"""Meloyu 数据备份脚本（P1-8；v0.15.0 增 PostgreSQL 通道）。
     sqlite3Connection.backup() 页级 API，服务运行中执行安全。
 2. 快照完整性校验：SQLite 快照执行 PRAGMA integrity_check；PG 转储逐表
     回读行数与 manifest 比对（gzip CRC 保证传输完整）。校验失败即删除并
-    报错（防"备了个坏的"——P0-8，2026-09-26）。
+    报错（防"备了个坏的"——，2026-09-26）。
 3. 音频产物增量复制：backend/data/audio/ → backend/data/backups/audio/。
    仅复制 size 或 mtime 与备份侧不一致的文件（os.walk 递归，保持相对目录结构）。
 4. 轮换：db 产物（.db 快照或 pg-* 目录）保留最近 N 份（默认 7，--keep 可调）；
@@ -97,7 +97,7 @@ def backup_postgres(keep: int, dry_run: bool) -> bool:
         return False
     finally:
         engine.dispose()
-    # P0-8：转储即校验——逐文件 gzip 解压回读（CRC）+ 行数与 manifest 比对
+    # 转储即校验——逐文件 gzip 解压回读（CRC）+ 行数与 manifest 比对
     for entry in manifest["tables"]:
         part = dest_dir / entry["file"]
         try:
@@ -163,7 +163,7 @@ def backup_sqlite(keep: int, dry_run: bool) -> bool:
         print(f"[db] 备份失败：{exc}", file=sys.stderr)
         dest.unlink(missing_ok=True)
         return False
-    # P0-8：快照即校验——integrity_check 不过的快照等于没有备份
+    # 快照即校验——integrity_check 不过的快照等于没有备份
     check = sqlite3.connect(dest)
     try:
         result = check.execute("PRAGMA integrity_check").fetchone()

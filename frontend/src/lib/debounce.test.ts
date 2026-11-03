@@ -55,7 +55,7 @@ describe('debounce', () => {
   })
 })
 
-describe('sanitizeQuery（契约 §7.1：q ≤50 字）', () => {
+describe('sanitizeQuery（q ≤50 字）', () => {
   it('去除首尾空白', () => {
     expect(sanitizeQuery('  国风 ')).toBe('国风')
     expect(sanitizeQuery('   ')).toBe('')

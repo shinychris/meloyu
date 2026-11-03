@@ -3,7 +3,7 @@
 生产/Supabase：settings.database_url（postgresql+psycopg2://...，SSL 经 URL
 query 参数 sslmode=require 传递）；本地 Docker 栈由 compose 的 postgres 服务
 提供。SQLite 回退仅服务无 PG 环境（裸 dev / 单元测试），沿用 WAL + 跨线程
-共享的既有形态（ADR-006）。
+共享的既有形态。
 
 历史上 SQLite 单写入方约束（两次库损坏事故，2026-09-05/06）随 PG 切换解除：
 PG 为多写入方 MVCC 并发模型，dev uvicorn 与 8180 容器可安全并存（仍建议

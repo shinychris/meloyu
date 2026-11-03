@@ -1,10 +1,10 @@
-"""模型中心路由（契约 v1.5 §5.8，15 接口）。
+"""模型中心路由（15 接口）。
 
 本地开源模型（Ollama）下载/删除/列举/选用 + 外部 API（OpenAI 兼容）配置与连通性
 测试 + 歌词引擎通道切换（V1.2）；外部歌曲生成 API（Suno 兼容）配置/探活/通道切换
 （V1.3）；开源歌曲模型目录/Replicate 托管/本机 MusicGen 下载/删除/探活（V1.4）。
 
-P1-2（v0.7.0）：全局配置写操作收权管理员（users.is_admin：settings.admin_emails
+v0.7.0：全局配置写操作收权管理员（users.is_admin：settings.admin_emails
 注册自动授予 + demo 种子账号）；读/探活/目录仍登录即可用。API key 落库经
 core/crypto.py Fernet 加密（KEY_ENCRYPTION_SECRET 配置后生效）。
 """
@@ -52,7 +52,7 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
 
 
 def require_admin_probe(user: User = Depends(get_current_user)) -> User:
-    """连通性测试端点同样需管理员（安审计 M-1，2026-09-09）。
+    """连通性测试端点同样需管理员（2026-09-09）。
 
     test-external/test-music 接受调用方任意 base_url 并由服务端发起请求——
     若登录即可用，构成内网探测/云元数据读取原语（SSRF）；与 PUT /settings

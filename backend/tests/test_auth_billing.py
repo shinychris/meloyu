@@ -1,9 +1,9 @@
-"""auth 账号体系（P1-3）+ 买断制 License（B2/B12）+ 计量模式（B5）单测。
+"""auth 账号体系+ 买断制 License（B2/B12）+ 计量模式（B5）单测。
 
-2026-10-03 定位转型：Stripe 订阅链路已拆除（B3），本文件覆盖——
+：Stripe 订阅链路已拆除（B3），本文件覆盖——
 - 账号体系（注册/刷新轮换/改密/注销/导出）行为不变；
 - License Ed25519 签发/验签/激活/幂等/解除；
-- 试用闸门（D-2：14 天试用，到期未激活 40203 拦截生成/导出）；
+- 试用闸门（14 天试用，到期未激活 40203 拦截生成/导出）；
 - license 模式积分纯计量（不扣减不拒绝）+ 月度发放水位拆除；
 - switch_plan 在 cloud/license 两模式下的引导语义。
 
@@ -400,7 +400,7 @@ class TestLicenseMetering(_DBTestCase):
 
 
 class TestEnterpriseLicenseGate(_DBTestCase):
-    """F-BE-04（2026-10-27）：enterprise 形态 License 激活/解除收管理员。
+    """（2026-10-27）：enterprise 形态 License 激活/解除收管理员。
 
     任何登录成员可解除整站授权=破坏性 DoS；activate 写调用者 plan=自我提权。
     """

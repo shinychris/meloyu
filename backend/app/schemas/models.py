@@ -1,4 +1,4 @@
-"""模型中心请求模型（契约 v1.3 §5.8）。"""
+"""模型中心请求模型。"""
 from __future__ import annotations
 
 from pydantic import BaseModel, Field, field_validator
@@ -33,7 +33,7 @@ class LLMSettingsRequest(BaseModel):
     music_model 为目录模型 id；replicate_slugs 覆盖目录默认 slug）。
     V1.5 扩展：music_backend 增 acestep_local（本机 ACE-Step v1.5 人声成曲）。
     V1.5.1 扩展：music_backend 增 mmax_local|songgen_local（自托管推理服务通道，
-    local_service_hosts 配置端点，ADR-017）。
+    local_service_hosts 配置端点）。
     """
     lyrics_backend: str | None = None
     ollama_host: str | None = Field(default=None, max_length=200)
@@ -53,7 +53,7 @@ class LLMSettingsRequest(BaseModel):
     @field_validator("lyrics_backend")
     @classmethod
     def _backend(cls, v: str | None) -> str | None:
-        if v == "localsynth":  # 历史遗留值（原离线规则引擎通道，ADR-019 移除）→ 未配置
+        if v == "localsynth":  # 历史遗留值（原离线规则引擎通道，已移除）→ 未配置
             return "none"
         if v is not None and v not in ("none", "ollama", "openai_compat"):
             raise ValueError(tr("lyrics_backend 必须为 none/ollama/openai_compat",

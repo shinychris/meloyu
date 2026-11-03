@@ -1,4 +1,4 @@
-"""授权证书：JSON 签发（契约 §8.4）+ PDF（V1.1，D8 转正）+ certificates/files/edit_events 落库。"""
+"""授权证书：JSON 签发 + PDF（V1.1）+ certificates/files/edit_events 落库。"""
 from __future__ import annotations
 
 import hashlib
@@ -24,7 +24,7 @@ DISCLOSURE_EN = ("This work was created with AI assistance ({provider_display} {
 
 CERT_FORMATS = ("json", "pdf")
 
-# MiniMax 社区许可义务①：商用产品对 MiniMax 产出须显著展示 "MiniMax-Music3"——
+# MiniMax 社区许可：商用产品对 MiniMax 产出须显著展示 "MiniMax-Music3"——
 # 证书/导出标识/披露中的引擎署名统一走本映射（其余通道同规则补全）。
 # 英文版同时作为导出产物（ID3/RIFF ASCII 帧）的固定署名（不随请求 locale 漂移）。
 PROVIDER_DISPLAY_ZH: dict[str, str] = {}
@@ -113,7 +113,7 @@ def issue_certificate(db: Session, user: User, version: Version, fmt: str = "jso
     # catalog_model 为执行时刻目录模型留痕，见 generation._persist_success）
     model_id = (version.params.get("catalog_model")
                 or version.params.get("model", "v1_pro"))
-    # P0-1 证书×许可分流：授权类型 = 用户档位 × 通道/模型许可双重判定（不再只看 plan）
+    # 证书×许可分流：授权类型 = 用户档位 × 通道/模型许可双重判定（不再只看 plan）
     from app.services import licensing
     lic = licensing.license_for_generation(user.plan, provider_name, model_id)
     license_type = lic["type"]
@@ -138,7 +138,7 @@ def issue_certificate(db: Session, user: User, version: Version, fmt: str = "jso
             "master_wav_sha256": master.sha256 if master else "",
             "preview_mp3_sha256": preview.sha256 if preview else "",
         },
-        # R-42 修复：披露文案固定双语锚定（zh + en 并存），不随下载者请求头漂移，
+        # 披露文案固定双语锚定（zh + en 并存），不随下载者请求头漂移，
         # 保证同一版本多次签发的证书记录披露内容一致
         "disclosure": (DISCLOSURE.format(provider_display=provider_display, model=model_id)
                        + "\n"
@@ -191,7 +191,7 @@ def issue_certificate(db: Session, user: User, version: Version, fmt: str = "jso
     return cert_dict, filename, payload, mime
 
 
-# ---------- V1.1 PDF 签发（D8 转正，fpdf2） ----------
+# ---------- V1.1 PDF 签发（fpdf2） ----------
 
 # 固定文档创建时间：同内容 → 同 PDF 字节（确定性；业务时间 issued_at 在正文内体现）
 _PDF_CREATION_DATE = datetime(2026, 1, 1, 0, 0, 0)

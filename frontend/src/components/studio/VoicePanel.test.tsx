@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { renderToString } from 'react-dom/server'
 import VoicePanel from './VoicePanel'
 
-/** SSR 冒烟：我的音色面板（FR-5）——合规口径（仅本人/活体/非采样）可见 */
-describe('VoicePanel (FR-5)', () => {
+/** SSR 冒烟：我的音色面板——合规口径（仅本人/活体/非采样）可见 */
+describe('VoicePanel', () => {
   it('渲染注册入口与合规说明（默认 locale=en）', () => {
     const html = renderToString(<VoicePanel />)
     expect(html).toContain('My voice')

@@ -1,4 +1,4 @@
-"""防侵权输入防护（MiniMax-Music3 社区许可义务②：technical safeguards）。
+"""防侵权输入防护（MiniMax-Music3 社区许可：technical safeguards）。
 
 许可原文（LICENSE 条件四，2026-09-02 核验）要求托管服务
 "implement and maintain reasonable technical and organizational safeguards
@@ -9,7 +9,7 @@ that infringes the rights of third parties"，且不得绕过/禁用——因此
 
 防护内容：在世艺术家名义/声音冒用（"in the style of <artist>"、"像/模仿
 <artist>"等模式）——生成请求的提示词/歌词中命中即拦截（42202）。版权歌词
-全量比对属组织级措施（见 docs/06-商业化 核验文档"义务落实记录"），输入侧
+全量比对属组织级措施，输入侧
 以拦截冒用为主，产出侧以 AIGC 标识 + SHA-256 指纹登记（可追溯）为措施。
 """
 from __future__ import annotations

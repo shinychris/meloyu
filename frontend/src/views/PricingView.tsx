@@ -18,7 +18,7 @@ const usd2 = (cents: number | null | undefined): string | null =>
  * 积分流水 + 开放 API。
  *
  * v0.17.0：license（桌面买断）形态的授权激活与用量统计已迁入系统设置页
- * （/settings），本页在该形态下直接重定向过去。
+ * （settings），本页在该形态下直接重定向过去。
  */
 export default function PricingView() {
   const [plans, setPlans] = useState<PlanInfo[]>([])
@@ -109,7 +109,7 @@ export default function PricingView() {
         <UsageRecords showBalance />
       </div>
 
-      {/* 开放 API（FR-19 β）——SaaS 账户档位口径 */}
+      {/* 开放 API（β）——SaaS 账户档位口径 */}
       <ApiKeysCard />
     </section>
   )

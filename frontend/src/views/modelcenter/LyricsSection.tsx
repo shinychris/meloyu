@@ -7,7 +7,7 @@ import { toast } from '../../stores/toast'
 import { useT } from '../../i18n'
 
 /**
- * 歌词引擎分区（F-FE-09 拆分）：通道卡（Ollama 模型选择）+ Ollama 服务地址 +
+ * 歌词引擎分区（拆分）：通道卡（Ollama 模型选择）+ Ollama 服务地址 +
  * 外部 API（OpenAI 兼容）。通道选择与端点草稿在共享 context（refreshAll 重置语义
  * 与拆分前一致）；连通性测试为纯本区块瞬态。
  */

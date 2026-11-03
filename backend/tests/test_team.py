@@ -1,4 +1,4 @@
-"""FR-13 团队空间与协作评论单测（v0.8.3）：角色判权 + 时间轴锚定评论 + 共享闭环。
+""" 团队空间与协作评论单测（v0.8.3）：角色判权 + 时间轴锚定评论 + 共享闭环。
 
 运行：.venv/Scripts/python.exe -m unittest discover -s tests -v
 """

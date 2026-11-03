@@ -16,7 +16,7 @@ const FORMATS: Array<{ code: ExportFormat; label: string; noteKey: TranslationKe
   { code: 'stems', label: 'Stems', noteKey: 'work.export.note.stems' },
 ]
 
-// FR-11 发行导出预设：platform 与后端 RELEASE_PRESETS 单一事实源对齐
+//  发行导出预设：platform 与后端 RELEASE_PRESETS 单一事实源对齐
 const PLATFORMS: Array<{
   code: 'douyin' | 'streaming'
   labelKey: TranslationKey
@@ -30,7 +30,7 @@ type BusyMap = Partial<Record<ExportFormat, number>>
 
 type ReleasePlatform = 'douyin' | 'streaming'
 
-/** 导出面板：WAV / MP3 / MIDI / Stems + 发行导出预设（FR-11）+ 授权证书 */
+/** 导出面板：WAV / MP3 / MIDI / Stems + 发行导出预设+ 授权证书 */
 export default function ExportPanel({ versionId, work }: { versionId: string; work?: Work | null }) {
   const t = useT()
   const user = useSessionStore((s) => s.user)
@@ -44,7 +44,7 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
   const timers = useRef<number[]>([])
   const mounted = useRef(true)
 
-  // F-FE-26：清理先拷贝 ref 引用再读 .current——直接在 effect 闭包里解引用
+  // ：清理先拷贝 ref 引用再读 .current——直接在 effect 闭包里解引用
   // timers.current 会拿到过期数组（react-hooks/exhaustive-deps 告警）
   useEffect(() => {
     mounted.current = true
@@ -200,7 +200,7 @@ export default function ExportPanel({ versionId, work }: { versionId: string; wo
         })}
       </div>
 
-      {/* 发行导出预设（FR-11）：平台模板打包 */}
+      {/* 发行导出预设：平台模板打包 */}
       <div className="rule-t mt-3 pt-3">
         <button
           className="w-full text-left flex items-center justify-between"

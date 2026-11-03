@@ -1,6 +1,6 @@
 /**
- * 作品市场 API（V2-c，契约 §11）。
- * F-FE-08：从 MarketView 组件内联请求收敛到 api/ 分层。
+ * 作品市场 API。
+ * ：从 MarketView 组件内联请求收敛到 api/ 分层。
  */
 import { apiDelete, apiGet, apiPost } from './client'
 import type { MarketListingInfo, MarketOrderInfo } from '../types/api'

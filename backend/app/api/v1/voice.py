@@ -1,4 +1,4 @@
-"""人声音色档案路由（FR-5，v0.8.2）：octet-stream 采样上传（与参考音频同协议）。
+"""人声音色档案路由（v0.8.2）：octet-stream 采样上传（与参考音频同协议）。
 
 采样请求体流式读取（超 20MB 即断）+ 特征提取包进工作线程（2026-10-27，
 与 hum/reference 上传通道同口径——避免阻塞事件循环）。
@@ -59,5 +59,5 @@ def get_voice_profile(profile_id: str, user: User = Depends(get_current_user),
 @router.delete("/voice-profiles/{profile_id}")
 def delete_voice_profile(profile_id: str, user: User = Depends(get_current_user),
                          db: Session = Depends(get_db)):
-    """删除=吊销：档案与采样清除（FR-5：仅本人可操作）。"""
+    """删除=吊销：档案与采样清除（仅本人可操作）。"""
     return ok(voice_svc.delete_profile(db, user, profile_id))

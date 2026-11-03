@@ -22,8 +22,8 @@ from app.services.serializers import task_to_dict
 from app.synth.editing import derive_op_seed
 
 DERIVED_OPS = ("extend", "variant", "regen_section", "retune",
-               "pitch_edit")  # v0.9.0 增 retune；v0.11.0 增 pitch_edit（/pitch）
-MAX_TOTAL_DURATION_SEC = 240  # 与契约 generation_limits.max_duration_sec 一致
+               "pitch_edit")  # v0.9.0 增 retune；v0.11.0 增 pitch_edit（pitch）
+MAX_TOTAL_DURATION_SEC = 240  # 与 generation_limits.max_duration_sec 一致
 
 
 def _source_context(db: Session, user: User, candidate_id: str,
@@ -108,7 +108,7 @@ def submit_derived(db: Session, user: User, candidate_id: str, op: str, *,
             if check_sensitive(style_prompt):
                 from app.core.errors import err_sensitive
                 raise err_sensitive()
-            # 义务②（与 POST /generations 同口径，2026-10-27 补齐）：风格变奏的
+            # （与 POST /generations 同口径，2026-10-27 补齐）：风格变奏的
             # 提示词同样不得冒用 in vivo 艺术家名义/声音
             from app.services.ip_protection import check_ip_protection
             check_ip_protection(style_prompt)

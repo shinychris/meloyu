@@ -33,7 +33,7 @@ export const pricingEn = {
   'pricing.tx.balance': 'Balance',
   'pricing.tx.task': 'Related task',
   'pricing.tx.empty': 'No records yet',
-  // ===== Open API keys (FR-19, v0.8.2) =====
+  // ===== Open API keys (, v0.8.2) =====
   'apikey.title': 'Open API (beta)',
   'apikey.hint': "Four machine endpoints — text-to-song / task polling / works listing / file download — authenticated by API key. Usage is metered to this account at the same rates as in-app (v1_pro=12 / v1_fast=6); commercial licensing follows the account plan × channel license (same certificate).",
   'apikey.namePlaceholder': 'Key name (e.g. production)',

@@ -2,7 +2,7 @@
 
 由 backend/app/providers/music_acestep.py 拉起——ACE-Step 钉死
 torch==2.7.1+cu128 与后端 venv（torch 2.13+cu130，MusicGen 用）互斥，
-故代码/依赖/checkpoints 全部隔离在 backend/data/acestep/（ADR-016）。
+故代码/依赖/checkpoints 全部隔离在 backend/data/acestep/。
 
 协议：stdout 每行一个 JSON 事件（stderr 原样透传，供排查）：
   {"event": "progress", "pct": 0~100, "message": "..."}

@@ -11,7 +11,7 @@ const MAX_SEC = 30
  * 哼唱成歌录音弹窗（v0.11.0）：MediaRecorder 录 ≤30s → 浏览器渲染 mono wav →
  * POST /hum/analyze（真实 f0 提取）→ 展示音高轮廓 → 「应用」写入表单
  * params.hum_melody（生成时由引擎按音程关系映射为人声旋律）。
- * WAV 编码复用 lib/audio 的 decodeToWav（F-FE-10：删除本地重复实现；
+ * WAV 编码复用 lib/audio 的 decodeToWav（删除本地重复实现；
  * mimeType 以 MediaRecorder 实际值为准，兜底 audio/webm）。
  */
 export default function HumDialog({ open, onClose, onApply }: {

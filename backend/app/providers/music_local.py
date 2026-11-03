@@ -1,8 +1,8 @@
-"""LocalSynthProvider：确定性算法作曲 + numpy DSP 合成（架构 §7 八阶段管线）。
+"""LocalSynthProvider：确定性算法作曲 + numpy DSP 合成（八阶段管线）。
 
 产物目录布局（dest_dir 为版本目录）：
   candidates/{A,B}/preview.mp3  master.wav  stems/{vocals,drums,bass,other}.wav  midi/*.mid
-MIDI 随生成落盘但不登记 files 表（契约：candidate.files 固定 6 项，MIDI 经导出获取）。
+MIDI 随生成落盘但不登记 files 表（接口约定：candidate.files 固定 6 项，MIDI 经导出获取）。
 
 V1.1：generate_derived 承接 extend/variant/regen-section 三种派生操作
 （编排见 services/editing.py，波形装配见 synth/editing.py）。
@@ -58,7 +58,7 @@ def _stage(progress: ProgressCallback, should_cancel: CancelCheck, key: str, pct
 def _style_tags(style_prompt: str, family: str) -> list[str]:
     """由 style_prompt 派生风格标签（候选展示用）；家族兜底标签按当前 locale。
 
-    分隔符只认逗号族（，,、。;；）——灵感指引组装的 "great for {scene}" /
+    分隔符只认逗号族（,、。;）——灵感指引组装的 "great for {scene}" /
     "{inst}-led" / "适合{scene}" 是有意为之的短语段，把空格也当分隔符会拆出
     "great" 这类碎片词（2026-10-28 模拟用户测试 F-02）。
     """
@@ -374,7 +374,7 @@ class LocalSynthProvider:
     def _derive_pitch_edit(self, request: SongRequest, spec: dict, base_req: SongRequest,
                            dest: Path, progress: ProgressCallback,
                            should_cancel: CancelCheck) -> tuple[CandidateArtifact, bool]:
-        """音符级修调（/pitch，v0.11.0）：同 seed 重建原曲 → 应用移调/量化 → 重渲染。
+        """音符级修调（pitch，v0.11.0）：同 seed 重建原曲 → 应用移调/量化 → 重渲染。
 
         素材（和声/编曲/人声音色/歌词对齐）与原曲一致；仅旋律音符的音高/起点
         按编辑变化。edits 以词谱绝对拍号（beat）为键（±0.05s 容差匹配）。

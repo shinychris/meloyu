@@ -1,4 +1,4 @@
-"""MusicGen 本地开源模型 Provider（V1.4「多类开源模型接入」，ADR-014）。
+"""MusicGen 本地开源模型 Provider（V1.4「多类开源模型接入」）。
 
 本机 transformers 直跑 Meta 开源 MusicGen（facebook/musicgen-small|medium）：
   - 模型权重经 huggingface_hub snapshot_download 真实下载（进度回调写 model_ops，
@@ -70,7 +70,7 @@ def _apply_hf_endpoint() -> None:
 # （重启服务后自动恢复尝试 GPU）
 _CUDA_POISONED = {"flag": False}
 
-# P1-9 模型常驻缓存：同一模型在进程生命周期内只 from_pretrained 一次
+# 模型常驻缓存：同一模型在进程生命周期内只 from_pretrained 一次
 # （原实现每次生成都冷加载权重，small 也要分钟级）。GPU 采样全程持锁串行
 # （transformers generate 非线程安全，且单卡显存本就只能串行）。
 _MODEL_CACHE: dict[str, tuple] = {}

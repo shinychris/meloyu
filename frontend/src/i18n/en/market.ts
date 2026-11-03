@@ -1,4 +1,4 @@
-/** market 命名空间：作品市场（V2-c，v0.10.1） */
+/** market 命名空间：作品市场（v0.10.1） */
 export const marketEn = {
   'market.view.label': 'Assets / Marketplace',
   'market.view.headline': 'Buy & sell works — credits, split & licensed',

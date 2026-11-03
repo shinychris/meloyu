@@ -1,4 +1,4 @@
-"""自托管推理服务通道 Provider（V1.5.1 补充批，ADR-017）。
+"""自托管推理服务通道 Provider（V1.5.1 补充批）。
 
 两个「本机/自托管」开源大模型通道——模型与推理服务不装进 Meloyu 后端
 （依赖栈/官方推理路径均独立于本仓库），用户在任意环境启动推理服务后把
@@ -12,7 +12,7 @@
     v2 权重需 Linux/ComfyUI 路径自建），FastAPI /load + /generate，
     输出 flac（sample_rate 由模型 cfg 决定）。
 
-显存/环境需求**不构成接入门槛**（用户测试时自行选择运行环境，ADR-017），
+显存/环境需求**不构成接入门槛**（用户测试时自行选择运行环境），
 目录 local_note 仅如实标注。服务未运行时 fail-fast 给出启动指引，不阻断
 其它通道；产物 master.wav（24bit PCM，模型原生采样率）+ preview.mp3，
 无分轨/MIDI（与既有整曲通道同一导出规则；SongGeneration separate 分轨
@@ -116,12 +116,12 @@ def _audiocpp_home() -> Path:
     return settings.data_path / "audiocpp"
 
 
-# R-37：audio.cpp 通道级并发上限（生成线程池共 2 worker，慢通道独占 1）
+# audio.cpp 通道级并发上限（生成线程池共 2 worker，慢通道独占 1）
 _AUDIOCPP_SEMAPHORE = threading.BoundedSemaphore(1)
 
 
 def _kill_process_tree(proc) -> None:
-    """R-39：击杀整个进程树（子进程可能派生孙进程占显存，单 kill 泄漏）。
+    """击杀整个进程树（子进程可能派生孙进程占显存，单 kill 泄漏）。
 
     Windows：taskkill /T /F；POSIX：进程组 SIGKILL 兜底单进程 kill。
     """
@@ -152,7 +152,7 @@ def _audiocpp_files() -> list:
 
 
 def audiocpp_verify() -> tuple[bool, str]:
-    """P1-10 供应链校验：data/audiocpp/SHA256SUMS 存在时逐文件校验（进程内缓存一次）。
+    """ 供应链校验：data/audiocpp/SHA256SUMS 存在时逐文件校验（进程内缓存一次）。
 
     部署方生成清单（在部署目录执行）：
       certutil -hashfile audiocpp_cli.exe SHA256  →  逐行 "<sha256>  <相对路径>" 写入
@@ -378,7 +378,7 @@ class MiniMaxSelfHostedProvider:
         from app.config import AUDIOCPP_TASK_TIMEOUT_SEC
         # 本地 Q4 量化实测 RTF~94（双候选可能 1 小时+），放宽任务熔断
         self.timeout_sec = AUDIOCPP_TASK_TIMEOUT_SEC
-        # R-37 容量治理：audio.cpp 单任务可占 GPU 数十分钟~4h，通道级并发上限 1，
+        # 容量治理：audio.cpp 单任务可占 GPU 数十分钟~4h，通道级并发上限 1，
         # 防止两个慢任务占满 2-worker 生成池拖瘫全站
         if not _AUDIOCPP_SEMAPHORE.acquire(blocking=False):
             _stage(progress, should_cancel, "model_load", 5,

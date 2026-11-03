@@ -28,7 +28,7 @@ import { toast } from '../../stores/toast'
 import { t } from '../../i18n'
 
 /**
- * 模型中心共享状态（F-FE-09 拆分）：
+ * 模型中心共享状态（拆分）：
  * 服务端数据（runtime/local/settings/presets/ops/catalog）与跨区块共享的可变
  * 草稿（通道选择、外部端点、slug/host 编辑、Replicate Token）收敛到 Provider；
  * 各 section 组件只保留本区块的瞬态（测试中/测试结果等）。

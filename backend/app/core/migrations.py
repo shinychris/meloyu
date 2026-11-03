@@ -40,10 +40,10 @@ _ADD_COLUMNS: list[tuple[str, str, str]] = [
      "ALTER TABLE users ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT 0"),
     ("users", "refresh_token_hash",
      "ALTER TABLE users ADD COLUMN refresh_token_hash VARCHAR(64)"),
-    # M-20260902-b：certificates 补证书×许可分流等级列（P0-1）
+    # M-20260902-b：certificates 补证书×许可分流等级列
     ("certificates", "license_grade",
      "ALTER TABLE certificates ADD COLUMN license_grade VARCHAR(16) NOT NULL DEFAULT ''"),
-    # M-20260904-c：v0.8.3 团队空间——works 补共享空间列（FR-13）
+    # M-20260904-c：v0.8.3 团队空间——works 补共享空间列
     ("works", "space_id", "ALTER TABLE works ADD COLUMN space_id VARCHAR(32)"),
     # M-20260926-c：v0.14.0——subscriptions 记录当前生效 Stripe 订阅 id
     ("subscriptions", "stripe_subscription_id",
@@ -78,7 +78,7 @@ _UNIQUE_INDEXES: list[tuple[str, str, str]] = [
 
 
 # 数据口径类迁移（双方言执行；SQL 自身幂等，重复执行无副作用）
-# M-20261101-a：v0.18.0——歌词引擎原离线规则引擎通道（localsynth）随 ADR-019 移除，
+# M-20261101-a：v0.18.0——歌词引擎原离线规则引擎通道（localsynth）通道已移除，
 # 存量行归一为 none（未配置）
 _DATA_MIGRATIONS: list[tuple[str, str]] = [
     ("m_20261101_a_lyrics_backend_none",
@@ -137,7 +137,7 @@ def run(engine: Engine) -> list[str]:
                 applied.append(f"{table}.{column}")
 
         # M-20260831-b：candidates.quality_score NOT NULL → 可空（外部模型候选无 AI 质量分，
-        # 不再造分——见 ADR-012）。SQLite 中 NULL 可通过 CHECK 约束，无需改约束本身。
+        # 不再造分）。SQLite 中 NULL 可通过 CHECK 约束，无需改约束本身。
         info = [r for r in conn.execute(text("PRAGMA table_info(candidates)"))
                 if r[1] == "quality_score"]
         if info and info[0][3]:  # 第 4 列 = notnull 标志
@@ -168,7 +168,7 @@ def run(engine: Engine) -> list[str]:
             _rebuild_table(conn, "subscriptions", "subscriptions__v07")
             applied.append("subscriptions.source 增加 stripe 枚举")
 
-        # M-20260904-a：v0.8.0 发行导出预设（FR-11）——tasks.format 补 release、
+        # M-20260904-a：v0.8.0 发行导出预设——tasks.format 补 release、
         # files.kind 补 export_release_zip（两表均带 CHECK 约束，走表重建）
         ddl = conn.execute(
             text("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'")
@@ -199,7 +199,7 @@ def run(engine: Engine) -> list[str]:
             _rebuild_table(conn, "versions", "versions__v09")
             applied.append("versions.source 增加 retune/mixdown 枚举")
 
-        # M-20260904-b：v0.8.1 人声克隆——candidates.vocal 补 voice_clone（FR-5）
+        # M-20260904-b：v0.8.1 人声克隆——candidates.vocal 补 voice_clone
         ddl = conn.execute(
             text("SELECT sql FROM sqlite_master WHERE type='table' AND name='candidates'")
         ).scalar_one_or_none()
@@ -242,7 +242,7 @@ def run(engine: Engine) -> list[str]:
             _rebuild_table(conn, "edit_events", "edit_events__v014")
             applied.append("edit_events.action 增加 payment_failed/past_due 枚举")
 
-        # M-20260926-a：v0.14.0 币种统一 USD（P0-5）——存量库 plans 价格从人民币
+        # M-20260926-a：v0.14.0 币种统一 USD——存量库 plans 价格从人民币
         # 口径一次性迁到 USD 分值；仅匹配旧值行（运营已自定义改价的行不动），
         # 新库由 seed 直接写 USD。幂等：迁移后再次执行匹配 0 行。
         n1 = conn.execute(text(

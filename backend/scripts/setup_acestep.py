@@ -15,7 +15,7 @@ desktop 首启自动部署共用同一入口（幂等，重复执行只补缺口
 无 uv/Python 时由服务自动钉版下载 uv 并托管 Python 3.12。
 
 为什么独立 venv：ACE-Step 钉死 torch==2.7.1+cu128，与后端 venv 的
-torch 2.13+cu130（MusicGen 使用）互斥（ADR-016）。部署产物全部位于
+torch 2.13+cu130（MusicGen 使用）互斥。部署产物全部位于
 数据目录 acestep/（gitignored）：源码、venv、checkpoints（约 11GB 权重，
 首次在模型中心下载）。
 """

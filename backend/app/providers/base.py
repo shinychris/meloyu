@@ -1,4 +1,4 @@
-"""Provider 协议 + 注册表（架构 §8）。"""
+"""Provider 协议 + 注册表。"""
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -65,7 +65,7 @@ class MusicProvider(Protocol):
 class CandidateArtifact:
     """单候选的产物元数据（文件已落盘，由 service 层登记 files 表）。
 
-    quality_score 允许 None：外部模型候选不产出质量分（V1.3，ADR-012）。
+    quality_score 允许 None：外部模型候选不产出质量分（V1.3）。
     """
 
     def __init__(self, label: str, seed: int, quality_score: int | None, duration_sec: float,

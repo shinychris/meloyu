@@ -32,7 +32,7 @@ export default function InspireBox() {
   }
 
   const random = () => {
-    // F-FE-12：随机组合收敛为 store action（写回灵感/风格描述/步骤/日志）
+    // ：随机组合收敛为 store action（写回灵感/风格描述/步骤/日志）
     randomizeInspire()
     toast(t('studio.toast.inspireRandom'))
   }

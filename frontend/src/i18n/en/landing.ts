@@ -219,7 +219,7 @@ export const landingEn = {
   'landing.data.audience.3.p1': 'Parallel engines, candidates in bulk',
   'landing.data.audience.3.p2': 'A traceable generate-edit-export audit trail',
   'landing.data.audience.3.p3': 'License certificates ship with every work — legal can actually read them',
-  // 授权定价（单档终身，D-1 定案）
+  // 授权定价（单档终身）
   'landing.data.license.name': 'Meloyu Desktop · Lifetime License',
   'landing.data.license.tagline': 'One-time purchase, no subscription',
   'landing.data.license.badge': 'Launch offer',

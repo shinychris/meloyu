@@ -1,4 +1,4 @@
-"""API 密钥表（FR-19，v0.8.2）。"""
+"""API 密钥表（v0.8.2）。"""
 from __future__ import annotations
 
 from sqlalchemy import Index, String

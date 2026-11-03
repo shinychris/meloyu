@@ -280,7 +280,7 @@ export default function LoginView() {
           </form>
 
           <div className="mt-5 pt-4 rule-t text-xs leading-relaxed text-dim">
-            {/* 2026-09-09 安审计 L2/M-4：移除 demo 固定凭据提示与自动填充——生产栈
+            {/* 2026-09-09  L2/：移除 demo 固定凭据提示与自动填充——生产栈
                 启动即禁用种子账号，该凭据已不可用；dev 演示凭据见 backend/README.md。
                 商业化发布：不再展示 demo 引擎说明文案 */}
             {/* F7：落地页已迁官网营销站（portal 托管），App 内无 /landing 路由——

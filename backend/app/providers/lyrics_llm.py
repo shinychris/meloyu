@@ -2,7 +2,7 @@
 
 - 创作型接口 generate / polish 走 LLM（提示词约束 + JSON 解析 + 行级 diff）；
   通道异常（不可达/超时/坏输出/输出命中敏感词）抛 LLMError 由服务层如实报错，
-  不再做无 AI 兜底（原本地规则引擎已移除，见 ADR-019）。
+  不再做无 AI 兜底（原本地规则引擎已移除）。
 """
 from __future__ import annotations
 

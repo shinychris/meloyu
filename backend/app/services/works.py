@@ -19,7 +19,7 @@ from app.services.serializers import event_to_dict, work_to_dict
 
 def _get_work_owned(db: Session, work_id: str, user: User,
                     min_role: str = "editor", owner_only: bool = False) -> Work:
-    """归属/权限校验取行（FR-13 角色化：共享作品的团队成员按 rank 判权）。
+    """归属/权限校验取行（角色化：共享作品的团队成员按 rank 判权）。
 
     min_role：viewer（读）/ commenter（评论，服务层内部用）/ editor（写）；
     owner_only=True 时仅作品属主本人（破坏性操作：删除/回收站/共享管理）。
@@ -44,7 +44,7 @@ def get_work_row(db: Session, work_id: str, user: User) -> Work:
 def exported_formats_map(db: Session, work_ids: list[str]) -> dict[str, list[str]]:
     """一批 work 的已导出格式（succeeded 导出任务 format 去重升序）。
 
-    一条聚合查询消除前端列表页 N+1 拉导出任务的根因（契约 §14 R1 转正）。
+    一条聚合查询消除前端列表页 N+1 拉导出任务的根因（转正）。
     """
     if not work_ids:
         return {}
@@ -63,7 +63,7 @@ def _serialize(db: Session, work: Work, user: User | None = None) -> dict:
     fmts = exported_formats_map(db, [work.id]).get(work.id, [])
     out = work_to_dict(work, exported_formats=fmts)
     if user is not None:
-        # FR-13：协作上下文（共享空间/是否属主/我的角色）——前端据此渲染评论与共享入口
+        # 协作上下文（共享空间/是否属主/我的角色）——前端据此渲染评论与共享入口
         from app.services.team import role_for_work
         out["space_id"] = work.space_id
         out["is_owner"] = work.user_id == user.id
@@ -74,7 +74,7 @@ def _serialize(db: Session, work: Work, user: User | None = None) -> dict:
 def list_works(db: Session, user: User, *, q: str | None, tag: str | None,
                favorite: bool | None, status: str, sort: str, order: str,
                page: int, page_size: int) -> dict:
-    # 回收站清扫已移至启动+定时（P2-1，2026-09-26）：读接口持写锁（SQLite 单写者）
+    # 回收站清扫已移至启动+定时（2026-09-26）：读接口持写锁（SQLite 单写者）
     # 与生成进度回写争锁，且"仅该用户再访问才触发"行为不可预期
     conds = [Work.user_id == user.id]
     if status == "active":
@@ -166,10 +166,10 @@ def restore_work(db: Session, work_id: str, user: User) -> dict:
 def _physical_delete(db: Session, work: Work) -> None:
     """物理删除：解除自引用外键 → DELETE+级联提交 → 再删磁盘目录。
 
-    顺序（P2-2，2026-09-26）：先提交 DB 删除后 rmtree——原实现先删盘后提交，
+    顺序（2026-09-26）：先提交 DB 删除后 rmtree——原实现先删盘后提交，
     commit 失败（busy 超时）即留下指向已删文件的悬空行；改为先提交后删盘后，
     提交成功而 rmtree 失败只会残留磁盘孤儿目录（由对账清扫兜底，无数据损坏）。
-    P1-1：同事务联动下架市场条目（market 表无外键，防买家买到已删作品）。
+    ：同事务联动下架市场条目（market 表无外键，防买家买到已删作品）。
     注意：id 须在 DELETE 提交前取用（提交后 ORM 实例过期，行已不在）。
     """
     work_id = work.id

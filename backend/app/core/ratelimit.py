@@ -1,4 +1,4 @@
-"""轻量接口限流中间件（P0-6，盘点报告 R-11 修复；自研零依赖替代 slowapi）。
+"""轻量接口限流中间件（自研零依赖替代 slowapi）。
 
 按 (client_ip, bucket) 滑动窗口计数，命中规则超限返回 429 + 业务码 42901。
 单进程内存实现（当前单机部署形态）；多副本部署时替换为 Redis 后端（接缝：
@@ -29,7 +29,7 @@ _RULES: list[tuple[str, int, int]] = [
     ("/api/v1/auth/send-code", 3600, 3),
     ("/api/v1/auth/forgot-password", 3600, 3),
     ("/api/v1/generations", 3600, 30),
-    ("/api/v1/public/generations", 3600, 30),  # FR-19 开放 API β：与站内同额度
+    ("/api/v1/public/generations", 3600, 30),  #  开放 API β：与站内同额度
     ("/api/v1/", 60, 300),
 ]
 
@@ -40,7 +40,7 @@ _MAX_KEYS = 20000  # 内存上限：超量按最旧键淘汰（防地址随机�
 def _client_ip(request: Request) -> str:
     """限流计数的客户端 IP。
 
-    安审计 H-1（2026-09-09）：无条件取 X-Forwarded-For 链首=攻击者可控，
+（2026-09-09）：无条件取 X-Forwarded-For 链首=攻击者可控，
     轮换伪造头即可绕过全部按 IP 限流（登录防爆破、注册防批量）。现改为：
     - 默认（TRUST_PROXY=false，直连部署）：只用 TCP 对端地址，忽略一切转发头；
     - TRUST_PROXY=true（自有反代之后）：优先 X-Real-IP（nginx 以 $remote_addr

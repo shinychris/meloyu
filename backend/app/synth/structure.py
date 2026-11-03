@@ -1,4 +1,4 @@
-"""阶段①：结构标签解析与自动推断（架构 §7.3）。
+"""阶段①：结构标签解析与自动推断。
 
 单一事实来源：providers/lyrics 的 complete-tags 复用本模块。
 """
@@ -13,7 +13,7 @@ TAG_RE = re.compile(r"^\[\s*([^\]]+?)\s*\]$")
 # 情感或配器（如（轻声吟唱）（合唱）(piano interlude)）。保留在原文供支持标记的
 # 歌唱引擎（ACE-Step 等）消费；本地合成与行级计算（韵脚/行号/diff）一律剥离。
 PAREN_MARK_RE = re.compile(r"[（(][^（）()]{0,30}[）)]")
-# 段落规范顺序（/system/meta structure_tags 与前端标签条目顺序的单一事实来源）
+# 段落规范顺序（system/meta structure_tags 与前端标签条目顺序的单一事实来源）
 SECTION_ORDER = ("intro", "verse", "pre_chorus", "chorus", "post_chorus", "refrain",
                  "bridge", "interlude", "drop", "breakdown", "rap", "spoken",
                  "ad_lib", "solo", "outro")
@@ -57,7 +57,7 @@ SECTION_ALIASES: dict[str, str] = {
     "outro": "outro", "尾奏": "outro",
 }
 
-# 段落基础小节与能量权重（架构 §7.3；新段落按其主流音乐功能定档）
+# 段落基础小节与能量权重（新段落按其主流音乐功能定档）
 SECTION_BASE_BARS = {"intro": 4, "verse": 8, "pre_chorus": 4, "chorus": 8,
                      "post_chorus": 4, "refrain": 4, "bridge": 4, "interlude": 4,
                      "drop": 8, "breakdown": 4, "rap": 8, "spoken": 4,

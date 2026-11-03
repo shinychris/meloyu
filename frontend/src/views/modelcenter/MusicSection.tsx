@@ -7,7 +7,7 @@ import { toast } from '../../stores/toast'
 import { useT } from '../../i18n'
 
 /**
- * 歌曲引擎分区（F-FE-09 拆分）：通道卡 + 外部歌曲 API + Replicate Token。
+ * 歌曲引擎分区（拆分）：通道卡 + 外部歌曲 API + Replicate Token。
  * 通道/端点草稿在共享 context（applyCatalogModel 等目录动作会写入本区块的
  * musicBackend/replicateKey）；测试与保存瞬态为本区块自持。
  */

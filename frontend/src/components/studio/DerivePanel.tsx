@@ -8,7 +8,7 @@ export type DeriveKind = 'extend' | 'variant' | 'regen'
 
 const EXTEND_PRESETS = [15, 30, 60] as const
 
-/** 同段出现次序（契约 v1.2 §5.7 occurrence，1 起始）：structure 前缀中与 pos 同 section 的个数 + 1 */
+/** 同段出现次序（occurrence，1 起始）：structure 前缀中与 pos 同 section 的个数 + 1 */
 function occurrenceNo(structure: Candidate['structure'], pos: number): number {
   let n = 0
   for (let i = 0; i < pos; i++) {
@@ -34,8 +34,8 @@ const KIND_TITLE: Record<DeriveKind, TranslationKey> = {
 }
 
 /**
- * 候选派生操作面板（V1.1，契约 §5.5~5.7）：
- * - extend：选续写秒数（15/30/60 预设，契约范围 15~60）
+ * 候选派生操作面板（V1.1）：
+ * - extend：选续写秒数（15/30/60 预设，范围 15~60）
  * - variant：新风格描述输入（可空 = 自动换风格）
  * - regen：从候选 structure 列出段落（多次出现以 #n 区分，带起止秒）供选择
  * 提交后由父组件交给 stores/studio.ts 复用生成轮询。

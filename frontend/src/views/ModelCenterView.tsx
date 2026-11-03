@@ -11,9 +11,9 @@ import OpsSection from './modelcenter/OpsSection'
 import { useT } from '../i18n'
 
 /**
- * 模型中心（契约 §5.8）：左侧分类导航 + 概览/组件中心/歌词引擎/歌曲引擎/
+ * 模型中心：左侧分类导航 + 概览/组件中心/歌词引擎/歌曲引擎/
  * 开源目录/本地模型库/操作记录。
- * F-FE-09：按 section 拆分为 modelcenter/ 下子组件，共享状态收敛到
+ * ：按 section 拆分为 modelcenter/ 下子组件，共享状态收敛到
  * ModelCenterProvider（行为与视觉与拆分前一致）。
  * 分区为点选切换：一次只渲染选中分区，不滚动；initialSection 供深链/测试
  * 指定初始分区（非法值回退首分区）。

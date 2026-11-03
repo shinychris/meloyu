@@ -1,4 +1,4 @@
-"""P1-8/P1-11 配额回归（2026-09-26 商业化审查）。
+"""/ 配额回归（2026-09-26）。
 
 - 在途任务上限：free 1 / pro 3 / studio 5（Plan 表可覆盖）
 - 存储配额：files 登记字节 ≥ 档位配额 → 拒绝提交（40901）
@@ -102,7 +102,7 @@ class TestInflightLimit(_QuotaTestCase):
 
 
 class TestFreeDailyLimit(_QuotaTestCase):
-    """F-BE-13（2026-10-27）：免费档日限不含 failed/canceled（失败即退款，
+    """（2026-10-27）：免费档日限不含 failed/canceled（失败即退款，
     失败也扣次数=对已退款请求二次收费——口径与退款对齐）。"""
 
     def test_refunded_states_do_not_count(self):

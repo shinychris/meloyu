@@ -2,7 +2,7 @@
 
 pypinyin 韵组为确定性声学计算，交给 LLM 反而不可靠、更慢，故独立成模块，
 供 /lyrics/rhyme-check 与 /lyrics/complete-tags 使用（原属本地歌词规则引擎，
-2026-11-01 随引擎一并移除后按工具保留，见 ADR-019）。同步、无状态、不扣积分。
+2026-11-01 随引擎一并移除后按工具保留）。同步、无状态、不扣积分。
 """
 from __future__ import annotations
 

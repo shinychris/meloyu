@@ -1,6 +1,6 @@
 """任务执行基础设施：优先级工作线程 + 导出独立池 + 启动僵尸回收。
 
-v0.14.0（2026-09-26 商业化审查 P0-4/P1-10）重构：
+v0.14.0（2026-09-26）重构：
 - 原单一 ThreadPoolExecutor(max_workers=2) 无优先级——studio 档「优先队列」
   承诺无从谈起。改为**双优先级堆队列**：plan 权重（studio/team=0、pro=1、
   free=2）为主序，提交先后为次序，2 个常驻 worker 线程消费。
@@ -70,7 +70,7 @@ def schedule_generation(task_id: str, plan: str = "free") -> None:
 
 
 def schedule_export(task_id: str) -> None:
-    """导出走独立单 worker 池：慢/卡导出不再挤占生成通道（P1-10）。"""
+    """导出走独立单 worker 池：慢/卡导出不再挤占生成通道。"""
     global _export_executor
     from app.services.export import execute_export
     if _export_executor is None:

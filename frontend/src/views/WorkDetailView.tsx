@@ -27,13 +27,13 @@ export default function WorkDetailView() {
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [engineDisplay, setEngineDisplay] = useState('')
   const [loading, setLoading] = useState(true)
-  /** 标题/标签内联编辑（PATCH /works/{id}，契约 §7.3） */
+  /** 标题/标签内联编辑（PATCH /works/{id}） */
   const [editing, setEditing] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const [tagsDraft, setTagsDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const playTrack = usePlayerStore((s) => s.playTrack)
-  /** FR-13 协作上下文：共享空间/角色（详情接口返回；属主可管理） */
+  /**  协作上下文：共享空间/角色（详情接口返回；属主可管理） */
   const [spaces, setSpaces] = useState<TeamSpaceInfo[]>([])
   const isOwner = work?.is_owner ?? false
   const myRole = work?.my_role ?? null
@@ -66,7 +66,7 @@ export default function WorkDetailView() {
     }
   }
 
-  /** F-FE-03：候选请求序号守卫——快速切换版本节点时旧响应不再覆盖新选中版本的候选 */
+  /** ：候选请求序号守卫——快速切换版本节点时旧响应不再覆盖新选中版本的候选 */
   const candSeqRef = useRef(0)
 
   const loadCandidates = useCallback(async (versionId: string) => {

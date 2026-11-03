@@ -1,4 +1,4 @@
-/** FR-4 参考音频：octet-stream 上传（无 python-multipart 依赖的轻协议） */
+/**  参考音频：octet-stream 上传（无 python-multipart 依赖的轻协议） */
 import type { ReferenceTrack, ReferenceTrackList } from '../types/api'
 import { apiDelete, apiGet, apiPost } from './client'
 

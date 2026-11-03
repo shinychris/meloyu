@@ -52,7 +52,7 @@ export default function LibraryView() {
     setPage(1)
   }, [])
 
-  /** F-FE-02：请求序号守卫——筛选/翻页快速变更时旧响应不再覆盖新查询的结果 */
+  /** ：请求序号守卫——筛选/翻页快速变更时旧响应不再覆盖新查询的结果 */
   const loadSeqRef = useRef(0)
 
   const load = useCallback(async () => {
@@ -72,7 +72,7 @@ export default function LibraryView() {
       setItems(res.items)
       setTotalPages(res.total_pages || 1)
       setTotal(res.total)
-      // 导出徽标（P2-5 修复）：优先读 works.exported_formats；字段缺失时一次批量拉取
+      // 导出徽标（修复）：优先读 works.exported_formats；字段缺失时一次批量拉取
       // 导出任务按 work_id 分组（1 次请求），不再逐作品 listTasks 造成 1+N。
       if (res.items.some((w) => !Array.isArray(w.exported_formats))) {
         try {

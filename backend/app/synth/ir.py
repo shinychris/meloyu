@@ -64,7 +64,7 @@ class SongRequest:
     language: str
     instrument_density: int
     seed: int
-    # FR-5（v0.8.2）：voice_clone 的音色参数（音域中心/共振峰缩放/谐波系数）
+    # （v0.8.2）：voice_clone 的音色参数（音域中心/共振峰缩放/谐波系数）
     voice_timbre: dict | None = None
     # v0.11.0 哼唱成歌：[[semi_rel, dur_beats], ...]（相对哼唱中位音的半音序列），
     # 引擎按音程关系映射为人声旋律轮廓（移调入调+适配音域）；None=正常 AI 作曲

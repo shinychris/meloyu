@@ -12,7 +12,7 @@ export default function VersionTree() {
   const opLogBaseLogged = useStudioStore((s) => s.opLogBaseLogged)
   const resetForNewWork = useStudioStore((s) => s.resetForNewWork)
 
-  // F-FE-13：初始「模板已载入」行按当前 locale 现取（store 不在模块加载时冻结文案）
+  // ：初始「模板已载入」行按当前 locale 现取（store 不在模块加载时冻结文案）
   const logLines = opLogBaseLogged ? opLog : [t('studio.log.templateLoaded'), ...opLog]
 
   const nodes = [...(versionTree?.nodes ?? [])].sort(

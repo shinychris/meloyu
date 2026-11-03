@@ -80,7 +80,7 @@ _VOCAL_LABELS = {
     "male_clear": ("男声 · 清朗", "Male · clear"),
     "choir": ("合唱", "Choir"),
     "instrumental": ("纯器乐", "Instrumental"),
-    # FR-5（v0.8.2）：本人音色档案（需已验证 voice_profile_id，仅本地引擎）
+    # （v0.8.2）：本人音色档案（需已验证 voice_profile_id，仅本地引擎）
     "voice_clone": ("我的音色（已验证）", "My voice (verified)"),
 }
 _LANG_LABELS = {"zh": ("中文（普通话）", "Chinese (Mandarin)"), "yue": ("粤语", "Cantonese"),
@@ -150,11 +150,11 @@ _INSTRUMENTS = (
 
 @router.get("/health")
 def health(db: Session = Depends(get_db)):
-    # 安审计 L-1（2026-09-09）：无鉴权端点不再回显版本号与内部规模统计
+    #（2026-09-09）：无鉴权端点不再回显版本号与内部规模统计
     # （版本指纹/侦察信息收敛）；运维侧版本经镜像 tag / 需登录接口可得。
-    # P0-9（2026-09-26）：回报数据盘真实水位，低于写入阈值时 degraded——
+    # （2026-09-26）：回报数据盘真实水位，低于写入阈值时 degraded——
     # "healthy 但拒绝一切写"的隐性失效必须能被探针看见。
-    # P1-12：生成队列深度（积压监控；无鉴权端点只给计数不给业务信息）
+    # 生成队列深度（积压监控；无鉴权端点只给计数不给业务信息）
     # 2026-10-27：db 检查执行真实 SELECT 1（原硬编码 ok，库挂时探针失明）；
     # 异常报 degraded 而非让探针 500——端点本身保持可达，状态字段如实降级。
     from sqlalchemy import text as _text
@@ -230,7 +230,7 @@ def meta():
         ],
         # v0.10.2：注册邮箱验证码开关下发（SMTP 配置后开启；前端据此显示验证码输入）
         "email_verification_enabled": settings.email_verification_enabled,
-        # 2026-10-03 定位转型：产品形态下发（前端据此适配桌面模式：
+        # 产品形态下发（前端据此适配桌面模式：
         # 免登录直达、激活页替换订阅页、隐藏市场等）
         "app_mode": settings.app_mode,
         "billing_mode": settings.billing_mode,

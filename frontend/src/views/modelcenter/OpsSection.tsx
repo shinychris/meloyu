@@ -3,7 +3,7 @@ import { OP_TYPE_LABEL } from './shared'
 import { formatDateTime } from '../../lib/format'
 import { useT } from '../../i18n'
 
-/** 操作记录分区（F-FE-09 拆分）：最近模型操作（下载/删除/部署）。 */
+/** 操作记录分区（拆分）：最近模型操作（下载/删除/部署）。 */
 export default function OpsSection() {
   const t = useT()
   const { ops } = useModelCenter()

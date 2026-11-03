@@ -1,13 +1,13 @@
-"""ACE-Step 组件应用内自动部署（v0.16.3，ADR-016 延伸）。
+"""ACE-Step 组件应用内自动部署（v0.16.3）。
 
 桌面买断制口径：Meloyu 是完整应用，默认安装即应部署 ACE-Step 组件——
 终端用户没有「到 backend/ 跑脚本」的开发环境，本服务把
 scripts/setup_acestep.py 的部署链路搬进应用内，并补齐干净机器引导：
 
-  ① 源码：GitHub codeload 钉 commit 下载（P1-10 供应链钉版）
+  ① 源码：GitHub codeload 钉 commit 下载（供应链钉版）
   ② uv：系统 PATH → 随包（backend/tools/uv）→ 数据目录缓存 → 钉版下载
      （版本 + sha256 双钉；干净机器零前置，uv 自带 Python 托管下载）
-  ③ venv：uv sync 独立 venv（torch cu128 与后端 venv 互斥，ADR-016）
+  ③ venv：uv sync 独立 venv（torch cu128 与后端 venv 互斥）
   ④ 校验：venv python -c "import acestep"
 
 消费方：模型中心部署操作（POST /models/acestep-deploy）、music-pull 对
@@ -44,13 +44,13 @@ from app.providers.music_acestep import (
 
 ProgressFn = Callable[[int, str], None]
 
-# P1-10 供应链钉版：默认钉 commit（与 scripts/setup_acestep.py 原逻辑一致）；
+# 供应链钉版：默认钉 commit（与 scripts/setup_acestep.py 原逻辑一致）；
 # 升级显式改此值（或 env ACE_STEP_REF 覆盖）并重新部署验证。
 # 2026-09-02 核验：ca1e85f = upstream main HEAD（"fix(jetson): remove GPL video codecs…"）
 ACE_STEP_REF = os.environ.get("ACE_STEP_REF", "ca1e85fe9430179831e6bc6be790c332190a3866")
 REPO_ZIP = f"https://codeload.github.com/ACE-Step/ACE-Step-1.5/zip/{ACE_STEP_REF}"
 
-# uv 引导工具钉版（同 P1-10：版本 + 逐平台 sha256 双钉；env ACESTEP_UV_VERSION
+# uv 引导工具钉版（同上：版本 + 逐平台 sha256 双钉；env ACESTEP_UV_VERSION
 # 覆盖版本时哈希校验自动让位为仅 HTTPS——升级需重新核验落表）。
 # 0.9.28 = 2026-01-29 发布，与本机 dev 环境一致（部署链路已实测）。
 # sha256 取自官方 Release 资产逐一下载核验（2026-10-17，win-x64/linux-x64/

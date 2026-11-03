@@ -92,7 +92,7 @@ export default function AnalysisPanel({ structure, rhyme, tagInfo, changes, onBa
         {rhyme ? t('lyrics.panel.rhymeMain', { group: rhyme.main_rhyme_group }) : ''}
       </div>
       <div className="flex flex-wrap gap-1.5 mt-2">
-        {/* F-FE-27：无数据展示 i18n 空态说明，不再渲染形似真实结果的硬编码示例 chips */}
+        {/* ：无数据展示 i18n 空态说明，不再渲染形似真实结果的硬编码示例 chips */}
         {rhymeChips.length === 0 ? (
           <span className="text-2xs text-dim">{t('lyrics.panel.rhymeEmpty')}</span>
         ) : (

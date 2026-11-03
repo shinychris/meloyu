@@ -52,7 +52,7 @@ export const workEn = {
   'work.export.failed': 'Export failed',
   'work.export.toast.pollBroken': 'Export task polling interrupted',
   'work.export.toast.certStarted': 'License certificate JSON download started',
-  // 发行导出预设（FR-11）
+  // 发行导出预设
   'work.export.release.title': 'Release export',
   'work.export.release.sub':
     'Platform-ready package: audio + cover placeholder + metadata.json + README',
@@ -77,7 +77,7 @@ export const workEn = {
   'work.export.release.coverHint': 'Optional: >=600x600 PNG replaces the generated placeholder',
   'work.export.release.titleRequired': 'Release title is required (1–80 characters)',
   'work.export.release.artistRequired': 'Artist name is required (1–60 characters)',
-  // ===== Team collaboration (FR-13, v0.8.1) =====
+  // ===== Team collaboration (, v0.8.1) =====
   'share.title': 'Team sharing',
   'share.sharedTo': 'Shared to a team space',
   'share.unshare': 'Stop sharing',

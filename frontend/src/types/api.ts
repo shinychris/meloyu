@@ -1,6 +1,6 @@
 /**
- * 与《API接口契约.md》v1.1 严格对齐的 TypeScript 类型（唯一事实来源的手写镜像）。
- * 字段名/可空性/枚举值不得偏离契约；联调发现差异以契约为准回改此文件。
+ * 与后端接口 v1.1 严格对齐的 TypeScript 类型（唯一事实来源的手写镜像）。
+ * 字段名/可空性/枚举值不得偏离后端实现；联调发现差异以后端为准回改此文件。
  */
 
 /* ============ 通用 ============ */
@@ -19,7 +19,7 @@ export interface Paginated<T> {
   total_pages: number
 }
 
-/* ============ 枚举（契约 §1.5） ============ */
+/* ============ 枚举 ============ */
 export type Mode = 'simple' | 'custom'
 export type ModelId = 'v1_pro' | 'v1_fast'
 export type Tonic = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B'
@@ -28,10 +28,10 @@ export type TimeSignature = '4/4' | '3/4' | '6/8'
 export type VocalType =
   | 'female_air' | 'female_bright' | 'female_deep'
   | 'male_magnetic' | 'male_clear' | 'choir' | 'instrumental'
-  /** FR-5（v0.8.2）：本人音色档案（须 voice_profile_id，仅本地引擎通道） */
+  /** （v0.8.2）：本人音色档案（须 voice_profile_id，仅本地引擎通道） */
   | 'voice_clone'
 export type Language = 'zh' | 'yue' | 'en' | 'ja'
-/** 段落枚举（契约 §1.5）：前 6 值 v1.1 既有，后 9 值 v1.20 扩全主流段落 */
+/** 段落枚举：前 6 值 v1.1 既有，后 9 值 v1.20 扩全主流段落 */
 export type Section =
   | 'intro' | 'verse' | 'pre_chorus' | 'chorus' | 'bridge' | 'outro'
   | 'post_chorus' | 'refrain' | 'interlude' | 'drop' | 'breakdown'
@@ -54,10 +54,10 @@ export type FileKind =
 export type StemName = 'vocals' | 'drums' | 'bass' | 'other'
 export type ExportFormat = 'mp3' | 'wav' | 'midi' | 'stems' | 'release'
 export type WorkStatus = 'active' | 'trash'
-/** 版本来源（契约 §1.6：MVP 仅 generate，extend/variant/regen_section 为 V1.1 值） */
+/** 版本来源（MVP 仅 generate，extend/variant/regen_section 为 V1.1 值） */
 export type VersionSource = 'generate' | 'extend' | 'variant' | 'regen_section'
 
-/* ============ 公共资源结构（契约 §1.6） ============ */
+/* ============ 公共资源结构 ============ */
 export interface CreditsInfo {
   balance: number
   monthly_grant: number
@@ -185,10 +185,10 @@ export interface Work {
   preview_file_id: string | null
   /**
    * 已成功导出的格式（去重，如 ['wav','mp3']）。V1.1 后端新增派生字段；
-   * 后端未重启/旧数据时可能缺失，前端需回退推导（契约 §14 R1 / 审查 P2-5）。
+   * 后端未重启/旧数据时可能缺失，前端需回退推导（R1 /）。
    */
   exported_formats?: string[]
-  /** FR-13 协作上下文（详情接口在登录态返回；旧后端可能缺失） */
+  /**  协作上下文（详情接口在登录态返回；旧后端可能缺失） */
   space_id?: string | null
   is_owner?: boolean
   my_role?: 'owner' | 'editor' | 'commenter' | 'viewer' | null
@@ -197,7 +197,7 @@ export interface Work {
   trashed_at: string | null
 }
 
-/** 生成请求 params 与版本快照 params 共用此形状（契约 §4.1 / §1.6） */
+/** 生成请求 params 与版本快照 params 共用此形状 */
 export interface GenerationParams {
   bpm: number
   key: KeyInfo
@@ -206,13 +206,13 @@ export interface GenerationParams {
   vocal: VocalType
   language: Language
   instrument_density: number
-  /** FR-5：vocal=voice_clone 时必填（已验证音色档案） */
+  /** ：vocal=voice_clone 时必填（已验证音色档案） */
   voice_profile_id?: string
   /** 哼唱成歌（v0.11.0）：[[相对半音, 拍长], ...]，仅本地引擎 */
   hum_melody?: number[][]
 }
 
-/* ============ voice-profiles（FR-5） ============ */
+/* ============ voice-profiles ============ */
 export interface VoiceProfile {
   id: string
   name: string
@@ -325,7 +325,7 @@ export interface OkResult {
   ok: boolean
 }
 
-/* ============ v0.16.0 license（买断制激活，2026-10-03 定位转型） ============ */
+/* ============ v0.16.0 license（买断制激活） ============ */
 
 /** GET /licenses/status —— 试用/激活状态（license 与 subscription 模式通用） */
 export interface LicenseStatus {
@@ -368,11 +368,11 @@ export interface GenerationSubmitRequest {
   simplified?: boolean
   seed?: number
   params?: GenerationParams
-  /** FR-4 参考音频：特征级参考（分析值覆盖 bpm/调性/器乐密度） */
+  /**  参考音频：特征级参考（分析值覆盖 bpm/调性/器乐密度） */
   reference_track_id?: string
 }
 
-/* ============ 作品市场（V2-c） ============ */
+/* ============ 作品市场 ============ */
 export interface MarketListingInfo {
   id: string
   work_id: string
@@ -400,7 +400,7 @@ export interface MarketOrderInfo {
   license: string
 }
 
-/* ============ 开放 API 密钥（FR-19） ============ */
+/* ============ 开放 API 密钥 ============ */
 export interface ApiKeyInfo {
   id: string
   name: string
@@ -409,7 +409,7 @@ export interface ApiKeyInfo {
   last_used_at: string | null
 }
 
-/* ============ team spaces & comments（FR-13） ============ */
+/* ============ team spaces & comments ============ */
 export type TeamRole = 'owner' | 'editor' | 'commenter' | 'viewer'
 
 export interface TeamMemberInfo {
@@ -442,7 +442,7 @@ export interface WorkCommentItem {
   created_at: string
 }
 
-/* ============ reference-tracks（FR-4） ============ */
+/* ============ reference-tracks ============ */
 export interface ReferenceAnalysis {
   bpm: number
   key_tonic: Tonic
@@ -483,12 +483,12 @@ export interface GenerationSubmitResult {
 export interface CandidatesResult {
   items: Candidate[]
   inferred_structure: boolean
-  /** 生成引擎署名（义务①：MiniMax 产出在生成结果页显著展示；v0.7.1） */
+  /** 生成引擎署名（MiniMax 产出在生成结果页显著展示；v0.7.1） */
   provider: string
   provider_display: string
 }
 
-/* ============ V1.1 候选派生操作（契约 §5.5~5.7，响应复用 POST /generations 的 task+work 形态） ============ */
+/* ============ V1.1 候选派生操作（响应复用 POST /generations 的 task+work 形态） ============ */
 
 /** POST /candidates/{id}/extend —— 从结尾续写 seconds 秒（15~60），生成子版本 */
 export interface ExtendCandidateRequest {
@@ -502,7 +502,7 @@ export interface VariantCandidateRequest {
 
 /**
  * POST /candidates/{id}/regen-section —— 仅重生成该段（其余段音频不变）。
- * 契约 v1.2 §5.7：请求体 { section, occurrence? }；occurrence 为该 section
+ * 请求体 { section, occurrence? }；occurrence 为该 section
  * 在候选 structure 中第几次出现，1 起始，缺省 = 1。
  */
 export interface PitchEditItem {
@@ -602,7 +602,7 @@ export interface ReleaseMeta {
 export interface ExportRequest {
   version_id: string
   format: ExportFormat
-  /** FR-11 发行导出预设：format=release 时必填 */
+  /**  发行导出预设：format=release 时必填 */
   platform?: 'douyin' | 'streaming'
   meta?: ReleaseMeta
 }
@@ -738,7 +738,7 @@ export interface SystemMeta {
   inspiration: InspirationMeta
   /** 注册邮箱验证码开关（SMTP 配置后开启；v0.10.2） */
   email_verification_enabled?: boolean
-  /** 产品形态（v0.16.0 定位转型）：desktop=桌面单机 / enterprise=私有化 / cloud=存量云 */
+  /** 产品形态（v0.16.0）：desktop=桌面单机 / enterprise=私有化 / cloud=存量云 */
   app_mode?: 'cloud' | 'desktop' | 'enterprise'
   billing_mode?: 'license' | 'subscription'
   /** 桌面形态本地数据目录（系统设置页展示；云形态不下发） */
@@ -782,8 +782,8 @@ export interface WorkDeleteResult {
   permanent: boolean
 }
 
-/* ============ models（V1.2 模型中心，契约 §5.8） ============ */
-/** 歌词引擎通道：none=未配置（无兜底引擎，ADR-019） */
+/* ============ models（V1.2 模型中心） ============ */
+/** 歌词引擎通道：none=未配置（无兜底引擎） */
 export type LyricsBackend = 'none' | 'ollama' | 'openai_compat'
 
 /** 歌曲生成引擎通道：本地合成 / Suno 兼容网关 / Replicate 托管 / 本机 MusicGen /

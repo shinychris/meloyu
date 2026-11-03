@@ -10,7 +10,7 @@ const DISCOUNT_PCT =
     ? Math.round(((LICENSE_SKU.price - LICENSE_SKU.salePrice) / LICENSE_SKU.price) * 100)
     : null
 
-/** 定价：单档终身授权买断（D-1 定案：$399 终身原价锚，限时买断价 $129；无免费层、无订阅） */
+/** 定价：单档终身授权买断（定案：$399 终身原价锚，限时买断价 $129；无免费层、无订阅） */
 export default function LandingPricing() {
   const navigate = useNavigate()
   const t = useT()

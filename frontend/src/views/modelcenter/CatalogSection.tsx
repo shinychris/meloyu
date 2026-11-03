@@ -6,7 +6,7 @@ import { toast } from '../../stores/toast'
 import { useT } from '../../i18n'
 
 /**
- * 开源歌曲模型目录分区（F-FE-09 拆分）：目录卡（云端/本机/自托管使用、下载/删除、
+ * 开源歌曲模型目录分区（拆分）：目录卡（云端/本机/自托管使用、下载/删除、
  * slug 与自托管端点编辑）。slug/host 草稿与 replicateKey 在共享 context——
  * 目录动作与歌词/歌曲分区的保存动作按拆分前语义联动。
  */

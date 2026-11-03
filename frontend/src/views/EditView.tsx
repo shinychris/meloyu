@@ -16,7 +16,7 @@ import { EmptyState } from '../components/common/EmptyState'
 
 type Tool = 'cut' | 'keep' | 'fadein' | 'fadeout' | 'gainUp' | 'gainDown' | 'normalize'
 
-/** F-FE-18：工具 → 词条常量表（消除模板字符串 + as never 的类型逃逸） */
+/** ：工具 → 词条常量表（消除模板字符串 + as never 的类型逃逸） */
 const TOOL_KEYS: Record<Tool, TranslationKey> = {
   cut: 'edit.tool.cut',
   keep: 'edit.tool.keep',
@@ -39,7 +39,7 @@ interface VersionLite {
 }
 
 /**
- * 音频剪辑（/edit，v0.11.0）：波形选区 + 剪掉/保留/淡入淡出/增益/标准化 +
+ * 音频剪辑（edit，v0.11.0）：波形选区 + 剪掉/保留/淡入淡出/增益/标准化 +
  * 爆音与静音检测 + 撤销/重做（非破坏：每次从原始母带重放操作），
  * 成品经 OfflineAudioContext 口径离线渲染为 48k wav → POST /versions/{id}/mixdown
  * 存为新版本（人类参与留痕，与 /arrange 同一回存通道）。
@@ -52,7 +52,7 @@ export default function EditView() {
   const [versionId, setVersionId] = useState<string>('')
   const [buffer, setBuffer] = useState<AudioBuffer | null>(null)
   const [loading, setLoading] = useState(false)
-  // 撤销/重做合并为单一 state（P1-19）：在 setState updater 内嵌套另一个
+  // 撤销/重做合并为单一 state：在 setState updater 内嵌套另一个
   // setState 是 React 禁止的副作用——StrictMode 双调 updater 会把 redoStack
   // 推入重复快照（redo 一次跳两级），并发重放同样危险
   const [hist, setHist] = useState<{ ops: EditOp[]; redo: EditOp[][] }>({ ops: [], redo: [] })
@@ -95,12 +95,12 @@ export default function EditView() {
       if (!file) {
         // 用模块级 t（非响应式）：不让 locale 变化重建本回调——否则切语言会
         // 重放整个加载流程（重新拉 stream-token + fetch 整曲 + decodeAudioData），
-        // 编辑中的 ops/选区全被清空（P1-20）
+        // 编辑中的 ops/选区全被清空
         toast(tGlobal('edit.toast.noAudio'), 'warn')
         return
       }
       const { url } = await getStreamToken(file.file_id)
-      // F-FE-06：音频字节下载收敛进 api/files（r.ok 校验）；失败显式 toast
+      // ：音频字节下载收敛进 api/files（r.ok 校验）；失败显式 toast
       // （流地址带签名 query 走直连 fetch，不经 axios 拦截器）
       let raw: ArrayBuffer
       try {
@@ -173,7 +173,7 @@ export default function EditView() {
     const toSec = (x: number) =>
       Math.max(0, Math.min(renderDuration, ((x - rect.left) / rect.width) * renderDuration))
     const a = toSec(e.clientX)
-    // F-FE-17：删除死代码（elementFromPoint → getBoundingClientRect 计算后 void 弃用）
+    // ：删除死代码（elementFromPoint → getBoundingClientRect 计算后 void 弃用）
     const move = (ev: MouseEvent) => {
       setSel({ a, b: toSec(ev.clientX) })
     }

@@ -3,7 +3,7 @@
  *
  * 全部为静态内嵌：落地页必须不依赖后端即可完整渲染。
  * 通道/模型目录与 backend/app/providers/music_catalog.py 对齐；
- * 定价为买断制终身授权口径（docs/06-商业化/2026-10-03-定位调整方案，D-1 定案）；
+ * 定价为买断制终身授权；
  * 版本号取交付报告口径（v0.7.0），并由 landing-data.test.ts 断言与 package.json version 严格同步。
  *
  * i18n：所有用户可见文本字段值为字典 key（landing.data.*，见 src/i18n/en/landing.ts），
@@ -309,8 +309,8 @@ export const AUDIENCES: Array<{ title: TranslationKey; sub: TranslationKey; poin
   },
 ]
 
-/** 授权定价（买断制定位 D-1 定案：$399 终身授权原价锚、限时买断 $129（2026-10-17 调价）；
- *  与 docs/06-商业化/2026-10-03-定位调整方案-SaaS转桌面买断制.md 对齐；USD 分值，展示侧 /100） */
+/** 授权定价（$399 终身授权原价锚、限时买断 $129（2026-10-17 调价）；
+ *  与定价口径对齐；USD 分值，展示侧 /100） */
 export const LICENSE_SKU: {
   code: string
   name: TranslationKey

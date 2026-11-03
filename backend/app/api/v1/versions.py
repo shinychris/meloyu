@@ -118,7 +118,7 @@ def version_certificate(version_id: str,
                         format: str = Query(default="json"),
                         user: User = Depends(get_current_user),
                         db: Session = Depends(get_db)):
-    """授权证书下载（format=json 契约 §8.4；format=pdf 为 V1.1 扩展）。"""
+    """授权证书下载（format=json ；format=pdf 为 V1.1 扩展）。"""
     if format not in cert_svc.CERT_FORMATS:
         raise err_validation(
             tr(f"format 必须为 {'/'.join(cert_svc.CERT_FORMATS)}",

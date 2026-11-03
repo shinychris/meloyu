@@ -1,4 +1,4 @@
-# ML 可选栈锁定（2026-10-27 评审 F-XC-03：自原 requirements.lock 的 ML 闭包拆出，
+# ML 可选栈锁定（2026-10-27：自原 requirements.lock 的 ML 闭包拆出，
 # 与 requirements-musicgen.txt 对应的钉死版本）。
 #
 # 用途：本地 GPU 栈 / 桌面 sidecar 启用 MusicGen 本地通道时安装。

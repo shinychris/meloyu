@@ -1,9 +1,9 @@
-"""MiniMax 社区许可三项义务落实的单测（义务②"持续测试"的组成部分）。
+"""MiniMax 社区许可三项义务落实的单测（"持续测试"的组成部分）。
 
 运行：.venv/Scripts/python.exe -m unittest discover -s tests -v
-- 义务①（UI 署名）：provider 显示名映射——MiniMax 产出在证书/导出中署名 MiniMax-Music3
-- 义务②（防侵权防护）：ip_protection 冒用检测（服务端强制）
-- 义务③（AUP 披露）：导出标识带引擎署名
+- （UI 署名）：provider 显示名映射——MiniMax 产出在证书/导出中署名 MiniMax-Music3
+- （防侵权防护）：ip_protection 冒用检测（服务端强制）
+- （AUP 披露）：导出标识带引擎署名
 - 商用开放：义务落实后 mmax 条件型 commercial（含 $20M 门槛 basis 与回退开关）
 """
 from __future__ import annotations
@@ -20,7 +20,7 @@ from app.synth.id3 import mark_mp3, mark_wav
 
 
 class TestObligation1Attribution(unittest.TestCase):
-    """义务①：MiniMax 产出在证书与导出标识中显著署名 "MiniMax-Music3"。"""
+    """MiniMax 产出在证书与导出标识中显著署名 "MiniMax-Music3"。"""
 
     def test_all_channels_have_display(self):
         for channel in ("localsynth", "api", "replicate", "musicgen_local",
@@ -35,7 +35,7 @@ class TestObligation1Attribution(unittest.TestCase):
         self.assertEqual(provider_attribution("mystery_channel"), "mystery_channel")
 
 class TestObligation2IpProtection(unittest.TestCase):
-    """义务②：在世艺术家名义/声音冒用拦截（服务端强制、无开关）。"""
+    """在世艺术家名义/声音冒用拦截（服务端强制、无开关）。"""
 
     def test_english_impersonation_blocked(self):
         for text in ("a song in the style of Taylor Swift",
@@ -65,7 +65,7 @@ class TestObligation2IpProtection(unittest.TestCase):
         self.assertEqual(ctx.exception.code, 42202)
 
     def test_lyrics_generate_and_polish_guarded(self):
-        """F-BE-28（2026-10-27）：歌词 generate/polish 输入接防侵权（义务口径对齐）。
+        """（2026-10-27）：歌词 generate/polish 输入接防侵权（义务口径对齐）。
 
         _guard 先于 provider 调用执行，冒用输入直接 42202（db 参数不可达，传 None）。
         """
@@ -85,7 +85,7 @@ class TestObligation2IpProtection(unittest.TestCase):
         self.assertIn("taylor swift", artists)
 
 class TestObligation3Disclosure(unittest.TestCase):
-    """义务③：导出产物 AIGC 标识带引擎署名（AUP 第 11 条机器生成内容披露）。"""
+    """导出产物 AIGC 标识带引擎署名（AUP 第 11 条机器生成内容披露）。"""
 
     def test_mp3_mark_contains_attribution(self):
         raw = b"\xff\xfb\x90\x00" + b"\x00" * 32

@@ -1,10 +1,10 @@
 # MusicGen 本地通道可选依赖（V1.4）：体积较大，未随主 requirements 安装。
 # 启用本机开源歌曲模型（facebook/musicgen-small|medium）时安装：
-#   ./.venv/Scripts/python -m pip install -r requirements-musicgen.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+# ./.venv/Scripts/python -m pip install -r requirements-musicgen.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 #
 # 注意：PyPI/镜像的 Windows torch 轮子默认为 CPU 版。有 NVIDIA 独显时换 CUDA 版
 # （须显式指定 local version，--upgrade 不会替换同版本号的 +cpu 轮子）：
-#   ./.venv/Scripts/python -m pip install torch==2.13.0+cu130 --index-url https://download.pytorch.org/whl/cu130
+# ./.venv/Scripts/python -m pip install torch==2.13.0+cu130 --index-url https://download.pytorch.org/whl/cu130
 # 代码自动检测 CUDA（可用则 .to("cuda")，否则 CPU）。
 #
 # 国内网络：可在 backend/.env 配 hf_endpoint=https://hf-mirror.com 走镜像下载权重；

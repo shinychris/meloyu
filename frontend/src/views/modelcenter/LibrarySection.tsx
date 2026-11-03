@@ -7,7 +7,7 @@ import { toast } from '../../stores/toast'
 import { useT } from '../../i18n'
 
 /**
- * 本地模型库分区（F-FE-09 拆分）：Ollama 本地模型表 + 下载区（含下载进度）。
+ * 本地模型库分区（拆分）：Ollama 本地模型表 + 下载区（含下载进度）。
  * pullTag/pulling 为本区块瞬态；activeOp/refreshAll 在共享 context。
  */
 export default function LibrarySection() {

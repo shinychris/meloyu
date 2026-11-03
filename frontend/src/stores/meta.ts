@@ -22,7 +22,7 @@ function defaultKeys(): SystemMeta['keys'] {
   return list
 }
 
-/** 与契约 §12.2 完全一致的兜底元数据（接口不可达时 UI 仍可工作；成功后覆盖） */
+/** 与 完全一致的兜底元数据（接口不可达时 UI 仍可工作；成功后覆盖） */
 function defaultMeta(): SystemMeta {
   return {
     models: [
@@ -157,7 +157,7 @@ export const useMetaStore = create<MetaState>((set, get) => ({
       const meta = await getSystemMeta()
       set({ meta, loaded: true })
     } catch {
-      // 后端未启动时静默使用兜底枚举（值与契约一致，不算编造数据）
+      // 后端未启动时静默使用兜底枚举（值与后端枚举一致，不算编造数据）
       set({ loaded: true })
     }
   },

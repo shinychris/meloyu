@@ -1,5 +1,5 @@
 /**
- * 生成 desktop/THIRD-PARTY-NOTICES.md（方案 §8 法务交付标配）。
+ * 生成 desktop/THIRD-PARTY-NOTICES.md（法务交付标配）。
  *
  * 数据源：
  *  1. npm 生产依赖 —— license-checker-rseidelsohn（--production，不含 devDependencies）

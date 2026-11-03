@@ -5,7 +5,7 @@ import { confirmDialog } from '../../stores/confirm'
 import { toast } from '../../stores/toast'
 import { useT } from '../../i18n'
 
-/** 开放 API 密钥卡（FR-19，v0.8.2）：签发（完整 key 仅一次）/列表/吊销 */
+/** 开放 API 密钥卡（v0.8.2）：签发（完整 key 仅一次）/列表/吊销 */
 export default function ApiKeysCard() {
   const t = useT()
   const [keys, setKeys] = useState<ApiKeyInfo[]>([])
@@ -41,7 +41,7 @@ export default function ApiKeysCard() {
   }
 
   const revoke = async (id: string, name: string) => {
-    // F-FE-22：吊销密钥为破坏性操作（使用该 key 的集成立即失效），二次确认
+    // ：吊销密钥为破坏性操作（使用该 key 的集成立即失效），二次确认
     const ok = await confirmDialog({
       title: t('apikey.confirm.revokeTitle', { name }),
       description: t('apikey.confirm.revokeDesc'),

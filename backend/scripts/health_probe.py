@@ -1,4 +1,4 @@
-r"""Meloyu 健康拨测脚本（P1-7）。
+r"""Meloyu 健康拨测脚本。
 
 检查项：
 1. HTTP 拨测：GET {base}/api/v1/system/health

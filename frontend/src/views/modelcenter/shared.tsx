@@ -27,7 +27,7 @@ export const SECTIONS: { id: string; labelKey: TranslationKey }[] = [
 ]
 
 /** 通道元数据（按 id 查找；分组渲染见 LYRICS_GROUPS / MUSIC_GROUPS）。
- *  none=未配置：不可选（歌词创作必须有真实 LLM 通道，无兜底引擎——ADR-019），
+ *  none=未配置：不可选（歌词创作必须有真实 LLM 通道，无兜底引擎），
  *  仅作为设置页/用量等处的通道展示名。 */
 export const BACKENDS: Record<LyricsBackend, { title: TranslationKey; desc: TranslationKey }> = {
   none: { title: 'models.backend.none.title', desc: 'models.backend.none.desc' },

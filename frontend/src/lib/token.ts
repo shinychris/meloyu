@@ -1,6 +1,6 @@
 /** JWT 本地存取（localStorage）。
  *
- * v0.13.0（安审计 M-1/M-2）：仅 access token（24h）留在 localStorage；
+ * v0.13.0：仅 access token（24h）留在 localStorage；
  * 轮换式 refresh token 改由后端经 HttpOnly+SameSite=Strict Cookie 下发
  * （Path=/api/v1/auth），JS 不可读——XSS 至多窃取短时 access，无法带走
  * 30 天刷新凭据。clearToken 顺带清理旧版本残留在 localStorage 的 refresh。 */

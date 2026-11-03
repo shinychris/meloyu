@@ -1,5 +1,5 @@
 """认证服务：注册（赠 200 积分/邮箱验证码/管理员授予）/ 登录 / me /
-刷新令牌轮换 / 找回重置密码 / 改密 / 注销（匿名化）/ 数据导出（P1-3，v0.7.0）。"""
+刷新令牌轮换 / 找回重置密码 / 改密 / 注销（匿名化）/ 数据导出（v0.7.0）。"""
 from __future__ import annotations
 
 import io
@@ -186,7 +186,7 @@ def delete_account(db: Session, user: User, password: str) -> dict:
     import secrets as _secrets
 
     from app.models import ReferenceTrack, VoiceProfile
-    # 声纹采样与参考音频：敏感个人信息/版权素材，注销必须物理清除（P2-7）
+    # 声纹采样与参考音频：敏感个人信息/版权素材，注销必须物理清除
     voice_dir = settings.audio_path / "voice" / user.id
     if voice_dir.exists():
         shutil.rmtree(voice_dir, ignore_errors=True)
@@ -260,7 +260,7 @@ def export_data(db: Session, user: User) -> tuple[str, bytes]:
 def _with_tokens(user: User) -> tuple[dict, str, int]:
     """组装登录/注册/刷新响应；返回 (body_data, refresh_token, refresh_ttl)。
 
-    安审计 M-1/M-2（2026-09-09）：refresh token 不再进响应体（localStorage
+（2026-09-09）：refresh token 不再进响应体（localStorage
     可被任意同源 JS 读取，XSS 后 30 天凭据失窃）——由路由层改经
     HttpOnly+SameSite=Strict Cookie 下发（api/v1/auth.py）。body 仅保留
     access_token（24h，XSS 窃取窗口有界；轮换式 refresh 在 HttpOnly 域）。

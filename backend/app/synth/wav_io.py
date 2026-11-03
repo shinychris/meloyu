@@ -48,7 +48,7 @@ def read_wav(path: str | Path) -> list[np.ndarray]:
     """读 WAV → 各声道 float [-1,1] 数组列表（write_wav 的逆操作，逐样本无损）。
 
     24bit 定点 ↔ float 往返精确（|v| < 2^53 内浮点乘除无损），保证
-    regen-section 复制非选区采样后重新写盘字节级不变（FR-6 验收基础）。
+    regen-section 复制非选区采样后重新写盘字节级不变（验收基础）。
     """
     with wave.open(str(path), "rb") as wf:
         ch, sw = wf.getnchannels(), wf.getsampwidth()

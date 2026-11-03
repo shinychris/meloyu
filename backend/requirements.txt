@@ -19,5 +19,5 @@ fpdf2>=2.8
 soundfile>=0.12
 # API key 落库加密（Fernet；桌面形态由首启密钥自生成接管，见 services/desktop.py）
 cryptography>=42.0
-# 监控（P1-12：SENTRY_DSN 配置后生效，镜像内置 sdk）
+# 监控（SENTRY_DSN 配置后生效，镜像内置 sdk）
 sentry-sdk>=2.0

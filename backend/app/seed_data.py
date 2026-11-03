@@ -164,10 +164,10 @@ WORK_SPECS = {
 }
 
 PLANS_ROWS = [
-    # 价格口径（P0-5，2026-09-26 商业化审查）：USD 美分（price_monthly=月付，
+    # 价格口径（2026-09-26）：USD 美分（price_monthly=月付，
     # price_yearly=年付折算的月单价），与 Stripe 实收一致；订单金额以 webhook
     # 回填的 Stripe 实收为准（amount_total/currency），本表值仅作展示与提示。
-    # 末两列（P1-8）：在途生成任务上限 / 存储配额 MB。
+    # 末两列：在途生成任务上限 / 存储配额 MB。
     ("free", "免费", 0, 0, 5, 0, "mp3", False, True, True, 10,
      ["每日 5 次生成", "仅 MP3 导出", "非商用 · 指纹登记"], 1, 2 * 1024),
     ("pro", "个人 Pro", 799, 639, None, 2500, "wav", True, False, True, 20,
@@ -231,7 +231,7 @@ def ensure_plans_seeded(db) -> int:
 
 
 def disable_seed_demo_accounts() -> int:
-    """生产启动自愈：禁用库中残留的固定密码种子账号（安审计 H-1，2026-09-09）。
+    """生产启动自愈：禁用库中残留的固定密码种子账号（2026-09-09）。
 
     demo/free 种子账号密码硬编码于仓库（开发演示便利）。生产库若复用自 dev
     （deploy/README 已警示）或历史误播种，任何读过源码的人都能登录 demo

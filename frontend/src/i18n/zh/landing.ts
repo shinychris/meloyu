@@ -221,7 +221,7 @@ export const landingZh: Record<keyof typeof landingEn, string> = {
   'landing.data.audience.3.p1': '多通道并行，批量出候选',
   'landing.data.audience.3.p2': '生成-编辑-导出全程留痕可回溯',
   'landing.data.audience.3.p3': '授权证书随作品交付，法务看得明白',
-  // 授权定价（单档终身，D-1 定案）
+  // 授权定价（单档终身）
   'landing.data.license.name': 'Meloyu Desktop · 终身授权',
   'landing.data.license.tagline': '一次性买断 · 无订阅',
   'landing.data.license.badge': '限时首发',
