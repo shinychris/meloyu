@@ -25,12 +25,12 @@ from app.core.errors import (
 from app.core.i18n import current_locale, tr
 from app.core.logging import logger
 from app.core.seed import cover_color_for_seed, derive_seed
+from app.core.sensitive import check_sensitive
 from app.database import SessionLocal
 from app.models import Candidate, File, Task, User, Version, Work
 from app.models.base import utc_now_iso
 from app.providers.base import SynthCancelled, stage_label
 from app.providers.llm.base import LLMError
-from app.core.sensitive import check_sensitive
 from app.services import model_center
 from app.services import works as works_svc
 from app.services.serializers import candidate_to_dict, task_to_dict
@@ -82,7 +82,7 @@ def expand_style_by_llm(chat, simple_prompt: str) -> str:
 def resolve_generation_request(payload: dict) -> dict:
     """规范化请求：simplified 减半、seed 派生，标记延迟任务。
 
-    V1.3 起（ADR-011）：simple 扩写与歌词自动生成延迟到执行线程完成
+    V1.3 起：simple 扩写与歌词自动生成延迟到执行线程完成
     （统一走模型中心配置的真实 LLM），提交接口保持快速返回；
     seed 以提交时的规范化参数派生，确定性语义不变。
     """
@@ -132,7 +132,7 @@ def check_generation_content(payload: dict) -> None:
     ]))
     if check_sensitive(text):
         raise err_sensitive()
-    # 义务②（MiniMax 社区许可）：在世艺术家名义/声音冒用防护（服务端强制）
+    # （MiniMax 社区许可）：在世艺术家名义/声音冒用防护（服务端强制）
     from app.services.ip_protection import check_ip_protection
     check_ip_protection(text)
 
@@ -141,7 +141,7 @@ def check_generation_entitlement(db: Session, user: User) -> None:
     """生成/派生提交的档位权益闸门（2026-10-03 B12）。
 
     - license 模式（desktop/enterprise）：试用期闸门——未激活且试用到期 → 40203
-      （D-2：无免费层，14 天全功能试用；激活/试用期内全放行）；
+      （无免费层，14 天全功能试用；激活/试用期内全放行）；
     - subscription 模式（cloud 存量）：免费档每日生成限额。
     """
     from app.config import settings
@@ -171,7 +171,7 @@ def check_free_daily_limit(db: Session, user: User) -> None:
             Task.status.in_(("queued", "running", "succeeded")),
             Task.created_at >= day_start_utc)
     ).scalar_one()
-    # P1-14：限额读 Plan 表（运营调表即时生效，不再硬编码 5）
+    # 限额读 Plan 表（运营调表即时生效，不再硬编码 5）
     plan = db.get(Plan, "free")
     limit = plan.daily_generations if plan and plan.daily_generations else 5
     if count >= limit:
@@ -180,7 +180,7 @@ def check_free_daily_limit(db: Session, user: User) -> None:
 
 
 def check_account_hourly_limit(db: Session, user: User) -> None:
-    """账号维度每小时生成上限（P1-7：叠加在 IP 限流之上，全部档位生效）。"""
+    """账号维度每小时生成上限（叠加在 IP 限流之上，全部档位生效）。"""
     from datetime import datetime, timedelta
     cutoff = (datetime.now(UTC) - timedelta(hours=1)
               ).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -204,7 +204,7 @@ _DEFAULT_STORAGE_MB = {"free": 2 * 1024, "pro": 20 * 1024,
 
 
 def check_inflight_limit(db: Session, user: User) -> None:
-    """P1-8：每用户在途（queued/running）生成任务上限，防单用户堆满队列。"""
+    """每用户在途（queued/running）生成任务上限，防单用户堆满队列。"""
     from app.models import Plan
     plan_row = db.get(Plan, user.plan)
     limit = (plan_row.max_concurrent_tasks if plan_row and plan_row.max_concurrent_tasks
@@ -222,7 +222,7 @@ def check_inflight_limit(db: Session, user: User) -> None:
 
 
 def check_storage_quota(db: Session, user: User) -> None:
-    """P1-8：每用户已登记文件总量 vs 档位存储配额（提交生成/导出前校验）。
+    """每用户已登记文件总量 vs 档位存储配额（提交生成/导出前校验）。
 
     只统计 files 表登记字节（未登记的临时文件由孤儿清扫兜底）；命中配额
     引导清理回收站（30 天后自动物理删除）。
@@ -244,7 +244,7 @@ def check_storage_quota(db: Session, user: User) -> None:
 
 
 def _check_maintenance() -> None:
-    """P1-13：维护模式（发布窗口）拒绝新任务提交，防进队列即被重启杀掉。"""
+    """维护模式（发布窗口）拒绝新任务提交，防进队列即被重启杀掉。"""
     if settings.maintenance_mode:
         raise err_conflict(
             tr("系统维护中，请稍后再试（通常几分钟内恢复）",
@@ -254,7 +254,7 @@ def _check_maintenance() -> None:
 def ensure_lyrics_engine_for_auto(db: Session, resolved: dict) -> None:
     """需要自动写词（未提供歌词且非器乐）时必须有真实 LLM 歌词引擎（40901）。
 
-    ADR-019：离线规则引擎移除后歌词创作无兜底，未配置在提交期即拒绝并引导
+    ：离线规则引擎移除后歌词创作无兜底，未配置在提交期即拒绝并引导
     配置；用户自带歌词（含器乐请求）不受影响。
     """
     if resolved.get("auto_lyrics") and model_center.current_lyrics_backend(db) == "none":
@@ -286,11 +286,11 @@ def submit_generation(db: Session, user: User, payload: dict,
     resolved = resolve_generation_request(payload)
     params = resolved["params"]
 
-    # 歌词引擎前置校验（ADR-019）：需要自动写词（未提供歌词且非器乐）时必须有
+    # 歌词引擎前置校验：需要自动写词（未提供歌词且非器乐）时必须有
     # 真实 LLM 歌词通道——原离线规则引擎已移除，未配置即在提交期明确拒绝
     ensure_lyrics_engine_for_auto(db, resolved)
 
-    # FR-4 参考音频（v0.8.1）：特征级参考——分析值覆盖 bpm/调性/器乐密度
+    # 参考音频（v0.8.1）：特征级参考——分析值覆盖 bpm/调性/器乐密度
     reference_info = None
     reference_track_id = (payload.get("reference_track_id") or "").lower()
     if reference_track_id:
@@ -311,7 +311,7 @@ def submit_generation(db: Session, user: User, payload: dict,
             "feature_level": True, "ack_rights": True,
         }
 
-    # FR-5 人声克隆（v0.8.2）：vocal=voice_clone 需已验证档案，仅本地引擎通道
+    # 人声克隆（v0.8.2）：vocal=voice_clone 需已验证档案，仅本地引擎通道
     voice_info = None
     if params.get("vocal") == "voice_clone":
         from app.models.enums import VOCALS  # noqa: F401 —— 校验已在 schema 完成
@@ -441,7 +441,7 @@ def _derive_title(payload: dict, params: dict) -> str:
 # ---------- 执行（线程池内）----------
 
 class LyricsEngineUnconfigured(Exception):
-    """歌词引擎未配置（ADR-019 移除兜底引擎后无 AI 可写词）。
+    """歌词引擎未配置（已移除兜底引擎后无 AI 可写词）。
 
     提交期已被 submit_generation 拦截；此处为执行线程的防御性兜底，
     上抛后任务以 40901 失败并退款，message 直接下发用户可读指引。
@@ -452,7 +452,7 @@ def _prepare_generation_inputs(db, task_id: str, payload_row: dict, resolved: di
     """执行前准备模型输入：simple 扩写 + 自动写词（V1.3 起走模型中心配置的真实引擎）。
 
     LLM 通道异常如实上抛（任务失败退款）；歌词引擎未配置防御性上抛
-    LyricsEngineUnconfigured（ADR-019 无兜底引擎）。引擎串写入任务快照
+    LyricsEngineUnconfigured（无兜底引擎）。引擎串写入任务快照
     _resolved、歌词回填 version.lyrics，供审计与前端展示。
     """
     params = resolved["params"]
@@ -528,7 +528,7 @@ def execute_generation(task_id: str) -> None:
         resolved = dict(payload_row.get("_resolved") or {})
         params = resolved["params"]
 
-        # 引擎选择（V1.3，ADR-010）：普通生成走模型中心配置（localsynth/api 双通道）；
+        # 引擎选择（V1.3）：普通生成走模型中心配置（localsynth/api 双通道）；
         # 派生编辑固定本地引擎（波形手术依赖本地渲染产物，外部候选已被产物校验拦截）
         with SessionLocal() as db:
             if derived_spec:
@@ -648,7 +648,7 @@ def _skip_transient_db(task_id: str, what: str, e: Exception) -> None:
 
 
 def _cleanup_failed_audio(task_id: str) -> None:
-    """P1-11：任务终态失败/取消后清扫版本目录的孤儿音频。
+    """任务终态失败/取消后清扫版本目录的孤儿音频。
 
     失败路径 provider 可能已落盘部分候选文件（如候选 A 成功 B 失败），
     rollback 只回滚 DB 引用不删盘——长期运行缓慢吃满磁盘。版本已有登记
@@ -736,7 +736,7 @@ def _persist_success(db: Session, task_id: str, user_id: str, output, provider) 
             if full in seen_paths:
                 # 同源产物注册多种 kind（外部通道 preview/master 同源整曲）：复制一份
                 # 独立物理文件再登记，避免 files.path UNIQUE 冲突——2026-09-26 商业化
-                # 审查 P0-7：该冲突曾使外部 API 通道每个任务在最后落库步必败并退款
+                # 该冲突曾使外部 API 通道每个任务在最后落库步必败并退款
                 new_rel = (f"{Path(rel).parent.as_posix()}/{Path(rel).stem}"
                            f"_{fmeta['kind']}{Path(rel).suffix}")
                 src = settings.audio_path / full
@@ -780,7 +780,7 @@ def _persist_success(db: Session, task_id: str, user_id: str, output, provider) 
     version.candidate_count = len(output.candidates)
     version.inferred_structure = bool(output.inferred_structure)
     if version.active_candidate_id is None and result_candidates:
-        pass  # 不自动采用，等待用户 adopt（契约语义）
+        pass  # 不自动采用，等待用户 adopt（接口语义）
     # V1.1 派生任务（extend/variant/regen-section）：子版本自动 adopt 首个候选，
     # 避免出现「无活跃候选的空壳子版本」（不写 human adopt 事件，不计入人工参与统计）
     derived_spec = (task.request_payload or {}).get("_derived") if task.request_payload else None
@@ -922,7 +922,7 @@ def cancel_task(db: Session, user: User, task_id: str) -> dict:
     if task.status in ("succeeded", "failed", "canceled"):
         raise err_conflict(tr("任务已结束，无法取消", "Task already finished; cannot cancel"))
     if task.type == "export" and task.status == "running":
-        # P1-10：排队中的导出可取消（worker 取到时按状态检查跳过）；
+        # 排队中的导出可取消（worker 取到时按状态检查跳过）；
         # 执行中的导出无阶段取消钩子（转码不可中断），只能等其自然终态/软超时
         raise err_conflict(tr("导出正在执行，暂不支持中断（最多 10 分钟自动结束）",
                               "Export is running and cannot be interrupted "
@@ -967,7 +967,7 @@ def list_candidates(db: Session, version_id: str, user: User) -> dict:
                       .where(Candidate.version_id == version.id)
                       .order_by(Candidate.label.asc())).scalars().all()
     items = [candidate_to_dict(c) for c in rows]
-    # 义务①（MiniMax 社区许可）：生成结果页（作品详情候选卡）展示生成引擎署名——
+    # （MiniMax 社区许可）：生成结果页（作品详情候选卡）展示生成引擎署名——
     # 取该版本最近一次生成任务的 provider 留痕，随候选列表下发
     from app.models import Task
     from app.services.certificate import provider_attribution

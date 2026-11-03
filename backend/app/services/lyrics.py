@@ -2,7 +2,7 @@
 
 歌词引擎由模型中心全局配置（Ollama 本地模型 / OpenAI 兼容外部 API 二选一）；
 未配置时创作型接口（generate/polish）明确报错引导配置——无 AI 兜底通道
-（原本地规则引擎已移除，ADR-019）。押韵检查/标签补全是确定性分析工具
+（原本地规则引擎已移除）。押韵检查/标签补全是确定性分析工具
 （services/lyrics_analysis），与引擎无关、恒可用。
 """
 from __future__ import annotations
@@ -33,7 +33,7 @@ def _provider(db: Session):
 def _guard(text: str) -> None:
     if check_sensitive(text):
         raise err_sensitive()
-    # 义务②（与 POST /generations 同口径，2026-10-27 补齐）：歌词生成/润色的
+    # （与 POST /generations 同口径，2026-10-27 补齐）：歌词生成/润色的
     # 输入同样不得冒用 in vivo 艺术家名义/声音
     from app.services.ip_protection import check_ip_protection
     check_ip_protection(text)
@@ -48,7 +48,7 @@ def generate(db: Session, theme: str, style_hint: str, mood: str | None, languag
                                 language=language, sections=sections)
     except LLMError as e:
         raise err_generation_failed(
-            tr("歌词生成失败：", "Lyrics generation failed: ") + e.message)
+            tr("歌词生成失败：", "Lyrics generation failed: ") + e.message) from e
     out.setdefault("engine", provider.engine_name)
     return out
 
@@ -62,7 +62,7 @@ def polish(db: Session, lyrics: str, target_section: str | None, style_hint: str
                               style_hint=style_hint, locked_lines=locked_lines)
     except LLMError as e:
         raise err_generation_failed(
-            tr("歌词润色失败：", "Lyrics polish failed: ") + e.message)
+            tr("歌词润色失败：", "Lyrics polish failed: ") + e.message) from e
     out.setdefault("engine", provider.engine_name)
     return out
 
