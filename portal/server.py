@@ -39,7 +39,6 @@ PORTAL_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = PORTAL_DIR.parent / "backend"
 sys.path.insert(0, str(BACKEND_DIR))  # 复用 backend 的 license 签名实现与依赖环境
 
-from app.config import LICENSE_PRICE_USD, LICENSE_SALE_PRICE_USD  # noqa: E402
 from app.services.license import sign_license, verify_license_key  # noqa: E402
 
 import db as portal_db  # noqa: E402
@@ -95,7 +94,7 @@ def send_activation_email(account: str, code: str, tier: str = "lifetime") -> bo
     msg["Subject"] = "Your Meloyu activation code"
     msg["From"] = SMTP_FROM
     msg["To"] = account
-    msg.set_content(f"""Thank you for buying Meloyu!
+    msg.set_content(f"""Your Meloyu activation details
 
 Your account : {account}
 Activation code : {code}
@@ -113,7 +112,7 @@ reply to this email.
     msg.add_alternative(f"""<html><body style="font-family:ui-monospace,Consolas,monospace;
 background:#0d0f10;color:#e8ece9;margin:0;padding:40px 16px">
 <div style="max-width:560px;margin:0 auto;background:#16191b;border:1px solid #2a2f33;padding:32px">
-<h2 style="color:#8be9c0;margin:0 0 8px">Thank you for buying Meloyu</h2>
+<h2 style="color:#8be9c0;margin:0 0 8px">Your Meloyu activation details</h2>
 <p style="color:#9aa3a7;font-size:14px">{tier_line}</p>
 <table style="margin:16px 0;font-size:14px;color:#e8ece9">
 <tr><td style="color:#9aa3a7;padding:6px 12px 6px 0">Your account</td>
@@ -147,22 +146,10 @@ STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 PAYMENT_LINK_URL = os.environ.get("PAYMENT_LINK_URL", "")
 # 无在线支付模式（默认）：售卖走人工渠道（邮箱联系 → 人工签发 Key）
 SALES_EMAIL = os.environ.get("PORTAL_SALES_EMAIL", "")
-# 价格单一事实源：backend/app/config.py（删除本地重复定义，
-# 调价只改 config.py 一处，portal 随 sys.path 同源生效）
-PRICE_USD = LICENSE_PRICE_USD
-SALE_PRICE_USD = LICENSE_SALE_PRICE_USD
-# 折扣展示：成交价低于原价时动态算折扣百分比（与后端 config / 前端 LICENSE_SKU 同源口径；
-# SALE ≥ PRICE 或非正 = 无折扣，回退单价格局——env 改价即可开关折扣）
-_DISCOUNT_PCT = (
-    round((PRICE_USD - SALE_PRICE_USD) * 100 / PRICE_USD)
-    if 0 < SALE_PRICE_USD < PRICE_USD else None
-)
-_PRICE_STRIKE = (
-    f'\n<span style="font-size:20px;color:#5c666b;text-decoration:line-through">'
-    f'${PRICE_USD // 100}</span> '
-    f'<span style="font-size:20px;color:#8be9c0;font-weight:700">-{_DISCOUNT_PCT}%</span>'
-    if _DISCOUNT_PCT else ""
-)
+# 开源免费口径（2026-11-06）：软件本体免费提供，展示面不再出现付费价格；
+# 价格常量仅保留在 backend/app/config.py 计费功能内（既有授权/企业服务）。
+# 免费获取入口：源码仓库
+REPO_URL = "https://github.com/shinychris/meloyu"
 
 
 # ---------------- 限流 ----------------
@@ -472,35 +459,38 @@ async def activate(request: Request):
                 "license_id": row["lid"], "devices": row["devices"]}
 
 
-# ---------------- 购买：Payment Link 跳转 + 现场履约 ----------------
+# ---------------- 获取：免费下载 + 激活码（Payment Link 链路保留） ----------------
 
 @app.get("/buy")
 async def buy():
-    """购买入口（双模式）：
+    """获取入口（开源免费口径，2026-11-06）：
 
-    - 在线支付（可选）：配 PAYMENT_LINK_URL → 302 Stripe Payment Link，履约走 /thanks；
-    - 人工签发（默认，零外部依赖）：未配支付链接 → 联系购买页（邮箱/流程说明），
-      管理员经 /api/admin/licenses 人工签发后交付 Key。
+    - 默认（零外部依赖）：免费下载（源码仓库）+ 激活码获取说明——既有授权、
+      企业授权与商用证书沿用人工签发链路（邮箱联系 → /api/admin/licenses 签发）；
+    - 在线支付（可选，计费功能保留）：配 PAYMENT_LINK_URL → 302 Stripe
+      Payment Link，履约走 /thanks（运营按需启用）。
     """
     if PAYMENT_LINK_URL:
         return RedirectResponse(PAYMENT_LINK_URL)
-    contact = html.escape(SALES_EMAIL or "support@meloyu.com")  # 
+    contact = html.escape(SALES_EMAIL or "support@meloyu.com")  #
+    repo = html.escape(REPO_URL)
     return HTMLResponse(f"""<!doctype html><html><head><meta charset="utf-8">
-<title>Meloyu — Get your license</title>
+<title>Meloyu — Free &amp; Open Source</title>
 <style>body{{font-family:ui-monospace,Consolas,monospace;background:#0d0f10;
 color:#e8ece9;display:flex;align-items:center;justify-content:center;height:100vh;
 margin:0}}.card{{max-width:560px;padding:40px;background:#16191b;border:1px solid #2a2f33}}
 h2{{color:#8be9c0;margin:0 0 12px}}.price{{font-size:40px;font-weight:800;margin:16px 0}}
 a{{color:#8be9c0}}li{{margin:8px 0;color:#9aa3a7;font-size:14px}}</style></head><body>
-<div class="card"><h2>Meloyu Desktop — Lifetime License</h2>
-<div class="price">${SALE_PRICE_USD // 100}{_PRICE_STRIKE}</div>
+<div class="card"><h2>Meloyu Desktop — Free &amp; Open Source</h2>
+<div class="price">Free</div>
 <ol>
-<li>Email <a href="mailto:{contact}">{contact}</a> to purchase (launch-offer ${SALE_PRICE_USD // 100}, one-time, lifetime).</li>
+<li>Download the app or the source code from <a href="{repo}">{repo}</a> — free under the MIT license.</li>
+<li>Need an activation code (existing lifetime license, enterprise or commercial-use licensing)? Email <a href="mailto:{contact}">{contact}</a>.</li>
 <li>You receive an activation email with your account and activation code (usually within 24 hours).</li>
 <li>Open Meloyu → Settings → License → enter your account + code. Done.</li>
 </ol>
-<p style="color:#5c666b;font-size:13px">One-time purchase · up to 3 devices · all future updates included ·
-14-day full-feature trial in the app before you buy.</p>
+<p style="color:#5c666b;font-size:13px">Free &amp; open source (MIT) · existing lifetime licenses remain valid ·
+up to 3 devices · all future updates included.</p>
 </div></body></html>""")
 
 
@@ -571,7 +561,7 @@ app.mount("/updates", StaticFiles(directory=str(DATA_DIR / "updates"), check_dir
 
 LANDING_DIR = Path(os.environ.get(
     "PORTAL_LANDING_DIR", PORTAL_DIR.parent / "frontend" / "dist-landing"))
-# 兜底基座页：插值仅构建期价格常量（int，无用户可控数据），无转义需求
+# 兜底基座页：插值仅构建期仓库链接常量（str，无用户可控数据），无转义需求
 _FALLBACK_PAGE = f"""<!doctype html><html><head><meta charset="utf-8">
 <title>Meloyu — AI Music Desktop Studio</title>
 <style>body{{font-family:ui-monospace,Consolas,monospace;background:#0d0f10;
@@ -581,10 +571,10 @@ margin:0;flex-direction:column;gap:16px}}
 a.btn{{background:#8be9c0;color:#0d0f10;padding:14px 34px;text-decoration:none;
 font-weight:700}}</style></head><body>
 <div style="letter-spacing:.2em;font-weight:700">MELOYU</div>
-<div>AI Music Desktop Studio — one purchase, yours for life</div>
-<div class="price">${SALE_PRICE_USD // 100}{_PRICE_STRIKE}</div>
-<a class="btn" href="/buy">Buy lifetime license</a>
-<div style="color:#5c666b;font-size:13px">Launch offer · macOS &amp; Windows ·
+<div>AI Music Desktop Studio — free &amp; open source</div>
+<div class="price">Free</div>
+<a class="btn" href="/buy">Get Meloyu — Free</a>
+<div style="color:#5c666b;font-size:13px">MIT licensed · macOS &amp; Windows ·
 all future updates included</div>
 </body></html>"""
 

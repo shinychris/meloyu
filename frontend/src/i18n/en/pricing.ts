@@ -1,17 +1,19 @@
-/** pricing 命名空间：定价与积分（v0.17.0 起 cloud 存量专用；激活/买断卡已迁入 settings 命名空间的系统设置页） */
+/** pricing 命名空间：定价与积分（v0.17.0 起 cloud 存量专用；激活/授权卡已迁入 settings 命名空间的系统设置页；
+ *  2026-11-06 起对外口径为开源免费（MIT），计费功能保留） */
 export const pricingEn = {
   // 页头
   'pricing.label': 'Pricing / Plans & Credits',
-  'pricing.title': 'One purchase, yours for life',
+  'pricing.title': 'Free & open source (MIT)',
   // 加载态
   'pricing.loading': 'Loading…',
   'pricing.loadFailed': 'Failed to load',
-  // 买断卡（LICENSE_SKU 单档，与落地页同源）
-  'pricing.buy.badge': 'Launch offer',
+  // 授权卡（LICENSE_SKU 单档，与落地页同源；开源免费口径）
+  'pricing.buy.badge': 'Open source',
   'pricing.buy.oneTime': 'one-time · lifetime',
-  'pricing.buy.cta': 'Buy at meloyu.com',
+  'pricing.buy.freePrice': 'Free · open source (MIT)',
+  'pricing.buy.cta': 'Get it at meloyu.com',
   'pricing.buy.note':
-    'One-time payment. Includes all future updates; no subscription, no credits.',
+    'Meloyu is now free and open source (MIT). Existing lifetime licenses remain valid and honored.',
   'pricing.buy.enterprise': 'Need on-premise deployment or team licensing? Contact sales.',
   // 用量说明（license 模式积分=纯计量）
   'pricing.usage.footnote':
@@ -20,7 +22,7 @@ export const pricingEn = {
   // cloud 存量：订阅停售公告
   'pricing.sunsetTitle': 'Subscriptions have been retired',
   'pricing.sunsetDesc':
-    'Meloyu is now a desktop app with a one-time lifetime license ($399, launch offer $129) — no more monthly fees. Your current plan stays active for the transition period; new subscriptions are no longer sold.',
+    'Meloyu is now free and open source (MIT) — no monthly fees and no license purchase. Your current plan stays active for the transition period (read-only reference below); new subscriptions are no longer sold.',
   'pricing.plansRefTitle': 'Plan quotas (reference)',
   'pricing.planRef': 'Current plan',
   'pricing.monthlyCredits.pre': '· Monthly',

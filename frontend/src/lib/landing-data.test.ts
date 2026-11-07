@@ -80,12 +80,11 @@ describe('landing-data 落地页数据完整性', () => {
     }
   })
 
-  it('授权定价与定案一致（单档终身买断，USD 分值：$399 原价锚 / 限时买断 $129，2026-10-17 调价）', () => {
-    expect(LICENSE_SKU.code).toBe('lifetime')
-    expect(LICENSE_SKU.price).toBe(39900)
-    expect(LICENSE_SKU.salePrice).toBe(12900)
-    // 折扣支持：成交价必须低于原价锚（LandingPricing 依此展示折扣百分比与划线原价）
-    expect(LICENSE_SKU.salePrice).toBeLessThan(LICENSE_SKU.price)
+  it('授权卡为开源免费口径（MIT）：不含付费价格字段，功能清单完备（2026-11-06 起）', () => {
+    expect(LICENSE_SKU.code).toBe('free')
+    // 展示面不出现付费价格：价格字段必须移除（价格常量仅保留在 backend config 计费功能内）
+    expect(Object.keys(LICENSE_SKU)).not.toContain('price')
+    expect(Object.keys(LICENSE_SKU)).not.toContain('salePrice')
     expect(LICENSE_SKU.features.length).toBeGreaterThanOrEqual(5)
     const fields = [
       LICENSE_SKU.name,
@@ -142,7 +141,7 @@ describe('landing 字典双语完整性', () => {
   })
 
   it('zh 关键口径保持现有原文', () => {
-    expect(zhMap['landing.data.license.name']).toBe('Meloyu Desktop · 终身授权')
+    expect(zhMap['landing.data.license.name']).toBe('Meloyu 桌面版 · 开源免费')
     expect(zhMap['landing.data.step.1.title']).toBe('描述灵感')
     expect(zhMap['landing.data.faq.4.q']).toBe('生成的作品可以商用吗？')
     expect(zhMap['landing.data.channel.acestep_local.name']).toBe('本机 ACE-Step v1.5')

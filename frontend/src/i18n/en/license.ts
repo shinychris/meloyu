@@ -11,11 +11,11 @@ export const licenseEn = {
   'license.sidebar.expired': 'Expired',
   // 账号菜单档位行（license 模式）
   'license.menu.planLabel': 'Local profile',
-  // 在线激活（2026-10-04 口径：邮件交付账户+激活码，在线兑换）
+  // 在线激活（邮件交付账户+激活码，在线兑换）
   'license.online.title': 'Activate with your code',
   'license.online.desc':
-    'Your purchase email contains your account and an activation code (MELOYU-XXXX-XXXX). Enter both below — activation is one-time; the app works fully offline afterwards.',
-  'license.online.accountLabel': 'Account (purchase email)',
+    'Your activation email contains your account and an activation code (MELOYU-XXXX-XXXX). Enter both below — activation is one-time; the app works fully offline afterwards.',
+  'license.online.accountLabel': 'Account (activation email)',
   'license.online.accountPlaceholder': 'you@example.com',
   'license.online.codeLabel': 'Activation code',
   'license.online.codePlaceholder': 'MELOYU-XXXXXXXX-XXXXXXXX',
@@ -27,7 +27,7 @@ export const licenseEn = {
   'license.activate.label': 'Activate',
   'license.activate.title': 'Activate your lifetime license',
   'license.activate.desc':
-    'Paste the license key from your purchase email (or from meloyu.com). Activation is verified offline — no account or internet required.',
+    'Paste the license key from your activation email (or from meloyu.com). Activation is verified offline — no account or internet required.',
   'license.activate.placeholder': 'MELOYU license key (v1.…)',
   'license.activate.cta': 'Activate',
   'license.activate.activating': 'Activating…',
@@ -42,7 +42,7 @@ export const licenseEn = {
   'license.trial.expiresAt': 'Ends {date}',
   'license.trial.expiredTitle': 'Trial ended',
   'license.trial.expiredDesc':
-    'Generating, editing and exporting are locked. Activate a lifetime license below to continue — browsing and playing existing works stays free.',
+    'Generating, editing and exporting are locked. Get your activation code at meloyu.com and activate below to continue — browsing and playing existing works stays free.',
   // 状态卡（已激活）
   'license.status.title': 'Lifetime license',
   'license.status.active': 'Active',

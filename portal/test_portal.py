@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import atexit
+import inspect
 import os
 import sqlite3
 import sys
@@ -139,12 +140,14 @@ class TestPortal(unittest.TestCase):
         self.assertEqual(revoked.json()["reason"], "revoked")
 
     def test_buy_manual_mode_default(self):
-        # 未配 PAYMENT_LINK_URL（默认零外部依赖模式）：人工签发售卖页 200，
-        # 而非 503 错误页（2026-10-04 用户口径：桌面软件无需 Stripe 支付）
+        # 未配 PAYMENT_LINK_URL（默认零外部依赖模式）：获取页 200 而非 503；
+        # 2026-11-06 开源免费口径：免费下载 + 既有授权/企业/商用证书沿用签发链路
         r = self.client.get("/buy")
         self.assertEqual(r.status_code, 200)
-        self.assertIn("Lifetime License", r.text)
-        # 2026-10-04 口径：邮件交付账户+激活码
+        self.assertIn("Free &amp; Open Source", r.text)
+        self.assertNotIn("$", r.text)
+        self.assertIn("github.com", r.text)
+        # 邮件交付账户+激活码（链路不变）
         self.assertIn("activation email", r.text)
         self.assertIn("activation code", r.text)
 
@@ -276,11 +279,13 @@ class TestPortal(unittest.TestCase):
         self.assertEqual(portal_server.mask_code(""), "MELOYU-***")
         self.assertEqual(portal_server.mask_code("short"), "MELOYU-***")
 
-    def test_price_constants_from_backend_config(self):
-        """价格常量与 backend config 同源（删除本地重复定义）。"""
+    def test_portal_free_positioning_no_price_display(self):
+        """开源免费口径（2026-11-06）：portal 不再 import/展示价格常量；
+        价格仅保留在 backend/app/config.py 计费功能内。"""
         import app.config as cfg
-        self.assertEqual(portal_server.PRICE_USD, cfg.LICENSE_PRICE_USD)
-        self.assertEqual(portal_server.SALE_PRICE_USD, cfg.LICENSE_SALE_PRICE_USD)
+        self.assertTrue(hasattr(cfg, "LICENSE_PRICE_USD"))
+        source = inspect.getsource(portal_server)
+        self.assertNotIn("PRICE_USD", source)
 
     def test_sqlite_wal_and_fk(self):
         """WAL 持久化生效；activations.lid 外键约束生效（悬空引用被拒）。"""

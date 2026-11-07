@@ -16,10 +16,6 @@ import { useI18nStore, useT, type TranslationKey } from '../i18n'
 import type { Locale } from '../i18n'
 
 
-/** 美分 → $ 展示（价格单一事实源：后端下发/前端 LICENSE_SKU 同源） */
-const usd = (cents: number | null | undefined): string | null =>
-  cents == null ? null : `$${(cents / 100).toFixed(0)}`
-
 /** 引擎通道 → 展示名（复用模型中心通道词条；未知通道回退原始标识）。
  *  localsynth=歌曲离线合成引擎（用量统计的歌曲通道维度）；none=歌词引擎未配置 */
 const ENGINE_LABEL: Record<string, TranslationKey> = {
@@ -100,12 +96,6 @@ export default function SettingsView({ initialSection }: { initialSection?: stri
 
   const activated = license?.activated ?? false
   const daysLeft = license?.trial.days_left ?? 0
-  // 折扣支持（v0.17.0 定价调整）：成交价低于原价时展示折扣百分比与划线原价；
-  // sale ≥ price 或非正 = 无折扣 → 单价格局（env 改价即可开关折扣）
-  const discountPct =
-    license && license.price_usd > license.sale_price_usd && license.sale_price_usd > 0
-      ? Math.round(((license.price_usd - license.sale_price_usd) / license.price_usd) * 100)
-      : null
 
   /** 激活：POST /licenses/activate（Ed25519 本地验签；40202 由拦截器 toast） */
   const onActivate = async () => {
@@ -487,28 +477,18 @@ export default function SettingsView({ initialSection }: { initialSection?: stri
                 )}
               </div>
 
-              {/* 买断卡 + 激活表单（未激活时展示） */}
+              {/* 授权卡（开源免费口径）+ 激活表单（未激活时展示） */}
               {license != null && !activated && (
                 <div className="grid grid-cols-1 md:grid-cols-2 mt-4">
                   <div className="card p-6 relative">
-                    {discountPct != null && (
-                      <div className="badge badge-solid absolute top-5 right-6">
-                        {t('pricing.buy.badge')} · -{discountPct}%
-                      </div>
-                    )}
+                    <div className="badge badge-solid absolute top-5 right-6">
+                      {t('pricing.buy.badge')}
+                    </div>
                     <div className="label" style={{ color: 'var(--acc)' }}>
                       {t(LICENSE_SKU.name)}
                     </div>
                     <div className="price-num mt-3 flex items-baseline gap-3 flex-wrap">
-                      <span>{usd(license.sale_price_usd)}</span>
-                      {discountPct != null && (
-                        <span className="text-base font-bold text-dim line-through">
-                          {usd(license.price_usd)}
-                        </span>
-                      )}
-                      <span className="text-base font-bold text-muted">
-                        {t('pricing.buy.oneTime')}
-                      </span>
+                      <span>{t('pricing.buy.freePrice')}</span>
                     </div>
                     <div className="text-xs mt-1.5 text-dim">
                       {t(LICENSE_SKU.tagline)} · {t(LICENSE_SKU.platforms)}

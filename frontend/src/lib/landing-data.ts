@@ -3,7 +3,7 @@
  *
  * 全部为静态内嵌：落地页必须不依赖后端即可完整渲染。
  * 通道/模型目录与 backend/app/providers/music_catalog.py 对齐；
- * 定价为买断制终身授权；
+ * 授权口径为开源免费（MIT，2026-11-06 起）——不展示付费价格；
  * 版本号取交付报告口径（v0.7.0），并由 landing-data.test.ts 断言与 package.json version 严格同步。
  *
  * i18n：所有用户可见文本字段值为字典 key（landing.data.*，见 src/i18n/en/landing.ts），
@@ -309,25 +309,21 @@ export const AUDIENCES: Array<{ title: TranslationKey; sub: TranslationKey; poin
   },
 ]
 
-/** 授权定价（$399 终身授权原价锚、限时买断 $129（2026-10-17 调价）；
- *  与定价口径对齐；USD 分值，展示侧 /100） */
+/** 授权卡（开源免费口径：MIT 许可，软件免费提供；既有终身授权继续有效，
+ *  企业部署/商用授权证书为可选增值服务。不含价格字段——展示面不出现付费价格） */
 export const LICENSE_SKU: {
   code: string
   name: TranslationKey
   tagline: TranslationKey
   badge: TranslationKey
   platforms: TranslationKey
-  price: number
-  salePrice: number
   features: TranslationKey[]
 } = {
-  code: 'lifetime',
+  code: 'free',
   name: 'landing.data.license.name',
   tagline: 'landing.data.license.tagline',
   badge: 'landing.data.license.badge',
   platforms: 'landing.data.license.platforms',
-  price: 39900,
-  salePrice: 12900,
   features: [
     'landing.data.license.f1',
     'landing.data.license.f2',

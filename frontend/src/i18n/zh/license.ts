@@ -10,11 +10,11 @@ export const licenseZh: Record<keyof typeof licenseEn, string> = {
   'license.sidebar.expired': '已到期',
   // 账号菜单档位行（license 模式）
   'license.menu.planLabel': '本地档案',
-  // 在线激活（2026-10-04 口径：邮件交付账户+激活码，在线兑换）
+  // 在线激活（邮件交付账户+激活码，在线兑换）
   'license.online.title': '使用激活码激活',
   'license.online.desc':
-    '购买邮件中包含你的账户与激活码（MELOYU-XXXX-XXXX 格式），在下方输入即可。激活仅需一次，之后完全离线可用。',
-  'license.online.accountLabel': '账户（购买邮箱）',
+    '激活邮件中包含你的账户与激活码（MELOYU-XXXX-XXXX 格式），在下方输入即可。激活仅需一次，之后完全离线可用。',
+  'license.online.accountLabel': '账户（激活邮箱）',
   'license.online.accountPlaceholder': 'you@example.com',
   'license.online.codeLabel': '激活码',
   'license.online.codePlaceholder': 'MELOYU-XXXXXXXX-XXXXXXXX',
@@ -26,7 +26,7 @@ export const licenseZh: Record<keyof typeof licenseEn, string> = {
   'license.activate.label': '激活',
   'license.activate.title': '激活终身授权',
   'license.activate.desc':
-    '粘贴购买邮件（或 meloyu.com）中的 License Key 即可。激活为本地离线验签——无需账号、无需联网。',
+    '粘贴激活邮件（或 meloyu.com）中的 License Key 即可。激活为本地离线验签——无需账号、无需联网。',
   'license.activate.placeholder': 'MELOYU 授权密钥（v1.…）',
   'license.activate.cta': '激活',
   'license.activate.activating': '激活中…',
@@ -41,7 +41,7 @@ export const licenseZh: Record<keyof typeof licenseEn, string> = {
   'license.trial.expiresAt': '{date} 到期',
   'license.trial.expiredTitle': '试用已结束',
   'license.trial.expiredDesc':
-    '生成、编辑与导出已锁定。在下方激活终身授权即可继续创作；已有作品的浏览与播放不受影响。',
+    '生成、编辑与导出已锁定。前往 meloyu.com 获取激活码，在下方激活即可继续创作；已有作品的浏览与播放不受影响。',
   // 状态卡（已激活）
   'license.status.title': '终身授权',
   'license.status.active': '已生效',

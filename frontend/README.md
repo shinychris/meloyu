@@ -74,14 +74,15 @@ src/
 | `#/library` | 作品库 | 筛选 chips / 收藏星标 / 回收站恢复与永久删除 / 行内试听 / 导出徽标(由导出任务推导) |
 | `#/works/:id` | 作品详情 | 版本树 + 候选（试听/采用定稿）+ 导出面板 + 证书 |
 | `#/rights` | 合规与权利中心 | 证书卡字段来自 /versions/{id}/certificate、合规检查清单、全局开关 |
-| `#/pricing` | 定价与激活（v0.16.0） | license 模式：试用状态卡 + 买断卡（划线原价/限时价）+ 账户+激活码在线兑换 + 离线整钥备用；cloud 模式：只读档位 |
+| `#/pricing` | 定价与激活 | license 模式重定向至 `#/settings` 授权分区；cloud 模式：停售公告（开源免费口径）+ 只读档位 + 积分流水 |
 | `#/models` | 模型中心 | 七通道卡片（BYOK Key 配置）+ 开源目录（10 模型）+ 下载管理 + 「本地组件」三卡（内置/MusicGen/ACE-Step，许可/体积/显存如实标注） |
 | `#/market` | 作品市场 | D-6：桌面形态隐藏（守卫重定向） |
 
 ### 落地页（官网营销站，独立构建）
 
-- 落地页组件保留在 `src/views/LandingView.tsx` + `src/components/landing/*`，经 `landing.html` 入口 + `vite.config-landing.ts` 独立构建为 `dist-landing/`（site 模式：登录入口隐藏、购买直链 /buy），由 `portal/` 官网托管；App 内不再注册 landing 路由。
-- 数据：`src/lib/landing-data.ts` 单一事实源（七通道/十模型目录/定价/FAQ/里程碑），**纯静态内嵌、不依赖后端**；有 `landing-data.test.ts` 完整性测试兜底（通道数量/排序/许可口径/定价与 seed_data 一致）。
+- 落地页组件保留在 `src/views/LandingView.tsx` + `src/components/landing/*`，经 `landing.html` 入口 + `vite.config-landing.ts` 独立构建为 `dist-landing/`（site 模式：登录入口隐藏、获取入口直链 /buy），由 `portal/` 官网托管；App 内不再注册 landing 路由。
+- 数据：`src/lib/landing-data.ts` 单一事实源（七通道/十模型目录/授权卡/FAQ/里程碑），**纯静态内嵌、不依赖后端**；有 `landing-data.test.ts` 完整性测试兜底（通道数量/排序/许可口径/开源免费口径——不含价格字段）。
+- 定价口径：开源免费（MIT，2026-11-06 起）——落地页/定价页不出现付费价格；计费功能（授权激活/积分/档位）保留，用于既有授权与企业/商用证书。
 - 真机截图：`public/shots/`。
 - 商用表述口径：「商用权利跟随所选通道的模型许可」，NC 权重如实标注，不写绝对化承诺。
 - 锚点导航在 HashRouter 下不能用 `href="#id"`，统一走 `scrollToSection()`（`components/landing/LandingNav.tsx`）。

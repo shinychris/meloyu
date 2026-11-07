@@ -1,18 +1,19 @@
 import { pricingEn } from '../en/pricing'
 
-/** pricing 命名空间：中文与原文一致（v0.16.0 买断制口径） */
+/** pricing 命名空间：中文与原文一致（2026-11-06 起开源免费口径，计费功能保留） */
 export const pricingZh: Record<keyof typeof pricingEn, string> = {
   // 页头
   'pricing.label': 'Pricing / 定价与积分',
-  'pricing.title': '一次买断，终身使用',
+  'pricing.title': '免费 · 开源（MIT）',
   // 加载态
   'pricing.loading': '加载中…',
   'pricing.loadFailed': '加载失败',
-  // 买断卡（LICENSE_SKU 单档，与落地页同源）
-  'pricing.buy.badge': '限时首发',
+  // 授权卡（LICENSE_SKU 单档，与落地页同源；开源免费口径）
+  'pricing.buy.badge': '开源免费',
   'pricing.buy.oneTime': '一次性买断 · 终身',
-  'pricing.buy.cta': '前往官网购买',
-  'pricing.buy.note': '一次付清买断。含全部版本更新；无订阅、无积分。',
+  'pricing.buy.freePrice': '免费 · 开源（MIT）',
+  'pricing.buy.cta': '前往官网获取',
+  'pricing.buy.note': 'Meloyu 现已开源（MIT）并免费提供；既有终身授权继续有效。',
   'pricing.buy.enterprise': '需要私有化部署或团队批量授权？请联系销售。',
   // 用量说明（license 模式积分=纯计量）
   'pricing.usage.footnote':
@@ -21,7 +22,7 @@ export const pricingZh: Record<keyof typeof pricingEn, string> = {
   // cloud 存量：订阅停售公告
   'pricing.sunsetTitle': '订阅已停售',
   'pricing.sunsetDesc':
-    'Meloyu 已转型为桌面软件，终身授权一次买断（$399，限时 $129）——不再有月费。存量档位在过渡期内继续有效，新订阅不再受理。',
+    'Meloyu 现已开源（MIT）并免费提供——不再有月费，也无需购买授权。存量档位在过渡期内继续有效（下方只读参考），新订阅不再受理。',
   'pricing.plansRefTitle': '档位配额（参考）',
   'pricing.planRef': '当前档位',
   'pricing.monthlyCredits.pre': '· 每月',

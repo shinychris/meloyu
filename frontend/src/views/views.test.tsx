@@ -111,9 +111,11 @@ describe('views render smoke', () => {
     expect(html).not.toContain('不可听水印')
   })
 
-  it('PricingView 渲染激活加载态与流水表（v0.16.0 买断制；license 状态未就绪时显示加载）', () => {
+  it('PricingView 渲染免费开源口径标题与流水表（2026-11-06 免费口径；license 状态未就绪时显示加载）', () => {
     const html = render(<PricingView />)
-    expect(html).toContain('One purchase, yours for life')
+    expect(html).toContain('Free &amp; open source (MIT)')
+    // 展示面不再出现付费价格话术
+    expect(html).not.toContain('One purchase, yours for life')
     // SSR 未加载态：license 为 null → Loading…
     expect(html).toContain('Loading…')
     // 订阅支付流组件已随 Stripe 拆除移除

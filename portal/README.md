@@ -1,16 +1,20 @@
 # Meloyu License Portal（官网四合一轻服务，P3）
 
-> 官网轻服务：营销站托管 + 购买（默认人工签发，Stripe Payment Link 可选）+
+> 官网轻服务：营销站托管 + 获取入口（免费下载 + 授权码签发）+
 > License 签发与设备治理（含换机解绑）+ 桌面更新源。复用 backend 的 Ed25519
 > 签名实现（`backend/app/services/license.py`，单一事实源），运行在 backend
 > venv 上，零新增 Python 依赖。
 
-## 售卖双模式
+> **计费口径（2026-11-06）**：软件已开源（MIT）并免费提供——展示面为免费下载 +
+> 激活码获取，不再出现付费价格。签发/激活/设备治理/在线支付链路全部保留，
+> 用于既有授权、企业授权与商用证书。
 
-- **人工签发（默认，零外部依赖）**：不配 `PAYMENT_LINK_URL`，`/buy` 展示联系购买页
-  （`PORTAL_SALES_EMAIL` 定制邮箱）；管理员经 `POST /api/admin/licenses` 签发 Key
-  邮件交付。适合起步期/小单量，无任何第三方依赖。
-- **在线支付（可选）**：配 `PAYMENT_LINK_URL`（Stripe Payment Link）+
+## 签发双模式
+
+- **人工签发（默认，零外部依赖）**：不配 `PAYMENT_LINK_URL`，`/buy` 展示免费下载 +
+  激活码获取页（`PORTAL_SALES_EMAIL` 定制邮箱）；管理员经 `POST /api/admin/licenses`
+  签发 Key 邮件交付。无任何第三方依赖。
+- **在线支付（可选，计费功能保留）**：配 `PAYMENT_LINK_URL`（Stripe Payment Link）+
   `STRIPE_SECRET_KEY`，`/buy` 302 跳转、`/thanks` 自动履约（见下节）。桌面客户端
   本身不含任何支付代码。
 
@@ -56,8 +60,8 @@ set PAYMENT_LINK_URL=https://buy.stripe.com/...
 
 | 端点 | 说明 |
 |---|---|
-| `GET /` | 官网营销站：landing 独立构建（`cd frontend && npm run build:landing` → `dist-landing/`，默认英文、zh 可切、买断定价与购买入口）；未构建时兜底基座页 |
-| `GET /buy` | 购买入口：默认人工签发联系页（价格/邮箱流程/激活邮件说明）；配 `PAYMENT_LINK_URL` 后 302 在线支付 |
+| `GET /` | 官网营销站：landing 独立构建（`cd frontend && npm run build:landing` → `dist-landing/`，默认英文、zh 可切、开源免费口径与获取入口）；未构建时兜底基座页 |
+| `GET /buy` | 获取入口：默认免费下载 + 激活码获取页（既有授权/企业授权/商用证书经邮箱联系人工签发）；配 `PAYMENT_LINK_URL` 后 302 在线支付（计费功能保留） |
 | `GET /thanks?session_id=` | 在线支付回跳（可选层）：直查 Stripe 校验已付 → **幂等签发** → 页面展示激活码 |
 | `POST /api/activate` | **桌面端在线激活**：`{account, code, device_id}` → 校验激活码/账户/吊销/设备数 → 返回完整签名密钥（App 兑换后离线持有）；未指定账户的码首次兑换即锁定账户 |
 | `POST /api/activate-report` | 桌面端可选在线上报：验签/吊销/设备数治理（离线验签不依赖） |
@@ -80,9 +84,10 @@ admin/activate 端点均带进程内 IP 限流，见「生产部署约束」）�
 桌面端输入账户+激活码在线兑换（仅需联网一次），完整授权密钥粘贴激活保留为
 离线备用。
 
-## 购买闭环
+## 签发闭环
 
-**默认（人工签发，零外部依赖）**：用户 `/buy` 联系购买 → 管理员
+**默认（人工签发，零外部依赖）**：用户 `/buy` 免费下载或经邮箱联系获取激活码
+（既有授权/企业授权/商用证书）→ 管理员
 `POST /api/admin/licenses`（填买家邮箱）→ 激活邮件自动发送（SMTP 未配置时日志
 打印人工交付）→ 用户在桌面端输入账户+激活码激活。
 

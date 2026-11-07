@@ -1,8 +1,11 @@
-"""买断价格常量同源守门（2026-10-27）。
+"""价格口径守门（2026-11-06 开源免费口径调整）。
 
-价格事实源是 app.config（portal 已改为直接 import，天然同源）；本测试钉住
-前端 landing-data.ts 的两处字面量必须与 backend config 一致——缺这道守门时，
-2026-10-17 的 $129 调价 README 就是漏网漂移实例。
+对外展示面（落地页 / portal 页面）已转为开源免费口径，不再出现付费价格；
+价格事实源仅保留在 app.config，供计费功能使用（billing API 下发、
+既有授权与企业/商用证书服务）。本测试钉住两件事：
+
+1. 前端 landing-data.ts 不再内嵌付费价格字面量（防免费口径回退）；
+2. app.config 价格常量保持计费不变式（0 < SALE ≤ PRICE）。
 """
 from __future__ import annotations
 
@@ -16,16 +19,17 @@ _LANDING = Path(__file__).resolve().parents[2] / "frontend" / "src" / "lib" / "l
 
 
 class PriceConsistencyTest(unittest.TestCase):
-    def test_frontend_landing_price_matches_config(self) -> None:
+    def test_frontend_landing_carries_no_paid_price(self) -> None:
+        """落地页数据源为开源免费口径：不得再出现 price/salePrice 付费字面量。"""
         text = _LANDING.read_text(encoding="utf-8")
-        price_m = re.search(r"\bprice:\s*(\d+)", text)
-        sale_m = re.search(r"\bsalePrice:\s*(\d+)", text)
-        self.assertIsNotNone(price_m, "landing-data.ts 缺少 price 常量（结构变更时同步更新本测试）")
-        self.assertIsNotNone(sale_m, "landing-data.ts 缺少 salePrice 常量（结构变更时同步更新本测试）")
-        self.assertEqual(int(price_m.group(1)), LICENSE_PRICE_USD)
-        self.assertEqual(int(sale_m.group(1)), LICENSE_SALE_PRICE_USD)
+        self.assertIsNone(
+            re.search(r"\b(price|salePrice):\s*\d", text),
+            "落地页已转开源免费口径，不应再内嵌付费价格字面量（结构变更时同步更新本测试）",
+        )
 
-    def test_sale_price_not_above_list_price(self) -> None:
+    def test_backend_price_config_invariants(self) -> None:
+        """计费功能保留：价格常量仍满足 0 < SALE ≤ PRICE（既有授权/企业服务在用）。"""
+        self.assertGreater(LICENSE_PRICE_USD, 0)
         self.assertLessEqual(LICENSE_SALE_PRICE_USD, LICENSE_PRICE_USD)
 
 
